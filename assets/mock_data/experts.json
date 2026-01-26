@@ -1,0 +1,185 @@
+[
+  {
+    "id": "1",
+    "name": "BS. Nguyễn Thị Mai",
+    "specialty": "Bác sĩ Cấp cứu",
+    "hospital": "Bệnh viện Nhiệt Đới TP.HCM",
+    "avatar": "https://via.placeholder.com/150?text=BSNTM",
+    "rating": 4.9,
+    "totalConsultations": 342,
+    "yearsExperience": 15,
+    "consultationFee": 200000,
+    "availability": [
+      {
+        "dayOfWeek": 1,
+        "slots": ["08:00", "09:00", "10:00", "14:00", "15:00", "16:00"]
+      },
+      {
+        "dayOfWeek": 2,
+        "slots": ["08:00", "09:00", "14:00", "15:00"]
+      },
+      {
+        "dayOfWeek": 3,
+        "slots": ["08:00", "09:00", "10:00", "14:00", "15:00", "16:00"]
+      },
+      {
+        "dayOfWeek": 5,
+        "slots": ["08:00", "09:00", "14:00", "15:00", "16:00"]
+      }
+    ],
+    "languages": ["Tiếng Việt", "English"],
+    "certifications": [
+      "Bác sĩ Đa khoa",
+      "Chuyên khoa Cấp cứu",
+      "Chứng chỉ điều trị ngộ độc"
+    ],
+    "bio": "Bác sĩ Nguyễn Thị Mai có 15 năm kinh nghiệm trong lĩnh vực cấp cứu và điều trị ngộ độc. Chuyên xử lý các ca ngộ độc rắn, bọ cạp và côn trùng độc.",
+    "isVerified": true,
+    "videoCallSupport": true,
+    "chatSupport": true
+  },
+  {
+    "id": "2",
+    "name": "TS. Trần Văn Hùng",
+    "specialty": "Chuyên gia Bò sát",
+    "hospital": "Viện Sinh học Nhiệt đới",
+    "avatar": "https://via.placeholder.com/150?text=TSTVH",
+    "rating": 4.8,
+    "totalConsultations": 198,
+    "yearsExperience": 20,
+    "consultationFee": 300000,
+    "availability": [
+      {
+        "dayOfWeek": 2,
+        "slots": ["09:00", "10:00", "11:00"]
+      },
+      {
+        "dayOfWeek": 4,
+        "slots": ["09:00", "10:00", "11:00", "14:00"]
+      },
+      {
+        "dayOfWeek": 6,
+        "slots": ["08:00", "09:00", "10:00"]
+      }
+    ],
+    "languages": ["Tiếng Việt", "English", "Français"],
+    "certifications": [
+      "Tiến sĩ Sinh học",
+      "Chuyên gia Rắn độc Đông Nam Á",
+      "Nhà nghiên cứu bò sát"
+    ],
+    "bio": "Tiến sĩ Trần Văn Hùng là chuyên gia hàng đầu về rắn độc Việt Nam với hơn 20 năm nghiên cứu. Tư vấn nhận diện, phòng tránh và xử lý khi bị cắn rắn.",
+    "isVerified": true,
+    "videoCallSupport": true,
+    "chatSupport": true
+  },
+  {
+    "id": "3",
+    "name": "BS. Lê Minh Phương",
+    "specialty": "Bác sĩ Hồi sức cấp cứu",
+    "hospital": "Bệnh viện Chợ Rẫy",
+    "avatar": "https://via.placeholder.com/150?text=BSLMP",
+    "rating": 4.7,
+    "totalConsultations": 267,
+    "yearsExperience": 12,
+    "consultationFee": 250000,
+    "availability": [
+      {
+        "dayOfWeek": 1,
+        "slots": ["14:00", "15:00", "16:00"]
+      },
+      {
+        "dayOfWeek": 3,
+        "slots": ["14:00", "15:00", "16:00", "17:00"]
+      },
+      {
+        "dayOfWeek": 5,
+        "slots": ["09:00", "10:00", "14:00", "15:00"]
+      }
+    ],
+    "languages": ["Tiếng Việt"],
+    "certifications": [
+      "Bác sĩ Hồi sức cấp cứu",
+      "Chuyên khoa Nội tổng hợp",
+      "Chứng chỉ xử trí cấp cứu"
+    ],
+    "bio": "Bác sĩ Lê Minh Phương chuyên điều trị các ca ngộ độc nặng tại khoa Hồi sức tích cực. Có kinh nghiệm xử lý biến chứng sau cắn rắn độc.",
+    "isVerified": true,
+    "videoCallSupport": true,
+    "chatSupport": false
+  },
+  {
+    "id": "4",
+    "name": "ThS. Phạm Thị Hoa",
+    "specialty": "Dược sĩ lâm sàng",
+    "hospital": "Bệnh viện Nhân Dân 115",
+    "avatar": "https://via.placeholder.com/150?text=PTHH",
+    "rating": 4.6,
+    "totalConsultations": 156,
+    "yearsExperience": 8,
+    "consultationFee": 150000,
+    "availability": [
+      {
+        "dayOfWeek": 2,
+        "slots": ["08:00", "09:00", "10:00", "14:00"]
+      },
+      {
+        "dayOfWeek": 4,
+        "slots": ["08:00", "09:00", "10:00"]
+      },
+      {
+        "dayOfWeek": 6,
+        "slots": ["08:00", "09:00"]
+      }
+    ],
+    "languages": ["Tiếng Việt", "English"],
+    "certifications": [
+      "Thạc sĩ Dược học",
+      "Dược sĩ lâm sàng",
+      "Tư vấn dùng thuốc an toàn"
+    ],
+    "bio": "Thạc sĩ Phạm Thị Hoa chuyên tư vấn về huyết thanh kháng nọc rắn, thuốc điều trị và phòng ngừa biến chứng sau cắn rắn.",
+    "isVerified": true,
+    "videoCallSupport": false,
+    "chatSupport": true
+  },
+  {
+    "id": "5",
+    "name": "BS. Võ Quốc Tuấn",
+    "specialty": "Bác sĩ Nội khoa",
+    "hospital": "Bệnh viện Thống Nhất",
+    "avatar": "https://via.placeholder.com/150?text=BSVQT",
+    "rating": 4.8,
+    "totalConsultations": 289,
+    "yearsExperience": 18,
+    "consultationFee": 220000,
+    "availability": [
+      {
+        "dayOfWeek": 1,
+        "slots": ["08:00", "09:00", "10:00"]
+      },
+      {
+        "dayOfWeek": 3,
+        "slots": ["08:00", "09:00", "10:00", "11:00"]
+      },
+      {
+        "dayOfWeek": 5,
+        "slots": ["14:00", "15:00", "16:00"]
+      },
+      {
+        "dayOfWeek": 6,
+        "slots": ["08:00", "09:00", "10:00"]
+      }
+    ],
+    "languages": ["Tiếng Việt", "English"],
+    "certifications": [
+      "Bác sĩ Nội khoa",
+      "Chuyên khoa Nội tiết",
+      "Điều trị biến chứng toàn thân"
+    ],
+    "bio": "Bác sĩ Võ Quốc Tuấn có kinh nghiệm điều trị các biến chứng nội khoa sau cắn rắn: suy thận, rối loạn đông máu, tổn thương gan.",
+    "isVerified": true,
+    "videoCallSupport": true,
+    "chatSupport": true
+  }
+]
