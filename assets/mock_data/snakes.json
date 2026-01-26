@@ -1,0 +1,121 @@
+[
+  {
+    "id": "1",
+    "name": "Rắn hổ mang chúa",
+    "scientificName": "Ophiophagus hannah",
+    "dangerLevel": "critical",
+    "imageUrl": "https://via.placeholder.com/300x200?text=King+Cobra",
+    "description": "Rắn hổ mang chúa là loài rắn độc lớn nhất thế giới, có thể dài tới 5.5m. Độc tính cực mạnh, tấn công nhanh và hung dữ khi bị đe dọa.",
+    "habitat": "Rừng nhiệt đới, vùng núi đá vôi",
+    "distribution": "Việt Nam, Đông Nam Á, Ấn Độ",
+    "symptoms": [
+      "Đau dữ dội tại vết cắn",
+      "Sưng nề nhanh chóng",
+      "Tê liệt cơ hô hấp",
+      "Rối loạn thị giác",
+      "Khó thở, ngưng thở"
+    ],
+    "firstAid": [
+      "Giữ bình tĩnh, nằm yên",
+      "Cố định vết thương thấp hơn tim",
+      "Gọi cấp cứu ngay (115)",
+      "KHÔNG rạch da, hút độc",
+      "KHÔNG băng ép chặt"
+    ]
+  },
+  {
+    "id": "2",
+    "name": "Rắn lục đuôi đỏ",
+    "scientificName": "Trimeresurus albolabris",
+    "dangerLevel": "major",
+    "imageUrl": "https://via.placeholder.com/300x200?text=Green+Pit+Viper",
+    "description": "Rắn lục đuôi đỏ có màu xanh lá cây, dài 60-90cm. Sống trên cây, thường cắn vào tay hoặc chân khi người dân hái rau, chặt cây.",
+    "habitat": "Rừng nhiệt đới, vườn cây ăn trái",
+    "distribution": "Khắp Việt Nam, Đông Nam Á",
+    "symptoms": [
+      "Đau và sưng tại chỗ",
+      "Chảy máu khó cầm",
+      "Xuất huyết dưới da",
+      "Chóng mặt, buồn nôn",
+      "Hạ huyết áp"
+    ],
+    "firstAid": [
+      "Nằm nghỉ, không vận động",
+      "Rửa vết thương bằng nước sạch",
+      "Cố định chi bị cắn",
+      "Đi bệnh viện ngay",
+      "Ghi nhớ màu sắc con rắn"
+    ]
+  },
+  {
+    "id": "3",
+    "name": "Rắn hổ đất",
+    "scientificName": "Bungarus fasciatus",
+    "dangerLevel": "major",
+    "imageUrl": "https://via.placeholder.com/300x200?text=Banded+Krait",
+    "description": "Rắn hổ đất có vằn đen vàng, dài 1-1.5m. Hoạt động về đêm, thường vào nhà tìm thức ăn. Độc tính mạnh, gây tê liệt.",
+    "habitat": "Đồng ruộng, vườn nhà, khu dân cư",
+    "distribution": "Nam Bộ, Trung Bộ Việt Nam",
+    "symptoms": [
+      "Ban đầu ít đau (nguy hiểm)",
+      "Tê bì vùng cắn",
+      "Mệt mỏi, chóng mặt",
+      "Khó nuốt, nói khó",
+      "Tê liệt cơ hô hấp sau 4-6h"
+    ],
+    "firstAid": [
+      "Gọi cấp cứu NGAY (115)",
+      "Nằm yên, không cử động",
+      "Theo dõi hô hấp liên tục",
+      "Sẵn sàng hô hấp nhân tạo",
+      "ĐƯA ĐẾN BỆNH VIỆN GẤP"
+    ]
+  },
+  {
+    "id": "4",
+    "name": "Rắn ráo trâu",
+    "scientificName": "Ptyas korros",
+    "dangerLevel": "minor",
+    "imageUrl": "https://via.placeholder.com/300x200?text=Rat+Snake",
+    "description": "Rắn ráo trâu không độc, màu nâu đen, dài 1.5-2m. Thường bắt gặp ở đồng ruộng, ăn chuột. Có thể cắn phản ứng khi bị tấn công.",
+    "habitat": "Đồng ruộng, vườn cây, khu dân cư",
+    "distribution": "Khắp Việt Nam",
+    "symptoms": [
+      "Vết thương cắn nông",
+      "Chảy máu nhẹ",
+      "Không triệu chứng ngộ độc",
+      "Có thể nhiễm trùng vết thương"
+    ],
+    "firstAid": [
+      "Rửa vết thương bằng xà phòng",
+      "Sát trùng bằng cồn/betadine",
+      "Băng bó sạch",
+      "Tiêm phòng uốn ván nếu cần",
+      "Theo dõi nhiễm trùng"
+    ]
+  },
+  {
+    "id": "5",
+    "name": "Rắn nước cổ đỏ",
+    "scientificName": "Rhabdophis subminiatus",
+    "dangerLevel": "moderate",
+    "imageUrl": "https://via.placeholder.com/300x200?text=Red+Neck+Keelback",
+    "description": "Rắn nước cổ đỏ có màu xanh, vùng cổ đỏ cam, dài 60-80cm. Sống gần ao, mương nước. Độc nhẹ nhưng có thể gây rối loạn đông máu.",
+    "habitat": "Ao, mương, ruộng lúa",
+    "distribution": "Khắp Việt Nam, Đông Á",
+    "symptoms": [
+      "Đau nhẹ tại vết cắn",
+      "Sưng nhẹ",
+      "Chảy máu kéo dài",
+      "Xuất huyết dưới da (hiếm)",
+      "Buồn nôn"
+    ],
+    "firstAid": [
+      "Rửa sạch vết thương",
+      "Cầm máu nhẹ nhàng",
+      "Đến trạm y tế kiểm tra",
+      "Theo dõi triệu chứng",
+      "Uống nhiều nước"
+    ]
+  }
+]

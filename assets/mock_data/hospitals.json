@@ -1,0 +1,102 @@
+[
+  {
+    "id": "1",
+    "name": "Bệnh viện Chợ Rẫy",
+    "address": "201B Nguyễn Chí Thanh, Quận 5, TP.HCM",
+    "phone": "028 3855 4137",
+    "emergencyPhone": "028 3855 4269",
+    "hasAntivenom": true,
+    "latitude": 10.7546,
+    "longitude": 106.6658,
+    "rating": 4.6,
+    "totalReviews": 1234,
+    "distance": 3.2,
+    "openingHours": "24/7",
+    "specialties": [
+      "Cấp cứu nội khoa",
+      "Hồi sức tích cực",
+      "Điều trị ngộ độc"
+    ],
+    "imageUrl": "https://via.placeholder.com/400x200?text=Benh+vien+Cho+Ray"
+  },
+  {
+    "id": "2",
+    "name": "Bệnh viện Nhân Dân 115",
+    "address": "527 Sư Vạn Hạnh, Quận 10, TP.HCM",
+    "phone": "028 3865 4269",
+    "emergencyPhone": "115",
+    "hasAntivenom": true,
+    "latitude": 10.7708,
+    "longitude": 106.6656,
+    "rating": 4.5,
+    "totalReviews": 987,
+    "distance": 4.1,
+    "openingHours": "24/7",
+    "specialties": [
+      "Cấp cứu đa khoa",
+      "Trung tâm chống độc",
+      "Hồi sức cấp cứu"
+    ],
+    "imageUrl": "https://via.placeholder.com/400x200?text=BV+Nhan+Dan+115"
+  },
+  {
+    "id": "3",
+    "name": "Bệnh viện Nhiệt Đới TP.HCM",
+    "address": "764 Võ Văn Kiệt, Quận 1, TP.HCM",
+    "phone": "028 3923 7881",
+    "emergencyPhone": "028 3923 7999",
+    "hasAntivenom": true,
+    "latitude": 10.7626,
+    "longitude": 106.6812,
+    "rating": 4.7,
+    "totalReviews": 765,
+    "distance": 2.8,
+    "openingHours": "24/7",
+    "specialties": [
+      "Bệnh nhiệt đới",
+      "Ngộ độc rắn",
+      "Điều trị huyết thanh kháng nọc"
+    ],
+    "imageUrl": "https://via.placeholder.com/400x200?text=BV+Nhiet+Doi"
+  },
+  {
+    "id": "4",
+    "name": "Bệnh viện Đại học Y Dược TP.HCM",
+    "address": "215 Hồng Bàng, Quận 5, TP.HCM",
+    "phone": "028 3855 2222",
+    "emergencyPhone": "028 3855 4000",
+    "hasAntivenom": false,
+    "latitude": 10.7541,
+    "longitude": 106.6664,
+    "rating": 4.3,
+    "totalReviews": 543,
+    "distance": 5.6,
+    "openingHours": "24/7",
+    "specialties": [
+      "Đa khoa",
+      "Nội tổng hợp",
+      "Cấp cứu"
+    ],
+    "imageUrl": "https://via.placeholder.com/400x200?text=BV+DH+Y+Duoc"
+  },
+  {
+    "id": "5",
+    "name": "Bệnh viện Thống Nhất",
+    "address": "1 Lý Thường Kiệt, Quận Tân Bình, TP.HCM",
+    "phone": "028 3842 4093",
+    "emergencyPhone": "028 3842 5555",
+    "hasAntivenom": true,
+    "latitude": 10.7991,
+    "longitude": 106.6528,
+    "rating": 4.4,
+    "totalReviews": 876,
+    "distance": 6.2,
+    "openingHours": "24/7",
+    "specialties": [
+      "Cấp cứu",
+      "Hồi sức tích cực",
+      "Nội khoa"
+    ],
+    "imageUrl": "https://via.placeholder.com/400x200?text=BV+Thong+Nhat"
+  }
+]

@@ -1,0 +1,131 @@
+[
+  {
+    "id": "1",
+    "title": "Sơ cứu khi bị rắn cắn",
+    "description": "Các bước cơ bản để sơ cứu khi bị rắn độc cắn",
+    "estimatedTime": 10,
+    "steps": [
+      {
+        "stepNumber": 1,
+        "title": "Giữ bình tĩnh và di chuyển ra xa",
+        "description": "Di chuyển ra xa con rắn để tránh bị cắn thêm lần nữa. Giữ bình tĩnh vì hoảng loạn sẽ làm tim đập nhanh, làm nọc độc lan nhanh hơn.",
+        "warning": "KHÔNG cố gắng bắt hoặc giết con rắn",
+        "imageUrl": "https://via.placeholder.com/400x200?text=Step+1",
+        "duration": 60
+      },
+      {
+        "stepNumber": 2,
+        "title": "Gọi cấp cứu ngay lập tức",
+        "description": "Gọi số cấp cứu 115 hoặc yêu cầu người xung quanh gọi giúp. Nếu có thể, chụp ảnh con rắn (từ xa) để bác sĩ nhận diện.",
+        "warning": "KHÔNG trì hoãn việc gọi cấp cứu",
+        "imageUrl": "https://via.placeholder.com/400x200?text=Step+2",
+        "duration": 120
+      },
+      {
+        "stepNumber": 3,
+        "title": "Nằm yên và giữ vết thương thấp hơn tim",
+        "description": "Nằm xuống hoặc ngồi yên. Giữ vết thương ở vị trí thấp hơn tim để làm chậm sự lan rộng của nọc độc. Tháo bỏ nhẫn, vòng tay nếu có.",
+        "warning": "KHÔNG vận động mạnh",
+        "imageUrl": "https://via.placeholder.com/400x200?text=Step+3",
+        "duration": 180
+      },
+      {
+        "stepNumber": 4,
+        "title": "Rửa nhẹ vết thương",
+        "description": "Dùng nước sạch rửa nhẹ nhàng vùng vết cắn. Không cần dùng xà phòng hoặc chất tẩy rửa mạnh.",
+        "warning": "KHÔNG rạch da hoặc hút nọc độc",
+        "imageUrl": "https://via.placeholder.com/400x200?text=Step+4",
+        "duration": 120
+      },
+      {
+        "stepNumber": 5,
+        "title": "Cố định vùng bị cắn",
+        "description": "Nếu bị cắn ở tay chân, dùng vật cứng (gỗ, thước) và vải băng để cố định nhẹ nhàng, tránh di chuyển. Băng không được quá chặt.",
+        "warning": "KHÔNG băng ép quá chặt làm tắc máu",
+        "imageUrl": "https://via.placeholder.com/400x200?text=Step+5",
+        "duration": 180
+      },
+      {
+        "stepNumber": 6,
+        "title": "Theo dõi triệu chứng",
+        "description": "Theo dõi các dấu hiệu: đau, sưng, tê bì, khó thở, chóng mặt. Ghi nhớ thời gian bị cắn và màu sắc con rắn để thông báo bác sĩ.",
+        "warning": "KHÔNG uống rượu hoặc thuốc giảm đau tự ý",
+        "imageUrl": "https://via.placeholder.com/400x200?text=Step+6",
+        "duration": 300
+      }
+    ],
+    "warnings": [
+      "TUYỆT ĐỐI KHÔNG rạch da, hút nọc độc",
+      "KHÔNG băng ép quá chặt gây tắc máu",
+      "KHÔNG uống rượu hoặc dùng thuốc giảm đau",
+      "KHÔNG chườm đá lạnh trực tiếp lên vết thương",
+      "KHÔNG cố gắng bắt hoặc tiếp cận con rắn"
+    ],
+    "urgentActions": [
+      "Gọi 115 ngay lập tức",
+      "Di chuyển nạn nhân đến bệnh viện gần nhất có huyết thanh kháng nọc rắn",
+      "Nếu ngưng thở: Thực hiện hô hấp nhân tạo",
+      "Nếu mất ý thức: Đặt nạn nhân nằm nghiêng"
+    ]
+  },
+  {
+    "id": "2",
+    "title": "Xử trí khẩn cấp cho trẻ em bị rắn cắn",
+    "description": "Sơ cứu đặc biệt khi trẻ em bị rắn cắn",
+    "estimatedTime": 8,
+    "steps": [
+      {
+        "stepNumber": 1,
+        "title": "An ủi và giữ trẻ bình tĩnh",
+        "description": "Trẻ em thường hoảng sợ khi bị rắn cắn. Ôm trẻ, nói chuyện nhẹ nhàng để giúp trẻ bình tĩnh. Sự hoảng loạn làm tim đập nhanh, nọc độc lan nhanh.",
+        "warning": "KHÔNG la mắng hoặc làm trẻ thêm sợ hãi",
+        "imageUrl": "https://via.placeholder.com/400x200?text=Child+Step+1",
+        "duration": 90
+      },
+      {
+        "stepNumber": 2,
+        "title": "Gọi cấp cứu và thông báo trẻ em",
+        "description": "Gọi 115 ngay. Thông báo rõ là trẻ em bị cắn vì trẻ cần liều huyết thanh khác người lớn. Nêu tuổi và cân nặng của trẻ nếu biết.",
+        "warning": "Trẻ em nhạy cảm với nọc độc hơn người lớn",
+        "imageUrl": "https://via.placeholder.com/400x200?text=Child+Step+2",
+        "duration": 120
+      },
+      {
+        "stepNumber": 3,
+        "title": "Cho trẻ nằm yên",
+        "description": "Đặt trẻ nằm xuống, giữ vết thương thấp hơn tim. Tháo giày, vớ, quần áo chật nếu vết cắn ở chân tay. Không cho trẻ đi lại.",
+        "warning": "KHÔNG để trẻ chạy nhảy",
+        "imageUrl": "https://via.placeholder.com/400x200?text=Child+Step+3",
+        "duration": 120
+      },
+      {
+        "stepNumber": 4,
+        "title": "Rửa vết thương nhẹ nhàng",
+        "description": "Dùng nước sạch rửa nhẹ vết cắn. Lau khô bằng khăn sạch. Không cọ xát mạnh.",
+        "warning": "KHÔNG dùng cồn hoặc thuốc sát trùng gây đau",
+        "imageUrl": "https://via.placeholder.com/400x200?text=Child+Step+4",
+        "duration": 90
+      },
+      {
+        "stepNumber": 5,
+        "title": "Theo dõi triệu chứng chặt chẽ",
+        "description": "Kiểm tra: Trẻ có thở khó không? Da có xanh tím không? Trẻ có buồn nôn/nôn không? Có sưng nhanh không? Ghi nhớ thời gian để báo bác sĩ.",
+        "warning": "Triệu chứng ở trẻ tiến triển NHANH hơn người lớn",
+        "imageUrl": "https://via.placeholder.com/400x200?text=Child+Step+5",
+        "duration": 300
+      }
+    ],
+    "warnings": [
+      "Trẻ em dễ bị ngộ độc nặng hơn người lớn",
+      "KHÔNG cho trẻ uống hoặc ăn gì",
+      "KHÔNG để trẻ ngủ trong khi chờ cấp cứu",
+      "KHÔNG áp dụng phương pháp dân gian"
+    ],
+    "urgentActions": [
+      "Gọi 115 ưu tiên cao nhất",
+      "Nếu trẻ ngừng thở: Hô hấp nhân tạo cho trẻ em",
+      "Đưa đến bệnh viện nhi hoặc bệnh viện có khoa nhi",
+      "Mang theo thông tin: tuổi, cân nặng, tiền sử bệnh của trẻ"
+    ]
+  }
+]
