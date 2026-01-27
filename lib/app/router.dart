@@ -20,6 +20,7 @@ import 'package:snakeaid_mobile/features/auth/screens/forgot_password_screen.dar
 import 'package:snakeaid_mobile/features/auth/screens/forgot_password_otp_screen.dart';
 import 'package:snakeaid_mobile/features/auth/screens/reset_password_screen.dart';
 import 'package:snakeaid_mobile/features/auth/screens/password_reset_success_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_alert_screen.dart';
 
 /// App routing configuration using go_router
 final router = GoRouter(
@@ -166,6 +167,13 @@ final router = GoRouter(
       path: '/member-home',
       name: 'member_home',
       builder: (context, state) => const MainScaffold(initialIndex: 0),
+    ),
+    
+    // === EMERGENCY ROUTES ===
+    GoRoute(
+      path: '/emergency-alert',
+      name: 'emergency_alert',
+      builder: (context, state) => const EmergencyAlertScreen(),
     ),
     
     // === SHARED/UTILS ROUTES ===

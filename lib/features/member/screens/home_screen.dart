@@ -264,12 +264,7 @@ class MemberHomeScreen extends StatelessWidget {
             label: 'XEM CHI TIẾT',
             onPressed: () {
               Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const EmergencyAlertScreen(),
-                ),
-              );
+              context.goNamed('emergency_alert');
             },
             backgroundColor: const Color(0xFF228B22),
             icon: Icons.arrow_forward,
