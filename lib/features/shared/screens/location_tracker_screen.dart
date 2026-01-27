@@ -56,8 +56,9 @@ class _LocationTrackerScreenState extends ConsumerState<LocationTrackerScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
           // Connection Controls
           Card(
             margin: const EdgeInsets.all(AppTheme.spacingSmall),
@@ -410,7 +411,8 @@ class _LocationTrackerScreenState extends ConsumerState<LocationTrackerScreen> {
           ),
 
           // Location Distance Tracking
-          Expanded(
+          SizedBox(
+            height: 500, // Fixed height for scrollable content
             child: locationUpdatesAsync.when(
               data: (locations) => _isMapView
                   ? _buildMapView(locations, userInfo.userId)
@@ -505,7 +507,10 @@ class _LocationTrackerScreenState extends ConsumerState<LocationTrackerScreen> {
             loading: () => const SizedBox(),
             error: (_, __) => const SizedBox(),
           ),
+          // Add bottom padding for scroll
+          const SizedBox(height: 20),
         ],
+      ),
       ),
     );
   }

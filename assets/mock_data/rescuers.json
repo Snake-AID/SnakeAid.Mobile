@@ -1,0 +1,121 @@
+[
+  {
+    "id": "1",
+    "name": "Nguyễn Văn An",
+    "phone": "0901234567",
+    "avatar": "https://via.placeholder.com/150?text=NVA",
+    "rating": 4.8,
+    "totalRescues": 156,
+    "yearsExperience": 8,
+    "latitude": 10.7756,
+    "longitude": 106.7019,
+    "distance": 1.2,
+    "status": "available",
+    "specialties": [
+      "Bắt rắn hổ mang",
+      "Rắn lục đuôi đỏ",
+      "Cứu hộ khẩn cấp"
+    ],
+    "certifications": [
+      "Chứng chỉ bắt rắn độc cấp A",
+      "Sơ cứu khẩn cấp"
+    ],
+    "isVerified": true,
+    "responseTime": "5-10 phút"
+  },
+  {
+    "id": "2",
+    "name": "Trần Minh Tuấn",
+    "phone": "0912345678",
+    "avatar": "https://via.placeholder.com/150?text=TMT",
+    "rating": 4.9,
+    "totalRescues": 203,
+    "yearsExperience": 12,
+    "latitude": 10.7625,
+    "longitude": 106.6825,
+    "distance": 2.3,
+    "status": "busy",
+    "specialties": [
+      "Rắn hổ đất",
+      "Rắn cạp nong",
+      "Rắn trong nhà"
+    ],
+    "certifications": [
+      "Chứng chỉ bắt rắn độc cấp A",
+      "Huấn luyện viên an toàn"
+    ],
+    "isVerified": true,
+    "responseTime": "10-15 phút"
+  },
+  {
+    "id": "3",
+    "name": "Lê Hoàng Long",
+    "phone": "0923456789",
+    "avatar": "https://via.placeholder.com/150?text=LHL",
+    "rating": 4.7,
+    "totalRescues": 98,
+    "yearsExperience": 5,
+    "latitude": 10.7890,
+    "longitude": 106.6980,
+    "distance": 3.5,
+    "status": "available",
+    "specialties": [
+      "Rắn lục đuôi đỏ",
+      "Rắn ráo trâu",
+      "Cứu hộ ban đêm"
+    ],
+    "certifications": [
+      "Chứng chỉ bắt rắn cấp B"
+    ],
+    "isVerified": true,
+    "responseTime": "10-20 phút"
+  },
+  {
+    "id": "4",
+    "name": "Phạm Đức Thắng",
+    "phone": "0934567890",
+    "avatar": "https://via.placeholder.com/150?text=PDT",
+    "rating": 4.6,
+    "totalReviews": 67,
+    "yearsExperience": 4,
+    "latitude": 10.7456,
+    "longitude": 106.7123,
+    "distance": 4.2,
+    "status": "offline",
+    "specialties": [
+      "Rắn nước",
+      "Rắn cạp nia",
+      "Cứu hộ vườn nhà"
+    ],
+    "certifications": [
+      "Chứng chỉ bắt rắn cấp B"
+    ],
+    "isVerified": false,
+    "responseTime": "15-30 phút"
+  },
+  {
+    "id": "5",
+    "name": "Võ Minh Quân",
+    "phone": "0945678901",
+    "avatar": "https://via.placeholder.com/150?text=VMQ",
+    "rating": 4.9,
+    "totalRescues": 178,
+    "yearsExperience": 10,
+    "latitude": 10.7689,
+    "longitude": 106.6755,
+    "distance": 1.8,
+    "status": "available",
+    "specialties": [
+      "Rắn hổ mang chúa",
+      "Rắn rồng",
+      "Cứu hộ nguy hiểm cao"
+    ],
+    "certifications": [
+      "Chứng chỉ bắt rắn độc cấp A",
+      "Sơ cứu nâng cao",
+      "An toàn lao động"
+    ],
+    "isVerified": true,
+    "responseTime": "5-10 phút"
+  }
+]
