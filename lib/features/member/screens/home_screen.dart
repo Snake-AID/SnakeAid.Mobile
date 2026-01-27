@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/sos_button.dart';
 import '../widgets/quick_action_buttons.dart';
+import '../../emergency/screens/members/emergency_alert_screen.dart';
 import '../widgets/quick_action_cards.dart';
 import '../widgets/secondary_menu_grid.dart';
 import '../widgets/notification_bar.dart';
 import '../widgets/education_section.dart';
+import '../../shared/widgets/custom_dialog.dart';
 
 /// Member Home Screen - Entry point with emergency-first design
 /// This is a content-only widget, Scaffold is provided by MainScaffold
@@ -225,56 +227,78 @@ class MemberHomeScreen extends StatelessWidget {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.emergency, color: Color(0xFFDC3545), size: 32),
-            SizedBox(width: 12),
-            Text('SOS Đã Kích Hoạt!'),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Đang gửi cảnh báo khẩn cấp...',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      builder: (context) => CustomDialog(
+        icon: Icons.emergency,
+        iconBackgroundColor: const Color(0xFFFFEBEE),
+        iconColor: const Color(0xFFDC3545),
+        title: 'SOS Đã Kích Hoạt!',
+        description: 'Đang gửi cảnh báo khẩn cấp và tìm kiếm hỗ trợ gần bạn...',
+        extraContent: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8F8F6),
+              borderRadius: BorderRadius.circular(12),
             ),
-            SizedBox(height: 12),
-            Text('• Đang xác định vị trí của bạn'),
-            Text('• Đang tìm kiếm cứu hộ gần nhất'),
-            Text('• Đang thông báo cho liên hệ khẩn cấp'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'HỦY SOS',
-              style: TextStyle(
-                color: Color(0xFFDC3545),
-                fontWeight: FontWeight.bold,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildStatusItem(Icons.location_on, 'Đang xác định vị trí của bạn'),
+                const SizedBox(height: 8),
+                _buildStatusItem(Icons.local_hospital, 'Đang tìm kiếm cứu hộ gần nhất'),
+                const SizedBox(height: 8),
+                _buildStatusItem(Icons.contact_phone, 'Đang thông báo cho liên hệ khẩn cấp'),
+              ],
             ),
           ),
-          ElevatedButton(
+        ],
+        actions: [
+          DialogAction(
+            label: 'HỦY SOS',
+            onPressed: () => Navigator.pop(context),
+            isOutlined: true,
+            textColor: const Color(0xFFDC3545),
+            borderColor: const Color(0xFFDC3545),
+          ),
+          DialogAction(
+            label: 'XEM CHI TIẾT',
             onPressed: () {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Cứu hộ đang trên đường đến!'),
-                  backgroundColor: Color(0xFF228B22),
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const EmergencyAlertScreen(),
                 ),
               );
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF228B22),
-            ),
-            child: const Text('XEM CHI TIẾT'),
+            backgroundColor: const Color(0xFF228B22),
+            icon: Icons.arrow_forward,
+            flex: 2,
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildStatusItem(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 16,
+          color: const Color(0xFF228B22),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF666666),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
