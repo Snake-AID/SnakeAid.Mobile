@@ -76,7 +76,13 @@ class _ExpertRegistrationScreenState extends State<ExpertRegistrationScreen> {
         shadowColor: Colors.black.withOpacity(0.1),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF333333)),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed('expert_login');
+            }
+          },
         ),
         title: const Text(
           'Đăng Ký Chuyên Gia',
@@ -102,14 +108,14 @@ class _ExpertRegistrationScreenState extends State<ExpertRegistrationScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
+                    color: const Color(0xFFF3E8FF),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
                       const Icon(
                         Icons.info_outline,
-                        color: Color(0xFF228B22),
+                        color: Color(0xFF9333EA),
                         size: 20,
                       ),
                       const SizedBox(width: 12),
@@ -289,13 +295,13 @@ class _ExpertRegistrationScreenState extends State<ExpertRegistrationScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _handleContinue,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF228B22),
+                      backgroundColor: const Color(0xFF9333EA),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                       elevation: 0,
-                      disabledBackgroundColor: const Color(0xFF228B22).withOpacity(0.5),
+                      disabledBackgroundColor: const Color(0xFF9333EA).withOpacity(0.5),
                     ),
                     child: _isLoading
                         ? const SizedBox(
@@ -336,7 +342,7 @@ class _ExpertRegistrationScreenState extends State<ExpertRegistrationScreen> {
                         'Đăng Nhập',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Color(0xFF228B22),
+                          color: Color(0xFF9333EA),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -411,7 +417,7 @@ class _ExpertRegistrationScreenState extends State<ExpertRegistrationScreen> {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(
-                color: Color(0xFF228B22),
+                color: Color(0xFF9333EA),
                 width: 1,
               ),
             ),
@@ -499,7 +505,7 @@ class _ExpertRegistrationScreenState extends State<ExpertRegistrationScreen> {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(
-                color: Color(0xFF228B22),
+                color: Color(0xFF9333EA),
                 width: 1,
               ),
             ),

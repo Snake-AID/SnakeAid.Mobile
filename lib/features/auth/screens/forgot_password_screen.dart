@@ -66,7 +66,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF333333)),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed(widget.roleRoute);
+            }
+          },
         ),
         title: const Text(
           'Quên Mật Khẩu',
@@ -251,7 +257,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
                 // Back to Login Link
                 GestureDetector(
-                  onTap: () => context.pop(),
+                  onTap: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.goNamed(widget.roleRoute);
+                    }
+                  },
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

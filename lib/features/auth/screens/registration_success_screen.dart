@@ -6,10 +6,14 @@ import 'package:go_router/go_router.dart';
 /// Màn hình đăng ký thành công với hiệu ứng confetti
 class RegistrationSuccessScreen extends StatefulWidget {
   final String email;
+  final String roleRoute; // Which login screen to return to
+  final Color themeColor; // Role-specific color
 
   const RegistrationSuccessScreen({
     super.key,
     required this.email,
+    required this.roleRoute,
+    required this.themeColor,
   });
 
   @override
@@ -65,7 +69,7 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen>
                         width: 128,
                         height: 128,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF228B22).withOpacity(0.2),
+                          color: widget.themeColor.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(64),
                         ),
                         child: Center(
@@ -73,7 +77,7 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen>
                             width: 120,
                             height: 120,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF228B22),
+                              color: widget.themeColor,
                               borderRadius: BorderRadius.circular(60),
                             ),
                             child: const Icon(
@@ -98,7 +102,7 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen>
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF228B22),
+                          color: Color(0xFF333333),
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -182,12 +186,10 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen>
                         height: 56,
                         child: ElevatedButton(
                           onPressed: () {
-                            // TODO: Navigate to home screen
-                            // For now, go back to role selection
-                            context.goNamed('role_selection');
+                            context.goNamed(widget.roleRoute);
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF228B22),
+                            backgroundColor: widget.themeColor,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
@@ -226,9 +228,9 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen>
                             );
                           },
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF228B22),
-                            side: const BorderSide(
-                              color: Color(0xFF228B22),
+                            foregroundColor: widget.themeColor,
+                            side: BorderSide(
+                              color: widget.themeColor,
                               width: 1,
                             ),
                             shape: RoundedRectangleBorder(

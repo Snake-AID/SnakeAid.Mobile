@@ -7,10 +7,14 @@ import 'package:go_router/go_router.dart';
 /// Màn hình xác thực mã OTP
 class OtpVerificationScreen extends StatefulWidget {
   final String email;
+  final String roleRoute;
+  final Color themeColor;
   
   const OtpVerificationScreen({
     super.key,
     required this.email,
+    required this.roleRoute,
+    required this.themeColor,
   });
 
   @override
@@ -113,7 +117,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       // Navigate to success screen
       context.goNamed(
         'registration_success',
-        extra: widget.email,
+        extra: {
+          'email': widget.email,
+          'roleRoute': widget.roleRoute,
+          'themeColor': widget.themeColor,
+        },
       );
     }
   }
@@ -125,9 +133,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
     // TODO: Implement resend OTP API call
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Mã OTP mới đã được gửi!'),
-        backgroundColor: Color(0xFF228B22),
+      SnackBar(
+        content: const Text('Mã OTP mới đã được gửi!'),
+        backgroundColor: widget.themeColor,
       ),
     );
 
@@ -158,7 +166,14 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF333333)),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              // Fallback to role_selection if can't determine role
+              context.goNamed('role_selection');
+            }
+          },
         ),
         title: const Text(
           'Xác Thực OTP',
@@ -184,13 +199,13 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                       width: 80,
                       height: 80,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF228B22).withOpacity(0.2),
+                        color: widget.themeColor.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(40),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.mail_outline,
                         size: 48,
-                        color: Color(0xFF228B22),
+                        color: widget.themeColor,
                       ),
                     ),
                     const SizedBox(height: 32),
@@ -274,8 +289,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                                   ),
                                   focusedBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8),
-                                    borderSide: const BorderSide(
-                                      color: Color(0xFF228B22),
+                                    borderSide: BorderSide(
+                                      color: widget.themeColor,
                                       width: 2,
                                     ),
                                   ),
@@ -326,7 +341,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                     child: ElevatedButton(
                       onPressed: _isVerifying ? null : _verifyOtp,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF228B22),
+                        backgroundColor: widget.themeColor,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -373,7 +388,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                             fontWeight: FontWeight.w600,
                             color: _secondsRemaining > 0
                                 ? const Color(0xFF666666)
-                                : const Color(0xFF228B22),
+                                : widget.themeColor,
                           ),
                         ),
                       ),

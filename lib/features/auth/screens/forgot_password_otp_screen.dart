@@ -138,7 +138,13 @@ class _ForgotPasswordOtpScreenState extends State<ForgotPasswordOtpScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF333333)),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed(widget.roleRoute);
+            }
+          },
         ),
         title: const Text(
           'Xác Thực OTP',

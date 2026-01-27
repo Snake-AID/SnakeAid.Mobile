@@ -55,6 +55,20 @@ class _ExpertLoginScreenState extends State<ExpertLoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8F6),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF6F8F6),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF333333)),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed('role_selection');
+            }
+          },
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -344,7 +358,7 @@ class _ExpertLoginScreenState extends State<ExpertLoginScreen> {
                                   'forgot_password',
                                   extra: {
                                     'themeColor': primaryColor,
-                                    'roleRoute': '/expert-login',
+                                    'roleRoute': 'expert_login',
                                   },
                                 );
                               },

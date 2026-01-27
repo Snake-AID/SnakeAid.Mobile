@@ -110,7 +110,14 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF333333)),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              // Fallback to role_selection if can't determine role
+              context.goNamed('role_selection');
+            }
+          },
         ),
         title: const Text(
           'Đặt Lại Mật Khẩu',
