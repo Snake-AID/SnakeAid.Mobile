@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:snakeaid_mobile/features/emergency/screens/members/snake_confirmation_screen.dart';
-import 'package:snakeaid_mobile/features/emergency/screens/members/generic_first_aid_screen.dart';
+import 'snake_confirmation_screen.dart';
+import 'symptom_report_screen.dart';
+import 'generic_first_aid_screen.dart';
 
+/// Snake Filtered Results Screen - Shows filtered snake results based on questionnaire answers
 class SnakeFilteredResultsScreen extends StatelessWidget {
   final Map<int, String> answers;
 
@@ -12,369 +14,276 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // In the future, use answers to filter the snake list
-    // For now, showing static results
-
-    final snakes = [
-      {
-        'name': 'King Cobra',
-        'nameVi': 'Rắn Hổ Mang Chúa',
-        'isPoisonous': true,
-        'confidence': 95,
-        'imageUrl':
-            'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/Ophiophagus_hannah_2.jpg/800px-Ophiophagus_hannah_2.jpg',
-      },
-      {
-        'name': 'Rat Snake',
-        'nameVi': 'Rắn Nhà',
-        'isPoisonous': false,
-        'confidence': 85,
-        'imageUrl':
-            'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Rat_snake.jpg/800px-Rat_snake.jpg',
-      },
-      {
-        'name': 'White-lipped Pit Viper',
-        'nameVi': 'Rắn Lục Đuôi Đỏ',
-        'isPoisonous': true,
-        'confidence': 78,
-        'imageUrl':
-            'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/Trimeresurus_albolabris_McM.jpg/800px-Trimeresurus_albolabris_McM.jpg',
-      },
-      {
-        'name': 'Banded Krait',
-        'nameVi': 'Rắn Cạp Nia',
-        'isPoisonous': true,
-        'confidence': 72,
-        'imageUrl':
-            'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Bungarus_fasciatus.jpg/800px-Bungarus_fasciatus.jpg',
-      },
-    ];
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8F8F6),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF6F8F6),
+        surfaceTintColor: const Color(0xFFF6F8F6),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF333333)),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Kết quả tìm kiếm',
+          'Rắn thường gặp ở khu vực bạn',
           style: TextStyle(
-            color: Colors.black,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF333333),
           ),
         ),
-        centerTitle: true,
+        centerTitle: false,
+        actions: [
+          // Location Badge
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFFE0E0E0),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.location_on,
+                  color: Color(0xFFDC3545),
+                  size: 16,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Quận 1, TP.HCM',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[800],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [
-          // Info banner
+          // Info Banner (Blue - Based on answers)
           Container(
-            width: double.infinity,
+            margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             padding: const EdgeInsets.all(16),
-            color: Colors.blue[50],
+            decoration: BoxDecoration(
+              color: const Color(0xFFE3F2FD),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFFBBDEFB),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.blue.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
+                const Icon(
                   Icons.info_outline,
-                  color: Colors.blue[700],
-                  size: 20,
+                  color: Color(0xFF1976D2),
+                  size: 24,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    'Dựa trên câu trả lời của bạn, hãy chọn loài rắn phù hợp nhất',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.blue[900],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Warning banner
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            color: Colors.yellow[50],
-            child: Row(
-              children: [
-                Icon(
-                  Icons.lightbulb_outline,
-                  color: Colors.orange[700],
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '💡 Lưu ý: Chọn con GIỐNG NHẤT với những gì bạn quan sát được',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.orange[900],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Location badge
-          Container(
-            padding: const EdgeInsets.all(16),
-            alignment: Alignment.centerLeft,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.location_on,
-                    size: 16,
-                    color: Colors.red[600],
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Quận 1, TP.HCM',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey[800],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Snake grid
-          Expanded(
-            child: GridView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.75,
-              ),
-              itemCount: snakes.length,
-              itemBuilder: (context, index) {
-                final snake = snakes[index];
-                final isPoisonous = snake['isPoisonous'] as bool;
-                final confidence = snake['confidence'] as int;
-
-                Color confidenceColor;
-                if (confidence >= 85) {
-                  confidenceColor = const Color(0xFF228B22);
-                } else if (confidence >= 70) {
-                  confidenceColor = const Color(0xFFFF9800);
-                } else {
-                  confidenceColor = const Color(0xFFDC3545);
-                }
-
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => SnakeConfirmationScreen(
-                          snakeName: snake['nameVi'] as String,
-                          englishName: snake['name'] as String,
-                          isPoisonous: isPoisonous,
-                          imageUrl: snake['imageUrl'] as String,
-                          confidence: confidence,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Dựa trên câu trả lời của bạn, hãy chọn loài rắn mà bạn đã bắt gặp',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue[900],
+                          height: 1.3,
                         ),
                       ),
-                    );
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Chọn con giống với rắn bạn gặp nhất',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.blue[700],
                         ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Image
-                        ClipRRect(
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(12),
-                          ),
-                          child: Container(
-                            height: 120,
-                            width: double.infinity,
-                            color: Colors.grey[200],
-                            child: const Center(
-                              child: Icon(
-                                Icons.image,
-                                size: 40,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Snake name
-                              Text(
-                                snake['nameVi'] as String,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-
-                              // English name
-                              Text(
-                                snake['name'] as String,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey[600],
-                                  fontStyle: FontStyle.italic,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 8),
-
-                              // Confidence badge
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: confidenceColor.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.check_circle,
-                                          size: 12,
-                                          color: confidenceColor,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '$confidence%',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: confidenceColor,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-
-                              // Poisonous badge
-                              Row(
-                                children: [
-                                  Icon(
-                                    isPoisonous
-                                        ? Icons.dangerous
-                                        : Icons.check_circle,
-                                    size: 14,
-                                    color: isPoisonous
-                                        ? const Color(0xFFDC3545)
-                                        : const Color(0xFF228B22),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    isPoisonous ? 'Độc' : 'Không độc',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: isPoisonous
-                                          ? const Color(0xFFDC3545)
-                                          : const Color(0xFF228B22),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                );
-              },
+                ),
+              ],
             ),
           ),
 
-          // Footer button
+          // Warning Banner (Yellow)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFACD),
+              border: Border(
+                top: BorderSide(color: Colors.yellow[200]!),
+                bottom: BorderSide(color: Colors.yellow[200]!),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  '💡',
+                  style: TextStyle(fontSize: 16),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.yellow[900],
+                        height: 1.3,
+                      ),
+                      children: const [
+                        TextSpan(text: 'Lưu ý: Chọn con '),
+                        TextSpan(
+                          text: 'GIỐNG NHẤT',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        TextSpan(text: ', không cần chính xác 100%'),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Snake Grid
+          Expanded(
+            child: GridView.count(
+              crossAxisCount: 2,
+              padding: const EdgeInsets.all(16),
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 0.65,
+              children: [
+                _buildSnakeCard(
+                  context: context,
+                  name: 'Rắn hổ mang chúa',
+                  englishName: 'King Cobra',
+                  scientificName: 'Ophiophagus hannah',
+                  isPoisonous: true,
+                  imageUrl:
+                      'https://lh3.googleusercontent.com/aida-public/AB6AXuB3iYF_YxR9JjZdQAqYN_emcm0lPiZbfDNnJkxmrHLoDnRNscK6NA2d4PUYAWZb-yv8x_jQOEv-wQcgUDdV0xdY-Byr1sorfuAue6p9u0m00PP-PGI03E3JGrpxVJFY5a4Q6iyhGmYCvdiktmFb5EcS3Z9Ux_QBzvG_NtFDFOgHVvT6MOecXyjPPUKkqf-kATR8s7XtQrAVdIe14ZYAzsTB36bh_h9EQqKR4mXDQWadTnXpgpELtqc7UZJkAppGYSdz8Yqwr5_UM_NS',
+                  features: [
+                    'Đầu dẹt hình thìa',
+                    'Màu nâu vàng, có vân',
+                    'Dài 1-3m',
+                  ],
+                ),
+                _buildSnakeCard(
+                  context: context,
+                  name: 'Rắn ráo trâu',
+                  englishName: 'Oriental Rat Snake',
+                  scientificName: 'Ptyas mucosa',
+                  isPoisonous: false,
+                  imageUrl:
+                      'https://lh3.googleusercontent.com/aida-public/AB6AXuA5kmOdxTyFaUJGPVwydfBlLJoO76xVwYQQit-lpI1pyS36awh_Ijncxm9zBnibCLaxlYEVq4W_Ydz0IMGg_9YIkydep3TYaZmMhOoVtnux9So5lafYmx16jHTMts-UXAAuW-2vqqaAU-FCCdEY942JL10pRgFT0Qq05YrZVBrqbJuV0Aeb4LgmfJSRDh629id6ABr5iUhDIOgtjRH864OvGBdfE6oJ1CMDVH-8zXuG1jYx6LH_Rdq2g4wU0D0D8LAfAR_0FHRCNAGy',
+                  features: [
+                    'Mắt to, màu đen',
+                    'Màu nâu hoặc xám',
+                    'Di chuyển rất nhanh',
+                  ],
+                ),
+                _buildSnakeCard(
+                  context: context,
+                  name: 'Rắn lục đuôi đỏ',
+                  englishName: 'White-lipped Pit Viper',
+                  scientificName: 'Trimeresurus albolabris',
+                  isPoisonous: true,
+                  imageUrl:
+                      'https://lh3.googleusercontent.com/aida-public/AB6AXuB8Yj6XnclUL6RhGokpHsxe2vT9C5TQK5lHl2goyZNQXxzFGEd4x69PJHFIJ8n6wheu7EiWh4UwLW574TvQ48jI1yDWELygeN41iDhL89B3rG29s0LOS53hdw7zIPw58601qLHymXrW9lXumTOGsbo3fjl9u4_Lz-2nZPJ5ir_DPaTtY2vTSW152gQuYT_6JrLpGmFAHRqPEvjK3CIy22qvLCX1aL94WtxMz4NWtvYSkYfel_3zgQUqFyNOSMu94e4zzY2e7BfDXL20',
+                  features: [
+                    'Đầu hình tam giác',
+                    'Xanh lá cây, đuôi đỏ',
+                  ],
+                ),
+                _buildSnakeCard(
+                  context: context,
+                  name: 'Rắn cạp nia',
+                  englishName: 'Malayan Krait',
+                  scientificName: 'Bungarus candidus',
+                  isPoisonous: true,
+                  imageUrl:
+                      'https://lh3.googleusercontent.com/aida-public/AB6AXuAKdTkiMiOs78CAHPcR7fi9kHDRb35zTvfoSJLPr9CvA9zzOwYLy3zsTSGvx5djM1H1SkIV2UxMFq584jrqqzCHk2325U9gSo3FOjopw4U7bDkAJHcm6lOUiTesAXu4zsBve5_VvEUW3q1JBUShiWXWnxTOYFQpnM0yA8vpwFXcCpOKfqkVn8yu4F3jsV14rpHszZgyrpuU5FV8K966jtHY4y7anagioZJ7DVXfswVCI_7NgSHr5xjw2FM8MYShL7ShDSuhtQNkPkWx',
+                  features: [
+                    'Khoang đen trắng',
+                    'Hoạt động về đêm',
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Footer
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
+              border: Border(
+                top: BorderSide(
+                  color: Colors.grey[200]!,
+                  width: 1,
+                ),
+              ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
+                  blurRadius: 8,
                   offset: const Offset(0, -2),
                 ),
               ],
             ),
             child: SafeArea(
-              child: SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const GenericFirstAidScreen(),
-                      ),
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.grey[700],
-                    side: BorderSide(color: Colors.grey[400]!),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+              top: false,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  // Go to generic first aid screen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const GenericFirstAidScreen(),
                     ),
-                  ),
-                  icon: Icon(Icons.help_outline, color: Colors.grey[700]),
-                  label: const Text(
-                    'Vẫn không tìm thấy loại rắn phù hợp?',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  );
+                },
+                icon: const Icon(Icons.search_off, size: 20),
+                label: const Text(
+                  'Vẫn không tìm thấy loại rắn phù hợp? -> Nhấn để tiếp tục sơ cứu',
+                  textAlign: TextAlign.center,
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF666666),
+                  side: const BorderSide(color: Color(0xFFBDBDBD)),
+                  minimumSize: const Size(double.infinity, 50),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ),
@@ -383,5 +292,292 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildSnakeCard({
+    required BuildContext context,
+    required String name,
+    required String englishName,
+    required String scientificName,
+    required bool isPoisonous,
+    required String imageUrl,
+    required List<String> features,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Image with poison badge
+          Stack(
+            children: [
+              Container(
+                height: 140,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F0F0),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Center(
+                      child: Icon(
+                        Icons.image,
+                        size: 50,
+                        color: Color(0xFFBDBDBD),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isPoisonous ? const Color(0xFFDC3545) : const Color(0xFF28A745),
+                    borderRadius: BorderRadius.circular(4),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isPoisonous ? Icons.dangerous : Icons.shield,
+                        color: Colors.white,
+                        size: 12,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isPoisonous ? 'RẮN ĐỘC' : 'KHÔNG ĐỘC',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Content
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Name
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF333333),
+                      height: 1.2,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+
+                  // Scientific name
+                  Text(
+                    scientificName,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.grey[500],
+                      fontFamily: 'serif',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Features
+                  Expanded(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: features.length > 3 ? 3 : features.length,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '• ',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey[400],
+                                ),
+                              ),
+                              Flexible(
+                                child: Text(
+                                  features[index],
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey[700],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  // Select Button
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => SnakeConfirmationScreen(
+                              snakeName: name,
+                              englishName: englishName,
+                              scientificName: scientificName,
+                              isPoisonous: isPoisonous,
+                              imageUrl: imageUrl,
+                              features: _getConfirmationFeatures(name),
+                              matchedFeaturesCount: 3,
+                            ),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF228B22),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Text(
+                            'Chọn loài này',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(width: 4),
+                          Icon(Icons.arrow_forward, size: 14),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<IdentificationFeature> _getConfirmationFeatures(String snakeName) {
+    // Return features based on snake name
+    switch (snakeName) {
+      case 'Rắn hổ mang chúa':
+        return [
+          IdentificationFeature(
+            icon: Icons.psychology,
+            title: 'Hình dạng đầu',
+            description: 'Đầu dẹt hình thìa, rõ ràng so với cổ',
+            isMatched: true,
+          ),
+          IdentificationFeature(
+            icon: Icons.texture,
+            title: 'Màu sắc & vân',
+            description: 'Màu nâu vàng với vân đen rõ ràng',
+            isMatched: true,
+          ),
+          IdentificationFeature(
+            icon: Icons.straighten,
+            title: 'Kích thước',
+            description: 'Dài từ 1-3m, có thể lớn hơn',
+            isMatched: true,
+          ),
+        ];
+      case 'Rắn ráo trâu':
+        return [
+          IdentificationFeature(
+            icon: Icons.remove_red_eye,
+            title: 'Đặc điểm mắt',
+            description: 'Mắt to, màu đen bóng',
+            isMatched: true,
+          ),
+          IdentificationFeature(
+            icon: Icons.palette,
+            title: 'Màu sắc',
+            description: 'Màu nâu hoặc xám đồng nhất',
+            isMatched: true,
+          ),
+          IdentificationFeature(
+            icon: Icons.speed,
+            title: 'Hành vi',
+            description: 'Di chuyển rất nhanh, hay trèo cây',
+            isMatched: true,
+          ),
+        ];
+      default:
+        return [
+          IdentificationFeature(
+            icon: Icons.psychology,
+            title: 'Hình dạng đầu',
+            description: 'Đầu tam giác, rõ ràng so với cổ',
+            isMatched: true,
+          ),
+          IdentificationFeature(
+            icon: Icons.texture,
+            title: 'Màu sắc & vân',
+            description: 'Có đặc điểm màu sắc rõ ràng',
+            isMatched: true,
+          ),
+          IdentificationFeature(
+            icon: Icons.forest,
+            title: 'Môi trường sống',
+            description: 'Thường gặp ở khu vực này',
+            isMatched: true,
+          ),
+        ];
+    }
   }
 }
