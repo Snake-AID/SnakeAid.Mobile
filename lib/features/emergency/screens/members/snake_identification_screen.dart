@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:camera/camera.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:camera/camera.dart';
+import 'dart:io';
+import 'snake_identification_result_screen.dart';
 import 'snake_selection_by_location_screen.dart';
-import 'snake_identification_questions_screen.dart';
 import '../../../shared/widgets/custom_dialog.dart';
 
+/// Snake Identification Screen - Camera and image upload for snake identification
 class SnakeIdentificationScreen extends StatefulWidget {
-  const SnakeIdentificationScreen({Key? key}) : super(key: key);
+  const SnakeIdentificationScreen({super.key});
 
   @override
   State<SnakeIdentificationScreen> createState() =>
@@ -14,11 +17,12 @@ class SnakeIdentificationScreen extends StatefulWidget {
 }
 
 class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
+  final ImagePicker _picker = ImagePicker();
+  bool _flashOn = false;
+  File? _selectedImage;
   CameraController? _cameraController;
   List<CameraDescription>? _cameras;
-  bool _isInitialized = false;
-  bool _isFlashOn = false;
-  final ImagePicker _picker = ImagePicker();
+  bool _isCameraInitialized = false;
 
   @override
   void initState() {
@@ -26,22 +30,41 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
     _initializeCamera();
   }
 
+  @override
+  void dispose() {
+    _cameraController?.dispose();
+    super.dispose();
+  }
+
   Future<void> _initializeCamera() async {
     try {
-      _cameras = await availableCameras();
-      if (_cameras!.isNotEmpty) {
-        _cameraController = CameraController(
-          _cameras![0],
-          ResolutionPreset.high,
-          enableAudio: false,
-        );
+      // Request camera permission
+      final status = await Permission.camera.request();
+      
+      if (status.isDenied || status.isPermanentlyDenied) {
+        return;
+      }
 
-        await _cameraController!.initialize();
-        if (mounted) {
-          setState(() {
-            _isInitialized = true;
-          });
-        }
+      // Get available cameras
+      _cameras = await availableCameras();
+      
+      if (_cameras == null || _cameras!.isEmpty) {
+        return;
+      }
+
+      // Initialize camera controller with rear camera
+      _cameraController = CameraController(
+        _cameras!.first,
+        ResolutionPreset.high,
+        enableAudio: false,
+      );
+
+      await _cameraController!.initialize();
+
+      if (mounted) {
+        setState(() {
+          _isCameraInitialized = true;
+        });
       }
     } catch (e) {
       debugPrint('Error initializing camera: $e');
@@ -49,83 +72,152 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
   }
 
   Future<void> _takePicture() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
-      return;
-    }
-
     try {
-      final XFile image = await _cameraController!.takePicture();
-      _processImage(image.path);
+      if (_cameraController == null || !_cameraController!.value.isInitialized) {
+        _showError('Camera chưa sẵn sàng');
+        return;
+      }
+
+      // Capture image from camera
+      final XFile photo = await _cameraController!.takePicture();
+
+      setState(() {
+        _selectedImage = File(photo.path);
+      });
+      _processImage();
     } catch (e) {
-      debugPrint('Error taking picture: $e');
+      _showError('Không thể chụp ảnh: $e');
     }
   }
 
   Future<void> _pickImage() async {
     try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      // Request storage permission
+      final status = await Permission.photos.request();
+      
+      if (status.isDenied) {
+        _showError('Cần cấp quyền truy cập ảnh');
+        return;
+      }
+      
+      if (status.isPermanentlyDenied) {
+        _showPermissionDialog();
+        return;
+      }
+
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+
       if (image != null) {
-        _processImage(image.path);
+        setState(() {
+          _selectedImage = File(image.path);
+        });
+        _processImage();
       }
     } catch (e) {
-      debugPrint('Error picking image: $e');
+      _showError('Không thể chọn ảnh: $e');
     }
   }
 
-  void _processImage(String imagePath) {
-    // TODO: Implement AI recognition when ready
+  void _processImage() {
+    if (_selectedImage == null) return;
+
+    // Show loading
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Tính năng AI đang phát triển. Vui lòng chọn cách khác.'),
+        content: Text('Đang phân tích ảnh bằng AI...'),
+        backgroundColor: Color(0xFF228B22),
         duration: Duration(seconds: 2),
+      ),
+    );
+    
+    // Simulate AI processing then navigate to results
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SnakeIdentificationResultScreen(
+              snakeImage: _selectedImage!,
+            ),
+          ),
+        );
+      }
+    });
+  }
+
+  Future<void> _toggleFlash() async {
+    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      return;
+    }
+
+    try {
+      setState(() {
+        _flashOn = !_flashOn;
+      });
+
+      await _cameraController!.setFlashMode(
+        _flashOn ? FlashMode.torch : FlashMode.off,
+      );
+    } catch (e) {
+      debugPrint('Error toggling flash: $e');
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFDC3545),
+        duration: const Duration(seconds: 4),
       ),
     );
   }
 
-  Future<void> _toggleFlash() async {
-    if (_cameraController == null) return;
-
-    try {
-      if (_isFlashOn) {
-        await _cameraController!.setFlashMode(FlashMode.off);
-      } else {
-        await _cameraController!.setFlashMode(FlashMode.torch);
-      }
-      setState(() {
-        _isFlashOn = !_isFlashOn;
-      });
-    } catch (e) {
-      debugPrint('Error toggling flash: $e');
-    }
+  void _showPermissionDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cần cấp quyền'),
+        content: const Text(
+          'Ứng dụng cần quyền truy cập camera và ảnh để nhận diện rắn. Vui lòng cấp quyền trong Cài đặt.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              openAppSettings();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF228B22),
+            ),
+            child: const Text('Mở Cài đặt'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showNoImageDialog() {
     showDialog(
       context: context,
       builder: (context) => CustomDialog(
-        icon: Icons.info_outline,
-        iconColor: Colors.blue,
-        title: 'Không thể chụp ảnh?',
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Bạn có thể nhận diện rắn bằng cách:',
-              style: TextStyle(fontSize: 14, color: Colors.black87),
-            ),
-            SizedBox(height: 16),
-            Text(
-              '• Chọn theo vị trí (các loài phổ biến)\n'
-              '• Trả lời câu hỏi về đặc điểm rắn',
-              style: TextStyle(fontSize: 14, color: Colors.black87, height: 1.5),
-            ),
-          ],
-        ),
+        icon: Icons.photo_camera_outlined,
+        iconBackgroundColor: const Color(0xFFFFF3E0),
+        iconColor: const Color(0xFFFF9800),
+        title: 'Không có ảnh rắn?',
+        description: 'Bạn có thể chọn rắn theo vị trí hoặc liên hệ với chuyên gia để được tư vấn trực tiếp.',
         actions: [
           DialogAction(
             label: 'Đóng',
             onPressed: () => Navigator.pop(context),
-            isPrimary: false,
+            isOutlined: true,
           ),
           DialogAction(
             label: 'Chọn theo vị trí',
@@ -138,8 +230,9 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
                 ),
               );
             },
-            isPrimary: true,
+            backgroundColor: const Color(0xFF228B22),
             icon: Icons.location_on,
+            flex: 2,
           ),
         ],
       ),
@@ -147,88 +240,22 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
   }
 
   @override
-  void dispose() {
-    _cameraController?.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            // Camera Preview
-            if (_isInitialized && _cameraController != null)
-              Positioned.fill(
-                child: CameraPreview(_cameraController!),
-              )
-            else
-              const Center(
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                ),
-              ),
-
-            // Corner brackets for framing
-            if (_isInitialized) ...[
-              // Top-left bracket
-              Positioned(
-                top: 100,
-                left: 40,
-                child: _buildCornerBracket(),
-              ),
-              // Top-right bracket
-              Positioned(
-                top: 100,
-                right: 40,
-                child: Transform.rotate(
-                  angle: 1.5708, // 90 degrees
-                  child: _buildCornerBracket(),
-                ),
-              ),
-              // Bottom-left bracket
-              Positioned(
-                bottom: 200,
-                left: 40,
-                child: Transform.rotate(
-                  angle: -1.5708, // -90 degrees
-                  child: _buildCornerBracket(),
-                ),
-              ),
-              // Bottom-right bracket
-              Positioned(
-                bottom: 200,
-                right: 40,
-                child: Transform.rotate(
-                  angle: 3.1416, // 180 degrees
-                  child: _buildCornerBracket(),
-                ),
-              ),
-            ],
-
-            // Top bar
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.7),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
+      body: Column(
+        children: [
+          // Header
+          Container(
+            color: Colors.white,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      icon: const Icon(Icons.arrow_back_ios_new),
                       onPressed: () => Navigator.pop(context),
                     ),
                     const Expanded(
@@ -236,179 +263,338 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
                         'Nhận diện rắn',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Colors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
                     IconButton(
-                      icon: Icon(
-                        _isFlashOn ? Icons.flash_on : Icons.flash_off,
-                        color: Colors.white,
-                      ),
-                      onPressed: _toggleFlash,
+                      icon: const Icon(Icons.help_outline),
+                      onPressed: () {
+                        _showHelpDialog();
+                      },
                     ),
                   ],
                 ),
               ),
             ),
+          ),
 
-            // Guide text
-            Positioned(
-              top: 120,
-              left: 0,
-              right: 0,
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 40),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.6),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'Đưa camera vào khung để chụp ảnh rắn',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
+          // Camera Viewfinder Area (70%)
+          Expanded(
+            flex: 7,
+            child: Container(
+              color: const Color(0xFF2C2C2C),
+              child: Column(
+                children: [
+                  // Warning Banner
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    color: const Color(0xFFFFF3CD),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '⚠️ ',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                        Text(
+                          'Giữ khoảng cách an toàn - KHÔNG đến gần rắn',
+                          style: TextStyle(
+                            color: Color(0xFF664D03),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+
+                  // Viewfinder Frame
+                  Expanded(
+                    child: Container(
+                      width: double.infinity,
+                      height: double.infinity,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // Camera preview or captured image
+                          if (_selectedImage != null)
+                            Image.file(
+                              _selectedImage!,
+                              fit: BoxFit.cover,
+                            )
+                          else if (_isCameraInitialized && _cameraController != null)
+                            CameraPreview(_cameraController!)
+                          else
+                            Container(
+                              color: const Color(0xFF2C2C2C),
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          
+                          // Corner brackets overlay
+                          ..._buildCornerBrackets(),
+                          
+                          // Center guide text (only show when camera is active)
+                          if (_selectedImage == null && _isCameraInitialized)
+                            const Center(
+                              child: Text(
+                                'Đặt con rắn vào giữa khung hình',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black,
+                                      blurRadius: 8,
+                                    ),
+                                  ],
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Tips Section
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Mẹo để có kết quả tốt nhất:',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildTipItem('Chụp toàn thân nếu có thể'),
+                        _buildTipItem('Tập trung vào đầu và hoa văn'),
+                        _buildTipItem('Chụp từ khoảng cách an toàn'),
+                        _buildTipItem('Sử dụng zoom nếu cần'),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
+          ),
 
-            // Bottom controls
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(30),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.8),
-                      Colors.transparent,
+          // Bottom Controls (30%)
+          Expanded(
+            flex: 3,
+            child: Container(
+              color: Colors.white,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Action Buttons Row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          // Upload Image Button
+                          _buildActionButton(
+                            icon: Icons.photo_library,
+                            label: 'Tải ảnh lên',
+                            onTap: _pickImage,
+                          ),
+
+                          // Camera Button (Large)
+                          GestureDetector(
+                            onTap: _takePicture,
+                            child: Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: const Color(0xFFBDBDBD),
+                                  width: 4,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Container(
+                                margin: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFE0E0E0),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // Flash Toggle Button
+                          _buildActionButton(
+                            icon: _flashOn ? Icons.flash_on : Icons.flash_off,
+                            label: _flashOn ? 'Flash: Bật' : 'Flash: Tắt',
+                            onTap: _toggleFlash,
+                          ),
+                        ],
+                      ),
+
+                      // No Image Link
+                      TextButton(
+                        onPressed: _showNoImageDialog,
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Tôi không có ảnh rắn',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF666666),
+                              ),
+                            ),
+                            SizedBox(width: 4),
+                            Icon(
+                              Icons.arrow_forward,
+                              size: 16,
+                              color: Color(0xFF666666),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Main action buttons row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        // Gallery button
-                        _buildActionButton(
-                          icon: Icons.photo_library,
-                          label: 'Thư viện',
-                          onPressed: _pickImage,
-                        ),
-
-                        // Capture button
-                        GestureDetector(
-                          onTap: _takePicture,
-                          child: Container(
-                            width: 70,
-                            height: 70,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 4,
-                              ),
-                            ),
-                            child: Container(
-                              margin: const EdgeInsets.all(6),
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // No image button
-                        _buildActionButton(
-                          icon: Icons.help_outline,
-                          label: 'Không có ảnh',
-                          onPressed: _showNoImageDialog,
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 30),
-
-                    // Alternative identification methods
-                    const Text(
-                      'HOẶC CHỌN CÁCH KHÁC',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                        letterSpacing: 1.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildMethodButton(
-                            icon: Icons.location_on,
-                            label: 'Chọn theo vị trí',
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const SnakeSelectionByLocationScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildMethodButton(
-                            icon: Icons.quiz,
-                            label: 'Trả lời câu hỏi',
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const SnakeIdentificationQuestionsScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildCornerBracket() {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: const BoxDecoration(
-        border: Border(
-          top: BorderSide(color: Colors.white, width: 3),
-          left: BorderSide(color: Colors.white, width: 3),
+  List<Widget> _buildCornerBrackets() {
+    const bracketSize = 40.0;
+    const bracketWidth = 4.0;
+    const bracketColor = Colors.white;
+
+    return [
+      // Top-left
+      Positioned(
+        top: 0,
+        left: 0,
+        child: Container(
+          width: bracketSize,
+          height: bracketSize,
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: bracketColor, width: bracketWidth),
+              left: BorderSide(color: bracketColor, width: bracketWidth),
+            ),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(8),
+            ),
+          ),
         ),
+      ),
+      // Top-right
+      Positioned(
+        top: 0,
+        right: 0,
+        child: Container(
+          width: bracketSize,
+          height: bracketSize,
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: bracketColor, width: bracketWidth),
+              right: BorderSide(color: bracketColor, width: bracketWidth),
+            ),
+            borderRadius: BorderRadius.only(
+              topRight: Radius.circular(8),
+            ),
+          ),
+        ),
+      ),
+      // Bottom-left
+      Positioned(
+        bottom: 0,
+        left: 0,
+        child: Container(
+          width: bracketSize,
+          height: bracketSize,
+          decoration: const BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: bracketColor, width: bracketWidth),
+              left: BorderSide(color: bracketColor, width: bracketWidth),
+            ),
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(8),
+            ),
+          ),
+        ),
+      ),
+      // Bottom-right
+      Positioned(
+        bottom: 0,
+        right: 0,
+        child: Container(
+          width: bracketSize,
+          height: bracketSize,
+          decoration: const BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: bracketColor, width: bracketWidth),
+              right: BorderSide(color: bracketColor, width: bracketWidth),
+            ),
+            borderRadius: BorderRadius.only(
+              bottomRight: Radius.circular(8),
+            ),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  Widget _buildTipItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '• ',
+            style: TextStyle(
+              color: Color(0xFFE0E0E0),
+              fontSize: 13,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Color(0xFFE0E0E0),
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -416,53 +602,92 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
   Widget _buildActionButton({
     required IconData icon,
     required String label,
-    required VoidCallback onPressed,
+    required VoidCallback onTap,
   }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          icon: Icon(icon, color: Colors.white, size: 28),
-          onPressed: onPressed,
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 12,
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: const Color(0xFFBDBDBD),
+                width: 2,
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              color: const Color(0xFF333333),
+              size: 24,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF333333),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildMethodButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onPressed,
-  }) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.white.withOpacity(0.2),
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Colors.white, width: 1),
+  void _showHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.help_outline, color: Color(0xFF228B22)),
+            SizedBox(width: 8),
+            Text('Hướng dẫn sử dụng'),
+          ],
         ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 20),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-              textAlign: TextAlign.center,
-            ),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Cách chụp ảnh tốt nhất:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              SizedBox(height: 8),
+              Text('1. Giữ khoảng cách an toàn (tối thiểu 2-3 mét)'),
+              SizedBox(height: 4),
+              Text('2. Đảm bảo ánh sáng đủ sáng'),
+              SizedBox(height: 4),
+              Text('3. Chụp rõ phần đầu và thân rắn'),
+              SizedBox(height: 4),
+              Text('4. Tránh rung lắc khi chụp'),
+              SizedBox(height: 12),
+              Text(
+                'Lưu ý an toàn:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Color(0xFFDC3545),
+                ),
+              ),
+              SizedBox(height: 8),
+              Text('⚠️ KHÔNG bao giờ tiếp cận gần rắn'),
+              SizedBox(height: 4),
+              Text('⚠️ KHÔNG cố gắng bắt hoặc làm phiền rắn'),
+              SizedBox(height: 4),
+              Text('⚠️ Gọi cứu hộ ngay nếu bị cắn'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đã hiểu'),
           ),
         ],
       ),
