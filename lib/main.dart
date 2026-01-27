@@ -2,9 +2,23 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:snakeaid_mobile/core/services/notification_service.dart';
-import 'package:snakeaid_mobile/examples/theme_examples.dart';
-import 'core/services/background_notification_service.dart';
-import 'core/services/fcm_service.dart';
+import 'package:snakeaid_mobile/features/auth/screens/splash_screen.dart';
+import 'package:snakeaid_mobile/features/auth/screens/role_selection_screen.dart';
+import 'package:snakeaid_mobile/features/auth/screens/member_login_screen.dart';
+import 'package:snakeaid_mobile/features/auth/screens/rescuer_login_screen.dart';
+import 'package:snakeaid_mobile/features/auth/screens/expert_login_screen.dart';
+import 'package:snakeaid_mobile/features/auth/screens/member_registration_screen.dart';
+import 'package:snakeaid_mobile/features/auth/screens/rescuer_registration_screen.dart';
+import 'package:snakeaid_mobile/features/auth/screens/rescuer_terms_screen.dart';
+import 'package:snakeaid_mobile/features/auth/screens/expert_registration_screen.dart';
+import 'package:snakeaid_mobile/features/auth/screens/expert_credentials_screen.dart';
+import 'package:snakeaid_mobile/features/auth/screens/otp_verification_screen.dart';
+import 'package:snakeaid_mobile/features/auth/screens/registration_success_screen.dart';
+import 'package:snakeaid_mobile/features/auth/screens/registration_pending_screen.dart';
+import 'package:snakeaid_mobile/features/auth/screens/forgot_password_screen.dart';
+import 'package:snakeaid_mobile/features/auth/screens/forgot_password_otp_screen.dart';
+import 'package:snakeaid_mobile/features/auth/screens/reset_password_screen.dart';
+import 'package:snakeaid_mobile/features/auth/screens/password_reset_success_screen.dart';
 import 'app/theme.dart';
 
 @pragma('vm:entry-point')
@@ -65,7 +79,89 @@ class MyApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system, // Tự động chuyển đổi theo system
 
-      home: const ThemeExamples(),
+      // Routes
+      initialRoute: '/',
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case '/':
+            return MaterialPageRoute(builder: (_) => const SplashScreen());
+          case '/role-selection':
+            return MaterialPageRoute(builder: (_) => const RoleSelectionScreen());
+          case '/member-login':
+            return MaterialPageRoute(builder: (_) => const MemberLoginScreen());
+          case '/rescuer-login':
+            return MaterialPageRoute(builder: (_) => const RescuerLoginScreen());
+          case '/expert-login':
+            return MaterialPageRoute(builder: (_) => const ExpertLoginScreen());
+          case '/member-registration':
+            return MaterialPageRoute(builder: (_) => const MemberRegistrationScreen());
+          case '/rescuer-registration':
+            return MaterialPageRoute(builder: (_) => const RescuerRegistrationScreen());
+          case '/rescuer-terms':
+            final data = settings.arguments as Map<String, String>;
+            return MaterialPageRoute(
+              builder: (_) => RescuerTermsScreen(registrationData: data),
+            );
+          case '/expert-registration':
+            return MaterialPageRoute(builder: (_) => const ExpertRegistrationScreen());
+          case '/expert-credentials':
+            final data = settings.arguments as Map<String, String>;
+            return MaterialPageRoute(
+              builder: (_) => ExpertCredentialsScreen(registrationData: data),
+            );
+          case '/otp-verification':
+            final email = settings.arguments as String;
+            return MaterialPageRoute(
+              builder: (_) => OtpVerificationScreen(email: email),
+            );
+          case '/registration-success':
+            final email = settings.arguments as String;
+            return MaterialPageRoute(
+              builder: (_) => RegistrationSuccessScreen(email: email),
+            );
+          case '/registration-pending':
+            final email = settings.arguments as String;
+            return MaterialPageRoute(
+              builder: (_) => RegistrationPendingScreen(email: email),
+            );
+          case '/forgot-password':
+            final data = settings.arguments as Map<String, dynamic>;
+            return MaterialPageRoute(
+              builder: (_) => ForgotPasswordScreen(
+                themeColor: data['themeColor'] as Color,
+                roleRoute: data['roleRoute'] as String,
+              ),
+            );
+          case '/forgot-password-otp':
+            final data = settings.arguments as Map<String, dynamic>;
+            return MaterialPageRoute(
+              builder: (_) => ForgotPasswordOtpScreen(
+                email: data['email'] as String,
+                themeColor: data['themeColor'] as Color,
+                roleRoute: data['roleRoute'] as String,
+              ),
+            );
+          case '/reset-password':
+            final data = settings.arguments as Map<String, dynamic>;
+            return MaterialPageRoute(
+              builder: (_) => ResetPasswordScreen(
+                email: data['email'] as String,
+                themeColor: data['themeColor'] as Color,
+                roleRoute: data['roleRoute'] as String,
+              ),
+            );
+          case '/password-reset-success':
+            final data = settings.arguments as Map<String, dynamic>;
+            return MaterialPageRoute(
+              builder: (_) => PasswordResetSuccessScreen(
+                themeColor: data['themeColor'] as Color,
+                roleRoute: data['roleRoute'] as String,
+              ),
+            );
+          default:
+            return MaterialPageRoute(builder: (_) => const SplashScreen());
+        }
+      },
     );
   }
 }
