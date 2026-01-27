@@ -1,8 +1,11 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:snakeaid_mobile/core/services/notification_service.dart';
 import 'package:snakeaid_mobile/examples/theme_examples.dart';
+import 'package:snakeaid_mobile/features/shared/screens/location_tracker_screen.dart';
+import 'package:snakeaid_mobile/features/shared/screens/signalr_test_screen.dart';
 import 'core/services/background_notification_service.dart';
 import 'core/services/fcm_service.dart';
 import 'app/theme.dart';
@@ -48,7 +51,7 @@ void main() async {
   // final fcmService = FCMService();
   // await fcmService.initialize();
 
-  runApp(const MyApp());
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {
@@ -64,8 +67,13 @@ class MyApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system, // Tự động chuyển đổi theo system
-
-      home: const ThemeExamples(),
+      // Define routes
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const ThemeExamples(),
+        '/signalr-test': (context) => const SignalRTestScreen(),
+        '/map-test': (context) => const LocationTrackerScreen(),
+      },
     );
   }
 }
@@ -165,7 +173,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   Text(
                     '$_counter',
                     style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                      color: AppTheme.primaryColor,
+                      color: AppTheme.lightTheme.colorScheme.primary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
