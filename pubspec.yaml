@@ -63,6 +63,7 @@ dependencies:
   flutter_rating_bar: ^4.0.1
   image_picker: ^1.1.2
   photo_view: ^0.15.0
+  camera: ^0.10.5+5
   
   # Maps & Location
   google_maps_flutter: ^2.9.0
