@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../widgets/sos_button.dart';
 import '../widgets/quick_action_buttons.dart';
 import '../../emergency/screens/members/emergency_alert_screen.dart';
@@ -161,6 +162,55 @@ class MemberHomeScreen extends StatelessWidget {
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: EducationSection(),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Developer Tools Section (for testing)
+                  Container(
+                    color: Colors.grey[50],
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '🛠️ Developer Tools',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () => context.go('/signalr-test'),
+                                icon: const Icon(Icons.chat),
+                                label: const Text('SignalR Test'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () => context.go('/location-tracker'),
+                                icon: const Icon(Icons.location_on),
+                                label: const Text('Location Tracker'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
 
                   const SizedBox(height: 90), // Space for bottom nav
