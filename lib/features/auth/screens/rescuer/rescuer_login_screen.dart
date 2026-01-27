@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 /// Rescuer Login Screen
 /// Màn hình đăng nhập cho người cứu hộ
@@ -339,10 +340,9 @@ class _RescuerLoginScreenState extends State<RescuerLoginScreen> {
                             ),
                             GestureDetector(
                               onTap: () {
-                                Navigator.pushNamed(
-                                  context,
-                                  '/forgot-password',
-                                  arguments: {
+                                context.goNamed(
+                                  'forgot_password',
+                                  extra: {
                                     'themeColor': primaryColor,
                                     'roleRoute': '/rescuer-login',
                                   },
@@ -522,8 +522,7 @@ class _RescuerLoginScreenState extends State<RescuerLoginScreen> {
                               ),
                               GestureDetector(
                                 onTap: () {
-                                  Navigator.pushNamed(
-                                      context, '/rescuer-registration');
+                                  context.goNamed('rescuer_registration');
                                 },
                                 child: const Text(
                                   'Đăng ký ngay',

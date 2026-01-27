@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 /// Registration Pending Screen
 /// Màn hình chờ phê duyệt sau khi đăng ký rescuer
@@ -190,8 +191,7 @@ class RegistrationPendingScreen extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: () {
                         // Navigate back to role selection
-                        Navigator.of(context).popUntil((route) => route.isFirst);
-                        Navigator.pushReplacementNamed(context, '/role-selection');
+                        context.goNamed('role_selection');
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF228B22),

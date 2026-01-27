@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 /// Rescuer Registration Screen
 /// Màn hình đăng ký tài khoản người cứu hộ
@@ -73,7 +74,7 @@ class _RescuerRegistrationScreenState extends State<RescuerRegistrationScreen> {
         shadowColor: Colors.black.withOpacity(0.1),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF333333)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Đăng Ký Người Cứu Hộ',
@@ -310,7 +311,7 @@ class _RescuerRegistrationScreenState extends State<RescuerRegistrationScreen> {
                         WidgetSpan(
                           child: GestureDetector(
                             onTap: () {
-                              Navigator.pop(context);
+                              context.pop();
                             },
                             child: const Text(
                               'Đăng nhập ngay',
@@ -561,10 +562,9 @@ class _RescuerRegistrationScreenState extends State<RescuerRegistrationScreen> {
       });
 
       // Navigate to terms screen
-      Navigator.pushNamed(
-        context,
-        '/rescuer-terms',
-        arguments: {
+      context.goNamed(
+        'rescuer_terms',
+        extra: {
           'email': _emailController.text,
           'fullName': _fullNameController.text,
           'phone': _phoneController.text,

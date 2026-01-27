@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 /// Rescuer Terms and Conditions Screen
 /// Màn hình điều khoản và cam kết cho người cứu hộ
@@ -57,7 +58,7 @@ class _RescuerTermsScreenState extends State<RescuerTermsScreen> {
         shadowColor: Colors.black.withOpacity(0.1),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF333333)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Điều Khoản & Cam Kết',
@@ -377,19 +378,17 @@ class _RescuerTermsScreenState extends State<RescuerTermsScreen> {
       });
 
       // Navigate to OTP verification first
-      final result = await Navigator.pushNamed(
-        context,
-        '/otp-verification',
-        arguments: widget.registrationData['email']!,
+      final result = await context.pushNamed(
+        'otp_verification',
+        extra: widget.registrationData['email']!,
       );
 
       // After OTP verification, navigate to pending screen
       if (mounted && result == null) {
         // OTP verified successfully, go to pending screen
-        Navigator.pushReplacementNamed(
-          context,
-          '/registration-pending',
-          arguments: widget.registrationData['email']!,
+        context.goNamed(
+          'registration_pending',
+          extra: widget.registrationData['email']!,
         );
       }
     }

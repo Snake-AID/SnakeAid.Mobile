@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 /// Expert Login Screen
 /// Màn hình đăng nhập cho chuyên gia
@@ -339,10 +340,9 @@ class _ExpertLoginScreenState extends State<ExpertLoginScreen> {
                             ),
                             GestureDetector(
                               onTap: () {
-                                Navigator.pushNamed(
-                                  context,
-                                  '/forgot-password',
-                                  arguments: {
+                                context.goNamed(
+                                  'forgot_password',
+                                  extra: {
                                     'themeColor': primaryColor,
                                     'roleRoute': '/expert-login',
                                   },
@@ -522,8 +522,7 @@ class _ExpertLoginScreenState extends State<ExpertLoginScreen> {
                               ),
                               GestureDetector(
                                 onTap: () {
-                                  Navigator.pushNamed(
-                                      context, '/expert-registration');
+                                  context.goNamed('expert_registration');
                                 },
                                 child: const Text(
                                   'Đăng ký ngay',

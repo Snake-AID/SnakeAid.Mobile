@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 /// Member Login Screen
 /// Màn hình đăng nhập cho người dùng
@@ -339,10 +340,9 @@ class _MemberLoginScreenState extends State<MemberLoginScreen> {
                             ),
                             GestureDetector(
                               onTap: () {
-                                Navigator.pushNamed(
-                                  context,
-                                  '/forgot-password',
-                                  arguments: {
+                                context.goNamed(
+                                  'forgot_password',
+                                  extra: {
                                     'themeColor': primaryColor,
                                     'roleRoute': '/member-login',
                                   },
@@ -522,8 +522,7 @@ class _MemberLoginScreenState extends State<MemberLoginScreen> {
                               ),
                               GestureDetector(
                                 onTap: () {
-                                  Navigator.pushNamed(
-                                      context, '/member-registration');
+                                  context.goNamed('member_registration');
                                 },
                                 child: const Text(
                                   'Đăng ký ngay',

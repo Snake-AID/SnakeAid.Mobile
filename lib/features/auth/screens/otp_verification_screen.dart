@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'package:go_router/go_router.dart';
 
 /// OTP Verification Screen
 /// Màn hình xác thực mã OTP
@@ -110,10 +111,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       });
 
       // Navigate to success screen
-      Navigator.pushReplacementNamed(
-        context,
-        '/registration-success',
-        arguments: widget.email,
+      context.goNamed(
+        'registration_success',
+        extra: widget.email,
       );
     }
   }
@@ -158,7 +158,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF333333)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Xác Thực OTP',

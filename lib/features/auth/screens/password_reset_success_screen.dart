@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 /// Password Reset Success Screen
 /// Màn hình thông báo đặt lại mật khẩu thành công
@@ -69,11 +70,7 @@ class PasswordResetSuccessScreen extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: () {
                     // Navigate back to login screen based on role
-                    Navigator.pushNamedAndRemoveUntil(
-                      context,
-                      roleRoute,
-                      (route) => false,
-                    );
+                    context.go(roleRoute);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: themeColor,

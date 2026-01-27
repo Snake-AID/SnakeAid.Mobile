@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:go_router/go_router.dart';
 
 /// Forgot Password OTP Verification Screen
 /// Màn hình xác thực OTP quên mật khẩu
@@ -99,10 +100,9 @@ class _ForgotPasswordOtpScreenState extends State<ForgotPasswordOtpScreen> {
       });
 
       // Navigate to reset password screen
-      Navigator.pushReplacementNamed(
-        context,
-        '/reset-password',
-        arguments: {
+      context.goNamed(
+        'reset_password',
+        extra: {
           'email': widget.email,
           'themeColor': widget.themeColor,
           'roleRoute': widget.roleRoute,
@@ -138,7 +138,7 @@ class _ForgotPasswordOtpScreenState extends State<ForgotPasswordOtpScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF333333)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Xác Thực OTP',

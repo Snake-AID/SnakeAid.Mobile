@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 /// Forgot Password Screen - Enter Email
 /// Màn hình quên mật khẩu - nhập email
@@ -45,10 +46,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       });
 
       // Navigate to OTP verification screen
-      Navigator.pushNamed(
-        context,
-        '/forgot-password-otp',
-        arguments: {
+      context.goNamed(
+        'forgot_password_otp',
+        extra: {
           'email': _emailOrPhoneController.text,
           'themeColor': widget.themeColor,
           'roleRoute': widget.roleRoute,
@@ -66,7 +66,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF333333)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Quên Mật Khẩu',
@@ -251,7 +251,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
                 // Back to Login Link
                 GestureDetector(
-                  onTap: () => Navigator.pop(context),
+                  onTap: () => context.pop(),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

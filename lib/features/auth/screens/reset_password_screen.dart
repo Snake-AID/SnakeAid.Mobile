@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 /// Reset Password Screen - Enter New Password
 /// Màn hình đặt lại mật khẩu mới
@@ -90,10 +91,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       });
 
       // Navigate to success screen
-      Navigator.pushReplacementNamed(
-        context,
-        '/password-reset-success',
-        arguments: {
+      context.goNamed(
+        'password_reset_success',
+        extra: {
           'themeColor': widget.themeColor,
           'roleRoute': widget.roleRoute,
         },
@@ -110,7 +110,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF333333)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Đặt Lại Mật Khẩu',

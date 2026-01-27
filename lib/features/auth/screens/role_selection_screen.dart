@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:snakeaid_mobile/features/auth/models/user_role.dart';
 
 /// Welcome Screen - Role Selection
@@ -133,11 +134,11 @@ class RoleSelectionScreen extends StatelessWidget {
   void _navigateToAuth(BuildContext context, UserRole role) {
     // Navigate to login screen based on role
     if (role == UserRole.member) {
-      Navigator.pushNamed(context, '/member-login');
+      context.goNamed('member_login');
     } else if (role == UserRole.rescuer) {
-      Navigator.pushNamed(context, '/rescuer-login');
+      context.goNamed('rescuer_login');
     } else if (role == UserRole.expert) {
-      Navigator.pushNamed(context, '/expert-login');
+      context.goNamed('expert_login');
     }
   }
 }

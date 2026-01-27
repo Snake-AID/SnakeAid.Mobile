@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 /// Expert Registration Screen
 /// Màn hình đăng ký tài khoản chuyên gia
@@ -75,7 +76,7 @@ class _ExpertRegistrationScreenState extends State<ExpertRegistrationScreen> {
         shadowColor: Colors.black.withOpacity(0.1),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF333333)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Đăng Ký Chuyên Gia',
@@ -588,10 +589,9 @@ class _ExpertRegistrationScreenState extends State<ExpertRegistrationScreen> {
       });
 
       // Navigate to credentials screen with registration data
-      Navigator.pushNamed(
-        context,
-        '/expert-credentials',
-        arguments: {
+      context.goNamed(
+        'expert_credentials',
+        extra: {
           'name': _fullNameController.text,
           'phone': _phoneController.text,
           'email': _emailController.text,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class ExpertCredentialsScreen extends StatefulWidget {
   final Map<String, String> registrationData;
@@ -56,19 +57,17 @@ class _ExpertCredentialsScreenState extends State<ExpertCredentialsScreen> {
       });
 
       // Navigate to OTP verification first
-      final result = await Navigator.pushNamed(
-        context,
-        '/otp-verification',
-        arguments: widget.registrationData['email']!,
+      final result = await context.pushNamed(
+        'otp_verification',
+        extra: widget.registrationData['email']!,
       );
 
       // After OTP verification, navigate to pending screen
       if (mounted && result == null) {
         // OTP verified successfully, go to pending screen
-        Navigator.pushReplacementNamed(
-          context,
-          '/registration-pending',
-          arguments: widget.registrationData['email']!,
+        context.goNamed(
+          'registration_pending',
+          extra: widget.registrationData['email']!,
         );
       }
     }
@@ -84,12 +83,12 @@ class _ExpertCredentialsScreenState extends State<ExpertCredentialsScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.pop(),
             child: const Text('Hủy'),
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
+              context.pop();
               _handleContinue();
             },
             child: const Text('Tiếp tục'),
@@ -108,7 +107,7 @@ class _ExpertCredentialsScreenState extends State<ExpertCredentialsScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Nộp Chứng Chỉ',

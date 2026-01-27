@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 /// Member Registration Screen
 /// Màn hình đăng ký tài khoản người dùng
@@ -107,7 +108,7 @@ class _MemberRegistrationScreenState extends State<MemberRegistrationScreen> {
         shadowColor: Colors.black.withOpacity(0.1),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF333333)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Đăng Ký Tài Khoản',
@@ -388,7 +389,7 @@ class _MemberRegistrationScreenState extends State<MemberRegistrationScreen> {
                           child: GestureDetector(
                             onTap: () {
                               // TODO: Navigate to login screen
-                              Navigator.pop(context);
+                              context.pop();
                             },
                             child: const Text(
                               'Đăng nhập ngay',
@@ -708,10 +709,9 @@ class _MemberRegistrationScreenState extends State<MemberRegistrationScreen> {
       });
 
       // Navigate to OTP verification screen
-      Navigator.pushNamed(
-        context,
-        '/otp-verification',
-        arguments: _emailController.text,
+      context.goNamed(
+        'otp_verification',
+        extra: _emailController.text,
       );
     }
   }

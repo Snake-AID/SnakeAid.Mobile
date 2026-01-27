@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
+import 'package:go_router/go_router.dart';
 
 /// Registration Success Screen
 /// Màn hình đăng ký thành công với hiệu ứng confetti
@@ -183,8 +184,7 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen>
                           onPressed: () {
                             // TODO: Navigate to home screen
                             // For now, go back to role selection
-                            Navigator.of(context).popUntil((route) => route.isFirst);
-                            Navigator.pushReplacementNamed(context, '/role-selection');
+                            context.goNamed('role_selection');
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF228B22),
