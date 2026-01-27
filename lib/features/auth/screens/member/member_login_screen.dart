@@ -46,8 +46,8 @@ class _MemberLoginScreenState extends State<MemberLoginScreen> {
         _isLoading = false;
       });
 
-      // Navigate to home screen
-      // TODO: Navigate to member home screen
+      // Navigate to member home screen
+      context.goNamed('member_home');
     }
   }
 
