@@ -110,16 +110,24 @@ final router = GoRouter(
       path: '/otp-verification',
       name: 'otp_verification',
       builder: (context, state) {
-        final email = state.extra as String;
-        return OtpVerificationScreen(email: email);
+        final data = state.extra as Map<String, dynamic>;
+        return OtpVerificationScreen(
+          email: data['email'] as String,
+          roleRoute: data['roleRoute'] as String,
+          themeColor: data['themeColor'] as Color,
+        );
       },
     ),
     GoRoute(
       path: '/registration-success',
       name: 'registration_success',
       builder: (context, state) {
-        final email = state.extra as String;
-        return RegistrationSuccessScreen(email: email);
+        final data = state.extra as Map<String, dynamic>;
+        return RegistrationSuccessScreen(
+          email: data['email'] as String,
+          roleRoute: data['roleRoute'] as String,
+          themeColor: data['themeColor'] as Color,
+        );
       },
     ),
     GoRoute(

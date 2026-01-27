@@ -108,7 +108,13 @@ class _MemberRegistrationScreenState extends State<MemberRegistrationScreen> {
         shadowColor: Colors.black.withOpacity(0.1),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF333333)),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed('member_login');
+            }
+          },
         ),
         title: const Text(
           'Đăng Ký Tài Khoản',
@@ -711,7 +717,11 @@ class _MemberRegistrationScreenState extends State<MemberRegistrationScreen> {
       // Navigate to OTP verification screen
       context.goNamed(
         'otp_verification',
-        extra: _emailController.text,
+        extra: {
+          'email': _emailController.text,
+          'roleRoute': 'member_login',
+          'themeColor': const Color(0xFF228B22),
+        },
       );
     }
   }

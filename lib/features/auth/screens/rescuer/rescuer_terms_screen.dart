@@ -58,7 +58,13 @@ class _RescuerTermsScreenState extends State<RescuerTermsScreen> {
         shadowColor: Colors.black.withOpacity(0.1),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF333333)),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed('rescuer_registration');
+            }
+          },
         ),
         title: const Text(
           'Điều Khoản & Cam Kết',
@@ -380,7 +386,11 @@ class _RescuerTermsScreenState extends State<RescuerTermsScreen> {
       // Navigate to OTP verification first
       final result = await context.pushNamed(
         'otp_verification',
-        extra: widget.registrationData['email']!,
+        extra: {
+          'email': widget.registrationData['email']!,
+          'roleRoute': 'rescuer_login',
+          'themeColor': const Color(0xFFFF6B35),
+        },
       );
 
       // After OTP verification, navigate to pending screen

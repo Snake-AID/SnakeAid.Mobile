@@ -70,7 +70,7 @@ class PasswordResetSuccessScreen extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: () {
                     // Navigate back to login screen based on role
-                    context.go(roleRoute);
+                    context.goNamed(roleRoute);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: themeColor,

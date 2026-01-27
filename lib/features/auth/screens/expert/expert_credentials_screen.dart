@@ -59,7 +59,11 @@ class _ExpertCredentialsScreenState extends State<ExpertCredentialsScreen> {
       // Navigate to OTP verification first
       final result = await context.pushNamed(
         'otp_verification',
-        extra: widget.registrationData['email']!,
+        extra: {
+          'email': widget.registrationData['email']!,
+          'roleRoute': 'expert_login',
+          'themeColor': const Color(0xFF9333EA),
+        },
       );
 
       // After OTP verification, navigate to pending screen
@@ -107,7 +111,13 @@ class _ExpertCredentialsScreenState extends State<ExpertCredentialsScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed('expert_registration');
+            }
+          },
         ),
         title: const Text(
           'Nộp Chứng Chỉ',

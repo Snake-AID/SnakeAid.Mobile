@@ -74,7 +74,13 @@ class _RescuerRegistrationScreenState extends State<RescuerRegistrationScreen> {
         shadowColor: Colors.black.withOpacity(0.1),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF333333)),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed('rescuer_login');
+            }
+          },
         ),
         title: const Text(
           'Đăng Ký Người Cứu Hộ',
@@ -100,17 +106,17 @@ class _RescuerRegistrationScreenState extends State<RescuerRegistrationScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF228B22).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    color: const Color(0xFFFF6B35).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: const Color(0xFF228B22).withOpacity(0.3),
+                      color: const Color(0xFFFF6B35).withOpacity(0.3),
                     ),
                   ),
                   child: Row(
                     children: const [
                       Icon(
                         Icons.info_outline,
-                        color: Color(0xFF228B22),
+                        color: Color(0xFFFF6B35),
                         size: 20,
                       ),
                       SizedBox(width: 12),
@@ -119,7 +125,7 @@ class _RescuerRegistrationScreenState extends State<RescuerRegistrationScreen> {
                           'Tài khoản cứu hộ cần được phê duyệt bởi quản trị viên',
                           style: TextStyle(
                             fontSize: 13,
-                            color: Color(0xFF228B22),
+                            color: Color(0xFFFF6B35),
                           ),
                         ),
                       ),
@@ -270,13 +276,13 @@ class _RescuerRegistrationScreenState extends State<RescuerRegistrationScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _handleContinue,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF228B22),
+                      backgroundColor: const Color(0xFFFF6B35),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                       elevation: 0,
-                      disabledBackgroundColor: const Color(0xFF228B22).withOpacity(0.5),
+                      disabledBackgroundColor: const Color(0xFFFF6B35).withOpacity(0.5),
                     ),
                     child: _isLoading
                         ? const SizedBox(
@@ -318,7 +324,7 @@ class _RescuerRegistrationScreenState extends State<RescuerRegistrationScreen> {
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF228B22),
+                                color: Color(0xFFFF6B35),
                               ),
                             ),
                           ),
@@ -384,7 +390,7 @@ class _RescuerRegistrationScreenState extends State<RescuerRegistrationScreen> {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(
-                color: Color(0xFF228B22),
+                color: Color(0xFFFF6B35),
                 width: 1,
               ),
             ),
@@ -472,7 +478,7 @@ class _RescuerRegistrationScreenState extends State<RescuerRegistrationScreen> {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(
-                color: Color(0xFF228B22),
+                color: Color(0xFFFF6B35),
                 width: 1,
               ),
             ),
