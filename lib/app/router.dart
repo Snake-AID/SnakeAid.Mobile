@@ -195,14 +195,8 @@ final router = GoRouter(
       name: 'snake_identification',
       builder: (context, state) => const SnakeIdentificationScreen(),
     ),
-    GoRoute(
-      path: '/snake-identification-result',
-      name: 'snake_identification_result',
-      builder: (context, state) {
-        final snakeName = state.extra as String;
-        return SnakeIdentificationResultScreen(identifiedSnake: snakeName);
-      },
-    ),
+    // Note: SnakeIdentificationResultScreen requires File snakeImage, not navigable via route name
+    // Use Navigator.push with MaterialPageRoute to pass File object
     GoRoute(
       path: '/snake-selection-by-location',
       name: 'snake_selection_by_location',
@@ -217,16 +211,24 @@ final router = GoRouter(
       path: '/snake-filtered-results',
       name: 'snake_filtered_results',
       builder: (context, state) {
-        final answers = state.extra as Map<String, String>;
-        return SnakeFilteredResultsScreen(questionAnswers: answers);
+        final answers = state.extra as Map<int, String>;
+        return SnakeFilteredResultsScreen(answers: answers);
       },
     ),
     GoRoute(
       path: '/snake-confirmation',
       name: 'snake_confirmation',
       builder: (context, state) {
-        final snakeName = state.extra as String;
-        return SnakeConfirmationScreen(snakeName: snakeName);
+        final data = state.extra as Map<String, dynamic>;
+        return SnakeConfirmationScreen(
+          snakeName: data['snakeName'] as String,
+          englishName: data['englishName'] as String,
+          scientificName: data['scientificName'] as String,
+          isPoisonous: data['isPoisonous'] as bool,
+          imageUrl: data['imageUrl'] as String?,
+          features: data['features'] as List<dynamic>,
+          matchedFeaturesCount: data['matchedFeaturesCount'] as int,
+        );
       },
     ),
     GoRoute(
@@ -238,8 +240,13 @@ final router = GoRouter(
       path: '/first-aid-steps',
       name: 'first_aid_steps',
       builder: (context, state) {
-        final snakeName = state.extra as String;
-        return FirstAidStepsScreen(snakeName: snakeName);
+        final data = state.extra as Map<String, dynamic>;
+        return FirstAidStepsScreen(
+          snakeName: data['snakeName'] as String,
+          snakeNameVi: data['snakeNameVi'] as String,
+          venomType: data['venomType'] as String,
+          snakeImageUrl: data['snakeImageUrl'] as String,
+        );
       },
     ),
     GoRoute(
@@ -251,10 +258,12 @@ final router = GoRouter(
       path: '/severity-assessment',
       name: 'severity_assessment',
       builder: (context, state) {
-        final data = state.extra as Map<String, dynamic>;
+        final data = state.extra as Map<String, dynamic>?;
         return SeverityAssessmentScreen(
-          snakeName: data['snakeName'] as String,
-          symptoms: data['symptoms'] as List<String>,
+          severityScore: data?['severityScore'] as int? ?? 85,
+          riskFactors: data?['riskFactors'] as List<String>? ?? [],
+          timeSinceBite: data?['timeSinceBite'] as String? ?? '15 phút',
+          painLevel: data?['painLevel'] as int? ?? 7,
         );
       },
     ),
@@ -284,8 +293,8 @@ final router = GoRouter(
       path: '/message-detail',
       name: 'message_detail',
       builder: (context, state) {
-        final messageId = state.extra as String;
-        return MessageDetailScreen(messageId: messageId);
+        final thread = state.extra as MessageThread;
+        return MessageDetailScreen(thread: thread);
       },
     ),
     
