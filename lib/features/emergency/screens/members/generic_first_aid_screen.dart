@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'symptom_report_screen.dart';
 
 /// Generic First Aid Screen - Shows general first aid instructions when snake species is unknown
@@ -15,7 +16,13 @@ class GenericFirstAidScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF333333)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed('emergency_alert');
+            }
+          },
         ),
         title: const Text(
           'Hướng dẫn sơ cứu chung',
@@ -349,12 +356,7 @@ class GenericFirstAidScreen extends StatelessWidget {
                     height: 64,
                     child: ElevatedButton(
                       onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const SymptomReportScreen(),
-                          ),
-                        );
+                        context.push('/emergency/symptom-report');
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF228B22),

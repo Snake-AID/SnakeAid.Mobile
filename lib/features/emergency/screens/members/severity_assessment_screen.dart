@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'emergency_tracking_screen.dart';
 import 'emergency_tracking_screen.dart';
 import 'dart:math' as math;
@@ -60,7 +61,13 @@ class _SeverityAssessmentScreenState extends State<SeverityAssessmentScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF191910)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed('emergency_alert');
+            }
+          },
         ),
         title: const Text(
           'Đánh giá mức độ nghiêm trọng',
@@ -405,12 +412,7 @@ class _SeverityAssessmentScreenState extends State<SeverityAssessmentScreen> {
           ElevatedButton(
             onPressed: () {
               // Navigate to emergency tracking screen
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const EmergencyTrackingScreen(),
-                ),
-              );
+              context.goNamed('emergency_tracking');
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF228B22),
@@ -451,7 +453,7 @@ class _SeverityAssessmentScreenState extends State<SeverityAssessmentScreen> {
                 const TextSpan(text: 'Triệu chứng của bạn đang được theo dõi\n'),
                 WidgetSpan(
                   child: GestureDetector(
-                    onTap: () => Navigator.pop(context),
+                    onTap: () => context.pop(),
                     child: const Text(
                       'Cập nhật triệu chứng',
                       style: TextStyle(

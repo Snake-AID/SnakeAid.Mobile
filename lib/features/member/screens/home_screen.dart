@@ -255,7 +255,7 @@ class MemberHomeScreen extends StatelessWidget {
         actions: [
           DialogAction(
             label: 'HỦY SOS',
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.pop(),
             isOutlined: true,
             textColor: const Color(0xFFDC3545),
             borderColor: const Color(0xFFDC3545),
@@ -263,13 +263,8 @@ class MemberHomeScreen extends StatelessWidget {
           DialogAction(
             label: 'XEM CHI TIẾT',
             onPressed: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const EmergencyAlertScreen(),
-                ),
-              );
+              context.pop();
+              context.pushNamed('emergency_alert');
             },
             backgroundColor: const Color(0xFF228B22),
             icon: Icons.arrow_forward,

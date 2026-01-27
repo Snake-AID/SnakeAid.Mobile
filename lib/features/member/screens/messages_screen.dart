@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'message_detail_screen.dart';
 
 /// Messages Screen - List of conversations
@@ -249,12 +250,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   }
 
   void _openMessageDetail(MessageThread thread) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => MessageDetailScreen(thread: thread),
-      ),
-    );
+    context.goNamed('message_detail', extra: thread);
   }
 }
 

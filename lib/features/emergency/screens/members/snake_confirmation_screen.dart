@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'symptom_report_screen.dart';
 import '../../../shared/widgets/custom_dialog.dart';
 import 'first_aid_steps_screen.dart';
@@ -81,7 +82,13 @@ class _SnakeConfirmationScreenState extends State<SnakeConfirmationScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF666666)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed('snake_identification_questions');
+            }
+          },
         ),
         title: const Text(
           'Xác nhận loài rắn',
@@ -419,7 +426,7 @@ class _SnakeConfirmationScreenState extends State<SnakeConfirmationScreen> {
                     width: double.infinity,
                     height: 48,
                     child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => context.pop(),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF666666),
                         side: const BorderSide(color: Color(0xFFBDBDBD), width: 2),
@@ -441,12 +448,7 @@ class _SnakeConfirmationScreenState extends State<SnakeConfirmationScreen> {
                   // Not Similar Button
                   TextButton(
                     onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SnakeIdentificationQuestionsScreen(),
-                        ),
-                      );
+                      context.push('/emergency/snake-identification-questions');
                     },
                     child: Text(
                       'Không giống - Trả lời câu hỏi chi tiết',
@@ -527,7 +529,7 @@ class _SnakeConfirmationScreenState extends State<SnakeConfirmationScreen> {
           DialogAction(
             label: 'Quay lại',
             isOutlined: true,
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.pop(),
             textColor: const Color(0xFF666666),
             borderColor: const Color(0xFFBDBDBD),
           ),
@@ -535,17 +537,15 @@ class _SnakeConfirmationScreenState extends State<SnakeConfirmationScreen> {
             label: 'Bắt đầu sơ cứu',
             icon: Icons.arrow_forward,
             onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => FirstAidStepsScreen(
-                    snakeName: widget.englishName,
-                    snakeNameVi: widget.snakeName,
-                    venomType: widget.isPoisonous ? 'Độc' : 'Không độc',
-                    snakeImageUrl: widget.imageUrl ?? '',
-                  ),
-                ),
+              context.pop(); // Close dialog
+              context.pushNamed(
+                'first_aid_steps',
+                extra: {
+                  'snakeName': widget.snakeName,
+                  'snakeNameVi': widget.snakeName,
+                  'venomType': widget.isPoisonous ? 'Độc' : 'Không độc',
+                  'snakeImageUrl': widget.imageUrl,
+                },
               );
             },
             backgroundColor: const Color(0xFF228B22),

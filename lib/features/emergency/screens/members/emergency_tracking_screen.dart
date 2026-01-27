@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:async';
 import 'first_aid_steps_screen.dart';
 import 'rescuer_arrived_screen.dart';
@@ -51,12 +52,7 @@ class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen> {
     return Scaffold(
       body: GestureDetector(
         onDoubleTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const RescuerArrivedScreen(),
-            ),
-          );
+          context.pushNamed('rescuer_arrived');
         },
         child: Stack(
           children: [
@@ -308,7 +304,13 @@ class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen> {
                 ),
                 child: IconButton(
                   icon: const Icon(Icons.arrow_back, size: 20),
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.goNamed('severity_assessment');
+                    }
+                  },
                   padding: EdgeInsets.zero,
                 ),
               ),
@@ -316,58 +318,81 @@ class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen> {
               Expanded(
                 child: Container(
                   height: 48,
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFFDC3545),
+                        const Color(0xFFDC3545).withOpacity(0.9),
+                      ],
+                    ),
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
+                        color: const Color(0xFFDC3545).withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        width: 8,
+                        height: 8,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFEE2E2),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFFFECACA)),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFDC3545),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'SOS ĐANG HOẠT ĐỘNG',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFFDC3545),
-                                letterSpacing: 0.5,
-                              ),
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.white.withOpacity(0.5),
+                              blurRadius: 4,
+                              spreadRadius: 2,
                             ),
                           ],
                         ),
                       ),
-                      const Spacer(),
-                      Padding(
-                        padding: const EdgeInsets.only(right: 12),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'SOS',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        height: 16,
+                        width: 1,
+                        color: Colors.white.withOpacity(0.4),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'ĐANG HOẠT ĐỘNG',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.25),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         child: Text(
                           _formatTime(_remainingSeconds),
                           style: const TextStyle(
-                            fontSize: 18,
+                            fontSize: 13,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF191910),
+                            color: Colors.white,
+                            fontFeatures: [FontFeature.tabularFigures()],
                           ),
                         ),
                       ),
@@ -797,16 +822,9 @@ class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen> {
             title: 'Hướng dẫn sơ cứu',
             subtitle: 'Đã xem 4 bước sơ cứu',
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const FirstAidStepsScreen(
-                    snakeName: 'King Cobra',
-                    snakeNameVi: 'Rắn hổ mang chúa',
-                    venomType: 'Neurotoxic Venom',
-                    snakeImageUrl: 'https://example.com/snake.jpg',
-                  ),
-                ),
+              context.push(
+                '/emergency/first-aid-steps',
+                extra: 'King Cobra',
               );
             },
           ),

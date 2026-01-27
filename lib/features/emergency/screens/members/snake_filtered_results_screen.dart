@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'snake_confirmation_screen.dart';
 import 'symptom_report_screen.dart';
 import 'generic_first_aid_screen.dart';
@@ -22,7 +23,13 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF333333)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed('snake_identification_questions');
+            }
+          },
         ),
         title: const Text(
           'Rắn thường gặp ở khu vực bạn',
@@ -265,12 +272,7 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: () {
                   // Go to generic first aid screen
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const GenericFirstAidScreen(),
-                    ),
-                  );
+                  context.pushNamed('generic_first_aid');
                 },
                 icon: const Icon(Icons.search_off, size: 20),
                 label: const Text(
@@ -463,19 +465,18 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => SnakeConfirmationScreen(
-                              snakeName: name,
-                              englishName: englishName,
-                              scientificName: scientificName,
-                              isPoisonous: isPoisonous,
-                              imageUrl: imageUrl,
-                              features: _getConfirmationFeatures(name),
-                              matchedFeaturesCount: 3,
-                            ),
-                          ),
+                        final confirmationFeatures = _getConfirmationFeatures(name);
+                        context.pushNamed(
+                          'snake_confirmation',
+                          extra: {
+                            'snakeName': name,
+                            'englishName': englishName,
+                            'scientificName': scientificName,
+                            'isPoisonous': isPoisonous,
+                            'imageUrl': imageUrl,
+                            'features': confirmationFeatures,
+                            'matchedFeaturesCount': confirmationFeatures.where((f) => f.isMatched).length,
+                          },
                         );
                       },
                       style: ElevatedButton.styleFrom(
