@@ -81,7 +81,7 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
                       children: [
                         IconButton(
                           icon: const Icon(Icons.arrow_back_ios_new),
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: () => context.pop(),
                         ),
                         const Expanded(
                           child: Text(
@@ -95,7 +95,7 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
                         ),
                         IconButton(
                           icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: () => context.pop(),
                         ),
                       ],
                     ),

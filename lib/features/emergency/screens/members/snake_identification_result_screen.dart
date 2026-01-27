@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:io';
 import 'first_aid_steps_screen.dart';
 
@@ -38,7 +39,7 @@ class _SnakeIdentificationResultScreenState
                   children: [
                     IconButton(
                       icon: const Icon(Icons.arrow_back_ios_new),
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => context.pop(),
                     ),
                     const Expanded(
                       child: Text(
@@ -104,16 +105,9 @@ class _SnakeIdentificationResultScreenState
                   OutlinedButton(
                     onPressed: () {
                       // Navigate to first aid steps screen
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const FirstAidStepsScreen(
-                            snakeName: 'King Cobra',
-                            snakeNameVi: 'Rắn hổ mang chúa',
-                            venomType: 'Neurotoxic Venom',
-                            snakeImageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA78Q8Y8rrYS37mi18pzkQVzGEl0d72xj2AxkV1aNGYBu2B8rXtRzDuDH7NE2et3ULymRNMXCcyPdV8sMLmx0h100VT8euLm3iFSVEbT-PhRTzqxr6vZy-i3VQ7hdm-qa9DxcZ338h1khIQYLraBX5Ohxb0xpfrpnLJ-xgdMaGVqvuShxfnjZLH0b1QSvuy_AIv12qVfUYwQDGNPwxbTb85vh4VlDreXGjzK65b2shRP5PFOZWIk-gi2BOIjFF8gMULJLuGjP6mRlqQ',
-                          ),
-                        ),
+                      context.push(
+                        '/emergency/first-aid-steps',
+                        extra: 'King Cobra',
                       );
                     },
                     style: OutlinedButton.styleFrom(
@@ -140,7 +134,7 @@ class _SnakeIdentificationResultScreenState
 
                   // Retake Link
                   TextButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => context.pop(),
                     child: const Text(
                       'Không đúng? Chụp lại',
                       style: TextStyle(

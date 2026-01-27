@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'severity_assessment_screen.dart';
 
@@ -74,7 +75,7 @@ class _SymptomReportScreenState extends State<SymptomReportScreen> {
               leading: const Icon(Icons.camera_alt, color: Color(0xFF228B22)),
               title: const Text('Chụp ảnh'),
               onTap: () {
-                Navigator.pop(context);
+                context.pop();
                 _pickImage(ImageSource.camera);
               },
             ),
@@ -82,7 +83,7 @@ class _SymptomReportScreenState extends State<SymptomReportScreen> {
               leading: const Icon(Icons.photo_library, color: Color(0xFF228B22)),
               title: const Text('Chọn từ thư viện'),
               onTap: () {
-                Navigator.pop(context);
+                context.pop();
                 _pickImage(ImageSource.gallery);
               },
             ),
@@ -144,19 +145,15 @@ class _SymptomReportScreenState extends State<SymptomReportScreen> {
 
     // Close loading dialog
     if (mounted) {
-      Navigator.pop(context);
+      context.pop();
       
       // Navigate to severity assessment screen
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => SeverityAssessmentScreen(
-            severityScore: severityScore,
-            riskFactors: riskFactors,
-            timeSinceBite: _timeSinceBite.replaceAll(' trước', ''),
-            painLevel: _painLevel.toInt(),
-          ),
-        ),
+      context.push(
+        '/emergency/severity-assessment',
+        extra: {
+          'snakeName': 'Unknown',
+          'symptoms': selectedSymptoms,
+        },
       );
     }
   }
@@ -170,7 +167,7 @@ class _SymptomReportScreenState extends State<SymptomReportScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF191910)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Báo cáo triệu chứng',
@@ -222,7 +219,7 @@ class _SymptomReportScreenState extends State<SymptomReportScreen> {
               // Skip Link
               Center(
                 child: TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => context.pop(),
                   child: Text(
                     'Bỏ qua bước này',
                     style: TextStyle(

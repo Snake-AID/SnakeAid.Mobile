@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../shared/widgets/chat_screen.dart';
 import 'emergency_service_completion_screen.dart';
 
@@ -23,7 +24,7 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
         scrolledUnderElevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF191910)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Đội Cứu Hộ Đã Đến',
@@ -65,12 +66,7 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
             _tapCount++;
             if (_tapCount >= 2) {
               // Navigate to completion screen on double tap
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const EmergencyServiceCompletionScreen(),
-                ),
-              );
+              context.goNamed('emergency_completion');
               _tapCount = 0;
             }
           } else {
@@ -324,15 +320,18 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
                       child: OutlinedButton.icon(
                         onPressed: () {
                           // Open chat screen with rescuer
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ChatScreen(
-                                recipientName: 'Nguyễn Văn A',
-                                recipientAvatar: '🚑',
-                                isExpert: true,
-                              ),
-                            ),
+                          // TODO: Add chat route or use Navigator.push
+                          // context.push(
+                          //   MaterialPageRoute(
+                          //     builder: (context) => const ChatScreen(
+                          //       recipientName: 'Nguyễn Văn A',
+                          //       recipientAvatar: '🚑',
+                          //       isExpert: true,
+                          //     ),
+                          //   ) as String,
+                          // );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Chat feature coming soon')),
                           );
                         },
                         icon: const Icon(Icons.chat_bubble_rounded, size: 18),
@@ -509,7 +508,7 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => context.pop(),
                   child: Text(
                     'Không',
                     style: TextStyle(
@@ -520,8 +519,8 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
                 ),
                 TextButton(
                   onPressed: () {
-                    Navigator.pop(context); // Close dialog
-                    Navigator.pop(context); // Go back
+                    context.pop(); // Close dialog
+                    context.pop(); // Go back
                   },
                   child: const Text(
                     'Hủy cứu hộ',

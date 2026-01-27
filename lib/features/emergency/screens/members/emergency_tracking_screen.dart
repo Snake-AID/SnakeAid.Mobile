@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:async';
 import 'first_aid_steps_screen.dart';
 import 'rescuer_arrived_screen.dart';
@@ -51,12 +52,7 @@ class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen> {
     return Scaffold(
       body: GestureDetector(
         onDoubleTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const RescuerArrivedScreen(),
-            ),
-          );
+          context.push('/emergency/rescuer-arrived');
         },
         child: Stack(
           children: [
@@ -308,7 +304,7 @@ class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen> {
                 ),
                 child: IconButton(
                   icon: const Icon(Icons.arrow_back, size: 20),
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => context.pop(),
                   padding: EdgeInsets.zero,
                 ),
               ),
@@ -598,16 +594,7 @@ class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen> {
                   icon: const Icon(Icons.chat, color: Color(0xFF228B22), size: 20),
                   onPressed: () {
                     // Open chat with rescuer
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ChatScreen(
-                          recipientName: 'Nguyễn Văn A',
-                          recipientAvatar: '🚑',
-                          isExpert: true,
-                        ),
-                      ),
-                    );
+                    context.push('/chat');
                   },
                   padding: EdgeInsets.zero,
                 ),
@@ -797,16 +784,9 @@ class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen> {
             title: 'Hướng dẫn sơ cứu',
             subtitle: 'Đã xem 4 bước sơ cứu',
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const FirstAidStepsScreen(
-                    snakeName: 'King Cobra',
-                    snakeNameVi: 'Rắn hổ mang chúa',
-                    venomType: 'Neurotoxic Venom',
-                    snakeImageUrl: 'https://example.com/snake.jpg',
-                  ),
-                ),
+              context.push(
+                '/emergency/first-aid-steps',
+                extra: 'King Cobra',
               );
             },
           ),

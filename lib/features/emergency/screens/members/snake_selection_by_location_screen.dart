@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'symptom_report_screen.dart';
 import 'snake_confirmation_screen.dart';
 import 'snake_identification_questions_screen.dart';
@@ -17,7 +18,7 @@ class SnakeSelectionByLocationScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF333333)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Rắn thường gặp ở khu vực bạn',
@@ -221,12 +222,7 @@ class SnakeSelectionByLocationScreen extends StatelessWidget {
                   // Không thấy trong danh sách
                   OutlinedButton.icon(
                     onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SnakeIdentificationQuestionsScreen(),
-                        ),
-                      );
+                      context.push('/emergency/snake-identification-questions');
                     },
                     icon: const Icon(Icons.search_off, size: 20),
                     label: const Text('Không thấy trong danh sách này'),
@@ -244,12 +240,7 @@ class SnakeSelectionByLocationScreen extends StatelessWidget {
                   // Bỏ qua nhận định
                   OutlinedButton.icon(
                     onPressed: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SymptomReportScreen(),
-                        ),
-                      );
+                      context.go('/emergency/symptom-report');
                     },
                     icon: const Icon(Icons.skip_next, size: 20),
                     label: const Text('Bỏ qua nhận định rắn'),
@@ -266,7 +257,7 @@ class SnakeSelectionByLocationScreen extends StatelessWidget {
                   
                   // Quay lại chụp ảnh
                   TextButton.icon(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => context.pop(),
                     icon: const Icon(Icons.camera_alt, size: 16),
                     label: const Text('Quay lại chụp ảnh'),
                     style: TextButton.styleFrom(
@@ -438,19 +429,9 @@ class SnakeSelectionByLocationScreen extends StatelessWidget {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => SnakeConfirmationScreen(
-                              snakeName: name,
-                              englishName: englishName,
-                              scientificName: scientificName,
-                              isPoisonous: isPoisonous,
-                              imageUrl: imageUrl,
-                              features: _getConfirmationFeatures(name),
-                              matchedFeaturesCount: 4,
-                            ),
-                          ),
+                        context.push(
+                          '/emergency/snake-confirmation',
+                          extra: name,
                         );
                       },
                       style: ElevatedButton.styleFrom(

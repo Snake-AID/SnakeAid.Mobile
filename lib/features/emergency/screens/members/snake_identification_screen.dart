@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:camera/camera.dart';
-import 'dart:io';
+import 'package:camera/camera.dart';import 'package:go_router/go_router.dart';import 'dart:io';
 import 'snake_identification_result_screen.dart';
 import 'snake_selection_by_location_screen.dart';
 import '../../../shared/widgets/custom_dialog.dart';
@@ -136,13 +136,9 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
     // Simulate AI processing then navigate to results
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => SnakeIdentificationResultScreen(
-              snakeImage: _selectedImage!,
-            ),
-          ),
+        context.push(
+          '/emergency/snake-identification-result',
+          extra: _selectedImage!,
         );
       }
     });
@@ -186,12 +182,12 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.pop(),
             child: const Text('Hủy'),
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context);
+              context.pop();
               openAppSettings();
             },
             style: ElevatedButton.styleFrom(
@@ -216,19 +212,14 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
         actions: [
           DialogAction(
             label: 'Đóng',
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.pop(),
             isOutlined: true,
           ),
           DialogAction(
             label: 'Chọn theo vị trí',
             onPressed: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SnakeSelectionByLocationScreen(),
-                ),
-              );
+              context.pop();
+              context.push('/emergency/snake-selection-location');
             },
             backgroundColor: const Color(0xFF228B22),
             icon: Icons.location_on,
@@ -256,7 +247,7 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.arrow_back_ios_new),
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => context.pop(),
                     ),
                     const Expanded(
                       child: Text(
@@ -686,7 +677,7 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.pop(),
             child: const Text('Đã hiểu'),
           ),
         ],

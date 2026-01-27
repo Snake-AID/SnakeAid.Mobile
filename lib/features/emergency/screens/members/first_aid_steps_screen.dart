@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'symptom_report_screen.dart';
 import 'emergency_tracking_screen.dart';
 
@@ -133,7 +134,7 @@ class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
       );
     } else {
       // Navigate to hospital finder or complete
-      Navigator.pop(context);
+      context.pop();
     }
   }
 
@@ -216,7 +217,7 @@ class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
         children: [
           // Back Button
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () => context.pop(),
             child: Container(
               width: 48,
               height: 48,
@@ -635,12 +636,7 @@ class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
             onPressed: isLastStep 
                 ? () {
                     // Navigate to symptom report
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const SymptomReportScreen(),
-                      ),
-                    );
+                    context.push('/emergency/symptom-report');
                   }
                 : _nextStep,
             style: ElevatedButton.styleFrom(
@@ -676,12 +672,7 @@ class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
             OutlinedButton(
               onPressed: () {
                 // Navigate to emergency tracking screen
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const EmergencyTrackingScreen(),
-                  ),
-                );
+                context.go('/emergency/tracking');
               },
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF228B22),

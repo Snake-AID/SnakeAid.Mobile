@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../shared/widgets/chat_screen.dart';
 import 'payment_success_screen.dart';
 
@@ -35,7 +36,7 @@ class _EmergencyServiceCompletionScreenState
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF191910)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Hoàn tất dịch vụ cấp cứu',
@@ -283,15 +284,9 @@ class _EmergencyServiceCompletionScreenState
             child: IconButton(
               icon: const Icon(Icons.chat_rounded, color: Color(0xFF228B22)),
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ChatScreen(
-                      recipientName: 'Nguyễn Văn A',
-                      recipientAvatar: '🚑',
-                      isExpert: true,
-                    ),
-                  ),
+                // TODO: Add chat route
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Chat feature coming soon')),
                 );
               },
             ),

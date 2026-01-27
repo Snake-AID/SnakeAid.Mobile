@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'snake_confirmation_screen.dart';
 import 'symptom_report_screen.dart';
 import 'generic_first_aid_screen.dart';
@@ -22,7 +23,7 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF333333)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Rắn thường gặp ở khu vực bạn',
@@ -265,12 +266,7 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: () {
                   // Go to generic first aid screen
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const GenericFirstAidScreen(),
-                    ),
-                  );
+                  context.push('/emergency/generic-first-aid');
                 },
                 icon: const Icon(Icons.search_off, size: 20),
                 label: const Text(
@@ -463,19 +459,9 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => SnakeConfirmationScreen(
-                              snakeName: name,
-                              englishName: englishName,
-                              scientificName: scientificName,
-                              isPoisonous: isPoisonous,
-                              imageUrl: imageUrl,
-                              features: _getConfirmationFeatures(name),
-                              matchedFeaturesCount: 3,
-                            ),
-                          ),
+                        context.push(
+                          '/emergency/snake-confirmation',
+                          extra: name,
                         );
                       },
                       style: ElevatedButton.styleFrom(

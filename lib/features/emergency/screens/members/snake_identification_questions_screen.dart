@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'snake_filtered_results_screen.dart';
 
 /// Snake Identification Questions Screen - Multi-step questionnaire for accurate identification
@@ -154,13 +155,9 @@ class _SnakeIdentificationQuestionsScreenState
 
   void _showResults() {
     // Navigate to filtered results screen with answers
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => SnakeFilteredResultsScreen(
-          answers: _selectedAnswers,
-        ),
-      ),
+    context.go(
+      '/emergency/snake-filtered-results',
+      extra: _selectedAnswers,
     );
   }
 
@@ -176,7 +173,7 @@ class _SnakeIdentificationQuestionsScreenState
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF666666)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Nhận dạng qua câu hỏi',
