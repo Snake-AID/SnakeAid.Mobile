@@ -1,557 +1,550 @@
 import 'package:flutter/material.dart';
-import '../../../shared/widgets/custom_dialog.dart';
+import '../../../shared/widgets/chat_screen.dart';
+import 'emergency_service_completion_screen.dart';
 
 class RescuerArrivedScreen extends StatefulWidget {
-  final String rescuerName;
-  final String rescuerPhone;
-  final double rescuerRating;
-
-  const RescuerArrivedScreen({
-    Key? key,
-    required this.rescuerName,
-    required this.rescuerPhone,
-    required this.rescuerRating,
-  }) : super(key: key);
+  const RescuerArrivedScreen({super.key});
 
   @override
   State<RescuerArrivedScreen> createState() => _RescuerArrivedScreenState();
 }
 
 class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
-  final Set<String> _completedChecklist = {};
-
-  final List<Map<String, String>> _checklistItems = [
-    {
-      'id': 'snake_info',
-      'title': 'Thông tin loài rắn',
-      'description': 'Đã chia sẻ loài rắn, độc tính, ảnh chụp',
-    },
-    {
-      'id': 'symptoms',
-      'title': 'Triệu chứng hiện tại',
-      'description': 'Đã báo cáo các triệu chứng đang gặp',
-    },
-    {
-      'id': 'first_aid',
-      'title': 'Sơ cứu đã thực hiện',
-      'description': 'Đã thông báo các bước sơ cứu đã làm',
-    },
-    {
-      'id': 'bite_time',
-      'title': 'Thời gian bị cắn',
-      'description': 'Đã xác nhận thời điểm bị rắn cắn',
-    },
-  ];
-
-  void _confirmArrival() {
-    if (_completedChecklist.length < _checklistItems.length) {
-      showDialog(
-        context: context,
-        builder: (context) => CustomDialog(
-          icon: Icons.warning_amber_rounded,
-          iconColor: Colors.orange,
-          title: 'Chưa hoàn thành checklist',
-          content: const Text(
-            'Vui lòng hoàn thành tất cả các mục trong danh sách '
-            'trước khi xác nhận cứu hộ viên đã đến.',
-            style: TextStyle(fontSize: 14),
-          ),
-          actions: [
-            DialogAction(
-              label: 'Đóng',
-              onPressed: () => Navigator.pop(context),
-              isPrimary: true,
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) => CustomDialog(
-        icon: Icons.check_circle,
-        iconColor: const Color(0xFF228B22),
-        title: 'Xác nhận cứu hộ viên đã đến?',
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Bạn đã gặp và xác minh danh tính của cứu hộ viên?',
-              style: TextStyle(fontSize: 14),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.shade200),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Sau khi xác nhận, bạn sẽ được chuyển đến bệnh viện '
-                      'và màn hình thanh toán.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.blue.shade900,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          DialogAction(
-            label: 'Chưa',
-            onPressed: () => Navigator.pop(context),
-            isPrimary: false,
-          ),
-          DialogAction(
-            label: 'Xác nhận',
-            onPressed: () {
-              Navigator.pop(context);
-              _proceedToPayment();
-            },
-            isPrimary: true,
-            icon: Icons.check,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _proceedToPayment() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Chuyển đến màn hình thanh toán...'),
-        backgroundColor: Color(0xFF228B22),
-      ),
-    );
-
-    // TODO: Navigate to PaymentScreen
-    // Navigator.pushReplacement(
-    //   context,
-    //   MaterialPageRoute(builder: (context) => const PaymentScreen()),
-    // );
-  }
+  int _tapCount = 0;
+  DateTime? _lastTapTime;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F8F6),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF228B22),
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF191910)),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: const Text(
-          'Cứu hộ viên đã đến',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          'Đội Cứu Hộ Đã Đến',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF191910),
+          ),
         ),
         centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Success banner
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(
+              child: Text(
+                TimeOfDay.now().format(context),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF228B22),
                 ),
               ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.check_circle,
-                      color: Color(0xFF228B22),
-                      size: 50,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Cứu hộ viên đã có mặt',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Vui lòng xác minh thông tin và hoàn thành checklist',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+            ),
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(
+            height: 1,
+            color: const Color(0xFFE5E7EB).withOpacity(0.8),
+          ),
+        ),
+      ),
+      body: GestureDetector(
+        onTap: () {
+          final now = DateTime.now();
+          if (_lastTapTime != null &&
+              now.difference(_lastTapTime!).inMilliseconds < 500) {
+            _tapCount++;
+            if (_tapCount >= 2) {
+              // Navigate to completion screen on double tap
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const EmergencyServiceCompletionScreen(),
+                ),
+              );
+              _tapCount = 0;
+            }
+          } else {
+            _tapCount = 1;
+          }
+          _lastTapTime = now;
+        },
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+              // Success Banner
+              _buildSuccessBanner(),
+              const SizedBox(height: 16),
+
+              // Main Status Card
+              _buildMainStatusCard(),
+              const SizedBox(height: 16),
+
+              // Rescuer Information Card
+              _buildRescuerInfoCard(context),
+              const SizedBox(height: 24),
+
+              // Section Header
+              const Text(
+                'Điều Cần Làm',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF191910),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Instructions Card
+              _buildInstructionsCard(),
+              const SizedBox(height: 32),
+
+              // Footer Action
+              _buildFooterAction(context),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+      ),
+    );
+  }
+
+  Widget _buildSuccessBanner() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFD4EDDA),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF155724).withOpacity(0.1),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: const Color(0xFF155724),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.check_circle_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 16),
+          const Expanded(
+            child: Text(
+              'Đội cứu hộ đã có mặt tại vị trí của bạn',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF155724),
+                height: 1.4,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
 
-            const SizedBox(height: 24),
-
-            // Rescuer verification card
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
+  Widget _buildMainStatusCard() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Shield Icon
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF228B22).withOpacity(0.15),
+                  const Color(0xFF228B22).withOpacity(0.05),
                 ],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Thông tin cứu hộ viên',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.verified_user_rounded,
+              size: 52,
+              color: Color(0xFF228B22),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Status Badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF2563EB).withOpacity(0.1),
+                  const Color(0xFF3B82F6).withOpacity(0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: const Color(0xFF2563EB).withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Icon(
+                  Icons.autorenew_rounded,
+                  size: 18,
+                  color: Color(0xFF2563EB),
+                ),
+                SizedBox(width: 8),
+                Text(
+                  'Đang Xử Lý',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF2563EB),
+                    letterSpacing: 0.3,
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      // Avatar
-                      Container(
-                        width: 70,
-                        height: 70,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF228B22),
-                          borderRadius: BorderRadius.circular(35),
-                        ),
-                        child: Center(
-                          child: Text(
-                            widget.rescuerName.substring(0, 2).toUpperCase(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
 
-                      const SizedBox(width: 16),
+          // Status Text
+          Text(
+            'Đội cứu hộ đang an toàn bắt rắn',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[700],
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
 
-                      // Info
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.rescuerName,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                const Icon(Icons.star, color: Colors.amber, size: 18),
-                                const SizedBox(width: 4),
-                                Text(
-                                  widget.rescuerRating.toString(),
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF228B22).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Text(
-                                'Đã xác minh',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF228B22),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Call button
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF228B22).withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Đang gọi ${widget.rescuerPhone}...'),
-                              ),
-                            );
-                          },
-                          icon: const Icon(
-                            Icons.phone,
+  Widget _buildRescuerInfoCard(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Nguyễn Văn A',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF191910),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Chuyên gia cứu hộ rắn',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {},
+                        icon: const Icon(Icons.call_rounded, size: 18),
+                        label: const Text('Gọi'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF228B22),
+                          side: const BorderSide(
                             color: Color(0xFF228B22),
+                            width: 1.5,
                           ),
-                          iconSize: 28,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          // Open chat screen with rescuer
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ChatScreen(
+                                recipientName: 'Nguyễn Văn A',
+                                recipientAvatar: '🚑',
+                                isExpert: true,
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.chat_bubble_rounded, size: 18),
+                        label: const Text('Nhắn Tin'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF228B22),
+                          side: const BorderSide(
+                            color: Color(0xFF228B22),
+                            width: 1.5,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF228B22),
+                  Color(0xFF1a6b1a),
                 ],
               ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF228B22).withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
+            child: const Icon(
+              Icons.person_rounded,
+              color: Colors.white,
+              size: 36,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-            const SizedBox(height: 24),
-
-            // Transfer checklist
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Checklist chuyển giao thông tin',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Đánh dấu các mục đã hoàn thành',
+  Widget _buildInstructionsCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFFFFF3CD),
+            const Color(0xFFFFF3CD).withOpacity(0.8),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFF856404).withOpacity(0.1),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildInstructionItem('Giữ khoảng cách an toàn'),
+          const SizedBox(height: 16),
+          _buildInstructionItem('Không tiếp cận con rắn'),
+          const SizedBox(height: 16),
+          _buildInstructionItem('Đội cứu hộ sẽ thông báo khi hoàn tất'),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.schedule_rounded,
+                  size: 20,
+                  color: const Color(0xFF856404).withOpacity(0.8),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Thường mất khoảng 10-20 phút để cứu hộ',
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF856404).withOpacity(0.9),
                     ),
                   ),
-                ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInstructionItem(String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          margin: const EdgeInsets.only(top: 2),
+          decoration: BoxDecoration(
+            color: const Color(0xFF856404).withOpacity(0.15),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.check_rounded,
+            size: 16,
+            color: Color(0xFF856404),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF856404),
+              height: 1.4,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFooterAction(BuildContext context) {
+    return Center(
+      child: TextButton(
+        onPressed: () {
+          // Show confirmation dialog
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
               ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Checklist items
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _checklistItems.length,
-              itemBuilder: (context, index) {
-                final item = _checklistItems[index];
-                final isCompleted = _completedChecklist.contains(item['id']);
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Material(
-                    color: isCompleted
-                        ? const Color(0xFF228B22).withOpacity(0.05)
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    child: InkWell(
-                      onTap: () {
-                        setState(() {
-                          if (isCompleted) {
-                            _completedChecklist.remove(item['id']);
-                          } else {
-                            _completedChecklist.add(item['id']!);
-                          }
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isCompleted
-                                ? const Color(0xFF228B22)
-                                : Colors.grey.shade300,
-                            width: isCompleted ? 2 : 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 28,
-                              height: 28,
-                              decoration: BoxDecoration(
-                                color: isCompleted
-                                    ? const Color(0xFF228B22)
-                                    : Colors.transparent,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: isCompleted
-                                      ? const Color(0xFF228B22)
-                                      : Colors.grey.shade400,
-                                  width: 2,
-                                ),
-                              ),
-                              child: isCompleted
-                                  ? const Icon(
-                                      Icons.check,
-                                      color: Colors.white,
-                                      size: 18,
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item['title']!,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: isCompleted
-                                          ? Colors.black87
-                                          : Colors.grey[700],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    item['description']!,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 24),
-
-            // Progress indicator
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF228B22).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFF228B22).withOpacity(0.3),
+              title: const Text(
+                'Hủy cứu hộ?',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              child: Row(
-                children: [
-                  Icon(
-                    _completedChecklist.length == _checklistItems.length
-                        ? Icons.check_circle
-                        : Icons.pending,
-                    color: _completedChecklist.length == _checklistItems.length
-                        ? const Color(0xFF228B22)
-                        : Colors.orange,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      '${_completedChecklist.length}/${_checklistItems.length} mục đã hoàn thành',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[800],
-                      ),
-                    ),
-                  ),
-                ],
+              content: const Text(
+                'Bạn có chắc chắn muốn hủy yêu cầu cứu hộ này không?',
+                style: TextStyle(
+                  fontSize: 15,
+                  height: 1.4,
+                ),
               ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Confirm button
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton.icon(
-                  onPressed: _confirmArrival,
-                  icon: const Icon(Icons.check_circle, size: 22),
-                  label: const Text(
-                    'Xác nhận đã gặp cứu hộ viên',
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    'Không',
                     style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _completedChecklist.length == _checklistItems.length
-                        ? const Color(0xFF228B22)
-                        : Colors.grey,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.grey[700],
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-              ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context); // Close dialog
+                    Navigator.pop(context); // Go back
+                  },
+                  child: const Text(
+                    'Hủy cứu hộ',
+                    style: TextStyle(
+                      color: Color(0xFFDC3545),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          );
+        },
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        ),
+        child: Text(
+          'Hủy cứu hộ (nếu cần)',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[600],
+          ),
         ),
       ),
     );
