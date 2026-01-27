@@ -642,7 +642,7 @@ class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
             onPressed: isLastStep 
                 ? () {
                     // Navigate to symptom report
-                    context.push('/emergency/symptom-report');
+                    context.pushNamed('symptom_report');
                   }
                 : _nextStep,
             style: ElevatedButton.styleFrom(
@@ -678,7 +678,7 @@ class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
             OutlinedButton(
               onPressed: () {
                 // Navigate to emergency tracking screen
-                context.go('/emergency/tracking');
+                context.goNamed('emergency_tracking');
               },
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF228B22),

@@ -272,7 +272,7 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: () {
                   // Go to generic first aid screen
-                  context.push('/emergency/generic-first-aid');
+                  context.pushNamed('generic_first_aid');
                 },
                 icon: const Icon(Icons.search_off, size: 20),
                 label: const Text(
@@ -465,9 +465,18 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
-                        context.push(
-                          '/emergency/snake-confirmation',
-                          extra: name,
+                        final confirmationFeatures = _getConfirmationFeatures(name);
+                        context.pushNamed(
+                          'snake_confirmation',
+                          extra: {
+                            'snakeName': name,
+                            'englishName': englishName,
+                            'scientificName': scientificName,
+                            'isPoisonous': isPoisonous,
+                            'imageUrl': imageUrl,
+                            'features': confirmationFeatures,
+                            'matchedFeaturesCount': confirmationFeatures.where((f) => f.isMatched).length,
+                          },
                         );
                       },
                       style: ElevatedButton.styleFrom(

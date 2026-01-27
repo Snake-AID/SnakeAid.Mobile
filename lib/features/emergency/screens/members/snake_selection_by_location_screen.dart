@@ -228,7 +228,7 @@ class SnakeSelectionByLocationScreen extends StatelessWidget {
                   // Không thấy trong danh sách
                   OutlinedButton.icon(
                     onPressed: () {
-                      context.push('/emergency/snake-identification-questions');
+                      context.goNamed('snake_identification_questions');
                     },
                     icon: const Icon(Icons.search_off, size: 20),
                     label: const Text('Không thấy trong danh sách này'),
@@ -246,7 +246,7 @@ class SnakeSelectionByLocationScreen extends StatelessWidget {
                   // Bỏ qua nhận định
                   OutlinedButton.icon(
                     onPressed: () {
-                      context.go('/emergency/symptom-report');
+                      context.goNamed('symptom_report');
                     },
                     icon: const Icon(Icons.skip_next, size: 20),
                     label: const Text('Bỏ qua nhận định rắn'),
@@ -441,9 +441,17 @@ class SnakeSelectionByLocationScreen extends StatelessWidget {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
-                        context.push(
-                          '/emergency/snake-confirmation',
-                          extra: name,
+                        context.pushNamed(
+                          'snake_confirmation',
+                          extra: {
+                            'snakeName': name,
+                            'englishName': englishName,
+                            'scientificName': scientificName,
+                            'isPoisonous': isPoisonous,
+                            'imageUrl': imageUrl,
+                            'features': _getConfirmationFeatures(name),
+                            'matchedFeaturesCount': _getConfirmationFeatures(name).where((f) => f.isMatched).length,
+                          },
                         );
                       },
                       style: ElevatedButton.styleFrom(

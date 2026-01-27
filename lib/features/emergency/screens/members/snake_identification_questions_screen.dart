@@ -155,8 +155,8 @@ class _SnakeIdentificationQuestionsScreenState
 
   void _showResults() {
     // Navigate to filtered results screen with answers
-    context.go(
-      '/emergency/snake-filtered-results',
+    context.pushNamed(
+      'snake_filtered_results',
       extra: _selectedAnswers,
     );
   }

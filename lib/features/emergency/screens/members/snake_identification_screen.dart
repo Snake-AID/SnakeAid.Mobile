@@ -125,19 +125,20 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
   void _processImage() {
     if (_selectedImage == null) return;
 
-    // Show loading
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Đang phân tích ảnh bằng AI...'),
-        backgroundColor: Color(0xFF228B22),
-        duration: Duration(seconds: 2),
-      ),
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AnalyzingLoadingDialog(),
     );
-    
+
     // Simulate AI processing then navigate to results
-    Future.delayed(const Duration(seconds: 2), () {
+    Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
-        // TODO: SnakeIdentificationResultScreen requires File object, use Navigator.push
+        // Close loading dialog
+        Navigator.pop(context);
+        
+        // Navigate to results
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -251,7 +252,13 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.arrow_back_ios_new),
-                      onPressed: () => context.pop(),
+                      onPressed: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.goNamed('emergency_alert');
+                        }
+                      },
                     ),
                     const Expanded(
                       child: Text(
@@ -685,6 +692,136 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
             child: const Text('Đã hiểu'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class AnalyzingLoadingDialog extends StatefulWidget {
+  const AnalyzingLoadingDialog({super.key});
+
+  @override
+  State<AnalyzingLoadingDialog> createState() => _AnalyzingLoadingDialogState();
+}
+
+class _AnalyzingLoadingDialogState extends State<AnalyzingLoadingDialog>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  int _currentStep = 0;
+
+  final List<String> _steps = [
+    'Đang phân tích ảnh...',
+    'Nhận diện đặc điểm rắn...',
+    'So sánh với cơ sở dữ liệu...',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat();
+
+    // Cycle through steps
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted) {
+        setState(() => _currentStep = 1);
+      }
+    });
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() => _currentStep = 2);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Animated loading indicator
+            RotationTransition(
+              turns: _controller,
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFFE5E7EB),
+                    width: 4,
+                  ),
+                ),
+                child: Stack(
+                  children: [
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF228B22),
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(30),
+                            topRight: Radius.circular(30),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // Processing text
+            Text(
+              _steps[_currentStep],
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF191910),
+              ),
+            ),
+            const SizedBox(height: 12),
+            
+            // Progress indicator
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(3, (index) {
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: index <= _currentStep
+                        ? const Color(0xFF228B22)
+                        : const Color(0xFFE5E7EB),
+                  ),
+                );
+              }),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -326,18 +326,15 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
                       child: OutlinedButton.icon(
                         onPressed: () {
                           // Open chat screen with rescuer
-                          // TODO: Add chat route or use Navigator.push
-                          // context.push(
-                          //   MaterialPageRoute(
-                          //     builder: (context) => const ChatScreen(
-                          //       recipientName: 'Nguyễn Văn A',
-                          //       recipientAvatar: '🚑',
-                          //       isExpert: true,
-                          //     ),
-                          //   ) as String,
-                          // );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Chat feature coming soon')),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ChatScreen(
+                                recipientName: 'Nguyễn Văn A',
+                                recipientAvatar: '🚑',
+                                isExpert: true,
+                              ),
+                            ),
                           );
                         },
                         icon: const Icon(Icons.chat_bubble_rounded, size: 18),

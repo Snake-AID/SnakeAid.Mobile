@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 /// Payment Success Screen - After completing emergency service payment
 class PaymentSuccessScreen extends StatelessWidget {
@@ -27,7 +28,7 @@ class PaymentSuccessScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.close_rounded, color: Color(0xFF191910)),
             onPressed: () {
-              Navigator.of(context).popUntil((route) => route.isFirst);
+              context.goNamed('member_home');
             },
           ),
         ],
@@ -632,7 +633,7 @@ class PaymentSuccessScreen extends StatelessWidget {
             child: InkWell(
               borderRadius: BorderRadius.circular(30),
               onTap: () {
-                Navigator.of(context).popUntil((route) => route.isFirst);
+                context.goNamed('member_home');
               },
               child: const Padding(
                 padding: EdgeInsets.symmetric(vertical: 18),

@@ -538,9 +538,14 @@ class _SnakeConfirmationScreenState extends State<SnakeConfirmationScreen> {
             icon: Icons.arrow_forward,
             onPressed: () {
               context.pop(); // Close dialog
-              context.push(
-                '/emergency/first-aid-steps',
-                extra: widget.snakeName,
+              context.pushNamed(
+                'first_aid_steps',
+                extra: {
+                  'snakeName': widget.snakeName,
+                  'snakeNameVi': widget.snakeName,
+                  'venomType': widget.isPoisonous ? 'Độc' : 'Không độc',
+                  'snakeImageUrl': widget.imageUrl,
+                },
               );
             },
             backgroundColor: const Color(0xFF228B22),

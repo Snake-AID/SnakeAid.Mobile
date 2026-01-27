@@ -105,9 +105,14 @@ class _SnakeIdentificationResultScreenState
                   OutlinedButton(
                     onPressed: () {
                       // Navigate to first aid steps screen
-                      context.push(
-                        '/emergency/first-aid-steps',
-                        extra: 'King Cobra',
+                      context.pushNamed(
+                        'first_aid_steps',
+                        extra: {
+                          'snakeName': 'King Cobra',
+                          'snakeNameVi': 'Rắn hổ mang chúa',
+                          'venomType': 'Neurotoxic',
+                          'snakeImageUrl': 'https://images.unsplash.com/photo-1531386151447-fd76ad50012f?w=400',
+                        },
                       );
                     },
                     style: OutlinedButton.styleFrom(

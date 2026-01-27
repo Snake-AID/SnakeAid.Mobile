@@ -412,7 +412,7 @@ class _SeverityAssessmentScreenState extends State<SeverityAssessmentScreen> {
           ElevatedButton(
             onPressed: () {
               // Navigate to emergency tracking screen
-              context.go('/emergency/tracking');
+              context.goNamed('emergency_tracking');
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF228B22),

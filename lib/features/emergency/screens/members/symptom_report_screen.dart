@@ -148,11 +148,13 @@ class _SymptomReportScreenState extends State<SymptomReportScreen> {
       context.pop();
       
       // Navigate to severity assessment screen
-      context.push(
-        '/emergency/severity-assessment',
+      context.pushNamed(
+        'severity_assessment',
         extra: {
-          'snakeName': 'Unknown',
-          'symptoms': selectedSymptoms,
+          'severityScore': severityScore,
+          'riskFactors': riskFactors,
+          'timeSinceBite': _timeSinceBite,
+          'painLevel': _painLevel.round(),
         },
       );
     }
@@ -171,7 +173,7 @@ class _SymptomReportScreenState extends State<SymptomReportScreen> {
             if (context.canPop()) {
               context.pop();
             } else {
-              context.goNamed('first_aid_steps');
+              context.goNamed('snake_selection_by_location');
             }
           },
         ),
