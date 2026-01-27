@@ -24,7 +24,13 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
         scrolledUnderElevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF191910)),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed('emergency_tracking');
+            }
+          },
         ),
         title: const Text(
           'Đội Cứu Hộ Đã Đến',

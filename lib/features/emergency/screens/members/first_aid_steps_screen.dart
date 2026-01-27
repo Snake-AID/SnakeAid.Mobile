@@ -217,7 +217,13 @@ class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
         children: [
           // Back Button
           GestureDetector(
-            onTap: () => context.pop(),
+            onTap: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.goNamed('snake_confirmation');
+              }
+            },
             child: Container(
               width: 48,
               height: 48,

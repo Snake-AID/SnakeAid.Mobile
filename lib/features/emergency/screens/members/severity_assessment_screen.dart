@@ -61,7 +61,13 @@ class _SeverityAssessmentScreenState extends State<SeverityAssessmentScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF191910)),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed('emergency_alert');
+            }
+          },
         ),
         title: const Text(
           'Đánh giá mức độ nghiêm trọng',

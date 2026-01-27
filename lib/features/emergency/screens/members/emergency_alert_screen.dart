@@ -81,7 +81,13 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
                       children: [
                         IconButton(
                           icon: const Icon(Icons.arrow_back_ios_new),
-                          onPressed: () => context.pop(),
+                          onPressed: () {
+                            if (context.canPop()) {
+                              context.pop();
+                            } else {
+                              context.goNamed('member_home');
+                            }
+                          },
                         ),
                         const Expanded(
                           child: Text(
@@ -95,7 +101,13 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
                         ),
                         IconButton(
                           icon: const Icon(Icons.close),
-                          onPressed: () => context.pop(),
+                          onPressed: () {
+                            if (context.canPop()) {
+                              context.pop();
+                            } else {
+                              context.goNamed('member_home');
+                            }
+                          },
                         ),
                       ],
                     ),
@@ -1039,7 +1051,7 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
           TextButton(
             onPressed: () {
               context.pop(); // Close dialog
-              context.pop(); // Close screen
+              context.goNamed('member_home'); // Go to member_home
             },
             style: TextButton.styleFrom(
               foregroundColor: const Color(0xFFDC3545),

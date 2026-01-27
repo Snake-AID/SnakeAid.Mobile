@@ -18,7 +18,13 @@ class SnakeSelectionByLocationScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF333333)),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed('snake_identification');
+            }
+          },
         ),
         title: const Text(
           'Rắn thường gặp ở khu vực bạn',
@@ -257,7 +263,13 @@ class SnakeSelectionByLocationScreen extends StatelessWidget {
                   
                   // Quay lại chụp ảnh
                   TextButton.icon(
-                    onPressed: () => context.pop(),
+                    onPressed: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.goNamed('snake_identification');
+                      }
+                    },
                     icon: const Icon(Icons.camera_alt, size: 16),
                     label: const Text('Quay lại chụp ảnh'),
                     style: TextButton.styleFrom(

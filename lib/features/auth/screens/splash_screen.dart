@@ -38,7 +38,7 @@ class _SplashScreenState extends State<SplashScreen> {
           // Navigate to role selection screen after loading
           Future.delayed(const Duration(milliseconds: 300), () {
             if (mounted) {
-              Navigator.of(context).pushReplacementNamed('/role-selection');
+              context.goNamed('role_selection');
             }
           });
         }

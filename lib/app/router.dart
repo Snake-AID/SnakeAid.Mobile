@@ -226,7 +226,7 @@ final router = GoRouter(
           scientificName: data['scientificName'] as String,
           isPoisonous: data['isPoisonous'] as bool,
           imageUrl: data['imageUrl'] as String?,
-          features: data['features'] as List<dynamic>,
+          features: (data['features'] as List<dynamic>).cast<IdentificationFeature>(),
           matchedFeaturesCount: data['matchedFeaturesCount'] as int,
         );
       },

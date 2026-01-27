@@ -264,7 +264,7 @@ class MemberHomeScreen extends StatelessWidget {
             label: 'XEM CHI TIẾT',
             onPressed: () {
               context.pop();
-              context.goNamed('emergency_alert');
+              context.pushNamed('emergency_alert');
             },
             backgroundColor: const Color(0xFF228B22),
             icon: Icons.arrow_forward,

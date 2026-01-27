@@ -167,7 +167,13 @@ class _SymptomReportScreenState extends State<SymptomReportScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF191910)),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed('first_aid_steps');
+            }
+          },
         ),
         title: const Text(
           'Báo cáo triệu chứng',

@@ -173,7 +173,13 @@ class _SnakeIdentificationQuestionsScreenState
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF666666)),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed('snake_selection_by_location');
+            }
+          },
         ),
         title: const Text(
           'Nhận dạng qua câu hỏi',

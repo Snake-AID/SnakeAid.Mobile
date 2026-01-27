@@ -82,7 +82,13 @@ class _SnakeConfirmationScreenState extends State<SnakeConfirmationScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF666666)),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed('snake_identification_questions');
+            }
+          },
         ),
         title: const Text(
           'Xác nhận loài rắn',

@@ -36,7 +36,13 @@ class _EmergencyServiceCompletionScreenState
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF191910)),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed('member_home');
+            }
+          },
         ),
         title: const Text(
           'Hoàn tất dịch vụ cấp cứu',

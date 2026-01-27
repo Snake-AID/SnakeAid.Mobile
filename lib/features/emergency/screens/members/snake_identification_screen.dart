@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:camera/camera.dart';import 'package:go_router/go_router.dart';import 'dart:io';
+import 'package:camera/camera.dart';
+import 'dart:io';
 import 'snake_identification_result_screen.dart';
 import 'snake_selection_by_location_screen.dart';
 import '../../../shared/widgets/custom_dialog.dart';
@@ -136,9 +137,12 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
     // Simulate AI processing then navigate to results
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
-        context.push(
-          '/emergency/snake-identification-result',
-          extra: _selectedImage!,
+        // TODO: SnakeIdentificationResultScreen requires File object, use Navigator.push
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SnakeIdentificationResultScreen(snakeImage: _selectedImage!),
+          ),
         );
       }
     });
@@ -219,7 +223,7 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
             label: 'Chọn theo vị trí',
             onPressed: () {
               context.pop();
-              context.push('/emergency/snake-selection-location');
+              context.goNamed('snake_selection_by_location');
             },
             backgroundColor: const Color(0xFF228B22),
             icon: Icons.location_on,

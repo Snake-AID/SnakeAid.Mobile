@@ -23,7 +23,13 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF333333)),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed('snake_identification_questions');
+            }
+          },
         ),
         title: const Text(
           'Rắn thường gặp ở khu vực bạn',
