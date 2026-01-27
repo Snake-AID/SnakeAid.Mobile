@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:snakeaid_mobile/core/services/notification_service.dart';
+import 'package:snakeaid_mobile/features/shared/screens/location_tracker_screen.dart';
+import 'package:snakeaid_mobile/features/shared/screens/signalr_test_screen.dart';
 import 'core/services/background_notification_service.dart';
 import 'core/services/fcm_service.dart';
 import 'app/router.dart';
@@ -59,7 +61,7 @@ class MyApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'SnakeAid Mobile',
       debugShowCheckedModeBanner: false,
-      
+
       // TODO: Replace with new theme when redesigned
       // For now using default Material Design 3 theme
       theme: ThemeData(
@@ -74,7 +76,7 @@ class MyApp extends ConsumerWidget {
         ),
       ),
       themeMode: ThemeMode.system,
-      
+
       // Use go_router configuration
       routerConfig: router,
     );
