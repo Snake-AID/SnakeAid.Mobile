@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../member/presentation/screens/home_screen.dart';
-import '../../member/presentation/screens/profile_screen.dart';
+import '../../member/screens/home_screen.dart';
+import '../../member/screens/profile_screen.dart';
 
 /// Main scaffold with IndexedStack for instant tab switching
 /// This keeps all screens alive and switches between them without rebuild
