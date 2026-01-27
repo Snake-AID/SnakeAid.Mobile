@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'messages_screen.dart';
 
 /// Message Detail Screen - Individual conversation
@@ -329,7 +330,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
               leading: const Icon(Icons.search, color: Color(0xFF228B22)),
               title: const Text('Tìm kiếm trong cuộc trò chuyện'),
               onTap: () {
-                Navigator.pop(context);
+                context.pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Tìm kiếm tin nhắn')),
                 );
@@ -339,7 +340,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
               leading: const Icon(Icons.notifications_off_outlined, color: Colors.grey),
               title: const Text('Tắt thông báo'),
               onTap: () {
-                Navigator.pop(context);
+                context.pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Đã tắt thông báo')),
                 );
@@ -349,7 +350,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
               leading: const Icon(Icons.block, color: Colors.red),
               title: const Text('Chặn người dùng'),
               onTap: () {
-                Navigator.pop(context);
+                context.pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Chặn người dùng')),
                 );
@@ -390,7 +391,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
                   label: 'Thư viện',
                   color: const Color(0xFF228B22),
                   onTap: () {
-                    Navigator.pop(context);
+                    context.pop();
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Chọn từ thư viện')),
                     );
@@ -401,7 +402,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
                   label: 'Camera',
                   color: const Color(0xFF2196F3),
                   onTap: () {
-                    Navigator.pop(context);
+                    context.pop();
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Mở camera')),
                     );
@@ -412,7 +413,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
                   label: 'Tài liệu',
                   color: const Color(0xFFFFA726),
                   onTap: () {
-                    Navigator.pop(context);
+                    context.pop();
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Chọn tài liệu')),
                     );

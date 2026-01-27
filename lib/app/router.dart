@@ -21,6 +21,21 @@ import 'package:snakeaid_mobile/features/auth/screens/forgot_password_otp_screen
 import 'package:snakeaid_mobile/features/auth/screens/reset_password_screen.dart';
 import 'package:snakeaid_mobile/features/auth/screens/password_reset_success_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_alert_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/members/snake_identification_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/members/snake_identification_result_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/members/snake_selection_by_location_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/members/snake_identification_questions_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/members/snake_filtered_results_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/members/snake_confirmation_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/members/generic_first_aid_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/members/first_aid_steps_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/members/symptom_report_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/members/severity_assessment_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_tracking_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/members/rescuer_arrived_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_service_completion_screen.dart';
+import 'package:snakeaid_mobile/features/member/screens/messages_screen.dart';
+import 'package:snakeaid_mobile/features/member/screens/message_detail_screen.dart';
 
 /// App routing configuration using go_router
 final router = GoRouter(
@@ -174,6 +189,104 @@ final router = GoRouter(
       path: '/emergency-alert',
       name: 'emergency_alert',
       builder: (context, state) => const EmergencyAlertScreen(),
+    ),
+    GoRoute(
+      path: '/snake-identification',
+      name: 'snake_identification',
+      builder: (context, state) => const SnakeIdentificationScreen(),
+    ),
+    GoRoute(
+      path: '/snake-identification-result',
+      name: 'snake_identification_result',
+      builder: (context, state) {
+        final snakeName = state.extra as String;
+        return SnakeIdentificationResultScreen(identifiedSnake: snakeName);
+      },
+    ),
+    GoRoute(
+      path: '/snake-selection-by-location',
+      name: 'snake_selection_by_location',
+      builder: (context, state) => const SnakeSelectionByLocationScreen(),
+    ),
+    GoRoute(
+      path: '/snake-identification-questions',
+      name: 'snake_identification_questions',
+      builder: (context, state) => const SnakeIdentificationQuestionsScreen(),
+    ),
+    GoRoute(
+      path: '/snake-filtered-results',
+      name: 'snake_filtered_results',
+      builder: (context, state) {
+        final answers = state.extra as Map<String, String>;
+        return SnakeFilteredResultsScreen(questionAnswers: answers);
+      },
+    ),
+    GoRoute(
+      path: '/snake-confirmation',
+      name: 'snake_confirmation',
+      builder: (context, state) {
+        final snakeName = state.extra as String;
+        return SnakeConfirmationScreen(snakeName: snakeName);
+      },
+    ),
+    GoRoute(
+      path: '/generic-first-aid',
+      name: 'generic_first_aid',
+      builder: (context, state) => const GenericFirstAidScreen(),
+    ),
+    GoRoute(
+      path: '/first-aid-steps',
+      name: 'first_aid_steps',
+      builder: (context, state) {
+        final snakeName = state.extra as String;
+        return FirstAidStepsScreen(snakeName: snakeName);
+      },
+    ),
+    GoRoute(
+      path: '/symptom-report',
+      name: 'symptom_report',
+      builder: (context, state) => const SymptomReportScreen(),
+    ),
+    GoRoute(
+      path: '/severity-assessment',
+      name: 'severity_assessment',
+      builder: (context, state) {
+        final data = state.extra as Map<String, dynamic>;
+        return SeverityAssessmentScreen(
+          snakeName: data['snakeName'] as String,
+          symptoms: data['symptoms'] as List<String>,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/emergency-tracking',
+      name: 'emergency_tracking',
+      builder: (context, state) => const EmergencyTrackingScreen(),
+    ),
+    GoRoute(
+      path: '/rescuer-arrived',
+      name: 'rescuer_arrived',
+      builder: (context, state) => const RescuerArrivedScreen(),
+    ),
+    GoRoute(
+      path: '/emergency-completion',
+      name: 'emergency_completion',
+      builder: (context, state) => const EmergencyServiceCompletionScreen(),
+    ),
+    
+    // === MEMBER ROUTES ===
+    GoRoute(
+      path: '/messages',
+      name: 'messages',
+      builder: (context, state) => const MessagesScreen(),
+    ),
+    GoRoute(
+      path: '/message-detail',
+      name: 'message_detail',
+      builder: (context, state) {
+        final messageId = state.extra as String;
+        return MessageDetailScreen(messageId: messageId);
+      },
     ),
     
     // === SHARED/UTILS ROUTES ===

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:async';
 import 'snake_identification_screen.dart';
 
@@ -975,12 +976,7 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
               // Instructions button
               OutlinedButton.icon(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const SnakeIdentificationScreen(),
-                    ),
-                  );
+                  context.goNamed('snake_identification');
                 },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF228B22),
@@ -1037,13 +1033,13 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.pop(),
             child: const Text('Tiếp tục chờ'),
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Close screen
+              context.pop(); // Close dialog
+              context.pop(); // Close screen
             },
             style: TextButton.styleFrom(
               foregroundColor: const Color(0xFFDC3545),
