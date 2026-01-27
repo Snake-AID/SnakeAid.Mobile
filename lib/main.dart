@@ -8,6 +8,7 @@ import 'package:snakeaid_mobile/features/shared/screens/signalr_test_screen.dart
 import 'core/services/background_notification_service.dart';
 import 'core/services/fcm_service.dart';
 import 'app/router.dart';
+import 'app/theme.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -62,19 +63,9 @@ class MyApp extends ConsumerWidget {
       title: 'SnakeAid Mobile',
       debugShowCheckedModeBanner: false,
 
-      // TODO: Replace with new theme when redesigned
-      // For now using default Material Design 3 theme
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.green,
-          brightness: Brightness.dark,
-        ),
-      ),
+      // Use AppTheme from auth branch
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
 
       // Use go_router configuration

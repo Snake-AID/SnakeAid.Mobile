@@ -109,6 +109,7 @@ flutter:
   # Assets
   assets:
     - assets/images/
+    - assets/images/logo/
     - assets/icons/
     - assets/animations/
     - assets/mock_data/
