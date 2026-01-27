@@ -135,7 +135,7 @@ class MemberHomeScreen extends StatelessWidget {
                     onHospitalPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Bệnh viện - Đang phát triển'),
+                          content: Text('Vui lòng dùng tab Bệnh viện ở thanh điều hướng'),
                         ),
                       );
                     },

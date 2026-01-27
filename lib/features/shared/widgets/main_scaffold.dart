@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../member/screens/home_screen.dart';
+import '../../member/screens/hospital_finder_screen.dart';
+import '../../member/screens/messages_screen.dart';
 import '../../member/screens/profile_screen.dart';
 
 /// Main scaffold with IndexedStack for instant tab switching
@@ -26,17 +28,6 @@ class _MainScaffoldState extends State<MainScaffold> {
   }
 
   void _onTabTapped(int index) {
-    if (index == 1 || index == 2) {
-      // Hospital and Consultation - show coming soon
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(index == 1 ? 'Bệnh viện - Đang phát triển' : 'Tư vấn - Đang phát triển'),
-          duration: const Duration(seconds: 1),
-        ),
-      );
-      return;
-    }
-
     if (_currentIndex != index) {
       setState(() {
         _currentIndex = index;
@@ -52,8 +43,8 @@ class _MainScaffoldState extends State<MainScaffold> {
         index: _currentIndex,
         children: const [
           MemberHomeScreen(),
-          SizedBox.shrink(), // Hospital placeholder
-          SizedBox.shrink(), // Consultation placeholder
+          HospitalFinderScreen(),
+          MessagesScreen(),
           ProfileScreen(),
         ],
       ),
@@ -91,8 +82,8 @@ class _MainScaffoldState extends State<MainScaffold> {
                 onTap: () => _onTabTapped(1),
               ),
               _NavItem(
-                icon: Icons.forum_outlined,
-                label: 'Tư vấn',
+                icon: Icons.chat_bubble_outline,
+                label: 'Tin nhắn',
                 hasNotification: true,
                 isActive: _currentIndex == 2,
                 onTap: () => _onTabTapped(2),
