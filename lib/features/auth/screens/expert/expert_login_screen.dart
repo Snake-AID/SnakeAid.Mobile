@@ -47,7 +47,7 @@ class _ExpertLoginScreenState extends State<ExpertLoginScreen> {
       });
 
       // Navigate to home screen
-      // TODO: Navigate to member home screen
+      context.goNamed('expert_home');
     }
   }
 
