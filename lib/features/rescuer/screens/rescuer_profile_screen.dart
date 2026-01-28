@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'rescuer_settings_screen.dart';
 
 /// Rescuer Profile Screen - Personal information and statistics for rescuer
 class RescuerProfileScreen extends StatefulWidget {
@@ -69,7 +70,14 @@ class _RescuerProfileScreenState extends State<RescuerProfileScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings, color: Color(0xFF2D2D2D)),
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const RescuerSettingsScreen(),
+                ),
+              );
+            },
           ),
         ],
       ),
