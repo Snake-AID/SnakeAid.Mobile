@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'rescuer_profile_screen.dart';
+import 'rescuer_sos_detail_screen.dart';
+import 'rescuer_navigation_screen.dart';
 
 /// Rescuer Home Screen - Dashboard for rescue team members
 class RescuerHomeScreen extends StatefulWidget {
@@ -1130,15 +1132,15 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
               child: ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Đã chấp nhận nhiệm vụ - Đang phát triển'),
-                      backgroundColor: Color(0xFF10B981),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const RescuerNavigationScreen(),
                     ),
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF10B981),
+                  backgroundColor: const Color(0xFFFF6B35),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -1160,9 +1162,11 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
               height: 48,
               child: OutlinedButton(
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Xem chi tiết - Đang phát triển'),
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const RescuerSosDetailScreen(),
                     ),
                   );
                 },
