@@ -46,8 +46,8 @@ class _RescuerLoginScreenState extends State<RescuerLoginScreen> {
         _isLoading = false;
       });
 
-      // Navigate to home screen
-      // TODO: Navigate to member home screen
+      // Navigate to rescuer home screen
+      context.goNamed('rescuer_home');
     }
   }
 

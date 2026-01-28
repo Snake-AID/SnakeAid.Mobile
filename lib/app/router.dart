@@ -36,6 +36,7 @@ import 'package:snakeaid_mobile/features/emergency/screens/members/rescuer_arriv
 import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_service_completion_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/messages_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/message_detail_screen.dart';
+import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_home_screen.dart';
 
 /// App routing configuration using go_router
 final router = GoRouter(
@@ -190,6 +191,13 @@ final router = GoRouter(
       path: '/member-home',
       name: 'member_home',
       builder: (context, state) => const MainScaffold(initialIndex: 0),
+    ),
+    
+    // === RESCUER APP ROUTES ===
+    GoRoute(
+      path: '/rescuer-home',
+      name: 'rescuer_home',
+      builder: (context, state) => const RescuerHomeScreen(),
     ),
     
     // === EMERGENCY ROUTES ===
