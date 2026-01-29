@@ -348,10 +348,10 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFF8800).withOpacity(0.15),
+                            color: const Color(0xFF28A745).withOpacity(0.15),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: const Color(0xFFFF8800).withOpacity(0.3),
+                              color: const Color(0xFF28A745).withOpacity(0.3),
                               width: 1,
                             ),
                           ),
@@ -913,7 +913,7 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                 child: ElevatedButton(
                   onPressed: _showConfirmationDialog,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF28A745),
+                    backgroundColor: const Color(0xFFFF8800),
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
