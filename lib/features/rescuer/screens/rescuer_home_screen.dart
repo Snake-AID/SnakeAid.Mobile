@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'rescuer_profile_screen.dart';
+import 'rescuer_income_management_screen.dart';
 
 /// Rescuer Home Screen - Dashboard for rescue team members
 class RescuerHomeScreen extends StatefulWidget {
@@ -816,9 +817,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
           label: 'Lịch Sử\nCứu Hộ',
           color: const Color(0xFF666666),
           onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Lịch sử cứu hộ - Đang phát triển')),
-            );
+            context.pushNamed('rescuer_history');
           },
         ),
         _buildQuickAccessItem(
@@ -826,9 +825,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
           label: 'Thu Nhập',
           color: const Color(0xFF666666),
           onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Thu nhập - Đang phát triển')),
-            );
+            context.pushNamed('rescuer_income_management');
           },
         ),
         _buildQuickAccessItem(
@@ -1254,16 +1251,7 @@ class _IncomeTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Thu Nhập\n(Đang phát triển)',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 18,
-          color: Color(0xFF666666),
-        ),
-      ),
-    );
+    return const RescuerIncomeManagementScreen();
   }
 }
 

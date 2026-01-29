@@ -101,18 +101,21 @@ class _RescuerProfileScreenState extends State<RescuerProfileScreen> {
               icon: Icons.checklist,
               title: 'Lịch Sử Cứu Hộ',
               subtitle: '87 nhiệm vụ đã hoàn thành',
+              onTap: () => context.pushNamed('rescuer_history'),
             ),
             const SizedBox(height: 12),
             _buildMenuItem(
               icon: Icons.wallet,
               title: 'Quản Lý Thu Nhập',
               subtitle: 'Xem báo cáo tài chính',
+              onTap: () => context.pushNamed('rescuer_income_management'),
             ),
             const SizedBox(height: 12),
             _buildMenuItem(
               icon: Icons.star,
               title: 'Đánh Giá & Phản Hồi',
               subtitle: '125 đánh giá từ khách hàng',
+              onTap: () => context.pushNamed('rescuer_feedback'),
             ),
             const SizedBox(height: 12),
             _buildMenuItem(
@@ -125,6 +128,7 @@ class _RescuerProfileScreenState extends State<RescuerProfileScreen> {
               icon: Icons.badge,
               title: 'Chứng Chỉ & Giấy Tờ',
               subtitle: 'CMND, BHYT',
+              onTap: () => context.pushNamed('rescuer_id_documents'),
             ),
             const SizedBox(height: 12),
             _buildMenuItem(
@@ -248,7 +252,9 @@ class _RescuerProfileScreenState extends State<RescuerProfileScreen> {
             width: double.infinity,
             height: 44,
             child: OutlinedButton(
-              onPressed: () {},
+              onPressed: () {
+                context.pushNamed('rescuer_edit_profile');
+              },
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Color(0xFFFF6B35), width: 1.5),
                 shape: RoundedRectangleBorder(
@@ -586,6 +592,7 @@ class _RescuerProfileScreenState extends State<RescuerProfileScreen> {
     required IconData icon,
     required String title,
     required String subtitle,
+    VoidCallback? onTap,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -602,7 +609,7 @@ class _RescuerProfileScreenState extends State<RescuerProfileScreen> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {},
+          onTap: onTap ?? () {},
           borderRadius: BorderRadius.circular(12),
           splashColor: const Color(0xFFFF6B35).withOpacity(0.1),
           highlightColor: const Color(0xFFFF6B35).withOpacity(0.05),
