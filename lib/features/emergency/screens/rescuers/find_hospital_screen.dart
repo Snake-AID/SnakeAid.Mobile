@@ -503,7 +503,7 @@ class _FindHospitalScreenState extends State<FindHospitalScreen> {
                     child: ElevatedButton(
                       onPressed: _showCompletionDialog,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF28A745),
+                        backgroundColor: const Color(0xFFFF8800),
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
