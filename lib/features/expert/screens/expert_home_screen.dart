@@ -946,8 +946,10 @@ class _UrgentRequestSheet extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     const Expanded(
+                     child: Center(
                       child: Text(
                         'YÊU CẦU KHẨN CẤP',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w900,
@@ -955,6 +957,7 @@ class _UrgentRequestSheet extends StatelessWidget {
                           letterSpacing: 0.5,
                         ),
                       ),
+                    ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close, color: Colors.white, size: 28),

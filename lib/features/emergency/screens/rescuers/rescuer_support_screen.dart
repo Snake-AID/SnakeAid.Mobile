@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:go_router/go_router.dart';
 
 class RescuerSupportScreen extends StatefulWidget {
   const RescuerSupportScreen({super.key});
@@ -209,7 +210,6 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 16),
 
                   // Tabs
                   Container(
@@ -440,90 +440,6 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
                   ),
 
                   const SizedBox(height: 16),
-
-                  // Snake Warning Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFFFFC107).withOpacity(0.5),
-                        width: 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFC107).withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.warning_amber,
-                            color: Color(0xFFFFC107),
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Rắn Còn Ở Hiện Trường',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1C100D),
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Hướng dẫn bắt rắn an toàn',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        OutlinedButton(
-                          onPressed: () {},
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFFFF8800),
-                            side: const BorderSide(
-                              color: Color(0xFFFF8800),
-                              width: 1.5,
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: const Text(
-                            'Xem',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
                   // Emergency Card
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -573,7 +489,7 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
-                            onPressed: () {},
+                            onPressed: () => context.pushNamed('find_hospital'),
                             icon: const Icon(Icons.local_hospital, size: 18),
                             label: const Text('Tìm bệnh viện gần nhất'),
                             style: ElevatedButton.styleFrom(
@@ -583,31 +499,6 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
                               elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            onPressed: () {},
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFFDC3545),
-                              side: const BorderSide(
-                                color: Color(0xFFDC3545),
-                                width: 1.5,
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'Liên Hệ Bác Sĩ Trực Tuyến',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
@@ -707,7 +598,7 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 100),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),
@@ -730,54 +621,13 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {},
-                          icon: const Icon(Icons.photo_camera, size: 18),
-                          label: const Text('Chụp Ảnh'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF666666),
-                            side: BorderSide(
-                              color: Colors.grey.withOpacity(0.3),
-                              width: 1.5,
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {},
-                          icon: const Icon(Icons.edit_note, size: 18),
-                          label: const Text('Ghi Chú'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF666666),
-                            side: BorderSide(
-                              color: Colors.grey.withOpacity(0.3),
-                              width: 1.5,
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
                     height: 54,
                     child: ElevatedButton(
                       onPressed: () {
-                        // TODO: Show completion confirmation
+                        context.pushNamed('mission_completion');
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF28A745),
@@ -837,3 +687,4 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
     );
   }
 }
+

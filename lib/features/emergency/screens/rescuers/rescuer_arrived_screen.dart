@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'rescuer_support_screen.dart';
+import 'package:go_router/go_router.dart';
 
 class RescuerArrivedScreen extends StatefulWidget {
   const RescuerArrivedScreen({super.key});
@@ -508,12 +508,7 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
                 height: 56,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const RescuerSupportScreen(),
-                      ),
-                    );
+                    context.pushNamed('rescuer_support');
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF28A745),
@@ -585,3 +580,4 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
     );
   }
 }
+
