@@ -68,10 +68,10 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF28A745).withOpacity(0.1),
+                      color: const Color(0xFFFF8800).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: const Color(0xFF28A745).withOpacity(0.3),
+                        color: const Color(0xFFFF8800).withOpacity(0.3),
                         width: 1,
                       ),
                     ),
@@ -79,7 +79,7 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
                       children: [
                         Icon(
                           Icons.check_circle,
-                          color: Color(0xFF28A745),
+                          color: Color(0xFFFF8800),
                           size: 24,
                         ),
                         SizedBox(width: 12),
@@ -89,7 +89,7 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF28A745),
+                              color: Color(0xFFFF8800),
                             ),
                           ),
                         ),
@@ -159,7 +159,7 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
                                 icon: const Icon(Icons.call, size: 18),
                                 label: const Text('Gọi Điện'),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF28A745),
+                                  backgroundColor: const Color(0xFFFF8800),
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(vertical: 14),
                                   elevation: 0,
@@ -448,7 +448,7 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF28A745).withOpacity(0.1),
+                            color: const Color(0xFFFF8800).withOpacity(0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: const Text(
@@ -456,7 +456,7 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF28A745),
+                              color: Color(0xFFFF8800),
                               letterSpacing: 0.5,
                             ),
                           ),
@@ -511,13 +511,13 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
                     context.pushNamed('rescuer_support');
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF28A745),
+                    backgroundColor: const Color(0xFFFF8800),
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    shadowColor: const Color(0xFF28A745).withOpacity(0.3),
+                    shadowColor: const Color(0xFFFF8800).withOpacity(0.3),
                   ),
                   child: const Text(
                     'BẮT ĐẦU HỖ TRỢ',
@@ -549,10 +549,10 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
             width: 22,
             height: 22,
             decoration: BoxDecoration(
-              color: isChecked ? const Color(0xFF28A745) : Colors.transparent,
+              color: isChecked ? const Color(0xFFFF8800) : Colors.transparent,
               borderRadius: BorderRadius.circular(4),
               border: Border.all(
-                color: isChecked ? const Color(0xFF28A745) : const Color(0xFFCCCCCC),
+                color: isChecked ? const Color(0xFFFF8800) : const Color(0xFFCCCCCC),
                 width: 2,
               ),
             ),

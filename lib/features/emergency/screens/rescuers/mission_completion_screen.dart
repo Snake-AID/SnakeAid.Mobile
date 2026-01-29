@@ -55,7 +55,7 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF28A745).withOpacity(0.1),
+                  color: const Color(0xFFFF8800).withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -112,7 +112,7 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                         context.go('/mission-success');
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF28A745),
+                        backgroundColor: const Color(0xFFFF8800),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         elevation: 0,
@@ -348,10 +348,10 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF28A745).withOpacity(0.15),
+                            color: const Color(0xFFFF8800).withOpacity(0.15),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: const Color(0xFF28A745).withOpacity(0.3),
+                              color: const Color(0xFFFF8800).withOpacity(0.3),
                               width: 1,
                             ),
                           ),
@@ -667,7 +667,7 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                           width: 40,
                           height: 3,
                           decoration: BoxDecoration(
-                            color: Color(0xFF28A745),
+                            color: Color(0xFFFF8800),
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
@@ -679,13 +679,13 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: [
-                                const Color(0xFF28A745).withOpacity(0.08),
-                                const Color(0xFF28A745).withOpacity(0.03),
+                                const Color(0xFFFF8800).withOpacity(0.08),
+                                const Color(0xFFFF8800).withOpacity(0.03),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: const Color(0xFF28A745).withOpacity(0.2),
+                              color: const Color(0xFFFF8800).withOpacity(0.2),
                               width: 1,
                             ),
                           ),
@@ -707,7 +707,7 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                                     style: TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF28A745),
+                                      color: Color(0xFFFF8800),
                                       letterSpacing: -0.5,
                                     ),
                                   ),

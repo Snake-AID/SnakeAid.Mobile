@@ -448,7 +448,7 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
                               width: 40,
                               height: 40,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF28A745).withOpacity(0.1),
+                                color: const Color(0xFFFF8800).withOpacity(0.1),
                                 shape: BoxShape.circle,
                               ),
                               child: Material(
@@ -458,7 +458,7 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
                                   customBorder: const CircleBorder(),
                                   child: const Icon(
                                     Icons.call,
-                                    color: Color(0xFF28A745),
+                                    color: Color(0xFFFF8800),
                                     size: 20,
                                   ),
                                 ),
@@ -479,11 +479,11 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
                               child: Container(
                                 height: 48,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF28A745),
+                                  color: const Color(0xFFFF8800),
                                   borderRadius: BorderRadius.circular(12),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFF28A745).withOpacity(0.25),
+                                      color: const Color(0xFFFF8800).withOpacity(0.25),
                                       blurRadius: 8,
                                       offset: const Offset(0, 4),
                                     ),
@@ -669,7 +669,7 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
       builder: (BuildContext dialogContext) => CustomDialog(
         icon: Icons.check_circle,
         iconBackgroundColor: const Color(0xFFD4EDDA),
-        iconColor: const Color(0xFF28A745),
+        iconColor: const Color(0xFFFF8800),
         title: 'Xác Nhận Đã Đến Nơi?',
         description: 'Sau khi xác nhận, bệnh nhân sẽ được thông báo và bạn có thể bắt đầu hỗ trợ.',
         extraContent: [
@@ -705,7 +705,7 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
           ),
           DialogAction(
             label: 'Xác nhận',
-            backgroundColor: const Color(0xFF28A745),
+            backgroundColor: const Color(0xFFFF8800),
             onPressed: () {
               Navigator.pop(dialogContext);
               context.pushNamed('rescuer_arrived');

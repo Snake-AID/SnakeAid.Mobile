@@ -630,7 +630,7 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
                         context.pushNamed('mission_completion');
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF28A745),
+                        backgroundColor: const Color(0xFFFF8800),
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(

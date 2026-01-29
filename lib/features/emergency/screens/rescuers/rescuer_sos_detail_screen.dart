@@ -157,7 +157,7 @@ class _RescuerSosDetailScreenState extends State<RescuerSosDetailScreen> {
                         context.pushNamed('rescuer_navigation');
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF28A745),
+                        backgroundColor: const Color(0xFFFF8800),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
@@ -282,8 +282,8 @@ class _RescuerSosDetailScreenState extends State<RescuerSosDetailScreen> {
                 icon: const Icon(Icons.call, size: 18),
                 label: const Text('Gọi'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF28A745),
-                  side: const BorderSide(color: Color(0xFF28A745)),
+                  foregroundColor: const Color(0xFFFF8800),
+                  side: const BorderSide(color: Color(0xFFFF8800)),
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
