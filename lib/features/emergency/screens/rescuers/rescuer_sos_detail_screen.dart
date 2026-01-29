@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:async';
-import 'rescuer_navigation_screen.dart';
 
 class RescuerSosDetailScreen extends StatefulWidget {
   const RescuerSosDetailScreen({super.key});
@@ -154,12 +154,7 @@ class _RescuerSosDetailScreenState extends State<RescuerSosDetailScreen> {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const RescuerNavigationScreen(),
-                          ),
-                        );
+                        context.pushNamed('rescuer_navigation');
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF28A745),
@@ -841,3 +836,4 @@ class _RescuerSosDetailScreenState extends State<RescuerSosDetailScreen> {
     );
   }
 }
+

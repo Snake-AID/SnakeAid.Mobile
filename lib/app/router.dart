@@ -32,12 +32,21 @@ import 'package:snakeaid_mobile/features/emergency/screens/members/first_aid_ste
 import 'package:snakeaid_mobile/features/emergency/screens/members/symptom_report_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/severity_assessment_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_tracking_screen.dart';
-import 'package:snakeaid_mobile/features/emergency/screens/members/rescuer_arrived_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/members/rescuer_arrived_screen.dart' as member_screens;
 import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_service_completion_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/messages_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/message_detail_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_home_screen.dart';
+import 'package:snakeaid_mobile/features/expert/screens/expert_settings_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_home_screen.dart';
+import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_settings_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_sos_detail_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_navigation_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_arrived_screen.dart' as rescuer_screens;
+import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_support_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/rescuers/find_hospital_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/rescuers/mission_completion_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_mission_success_screen.dart';
 
 /// App routing configuration using go_router
 final router = GoRouter(
@@ -113,6 +122,16 @@ final router = GoRouter(
       name: 'expert_home',
       builder: (context, state) => const ExpertHomeScreen(),
     ),
+    
+    // === EXPERT APP ROUTES ===
+    // Expert Settings
+    GoRoute(
+      path: '/expert-settings',
+      name: 'expert_settings',
+      builder: (context, state) => const ExpertSettingsScreen(),
+    ),
+    // Note: Expert consultation and emergency routes will be added here
+    // as the expert workflow screens are implemented
     
     // Common Auth Routes
     GoRoute(
@@ -208,6 +227,50 @@ final router = GoRouter(
       builder: (context, state) => const RescuerHomeScreen(),
     ),
     
+    // Rescuer Settings
+    GoRoute(
+      path: '/rescuer-settings',
+      name: 'rescuer_settings',
+      builder: (context, state) => const RescuerSettingsScreen(),
+    ),
+    
+    // Rescuer Emergency/SOS Routes
+    GoRoute(
+      path: '/rescuer-sos-detail',
+      name: 'rescuer_sos_detail',
+      builder: (context, state) => const RescuerSosDetailScreen(),
+    ),
+    GoRoute(
+      path: '/rescuer-navigation',
+      name: 'rescuer_navigation',
+      builder: (context, state) => const RescuerNavigationScreen(),
+    ),
+    GoRoute(
+      path: '/rescuer-arrived',
+      name: 'rescuer_arrived',
+      builder: (context, state) => const rescuer_screens.RescuerArrivedScreen(),
+    ),
+    GoRoute(
+      path: '/rescuer-support',
+      name: 'rescuer_support',
+      builder: (context, state) => const RescuerSupportScreen(),
+    ),
+    GoRoute(
+      path: '/find-hospital',
+      name: 'find_hospital',
+      builder: (context, state) => const FindHospitalScreen(),
+    ),
+    GoRoute(
+      path: '/mission-completion',
+      name: 'mission_completion',
+      builder: (context, state) => const MissionCompletionScreen(),
+    ),
+    GoRoute(
+      path: '/mission-success',
+      name: 'mission_success',
+      builder: (context, state) => const RescuerMissionSuccessScreen(),
+    ),
+    
     // === EMERGENCY ROUTES ===
     GoRoute(
       path: '/emergency-alert',
@@ -297,9 +360,9 @@ final router = GoRouter(
       builder: (context, state) => const EmergencyTrackingScreen(),
     ),
     GoRoute(
-      path: '/rescuer-arrived',
-      name: 'rescuer_arrived',
-      builder: (context, state) => const RescuerArrivedScreen(),
+      path: '/member-rescuer-arrived',
+      name: 'member_rescuer_arrived',
+      builder: (context, state) => const member_screens.RescuerArrivedScreen(),
     ),
     GoRoute(
       path: '/emergency-completion',

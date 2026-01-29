@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'expert_settings_screen.dart';
+import 'package:go_router/go_router.dart';
 
 /// Expert Profile Screen - Personal information and statistics for expert
 class ExpertProfileScreen extends StatefulWidget {
@@ -38,12 +38,7 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
           IconButton(
             icon: const Icon(Icons.settings, color: Color(0xFF6C47C2)),
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ExpertSettingsScreen(),
-                ),
-              );
+              context.pushNamed('expert_settings');
             },
           ),
         ],

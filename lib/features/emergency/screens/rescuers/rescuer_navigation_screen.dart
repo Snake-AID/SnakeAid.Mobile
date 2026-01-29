@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:async';
-import 'rescuer_sos_detail_screen.dart';
-import 'rescuer_arrived_screen.dart';
-import '../../shared/widgets/custom_dialog.dart';
+import '../../../shared/widgets/custom_dialog.dart';
 
 class RescuerNavigationScreen extends StatefulWidget {
   const RescuerNavigationScreen({super.key});
@@ -199,7 +198,7 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
-                        onTap: () => Navigator.pop(context),
+                        onTap: () => context.pop(),
                         customBorder: const CircleBorder(),
                         child: const Icon(
                           Icons.arrow_back,
@@ -523,12 +522,7 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
                               Icons.info_outline,
                               const Color(0xFF666666),
                               () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const RescuerSosDetailScreen(),
-                                  ),
-                                );
+                                context.pushNamed('rescuer_sos_detail');
                               },
                             ),
                             const SizedBox(width: 8),
@@ -602,7 +596,7 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
             DialogAction(
               label: 'Quay lại',
               isOutlined: true,
-              onPressed: () => Navigator.pop(dialogContext),
+              onPressed: () => context.pop(),
             ),
             DialogAction(
               label: 'Xác nhận hủy',
@@ -610,7 +604,7 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
               onPressed: () {
                 if (selectedReason != null) {
                   Navigator.of(dialogContext).pop();
-                  Navigator.of(this.context).pop();
+                  context.pop();
                 }
               },
             ),
@@ -707,19 +701,14 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
           DialogAction(
             label: 'Chưa đến',
             isOutlined: true,
-            onPressed: () => Navigator.pop(dialogContext),
+            onPressed: () => context.pop(),
           ),
           DialogAction(
             label: 'Xác nhận',
             backgroundColor: const Color(0xFF28A745),
             onPressed: () {
               Navigator.pop(dialogContext);
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const RescuerArrivedScreen(),
-                ),
-              );
+              context.pushNamed('rescuer_arrived');
             },
           ),
         ],
@@ -727,3 +716,4 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
     );
   }
 }
+

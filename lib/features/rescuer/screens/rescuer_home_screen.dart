@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'rescuer_profile_screen.dart';
-import 'rescuer_sos_detail_screen.dart';
-import 'rescuer_navigation_screen.dart';
 
 /// Rescuer Home Screen - Dashboard for rescue team members
 class RescuerHomeScreen extends StatefulWidget {
@@ -1132,12 +1130,7 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
               child: ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const RescuerNavigationScreen(),
-                    ),
-                  );
+                  context.pushNamed('rescuer_navigation');
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFF6B35),
@@ -1163,12 +1156,7 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
               child: OutlinedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const RescuerSosDetailScreen(),
-                    ),
-                  );
+                  context.pushNamed('rescuer_sos_detail');
                 },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF666666),
