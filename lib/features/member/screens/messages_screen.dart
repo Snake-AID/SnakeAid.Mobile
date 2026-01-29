@@ -250,7 +250,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   }
 
   void _openMessageDetail(MessageThread thread) {
-    context.goNamed('message_detail', extra: thread);
+    context.pushNamed('message_detail', extra: thread);
   }
 }
 
