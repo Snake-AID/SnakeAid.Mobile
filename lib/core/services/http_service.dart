@@ -23,25 +23,155 @@ class HttpService {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // Add auth token if available
+          // Check if token needs refresh (trước khi gửi request)
           final prefs = await SharedPreferences.getInstance();
+          final tokenExpiryStr = prefs.getString('token_expiry');
+          
+          if (tokenExpiryStr != null) {
+            final tokenExpiry = DateTime.parse(tokenExpiryStr);
+            final now = DateTime.now();
+            
+            // Nếu token sắp hết hạn (hoặc đã hết), refresh trước
+            if (now.isAfter(tokenExpiry) || now.isAtSameMomentAs(tokenExpiry)) {
+              debugPrint('⏰ Token sắp hết hạn, refreshing proactively...');
+              
+              final refreshToken = prefs.getString('refresh_token');
+              final userId = prefs.getString('user_id');
+              
+              if (refreshToken != null && userId != null) {
+                try {
+                  // Gọi API refresh token
+                  final refreshResponse = await _dio.post(
+                    '/api/auth/refresh',
+                    data: {
+                      'userId': userId,
+                      'refreshToken': refreshToken,
+                    },
+                  );
+                  
+                  // Lưu token mới
+                  if (refreshResponse.data != null && 
+                      refreshResponse.data['is_success'] == true &&
+                      refreshResponse.data['data'] != null) {
+                    final newAccessToken = refreshResponse.data['data']['accessToken'];
+                    final newRefreshToken = refreshResponse.data['data']['refreshToken'];
+                    
+                    await prefs.setString('access_token', newAccessToken);
+                    await prefs.setString('refresh_token', newRefreshToken);
+                    await prefs.setString('auth_token', newAccessToken);
+                    
+                    // Cập nhật expiry time mới (refresh trước 5 phút)
+                    final newExpiry = DateTime.now().add(const Duration(minutes: 55));
+                    await prefs.setString('token_expiry', newExpiry.toIso8601String());
+                    
+                    debugPrint('✅ Token refreshed proactively');
+                    debugPrint('⏰ Next refresh at: $newExpiry');
+                    
+                    // Cập nhật header với token mới
+                    options.headers['Authorization'] = 'Bearer $newAccessToken';
+                  }
+                } catch (e) {
+                  debugPrint('❌ Proactive refresh failed: $e');
+                }
+              }
+            }
+          }
+          
+          // Add auth token if available
           final token = prefs.getString('auth_token');
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
-          debugPrint('REQUEST[${options.method}] => PATH: ${options.path}');
+          debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          debugPrint('📤 REQUEST[${options.method}] => ${options.path}');
+          debugPrint('📋 Data: ${options.data}');
+          debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
           return handler.next(options);
         },
         onResponse: (response, handler) {
-          debugPrint(
-            'RESPONSE[${response.statusCode}] => PATH: ${response.requestOptions.path}',
-          );
+          debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          debugPrint('📥 RESPONSE[${response.statusCode}] => ${response.requestOptions.path}');
+          debugPrint('📋 Data: ${response.data}');
+          debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
           return handler.next(response);
         },
-        onError: (error, handler) {
-          debugPrint(
-            'ERROR[${error.response?.statusCode}] => PATH: ${error.requestOptions.path}',
-          );
+        onError: (error, handler) async {
+          debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          debugPrint('❌ ERROR[${error.response?.statusCode}] => ${error.requestOptions.path}');
+          debugPrint('❌ Message: ${error.message}');
+          debugPrint('❌ Response: ${error.response?.data}');
+          debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          
+          // Danh sách các endpoint không cần refresh token khi gặp 401
+          final publicEndpoints = [
+            '/api/auth/login',
+            '/api/auth/register',
+            '/api/auth/refresh',
+            '/api/email/send-otp',
+            '/api/email/verify',
+          ];
+          
+          final requestPath = error.requestOptions.path;
+          final isPublicEndpoint = publicEndpoints.any((endpoint) => requestPath.contains(endpoint));
+          
+          // Auto refresh token nếu gặp 401 Unauthorized (fallback)
+          // NHƯNG không refresh nếu là public endpoint (login/register/verify)
+          if (error.response?.statusCode == 401 && !isPublicEndpoint) {
+            debugPrint('🔄 Token expired (401), attempting fallback refresh...');
+            
+            // Lấy refresh token và userId
+            final prefs = await SharedPreferences.getInstance();
+            final refreshToken = prefs.getString('refresh_token');
+            final userId = prefs.getString('user_id');
+            
+            if (refreshToken != null && userId != null) {
+              try {
+                // Gọi API refresh token
+                final refreshResponse = await _dio.post(
+                  '/api/auth/refresh',
+                  data: {
+                    'userId': userId,
+                    'refreshToken': refreshToken,
+                  },
+                );
+                
+                // Lưu token mới
+                if (refreshResponse.data != null && 
+                    refreshResponse.data['is_success'] == true &&
+                    refreshResponse.data['data'] != null) {
+                  final newAccessToken = refreshResponse.data['data']['accessToken'];
+                  final newRefreshToken = refreshResponse.data['data']['refreshToken'];
+                  
+                  await prefs.setString('access_token', newAccessToken);
+                  await prefs.setString('refresh_token', newRefreshToken);
+                  await prefs.setString('auth_token', newAccessToken);
+                  
+                  // Cập nhật expiry time
+                  final newExpiry = DateTime.now().add(const Duration(minutes: 55));
+                  await prefs.setString('token_expiry', newExpiry.toIso8601String());
+                  
+                  debugPrint('✅ Token refreshed (fallback)');
+                  
+                  // Retry request ban đầu với token mới
+                  error.requestOptions.headers['Authorization'] = 'Bearer $newAccessToken';
+                  final cloneReq = await _dio.fetch(error.requestOptions);
+                  return handler.resolve(cloneReq);
+                }
+              } catch (e) {
+                debugPrint('❌ Fallback refresh failed: $e');
+                // Clear session nếu refresh thất bại
+                await prefs.remove('access_token');
+                await prefs.remove('refresh_token');
+                await prefs.remove('user_id');
+                await prefs.remove('auth_token');
+                await prefs.remove('token_expiry');
+                debugPrint('🗑️ Session cleared due to refresh failure');
+              }
+            }
+          } else if (error.response?.statusCode == 401 && isPublicEndpoint) {
+            debugPrint('⚠️ 401 on public endpoint - không refresh token');
+          }
+          
           return handler.next(error);
         },
       ),
@@ -130,55 +260,75 @@ class HttpService {
 
   // Error handler - extracts message from ApiResponse structure
   String _handleError(DioException error) {
+    debugPrint('🔍 Handling DioException: ${error.type}');
+    
     String errorMessage;
     switch (error.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
-        errorMessage = 'Connection timeout. Please try again.';
+        errorMessage = 'Kết nối timeout. Vui lòng thử lại.';
         break;
       case DioExceptionType.badResponse:
         // Try to extract message from ApiResponse structure
-        if (error.response?.data != null && error.response?.data is Map) {
-          final data = error.response?.data as Map;
-          // Backend returns ApiResponse with 'message' field
-          if (data.containsKey('message')) {
-            errorMessage = data['message'].toString();
+        if (error.response?.data != null) {
+          debugPrint('🔍 Response data type: ${error.response?.data.runtimeType}');
+          
+          if (error.response?.data is Map) {
+            final data = error.response?.data as Map;
+            debugPrint('🔍 Response keys: ${data.keys}');
+            
+            // Backend returns ApiResponse with 'message' field
+            if (data.containsKey('message')) {
+              errorMessage = data['message'].toString();
+            } else if (data.containsKey('error') && data['error'] is Map) {
+              final errorData = data['error'] as Map;
+              errorMessage = errorData['message']?.toString() ?? _handleHttpError(error.response?.statusCode);
+            } else {
+              errorMessage = _handleHttpError(error.response?.statusCode);
+            }
           } else {
-            errorMessage = _handleHttpError(error.response?.statusCode);
+            errorMessage = error.response?.data.toString() ?? _handleHttpError(error.response?.statusCode);
           }
         } else {
           errorMessage = _handleHttpError(error.response?.statusCode);
         }
         break;
       case DioExceptionType.cancel:
-        errorMessage = 'Request cancelled.';
+        errorMessage = 'Request đã bị hủy.';
+        break;
+      case DioExceptionType.connectionError:
+        errorMessage = 'Không thể kết nối tới server. Kiểm tra kết nối mạng.';
         break;
       case DioExceptionType.unknown:
-        errorMessage = 'Network error. Please check your connection.';
+        errorMessage = error.message?.contains('SocketException') ?? false
+            ? 'Không thể kết nối tới server'
+            : 'Lỗi mạng. Vui lòng kiểm tra kết nối.';
         break;
       default:
-        errorMessage = 'Something went wrong. Please try again.';
+        errorMessage = 'Đã có lỗi xảy ra. Vui lòng thử lại.';
     }
+    
+    debugPrint('🔍 Final error message: $errorMessage');
     return errorMessage;
   }
 
   String _handleHttpError(int? statusCode) {
     switch (statusCode) {
       case 400:
-        return 'Bad request.';
+        return 'Yêu cầu không hợp lệ.';
       case 401:
-        return 'Unauthorized. Please login again.';
+        return 'Không có quyền truy cập.';
       case 403:
-        return 'Forbidden.';
+        return 'Truy cập bị cấm.';
       case 404:
-        return 'Not found.';
+        return 'Không tìm thấy.';
       case 500:
-        return 'Internal server error.';
+        return 'Lỗi máy chủ.';
       case 503:
-        return 'Service unavailable.';
+        return 'Dịch vụ không khả dụng.';
       default:
-        return 'Something went wrong.';
+        return 'Đã có lỗi xảy ra (${statusCode ?? 'unknown'}).';
     }
   }
 

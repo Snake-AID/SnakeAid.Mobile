@@ -1,30 +1,107 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:async';
+import 'package:snakeaid_mobile/features/auth/repository/auth_repository.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Splash Screen with loading animation
 /// Màn hình khởi động với thanh loading
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends ConsumerState<SplashScreen> {
   double _progress = 0.0;
   Timer? _timer;
+  String? _targetRoute; // Route để navigate sau khi loading xong
+  bool _sessionChecked = false; // Flag để biết đã check session xong chưa
 
   @override
   void initState() {
     super.initState();
-    _startLoading();
+    _checkSessionAndStartLoading();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  /// Check session trước, sau đó mới bắt đầu animation
+  Future<void> _checkSessionAndStartLoading() async {
+    // Check session ngay khi init
+    await _checkSession();
+    
+    // Sau đó mới bắt đầu loading animation
+    _startLoading();
+  }
+
+  /// Kiểm tra session và xác định route cần navigate
+  Future<void> _checkSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final accessToken = prefs.getString('access_token');
+      final refreshToken = prefs.getString('refresh_token');
+      final userId = prefs.getString('user_id');
+      
+      debugPrint('🔍 Checking saved session...');
+      debugPrint('Access Token: ${accessToken != null ? "exists" : "null"}');
+      debugPrint('Refresh Token: ${refreshToken != null ? "exists" : "null"}');
+      debugPrint('User ID: $userId');
+      
+      // Nếu có access token và refresh token, verify token còn valid không
+      if (accessToken != null && refreshToken != null && userId != null) {
+        debugPrint('✅ Found saved session, verifying token...');
+        
+        try {
+          // Gọi API để verify token
+          final authRepository = ref.read(authRepositoryProvider);
+          final user = await authRepository.getCurrentUser();
+          
+          if (user != null) {
+            debugPrint('✅ Session valid, will navigate to home based on role: ${user.role.name}');
+            
+            // Xác định route dựa vào role (case-insensitive)
+            final roleName = user.role.name.toUpperCase();
+            switch (roleName) {
+              case 'MEMBER':
+                _targetRoute = '/member-home';
+                break;
+              case 'RESCUER':
+                _targetRoute = '/rescuer-home';
+                break;
+              case 'EXPERT':
+                _targetRoute = '/expert-home';
+                break;
+              default:
+                _targetRoute = '/role-selection';
+            }
+            _sessionChecked = true;
+            return;
+          }
+        } catch (e) {
+          debugPrint('⚠️ Token expired or invalid: $e');
+          // Token hết hạn hoặc invalid, clear session
+          final authRepository = ref.read(authRepositoryProvider);
+          await authRepository.clearSession();
+        }
+      }
+      
+      // Nếu không có session hoặc token invalid, navigate về role selection
+      debugPrint('ℹ️ No valid session, will navigate to role selection');
+      _targetRoute = '/role-selection';
+      _sessionChecked = true;
+    } catch (e) {
+      debugPrint('❌ Error checking session: $e');
+      // Có lỗi, navigate về role selection cho an toàn
+      _targetRoute = '/role-selection';
+      _sessionChecked = true;
+    }
   }
 
   void _startLoading() {
@@ -35,12 +112,12 @@ class _SplashScreenState extends State<SplashScreen> {
         
         if (_progress >= 1.0) {
           timer.cancel();
-          // Navigate to role selection screen after loading
-          Future.delayed(const Duration(milliseconds: 300), () {
-            if (mounted) {
-              context.goNamed('role_selection');
-            }
-          });
+          
+          // Navigate sau khi loading animation xong
+          if (_sessionChecked && _targetRoute != null && mounted) {
+            debugPrint('🚀 Navigating to: $_targetRoute');
+            context.go(_targetRoute!);
+          }
         }
       });
     });

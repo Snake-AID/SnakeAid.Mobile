@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../models/verify_account_request.dart';
+import '../repository/auth_repository.dart';
 
 /// OTP Verification Screen
 /// Màn hình xác thực mã OTP
-class OtpVerificationScreen extends StatefulWidget {
+class OtpVerificationScreen extends ConsumerStatefulWidget {
   final String email;
   final String roleRoute;
   final Color themeColor;
@@ -18,10 +21,10 @@ class OtpVerificationScreen extends StatefulWidget {
   });
 
   @override
-  State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
+  ConsumerState<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
 }
 
-class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
+class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
   final List<TextEditingController> _controllers = List.generate(
     6,
     (index) => TextEditingController(),
@@ -74,6 +77,22 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     if (value.length == 1 && index < 5) {
       _focusNodes[index + 1].requestFocus();
     }
+    
+    // Auto-submit when all 6 digits are entered
+    if (value.length == 1 && index == 5) {
+      // Check if all fields are filled
+      final otpCode = _getOtpCode();
+      if (otpCode.length == 6) {
+        // Unfocus current field
+        _focusNodes[index].unfocus();
+        // Auto verify after short delay for better UX
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            _verifyOtp();
+          }
+        });
+      }
+    }
   }
 
   void _onKeyEvent(KeyEvent event, int index) {
@@ -106,40 +125,98 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       _isVerifying = true;
     });
 
-    // TODO: Implement OTP verification API call
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (mounted) {
-      setState(() {
-        _isVerifying = false;
-      });
-
-      // Navigate to success screen
-      context.goNamed(
-        'registration_success',
-        extra: {
-          'email': widget.email,
-          'roleRoute': widget.roleRoute,
-          'themeColor': widget.themeColor,
-        },
+    try {
+      // Tạo verify request
+      final verifyRequest = VerifyAccountRequest(
+        email: widget.email,
+        otp: otpCode,
       );
+
+      // Gọi API verify account
+      final authRepository = ref.read(authRepositoryProvider);
+      final response = await authRepository.verifyAccount(verifyRequest);
+
+      if (mounted) {
+        setState(() {
+          _isVerifying = false;
+        });
+
+        if (response.isSuccess) {
+          // Hiển thị thông báo thành công
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Xác thực thành công! Chào mừng ${response.authData?.user.fullName ?? "bạn"}'),
+              backgroundColor: widget.themeColor,
+            ),
+          );
+
+          // Navigate to success screen
+          context.goNamed(
+            'registration_success',
+            extra: {
+              'email': widget.email,
+              'roleRoute': widget.roleRoute,
+              'themeColor': widget.themeColor,
+            },
+          );
+        } else {
+          // Xử lý trường hợp verify không thành công
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response.message),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isVerifying = false;
+        });
+
+        // Hiển thị lỗi
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 
-  void _resendOtp() {
+  void _resendOtp() async {
     if (_secondsRemaining > 0) {
       return;
     }
 
-    // TODO: Implement resend OTP API call
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Mã OTP mới đã được gửi!'),
-        backgroundColor: widget.themeColor,
-      ),
-    );
+    try {
+      // Gọi API gửi lại OTP
+      final authRepository = ref.read(authRepositoryProvider);
+      await authRepository.sendOtp(widget.email);
 
-    _startTimer();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Mã OTP mới đã được gửi đến email của bạn!'),
+            backgroundColor: widget.themeColor,
+          ),
+        );
+
+        _startTimer();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gửi OTP thất bại: ${e.toString().replaceAll("Exception: ", "")}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   String _getMaskedEmail() {

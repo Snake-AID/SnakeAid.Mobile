@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../auth/repository/auth_repository.dart';
 
 /// Expert Settings Screen
-class ExpertSettingsScreen extends StatefulWidget {
+class ExpertSettingsScreen extends ConsumerStatefulWidget {
   const ExpertSettingsScreen({super.key});
 
   @override
-  State<ExpertSettingsScreen> createState() => _ExpertSettingsScreenState();
+  ConsumerState<ExpertSettingsScreen> createState() => _ExpertSettingsScreenState();
 }
 
-class _ExpertSettingsScreenState extends State<ExpertSettingsScreen> {
+class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
   // Schedule toggles
   final Map<String, bool> _scheduleEnabled = {
     'Thứ 2': true,
@@ -508,7 +511,9 @@ class _ExpertSettingsScreenState extends State<ExpertSettingsScreen> {
                   _buildActionButton(
                     label: 'Đăng xuất',
                     color: const Color(0xFF6C47C2),
-                    onTap: () {},
+                    onTap: () {
+                      _showLogoutDialog();
+                    },
                   ),
                   const SizedBox(height: 12),
                   _buildActionButton(
@@ -931,6 +936,96 @@ class _ExpertSettingsScreenState extends State<ExpertSettingsScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Đăng xuất',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF333333),
+          ),
+        ),
+        content: const Text(
+          'Bạn có chắc muốn đăng xuất khỏi tài khoản?',
+          style: TextStyle(
+            fontSize: 14,
+            color: Color(0xFF666666),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text(
+              'Hủy',
+              style: TextStyle(color: Color(0xFF888888)),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              
+              // Show loading
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (loadingContext) => const Center(
+                  child: CircularProgressIndicator(
+                    color: Color(0xFF6C47C2),
+                  ),
+                ),
+              );
+              
+              try {
+                // Call logout API
+                final authRepository = ref.read(authRepositoryProvider);
+                await authRepository.logout();
+                
+                if (mounted) {
+                  // Close loading dialog
+                  Navigator.of(context, rootNavigator: true).pop();
+                  
+                  // Small delay to ensure dialog is closed
+                  await Future.delayed(const Duration(milliseconds: 100));
+                  
+                  // Navigate to role selection screen using GoRouter
+                  if (mounted) {
+                    GoRouter.of(context).goNamed('role_selection');
+                  }
+                }
+              } catch (e) {
+                if (mounted) {
+                  // Close loading dialog
+                  Navigator.of(context, rootNavigator: true).pop();
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(e.toString().replaceAll('Exception: ', '')),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6C47C2),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Đăng xuất'),
+          ),
+        ],
       ),
     );
   }
