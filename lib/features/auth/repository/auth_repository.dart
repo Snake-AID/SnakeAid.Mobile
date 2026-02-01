@@ -270,8 +270,9 @@ class AuthRepository {
       debugPrint('✅ Get current user successful');
       debugPrint('✅ Response: ${response.data}');
       
-      if (response.data is Map<String, dynamic>) {
-        final user = User.fromJson(response.data);
+      if (response.data is Map<String, dynamic> && response.data['data'] != null) {
+        final userData = response.data['data'] as Map<String, dynamic>;
+        final user = User.fromJson(userData);
         debugPrint('✅ User: ${user.email}, Role: ${user.role.name}');
         return user;
       }

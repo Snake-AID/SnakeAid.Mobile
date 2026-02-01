@@ -38,10 +38,25 @@ class User {
     );
   }
 
-  /// Convert role int to UserRole enum
+  /// Convert role int or string to UserRole enum
   static UserRole _getRoleFromInt(dynamic roleValue) {
     if (roleValue == null) return UserRole.member;
     
+    // Nếu role là String (từ API)
+    if (roleValue is String) {
+      switch (roleValue.toUpperCase()) {
+        case 'MEMBER':
+          return UserRole.member;
+        case 'RESCUER':
+          return UserRole.rescuer;
+        case 'EXPERT':
+          return UserRole.expert;
+        default:
+          return UserRole.member;
+      }
+    }
+    
+    // Nếu role là int
     int roleInt = roleValue is int ? roleValue : int.tryParse(roleValue.toString()) ?? 0;
     
     switch (roleInt) {

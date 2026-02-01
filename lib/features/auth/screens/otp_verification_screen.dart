@@ -396,7 +396,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Gửi lại mã sau ${_secondsRemaining.toString().padLeft(2, '0')}:${(_secondsRemaining % 60).toString().padLeft(2, '0')}',
+                          'Gửi lại mã sau ${_secondsRemaining.toString().padLeft(2, '0')}s',
                           style: const TextStyle(
                             fontSize: 14,
                             color: Color(0xFF666666),

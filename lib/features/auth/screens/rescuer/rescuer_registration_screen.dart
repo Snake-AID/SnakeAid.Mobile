@@ -700,81 +700,26 @@ class _RescuerRegistrationScreenState extends ConsumerState<RescuerRegistrationS
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // Tạo request object
-      String? typeValue;
-      if (_rescuerType == 'Emergency') {
-        typeValue = '1';
-      } else if (_rescuerType == 'SnakeCatching') {
-        typeValue = '2';
-      } else if (_rescuerType == 'Both') {
-        typeValue = '3';
-      }
-
-      final registerRequest = RegisterRequest(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        fullName: _fullNameController.text.trim(),
-        phoneNumber: _phoneController.text.trim(),
-        role: 'RESCUER',
-        type: typeValue,
-        biography: null,
-      );
-
-      // Gọi API register
-      final authRepository = ref.read(authRepositoryProvider);
-      final response = await authRepository.register(registerRequest);
-
-      // Gửi OTP qua email sau khi register thành công
-      try {
-        await authRepository.sendOtp(_emailController.text.trim());
-      } catch (e) {
-        // Nếu send OTP thất bại, vẫn cho phép user tiếp tục
-        debugPrint('⚠️ Send OTP failed but continuing: $e');
-      }
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-
-        // Hiển thị thông báo thành công
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Đăng ký thành công! Mã OTP đã được gửi đến email của bạn'),
-            backgroundColor: Color(0xFFFF8800),
-          ),
-        );
-
-        // Navigate to OTP verification screen
-        context.goNamed(
-          'otp_verification',
-          extra: {
-            'email': _emailController.text.trim(),
-            'roleRoute': 'rescuer_login',
-            'themeColor': const Color(0xFFFF8800),
-          },
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        
-        // Hiển thị lỗi
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
+    // Chuẩn bị dữ liệu đăng ký
+    String? typeValue;
+    if (_rescuerType == 'Emergency') {
+      typeValue = '0';
+    } else if (_rescuerType == 'SnakeCatching') {
+      typeValue = '1';
+    } else if (_rescuerType == 'Both') {
+      typeValue = '2';
     }
+
+    // Navigate đến màn hình điều khoản với dữ liệu đăng ký
+    context.pushNamed(
+      'rescuer_terms',
+      extra: {
+        'email': _emailController.text.trim(),
+        'password': _passwordController.text,
+        'fullName': _fullNameController.text.trim(),
+        'phoneNumber': _phoneController.text.trim(),
+        'type': typeValue ?? '0',
+      },
+    );
   }
 }

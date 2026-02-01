@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../models/register_request.dart';
+import '../../repository/auth_repository.dart';
 
 /// Rescuer Terms and Conditions Screen
 /// Màn hình điều khoản và cam kết cho người cứu hộ
-class RescuerTermsScreen extends StatefulWidget {
+class RescuerTermsScreen extends ConsumerStatefulWidget {
   final Map<String, String> registrationData;
 
   const RescuerTermsScreen({
@@ -12,10 +15,10 @@ class RescuerTermsScreen extends StatefulWidget {
   });
 
   @override
-  State<RescuerTermsScreen> createState() => _RescuerTermsScreenState();
+  ConsumerState<RescuerTermsScreen> createState() => _RescuerTermsScreenState();
 }
 
-class _RescuerTermsScreenState extends State<RescuerTermsScreen> {
+class _RescuerTermsScreenState extends ConsumerState<RescuerTermsScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _hasScrolledToBottom = false;
   bool _agreedToTerms = false;
@@ -375,30 +378,66 @@ class _RescuerTermsScreenState extends State<RescuerTermsScreen> {
       _isLoading = true;
     });
 
-    // TODO: Submit registration data to API
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-
-      // Navigate to OTP verification first
-      final result = await context.pushNamed(
-        'otp_verification',
-        extra: {
-          'email': widget.registrationData['email']!,
-          'roleRoute': 'rescuer_login',
-          'themeColor': const Color(0xFFFF6B35),
-        },
+    try {
+      // Tạo request object từ registration data
+      final registerRequest = RegisterRequest(
+        email: widget.registrationData['email']!,
+        password: widget.registrationData['password']!,
+        fullName: widget.registrationData['fullName']!,
+        phoneNumber: widget.registrationData['phoneNumber']!,
+        role: 'RESCUER',
+        type: widget.registrationData['type'],
+        biography: null,
       );
 
-      // After OTP verification, navigate to pending screen
-      if (mounted && result == null) {
-        // OTP verified successfully, go to pending screen
+      // Gọi API register
+      final authRepository = ref.read(authRepositoryProvider);
+      final response = await authRepository.register(registerRequest);
+
+      // Gửi OTP qua email sau khi register thành công
+      try {
+        await authRepository.sendOtp(widget.registrationData['email']!);
+      } catch (e) {
+        // Nếu send OTP thất bại, vẫn cho phép user tiếp tục
+        debugPrint('⚠️ Send OTP failed but continuing: $e');
+      }
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Hiển thị thông báo thành công
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đăng ký thành công! Mã OTP đã được gửi đến email của bạn'),
+            backgroundColor: Color(0xFFFF8800),
+          ),
+        );
+
+        // Navigate to OTP verification screen
         context.goNamed(
-          'registration_pending',
-          extra: widget.registrationData['email']!,
+          'otp_verification',
+          extra: {
+            'email': widget.registrationData['email']!,
+            'roleRoute': 'rescuer_login',
+            'themeColor': const Color(0xFFFF8800),
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        
+        // Hiển thị lỗi
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     }

@@ -840,7 +840,12 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.of(context).pop();
+              // Lấy navigator và router trước khi async operations
+              final navigator = Navigator.of(context);
+              final router = GoRouter.of(context);
+              
+              // Đóng dialog xác nhận
+              navigator.pop();
               
               // Show loading
               showDialog(
@@ -858,22 +863,12 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
                 final authRepository = ref.read(authRepositoryProvider);
                 await authRepository.logout();
                 
-                if (mounted) {
-                  // Close loading dialog
-                  Navigator.of(context, rootNavigator: true).pop();
-                  
-                  // Small delay to ensure dialog is closed
-                  await Future.delayed(const Duration(milliseconds: 100));
-                  
-                  // Navigate to role selection screen using GoRouter
-                  if (mounted) {
-                    GoRouter.of(context).goNamed('role_selection');
-                  }
-                }
+                // Navigate sử dụng router đã lấy trước đó
+                router.go('/role-selection');
               } catch (e) {
+                // Close loading dialog nếu có lỗi
                 if (mounted) {
-                  // Close loading dialog
-                  Navigator.of(context, rootNavigator: true).pop();
+                  navigator.pop();
                   
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
