@@ -1,29 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../models/register_request.dart';
+import '../../repository/auth_repository.dart';
 
 /// Rescuer Registration Screen
 /// Màn hình đăng ký tài khoản người cứu hộ
-class RescuerRegistrationScreen extends StatefulWidget {
+class RescuerRegistrationScreen extends ConsumerStatefulWidget {
   const RescuerRegistrationScreen({super.key});
 
   @override
-  State<RescuerRegistrationScreen> createState() => _RescuerRegistrationScreenState();
+  ConsumerState<RescuerRegistrationScreen> createState() => _RescuerRegistrationScreenState();
 }
 
-class _RescuerRegistrationScreenState extends State<RescuerRegistrationScreen> {
+class _RescuerRegistrationScreenState extends ConsumerState<RescuerRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _organizationController = TextEditingController();
-  final _yearsOfExperienceController = TextEditingController();
   
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
+  bool _submitAttempted = false;
   
+  String _rescuerType = 'Emergency'; // Emergency, SnakeCatching, Both
+  
+  // Password requirements
+  bool _hasMinLength = false;
+  bool _hasLowercase = false;
+  bool _hasUppercase = false;
+  bool _hasDigit = false;
+  bool _hasSpecialChar = false;
   double _passwordStrength = 0.0;
 
   @override
@@ -33,34 +43,28 @@ class _RescuerRegistrationScreenState extends State<RescuerRegistrationScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _organizationController.dispose();
-    _yearsOfExperienceController.dispose();
     super.dispose();
   }
 
-  void _calculatePasswordStrength(String password) {
-    double strength = 0.0;
-    
-    if (password.isEmpty) {
-      strength = 0.0;
-    } else {
-      bool hasLetters = password.contains(RegExp(r'[a-zA-Z]'));
-      bool hasDigits = password.contains(RegExp(r'[0-9]'));
-      bool hasSpecialCharacters = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;/~`]'));
-      
-      if (hasLetters && hasDigits && hasSpecialCharacters) {
-        strength = 1.0;
-      } else if (hasLetters && hasDigits) {
-        strength = 0.66;
-      } else if (hasLetters) {
-        strength = 0.33;
-      } else {
-        strength = 0.0;
-      }
-    }
-    
+  void _checkPasswordRequirements(String password) {
     setState(() {
-      _passwordStrength = strength;
+      _hasMinLength = password.length >= 8;
+      _hasLowercase = password.contains(RegExp(r'[a-z]'));
+      _hasUppercase = password.contains(RegExp(r'[A-Z]'));
+      _hasDigit = password.contains(RegExp(r'[0-9]'));
+      _hasSpecialChar = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;/~`]'));
+      
+      if (password.isEmpty) {
+        _passwordStrength = 0.0;
+      } else if (_hasDigit && (_hasLowercase || _hasUppercase) && _hasSpecialChar) {
+        _passwordStrength = 1.0;
+      } else if (_hasDigit && (_hasLowercase || _hasUppercase)) {
+        _passwordStrength = 0.66;
+      } else if (_hasLowercase || _hasUppercase || _hasDigit) {
+        _passwordStrength = 0.33;
+      } else {
+        _passwordStrength = 0.0;
+      }
     });
   }
 
@@ -189,30 +193,8 @@ class _RescuerRegistrationScreenState extends State<RescuerRegistrationScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Organization Field
-                _buildTextField(
-                  controller: _organizationController,
-                  label: 'Tổ chức/Đơn vị (nếu có)',
-                  hint: 'Tên tổ chức cứu hộ',
-                ),
-                const SizedBox(height: 16),
-
-                // Years of Experience
-                _buildTextField(
-                  controller: _yearsOfExperienceController,
-                  label: 'Số năm kinh nghiệm cứu hộ',
-                  hint: 'VD: 5',
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value != null && value.isNotEmpty) {
-                      final years = int.tryParse(value);
-                      if (years == null || years < 0) {
-                        return 'Vui lòng nhập số hợp lệ';
-                      }
-                    }
-                    return null;
-                  },
-                ),
+                // Rescuer Type Selection
+                _buildRescuerTypeSelection(),
                 const SizedBox(height: 16),
 
                 // Password Field with Strength Indicator
@@ -226,7 +208,7 @@ class _RescuerRegistrationScreenState extends State<RescuerRegistrationScreen> {
                       _isPasswordVisible = !_isPasswordVisible;
                     });
                   },
-                  onChanged: (value) => _calculatePasswordStrength(value),
+                  onChanged: (value) => _checkPasswordRequirements(value),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Vui lòng nhập mật khẩu';
@@ -236,6 +218,9 @@ class _RescuerRegistrationScreenState extends State<RescuerRegistrationScreen> {
                     }
                     if (!value.contains(RegExp(r'[a-zA-Z]'))) {
                       return 'Mật khẩu phải có ít nhất 1 chữ cái';
+                    }
+                    if (!value.contains(RegExp(r'[A-Z]'))) {
+                      return 'Mật khẩu phải có ít nhất 1 chữ viết hoa';
                     }
                     if (!value.contains(RegExp(r'[0-9]'))) {
                       return 'Mật khẩu phải có ít nhất 1 chữ số';
@@ -536,12 +521,34 @@ class _RescuerRegistrationScreenState extends State<RescuerRegistrationScreen> {
                   decoration: BoxDecoration(
                     color: _passwordStrength >= 1.0
                         ? const Color(0xFF2ECC40)
-                        : _passwordStrength >= 0.66
-                            ? const Color(0xFF2ECC40).withOpacity(0.3)
-                            : const Color(0xFFDDDDDD),
+                        : const Color(0xFFDDDDDD),
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _buildPasswordRequirement('Ít nhất 8 ký tự', _hasMinLength),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildPasswordRequirement('Có số (0-9)', _hasDigit),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: _buildPasswordRequirement('Ít nhất 1 chữ hoa (A-Z)', _hasUppercase),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildPasswordRequirement('Ký tự đặc biệt (!@#\$...)', _hasSpecialChar),
               ),
             ],
           ),
@@ -550,34 +557,169 @@ class _RescuerRegistrationScreenState extends State<RescuerRegistrationScreen> {
     );
   }
 
+  Widget _buildPasswordRequirement(String requirement, bool isMet) {
+    final color = isMet 
+        ? const Color(0xFFFF6B35)
+        : (_submitAttempted 
+            ? const Color(0xFFFF4136)
+            : Colors.grey.shade400);
+    
+    return Row(
+      children: [
+        Icon(
+          isMet ? Icons.check_circle : Icons.cancel,
+          size: 16,
+          color: color,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          requirement,
+          style: TextStyle(
+            fontSize: 12,
+            color: color,
+            fontWeight: isMet ? FontWeight.w500 : FontWeight.normal,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRescuerTypeSelection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Loại cứu hộ *',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF333333),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: const Color(0xFFDDDDDD),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              RadioListTile<String>(
+                value: 'Emergency',
+                groupValue: _rescuerType,
+                onChanged: (value) {
+                  setState(() {
+                    _rescuerType = value!;
+                  });
+                },
+                title: const Text(
+                  'Cứu hộ khẩn cấp',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF333333),
+                  ),
+                ),
+                subtitle: const Text(
+                  'Hỗ trợ các trường hợp cấp cứu rắn cắn',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF666666),
+                  ),
+                ),
+                activeColor: const Color(0xFFFF6B35),
+              ),
+              const Divider(height: 1),
+              RadioListTile<String>(
+                value: 'SnakeCatching',
+                groupValue: _rescuerType,
+                onChanged: (value) {
+                  setState(() {
+                    _rescuerType = value!;
+                  });
+                },
+                title: const Text(
+                  'Bắt rắn',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF333333),
+                  ),
+                ),
+                subtitle: const Text(
+                  'Bắt và di dời rắn an toàn',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF666666),
+                  ),
+                ),
+                activeColor: const Color(0xFFFF6B35),
+              ),
+              const Divider(height: 1),
+              RadioListTile<String>(
+                value: 'Both',
+                groupValue: _rescuerType,
+                onChanged: (value) {
+                  setState(() {
+                    _rescuerType = value!;
+                  });
+                },
+                title: const Text(
+                  'Cả hai',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF333333),
+                  ),
+                ),
+                subtitle: const Text(
+                  'Cả cứu hộ khẩn cấp và bắt rắn',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF666666),
+                  ),
+                ),
+                activeColor: const Color(0xFFFF6B35),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   void _handleContinue() async {
     if (!_formKey.currentState!.validate()) {
+      setState(() {
+        _submitAttempted = true;
+      });
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
-
-    // TODO: Implement registration API call
-    await Future.delayed(const Duration(seconds: 1));
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-
-      // Navigate to terms screen
-      context.goNamed(
-        'rescuer_terms',
-        extra: {
-          'email': _emailController.text,
-          'fullName': _fullNameController.text,
-          'phone': _phoneController.text,
-          'organization': _organizationController.text,
-          'experience': _yearsOfExperienceController.text,
-        },
-      );
+    // Chuẩn bị dữ liệu đăng ký
+    String? typeValue;
+    if (_rescuerType == 'Emergency') {
+      typeValue = '0';
+    } else if (_rescuerType == 'SnakeCatching') {
+      typeValue = '1';
+    } else if (_rescuerType == 'Both') {
+      typeValue = '2';
     }
+
+    // Navigate đến màn hình điều khoản với dữ liệu đăng ký
+    context.pushNamed(
+      'rescuer_terms',
+      extra: {
+        'email': _emailController.text.trim(),
+        'password': _passwordController.text,
+        'fullName': _fullNameController.text.trim(),
+        'phoneNumber': _phoneController.text.trim(),
+        'type': typeValue ?? '0',
+      },
+    );
   }
 }

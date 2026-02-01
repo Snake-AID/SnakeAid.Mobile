@@ -38,8 +38,18 @@ import 'package:snakeaid_mobile/features/member/screens/messages_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/message_detail_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_home_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_settings_screen.dart';
+import 'package:snakeaid_mobile/features/expert/screens/expert_edit_profile_screen.dart';
+import 'package:snakeaid_mobile/features/expert/screens/expert_id_documents_screen.dart';
+import 'package:snakeaid_mobile/features/expert/screens/expert_specialties_screen.dart';
+import 'package:snakeaid_mobile/features/expert/screens/expert_feedback_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_home_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_settings_screen.dart';
+import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_edit_profile_screen.dart';
+import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_history_screen.dart';
+import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_history_detail_screen.dart';
+import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_income_management_screen.dart';
+import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_feedback_screen.dart';
+import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_id_documents_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_sos_detail_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_navigation_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_arrived_screen.dart' as rescuer_screens;
@@ -129,6 +139,34 @@ final router = GoRouter(
       path: '/expert-settings',
       name: 'expert_settings',
       builder: (context, state) => const ExpertSettingsScreen(),
+    ),
+    
+    // Expert Edit Profile
+    GoRoute(
+      path: '/expert-edit-profile',
+      name: 'expert_edit_profile',
+      builder: (context, state) => const ExpertEditProfileScreen(),
+    ),
+    
+    // Expert ID Documents
+    GoRoute(
+      path: '/expert-id-documents',
+      name: 'expert_id_documents',
+      builder: (context, state) => const ExpertIdDocumentsScreen(),
+    ),
+    
+    // Expert Specialties
+    GoRoute(
+      path: '/expert-specialties',
+      name: 'expert_specialties',
+      builder: (context, state) => const ExpertSpecialtiesScreen(),
+    ),
+    
+    // Expert Feedback
+    GoRoute(
+      path: '/expert-feedback',
+      name: 'expert_feedback',
+      builder: (context, state) => const ExpertFeedbackScreen(),
     ),
     // Note: Expert consultation and emergency routes will be added here
     // as the expert workflow screens are implemented
@@ -232,6 +270,49 @@ final router = GoRouter(
       path: '/rescuer-settings',
       name: 'rescuer_settings',
       builder: (context, state) => const RescuerSettingsScreen(),
+    ),
+    
+    // Rescuer Edit Profile
+    GoRoute(
+      path: '/rescuer-edit-profile',
+      name: 'rescuer_edit_profile',
+      builder: (context, state) => const RescuerEditProfileScreen(),
+    ),
+    
+    // Rescuer History
+    GoRoute(
+      path: '/rescuer-history',
+      name: 'rescuer_history',
+      builder: (context, state) => const RescuerHistoryScreen(),
+    ),
+    GoRoute(
+      path: '/rescuer-history-detail',
+      name: 'rescuer_history_detail',
+      builder: (context, state) {
+        final mission = state.extra as Map<String, dynamic>;
+        return RescuerHistoryDetailScreen(mission: mission);
+      },
+    ),
+    
+    // Rescuer Income Management
+    GoRoute(
+      path: '/rescuer-income-management',
+      name: 'rescuer_income_management',
+      builder: (context, state) => const RescuerIncomeManagementScreen(),
+    ),
+    
+    // Rescuer Feedback
+    GoRoute(
+      path: '/rescuer-feedback',
+      name: 'rescuer_feedback',
+      builder: (context, state) => const RescuerFeedbackScreen(),
+    ),
+    
+    // Rescuer ID Documents
+    GoRoute(
+      path: '/rescuer-id-documents',
+      name: 'rescuer_id_documents',
+      builder: (context, state) => const RescuerIdDocumentsScreen(),
     ),
     
     // Rescuer Emergency/SOS Routes

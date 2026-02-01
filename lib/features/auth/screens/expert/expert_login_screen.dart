@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../models/login_request.dart';
+import '../../repository/auth_repository.dart';
 
 /// Expert Login Screen
 /// Màn hình đăng nhập cho chuyên gia
-class ExpertLoginScreen extends StatefulWidget {
+class ExpertLoginScreen extends ConsumerStatefulWidget {
   const ExpertLoginScreen({super.key});
 
   @override
-  State<ExpertLoginScreen> createState() => _ExpertLoginScreenState();
+  ConsumerState<ExpertLoginScreen> createState() => _ExpertLoginScreenState();
 }
 
-class _ExpertLoginScreenState extends State<ExpertLoginScreen> {
+class _ExpertLoginScreenState extends ConsumerState<ExpertLoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailOrPhoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   
   bool _isPasswordVisible = false;
@@ -24,7 +27,7 @@ class _ExpertLoginScreenState extends State<ExpertLoginScreen> {
 
   @override
   void dispose() {
-    _emailOrPhoneController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -38,16 +41,58 @@ class _ExpertLoginScreenState extends State<ExpertLoginScreen> {
       _isLoading = true;
     });
 
-    // TODO: Implement login API call
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      // Tạo login request
+      final loginRequest = LoginRequest(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
+      // Gọi API login
+      final authRepository = ref.read(authRepositoryProvider);
+      final response = await authRepository.login(loginRequest);
 
-      // Navigate to home screen
-      context.goNamed('expert_home');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        if (response.isSuccess && response.data != null) {
+          // Hiển thị thông báo thành công
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Đăng nhập thành công! Chào mừng ${response.data!.user.fullName}'),
+              backgroundColor: primaryColor,
+            ),
+          );
+
+          // Navigate to expert home screen
+          context.goNamed('expert_home');
+        } else {
+          // Hiển thị lỗi từ response
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response.message),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Hiển thị lỗi
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 
@@ -156,12 +201,12 @@ class _ExpertLoginScreenState extends State<ExpertLoginScreen> {
                         ),
                         const SizedBox(height: 24),
 
-                        // Email or Phone Field
+                        // Email Field
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Email hoặc Số điện thoại',
+                              'Email',
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
@@ -170,10 +215,10 @@ class _ExpertLoginScreenState extends State<ExpertLoginScreen> {
                             ),
                             const SizedBox(height: 8),
                             TextFormField(
-                              controller: _emailOrPhoneController,
+                              controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
                               decoration: InputDecoration(
-                                hintText: 'Nhập email hoặc số điện thoại',
+                                hintText: 'Nhập email',
                                 hintStyle: const TextStyle(
                                   color: Color(0xFFBDBDBD),
                                   fontSize: 14,
@@ -222,7 +267,11 @@ class _ExpertLoginScreenState extends State<ExpertLoginScreen> {
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Vui lòng nhập email hoặc số điện thoại';
+                                  return 'Vui lòng nhập email';
+                                }
+                                final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                                if (!emailRegex.hasMatch(value)) {
+                                  return 'Email không hợp lệ';
                                 }
                                 return null;
                               },
@@ -548,23 +597,6 @@ class _ExpertLoginScreenState extends State<ExpertLoginScreen> {
                                 ),
                               ),
                             ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Skip Link
-                        Center(
-                          child: GestureDetector(
-                            onTap: () {
-                              // TODO: Skip login
-                            },
-                            child: Text(
-                              'Bỏ qua, dùng thử không cần đăng nhập',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade500,
-                              ),
-                            ),
                           ),
                         ),
                       ],
