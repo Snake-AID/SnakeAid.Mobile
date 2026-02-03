@@ -1,41 +1,105 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'emergency_tracking_screen.dart';
-import 'emergency_tracking_screen.dart';
 import 'dart:math' as math;
+import '../../repository/snake_ai_repository.dart';
+import '../../models/snake_detection_response.dart';
 
-class SeverityAssessmentScreen extends StatefulWidget {
-  final int severityScore;
-  final List<String> riskFactors;
+class SeverityAssessmentScreen extends ConsumerStatefulWidget {
+  final int severityLevel;
+  final List<String> symptomsReport;
   final String timeSinceBite;
-  final int painLevel;
+  final String? recognitionResultId;
 
   const SeverityAssessmentScreen({
     super.key,
-    this.severityScore = 85,
-    this.riskFactors = const [],
+    this.severityLevel = 0,
+    this.symptomsReport = const [],
     this.timeSinceBite = '15 phút',
-    this.painLevel = 7,
+    this.recognitionResultId,
   });
 
   @override
-  State<SeverityAssessmentScreen> createState() => _SeverityAssessmentScreenState();
+  ConsumerState<SeverityAssessmentScreen> createState() => _SeverityAssessmentScreenState();
 }
 
-class _SeverityAssessmentScreenState extends State<SeverityAssessmentScreen> {
+class _SeverityAssessmentScreenState extends ConsumerState<SeverityAssessmentScreen> {
   late String _assessmentTime;
+  List<FirstAidStep> _dosActions = [];
+  bool _isLoadingDos = false;
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
     _assessmentTime = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    debugPrint('📊 Severity Assessment Screen');
+    debugPrint('Recognition Result ID: ${widget.recognitionResultId}');
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    // Load dos from API if recognitionResultId is provided
+    if (widget.recognitionResultId != null) {
+      _loadFirstAidDos();
+    } else {
+      debugPrint('⚠️ No recognitionResultId - using default dos');
+    }
+  }
+
+  Future<void> _loadFirstAidDos() async {
+    setState(() {
+      _isLoadingDos = true;
+    });
+
+    try {
+      debugPrint('🔍 Loading first aid dos from API...');
+      final repository = ref.read(snakeAiRepositoryProvider);
+      final response = await repository.getDetectionResult(
+        recognitionResultId: widget.recognitionResultId!,
+      );
+
+      if (response.isSuccess && response.data != null) {
+        final results = response.data!.results;
+        if (results.isNotEmpty) {
+          final snake = results.first.snake;
+          final venoms = snake.speciesVenoms;
+          
+          debugPrint('✅ Found ${venoms.length} venom types');
+          
+          // Collect all dos from all venom types
+          final allDos = <FirstAidStep>[];
+          for (var venom in venoms) {
+            if (venom.venomType.firstAidGuideline != null) {
+              final dos = venom.venomType.firstAidGuideline!.content.dos;
+              debugPrint('  - ${venom.venomType.name}: ${dos.length} dos items');
+              allDos.addAll(dos);
+            }
+          }
+
+          debugPrint('✅ Total dos loaded: ${allDos.length}');
+          setState(() {
+            _dosActions = allDos;
+            _isLoadingDos = false;
+          });
+          return;
+        }
+      }
+      
+      debugPrint('⚠️ No data in response');
+    } catch (e) {
+      debugPrint('❌ Error loading dos: $e');
+    }
+
+    setState(() {
+      _isLoadingDos = false;
+    });
   }
 
   Color _getSeverityColor() {
-    if (widget.severityScore >= 70) {
+    if (widget.severityLevel >= 70) {
       return const Color(0xFFC0392B); // Critical red
-    } else if (widget.severityScore >= 40) {
+    } else if (widget.severityLevel >= 40) {
       return const Color(0xFFF59E0B); // Warning amber
     } else {
       return const Color(0xFF228B22); // Safe green
@@ -43,9 +107,9 @@ class _SeverityAssessmentScreenState extends State<SeverityAssessmentScreen> {
   }
 
   String _getSeverityLevel() {
-    if (widget.severityScore >= 70) {
+    if (widget.severityLevel >= 70) {
       return '🚨 NGHIÊM TRỌNG - CẦN CẤP CỨU NGAY';
-    } else if (widget.severityScore >= 40) {
+    } else if (widget.severityLevel >= 40) {
       return '⚠️ TRUNG BÌNH - CẦN THEO DÕI';
     } else {
       return '✓ NHẸ - TIẾP TỤC SƠ CỨU';
@@ -172,7 +236,7 @@ class _SeverityAssessmentScreenState extends State<SeverityAssessmentScreen> {
             height: 160,
             child: CustomPaint(
               painter: CircularProgressPainter(
-                progress: widget.severityScore / 100,
+                progress: widget.severityLevel / 100,
                 color: _getSeverityColor(),
               ),
               child: Center(
@@ -180,7 +244,7 @@ class _SeverityAssessmentScreenState extends State<SeverityAssessmentScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      '${widget.severityScore}',
+                      '${widget.severityLevel}',
                       style: const TextStyle(
                         fontSize: 40,
                         fontWeight: FontWeight.bold,
@@ -202,7 +266,7 @@ class _SeverityAssessmentScreenState extends State<SeverityAssessmentScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Điểm mức độ: ${widget.severityScore}/100',
+            'Điểm mức độ: ${widget.severityLevel}/100',
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -223,14 +287,7 @@ class _SeverityAssessmentScreenState extends State<SeverityAssessmentScreen> {
   }
 
   Widget _buildRiskFactorsCard() {
-    final defaultFactors = [
-      'Phát hiện khó thở',
-      'Mức độ đau cao (${widget.painLevel}/10)',
-      'Sưng tấy và tê bỏi',
-      'Xác nhận rắn độc',
-    ];
-
-    final factors = widget.riskFactors.isNotEmpty ? widget.riskFactors : defaultFactors;
+    final symptoms = widget.symptomsReport;
 
     return Container(
       width: double.infinity,
@@ -250,7 +307,7 @@ class _SeverityAssessmentScreenState extends State<SeverityAssessmentScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Các yếu tố nguy cơ:',
+            'Các triệu chứng đã ghi nhận:',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -258,30 +315,40 @@ class _SeverityAssessmentScreenState extends State<SeverityAssessmentScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          ...factors.asMap().entries.map((entry) {
-            return Padding(
-              padding: EdgeInsets.only(bottom: entry.key < factors.length - 1 ? 12 : 0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '❗',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      entry.value,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Color(0xFF191910),
+          if (symptoms.isEmpty)
+            Text(
+              'Chưa có triệu chứng nào được ghi nhận',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            )
+          else
+            ...symptoms.asMap().entries.map((entry) {
+              return Padding(
+                padding: EdgeInsets.only(bottom: entry.key < symptoms.length - 1 ? 12 : 0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '❗',
+                      style: TextStyle(fontSize: 18),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        entry.value,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: Color(0xFF191910),
+                          height: 1.4,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
+                  ],
+                ),
+              );
+            }).toList(),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.only(top: 16),
@@ -311,6 +378,18 @@ class _SeverityAssessmentScreenState extends State<SeverityAssessmentScreen> {
   }
 
   Widget _buildActionItemsCard() {
+    // Use API dos if available, otherwise use default
+    final defaultActions = [
+      'GỌI CẤP CỨU NGAY',
+      'Đến bệnh viện gần nhất ngay lập tức',
+      'Thông báo người thân khẩn cấp',
+      'Tiếp tục sơ cứu trong khi chờ',
+    ];
+
+    final actions = _dosActions.isNotEmpty
+        ? _dosActions.map((d) => d.text).toList()
+        : defaultActions;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -328,22 +407,36 @@ class _SeverityAssessmentScreenState extends State<SeverityAssessmentScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Cần làm NGAY:',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF191910),
-            ),
+          Row(
+            children: [
+              const Text(
+                'Cần làm NGAY:',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF191910),
+                ),
+              ),
+              if (_isLoadingDos) ...[
+                const SizedBox(width: 8),
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFF228B22),
+                  ),
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: 16),
-          _buildActionItem(1, 'GỌI CẤP CỨU NGAY'),
-          const SizedBox(height: 12),
-          _buildActionItem(2, 'Đến bệnh viện gần nhất ngay lập tức'),
-          const SizedBox(height: 12),
-          _buildActionItem(3, 'Thông báo người thân khẩn cấp'),
-          const SizedBox(height: 12),
-          _buildActionItem(4, 'Tiếp tục sơ cứu trong khi chờ'),
+          ...List.generate(actions.length, (index) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: index < actions.length - 1 ? 12 : 0),
+              child: _buildActionItem(index + 1, actions[index]),
+            );
+          }),
         ],
       ),
     );

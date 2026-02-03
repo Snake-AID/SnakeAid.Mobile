@@ -29,6 +29,8 @@ import 'package:snakeaid_mobile/features/emergency/screens/members/snake_filtere
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_confirmation_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/generic_first_aid_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/first_aid_steps_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/models/snake_detection_response.dart';
+import 'package:snakeaid_mobile/features/emergency/models/sos_incident_response.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/symptom_report_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/severity_assessment_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_tracking_screen.dart';
@@ -356,19 +358,34 @@ final router = GoRouter(
     GoRoute(
       path: '/emergency-alert',
       name: 'emergency_alert',
-      builder: (context, state) => const EmergencyAlertScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return EmergencyAlertScreen(
+          incident: extra?['incident'] as IncidentData?,
+        );
+      },
     ),
     GoRoute(
       path: '/snake-identification',
       name: 'snake_identification',
-      builder: (context, state) => const SnakeIdentificationScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return SnakeIdentificationScreen(
+          incident: extra?['incident'] as IncidentData?,
+        );
+      },
     ),
     // Note: SnakeIdentificationResultScreen requires File snakeImage, not navigable via route name
     // Use Navigator.push with MaterialPageRoute to pass File object
     GoRoute(
       path: '/snake-selection-by-location',
       name: 'snake_selection_by_location',
-      builder: (context, state) => const SnakeSelectionByLocationScreen(),
+      builder: (context, state) {
+        final data = state.extra as Map<String, dynamic>?;
+        return SnakeSelectionByLocationScreen(
+          incident: data?['incident'] as IncidentData?,
+        );
+      },
     ),
     GoRoute(
       path: '/snake-identification-questions',
@@ -410,17 +427,22 @@ final router = GoRouter(
       builder: (context, state) {
         final data = state.extra as Map<String, dynamic>;
         return FirstAidStepsScreen(
-          snakeName: data['snakeName'] as String,
-          snakeNameVi: data['snakeNameVi'] as String,
-          venomType: data['venomType'] as String,
-          snakeImageUrl: data['snakeImageUrl'] as String,
+          detectionResult: data['detectionResult'] as DetectionResult?,
+          incident: data['incident'] as IncidentData,
+          recognitionResultId: data['recognitionResultId'] as String,
         );
       },
     ),
     GoRoute(
       path: '/symptom-report',
       name: 'symptom_report',
-      builder: (context, state) => const SymptomReportScreen(),
+      builder: (context, state) {
+        final data = state.extra as Map<String, dynamic>;
+        return SymptomReportScreen(
+          incidentId: data['incidentId'] as String,
+          recognitionResultId: data['recognitionResultId'] as String?,
+        );
+      },
     ),
     GoRoute(
       path: '/severity-assessment',
@@ -428,10 +450,10 @@ final router = GoRouter(
       builder: (context, state) {
         final data = state.extra as Map<String, dynamic>?;
         return SeverityAssessmentScreen(
-          severityScore: data?['severityScore'] as int? ?? 85,
-          riskFactors: data?['riskFactors'] as List<String>? ?? [],
+          severityLevel: data?['severityLevel'] as int? ?? 0,
+          symptomsReport: data?['symptomsReport'] as List<String>? ?? [],
           timeSinceBite: data?['timeSinceBite'] as String? ?? '15 phút',
-          painLevel: data?['painLevel'] as int? ?? 7,
+          recognitionResultId: data?['recognitionResultId'] as String?,
         );
       },
     ),

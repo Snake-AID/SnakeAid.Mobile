@@ -1,16 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
-import 'first_aid_steps_screen.dart';
+import '../../models/snake_detection_response.dart';
+import '../../models/sos_incident_response.dart';
 
 /// Snake Identification Result Screen
 /// Shows AI identification results with danger level and first aid instructions
 class SnakeIdentificationResultScreen extends StatefulWidget {
   final File snakeImage;
+  final DetectionData detectionData;
+  final IncidentData incident;
   
   const SnakeIdentificationResultScreen({
     super.key,
     required this.snakeImage,
+    required this.detectionData,
+    required this.incident,
   });
 
   @override
@@ -21,6 +27,49 @@ class SnakeIdentificationResultScreen extends StatefulWidget {
 class _SnakeIdentificationResultScreenState
     extends State<SnakeIdentificationResultScreen> {
   bool _showDetails = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    _saveRecognitionResultId();
+  }
+
+  Future<void> _saveRecognitionResultId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final incidentId = widget.incident.id;
+      final recognitionResultId = widget.detectionData.recognitionResultId;
+      
+      await prefs.setString('recognition_result_$incidentId', recognitionResultId);
+      debugPrint('✅ Saved recognition result ID: $recognitionResultId for incident: $incidentId');
+    } catch (e) {
+      debugPrint('❌ Error saving recognition result ID: $e');
+    }
+  }
+  
+  // Get first detection result
+  DetectionResult? get _result => widget.detectionData.results.isNotEmpty 
+      ? widget.detectionData.results.first 
+      : null;
+  
+  SnakeInfo? get _snake => _result?.snake;
+  AiDetection? get _aiDetection => _result?.aiDetection;
+  
+  // Calculate risk level text
+  String get _riskLevelText {
+    if (_snake == null) return 'TRUNG BÌNH';
+    if (_snake!.riskLevel >= 8) return 'CAO';
+    if (_snake!.riskLevel >= 5) return 'TRUNG BÌNH';
+    return 'THẤP';
+  }
+  
+  // Calculate risk color
+  Color get _riskColor {
+    if (_snake == null) return const Color(0xFFFFC107);
+    if (_snake!.riskLevel >= 8) return const Color(0xFFDC3545);
+    if (_snake!.riskLevel >= 5) return const Color(0xFFFFC107);
+    return const Color(0xFF28A745);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,12 +115,16 @@ class _SnakeIdentificationResultScreenState
           // Warning Banner
           Container(
             width: double.infinity,
-            color: const Color(0xFFDC3545),
+            color: _snake?.isVenomous == true 
+                ? const Color(0xFFDC3545) 
+                : const Color(0xFF228B22),
             padding: const EdgeInsets.symmetric(vertical: 12),
-            child: const Text(
-              '⚠️ PHÁT HIỆN RẮN ĐỘC',
+            child: Text(
+              _snake?.isVenomous == true 
+                  ? '⚠️ PHÁT HIỆN RẮN ĐỘC' 
+                  : '✓ RẮN KHÔNG ĐỘC',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -105,15 +158,20 @@ class _SnakeIdentificationResultScreenState
                   OutlinedButton(
                     onPressed: () {
                       // Navigate to first aid steps screen
-                      context.pushNamed(
-                        'first_aid_steps',
-                        extra: {
-                          'snakeName': 'King Cobra',
-                          'snakeNameVi': 'Rắn hổ mang chúa',
-                          'venomType': 'Neurotoxic',
-                          'snakeImageUrl': 'https://images.unsplash.com/photo-1531386151447-fd76ad50012f?w=400',
-                        },
-                      );
+                      if (_result != null) {
+                        context.pushNamed(
+                          'first_aid_steps',
+                          extra: {
+                            'detectionResult': _result,
+                            'incident': widget.incident,
+                            'recognitionResultId': widget.detectionData.recognitionResultId,
+                          },
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Không có kết quả nhận diện')),
+                        );
+                      }
                     },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF666666),
@@ -187,9 +245,9 @@ class _SnakeIdentificationResultScreenState
           const SizedBox(height: 16),
 
           // English Name
-          const Text(
-            'King Cobra',
-            style: TextStyle(
+          Text(
+            _snake?.commonName ?? 'Đang xác định...',
+            style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Color(0xFF333333),
@@ -198,9 +256,9 @@ class _SnakeIdentificationResultScreenState
           const SizedBox(height: 4),
 
           // Scientific Name
-          const Text(
-            'Ophiophagus hannah',
-            style: TextStyle(
+          Text(
+            _snake?.scientificName ?? '',
+            style: const TextStyle(
               fontSize: 16,
               fontStyle: FontStyle.italic,
               color: Color(0xFF666666),
@@ -208,20 +266,21 @@ class _SnakeIdentificationResultScreenState
           ),
           const SizedBox(height: 4),
 
-          // Vietnamese Name
-          const Text(
-            'Rắn hổ mang chúa',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF333333),
+          // Vietnamese Name  
+          if (_snake != null)
+            Text(
+              _snake!.commonName,
+              style: const TextStyle(
+                fontSize: 16,
+                color: Color(0xFF333333),
+              ),
             ),
-          ),
           const SizedBox(height: 12),
 
           // Confidence Level
-          const Text(
-            'Độ tin cậy AI: 94%',
-            style: TextStyle(
+          Text(
+            'Độ tin cậy AI: ${((_aiDetection?.confidence ?? 0) * 100).toStringAsFixed(0)}%',
+            style: const TextStyle(
               fontSize: 14,
               color: Color(0xFF999999),
             ),
@@ -247,97 +306,148 @@ class _SnakeIdentificationResultScreenState
       ),
       child: Column(
         children: [
-          // Gradient Bar
-          SizedBox(
-            height: 50,
-            child: Stack(
-              clipBehavior: Clip.none,
-              alignment: Alignment.center,
-              children: [
-                // Gradient bar
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    height: 12,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(6),
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFF28A745), // Green
-                          Color(0xFFFFC107), // Yellow
-                          Color(0xFFDC3545), // Red
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                // Marker
-                Positioned(
-                  left: MediaQuery.of(context).size.width * 0.68,
-                  bottom: 0,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDC3545),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text(
-                          'CAO',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 0.5,
+          // Risk Level Badge at top
+         
+          const SizedBox(height: 20),
+          
+          // Gradient Progress Bar
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final riskLevel = _snake?.riskLevel ?? 5;
+              // Calculate position (0-10 scale), clamp between 0 and 1
+              final progress = (riskLevel / 10).clamp(0.0, 1.0);
+              
+              return Column(
+                children: [
+                  // Progress bar with marker
+                  SizedBox(
+                    height: 32,
+                    child: Stack(
+                      children: [
+                        // Background gradient bar
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          top: 10,
+                          child: Container(
+                            height: 12,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(6),
+                              gradient: const LinearGradient(
+                                colors: [
+                                  Color(0xFF28A745), // Green
+                                  Color(0xFFFFC107), // Yellow  
+                                  Color(0xFFDC3545), // Red
+                                ],
+                              ),
+                            ),
                           ),
                         ),
+                        // Marker indicator
+                        Positioned(
+                          left: (constraints.maxWidth - 16) * progress,
+                          top: 0,
+                          child: Container(
+                            width: 16,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: _riskColor,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Labels below bar
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'THẤP',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF28A745),
+                        ),
                       ),
-                      const SizedBox(height: 4),
-                      Container(
-                        width: 3,
-                        height: 8,
-                        color: const Color(0xFFDC3545),
+                      Text(
+                        'TRUNG BÌNH',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFFFC107),
+                        ),
+                      ),
+                      Text(
+                        'CAO',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFDC3545),
+                        ),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 24),
 
           // Danger Level Text
-          const Text(
-            'Mức độ nguy hiểm: CAO',
+          Text(
+            'Mức độ nguy hiểm: $_riskLevelText',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Color(0xFFDC3545),
+              color: _riskColor,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: const Color(0xFFFFF3CD),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Text(
-              'Có độc rất cao - Cần chăm sóc y tế ngay lập tức',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Color(0xFF664D03),
-                fontWeight: FontWeight.w500,
-              ),
+            child: Row(
+              children: [
+                Icon(
+                  _snake?.isVenomous == true 
+                      ? Icons.warning_amber_rounded 
+                      : Icons.info_outline,
+                  color: const Color(0xFF664D03),
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _snake?.isVenomous == true 
+                        ? '${_snake!.primaryVenomType} - Cần chăm sóc y tế ngay lập tức'
+                        : 'Không độc - Vẫn cần quan sát triệu chứng',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF664D03),
+                      fontWeight: FontWeight.w500,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -346,6 +456,20 @@ class _SnakeIdentificationResultScreenState
   }
 
   Widget _buildFirstAidCard() {
+    // Get first aid steps from venom type
+    final firstVenom = _snake?.speciesVenoms.isNotEmpty == true 
+        ? _snake!.speciesVenoms.first.venomType 
+        : null;
+    final firstAidSteps = firstVenom?.firstAidGuideline.content.steps ?? [];
+    
+    // Use up to 3 steps or default steps
+    final stepsToShow = firstAidSteps.take(3).toList();
+    final defaultSteps = [
+      ('Gọi cấp cứu ngay lập tức', Icons.phone_in_talk),
+      ('Băng ép vết cắn', Icons.healing),
+      ('Đến bệnh viện có huyết thanh gần nhất', Icons.local_hospital),
+    ];
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -385,23 +509,28 @@ class _SnakeIdentificationResultScreenState
           ),
           const SizedBox(height: 20),
 
-          _buildInstructionItem(
-            1,
-            'Gọi cấp cứu ngay lập tức',
-            Icons.phone_in_talk,
-          ),
-          const SizedBox(height: 16),
-          _buildInstructionItem(
-            2,
-            'Băng ép vết cắn',
-            Icons.healing,
-          ),
-          const SizedBox(height: 16),
-          _buildInstructionItem(
-            3,
-            'Đến bệnh viện có huyết thanh gần nhất',
-            Icons.local_hospital,
-          ),
+          // Show steps from API or default
+          if (stepsToShow.isNotEmpty) ...[
+            for (int i = 0; i < stepsToShow.length; i++) ...[
+              _buildInstructionItem(
+                i + 1,
+                stepsToShow[i].text,
+                i == 0 ? Icons.phone_in_talk : 
+                i == 1 ? Icons.healing : 
+                Icons.local_hospital,
+              ),
+              if (i < stepsToShow.length - 1) const SizedBox(height: 16),
+            ],
+          ] else ...[
+            for (int i = 0; i < defaultSteps.length; i++) ...[
+              _buildInstructionItem(
+                i + 1,
+                defaultSteps[i].$1,
+                defaultSteps[i].$2,
+              ),
+              if (i < defaultSteps.length - 1) const SizedBox(height: 16),
+            ],
+          ],
         ],
       ),
     );

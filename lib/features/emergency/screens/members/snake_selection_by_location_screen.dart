@@ -3,10 +3,13 @@ import 'package:go_router/go_router.dart';
 import 'symptom_report_screen.dart';
 import 'snake_confirmation_screen.dart';
 import 'snake_identification_questions_screen.dart';
+import '../../models/sos_incident_response.dart';
 
 /// Snake Selection by Location Screen - Manual snake selection when no image available
 class SnakeSelectionByLocationScreen extends StatelessWidget {
-  const SnakeSelectionByLocationScreen({super.key});
+  final IncidentData? incident;
+  
+  const SnakeSelectionByLocationScreen({super.key, this.incident});
 
   @override
   Widget build(BuildContext context) {
@@ -246,7 +249,22 @@ class SnakeSelectionByLocationScreen extends StatelessWidget {
                   // Bỏ qua nhận định
                   OutlinedButton.icon(
                     onPressed: () {
-                      context.goNamed('symptom_report');
+                      if (incident != null) {
+                        context.goNamed(
+                          'symptom_report',
+                          extra: {
+                            'incidentId': incident!.id,
+                          },
+                        );
+                      } else {
+                        // Fallback if no incident
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Không tìm thấy thông tin sự cố'),
+                            backgroundColor: Color(0xFFDC3545),
+                          ),
+                        );
+                      }
                     },
                     icon: const Icon(Icons.skip_next, size: 20),
                     label: const Text('Bỏ qua nhận định rắn'),

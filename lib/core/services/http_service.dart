@@ -23,22 +23,39 @@ class HttpService {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          // Skip token refresh cho public endpoints
+          final publicEndpoints = [
+            '/api/auth/login',
+            '/api/auth/register',
+            '/api/auth/refresh',
+            '/api/email/send-otp',
+            '/api/email/verify',
+          ];
+          
+          final requestPath = options.path;
+          final isPublicEndpoint = publicEndpoints.any((endpoint) => requestPath.contains(endpoint));
+          
           // Check if token needs refresh (trước khi gửi request)
           final prefs = await SharedPreferences.getInstance();
-          final tokenExpiryStr = prefs.getString('token_expiry');
           
-          if (tokenExpiryStr != null) {
-            final tokenExpiry = DateTime.parse(tokenExpiryStr);
-            final now = DateTime.now();
+          // Nếu là refresh token request, không check token expiry (tránh vòng lặp)
+          if (!isPublicEndpoint) {
+            final tokenExpiryStr = prefs.getString('token_expiry');
+            final refreshToken = prefs.getString('refresh_token');
+            final userId = prefs.getString('user_id');
             
-            // Nếu token sắp hết hạn (hoặc đã hết), refresh trước
-            if (now.isAfter(tokenExpiry) || now.isAtSameMomentAs(tokenExpiry)) {
-              debugPrint('⏰ Token sắp hết hạn, refreshing proactively...');
+            // Proactive refresh: Nếu có token expiry và refresh token
+            if (tokenExpiryStr != null && refreshToken != null && userId != null) {
+              final tokenExpiry = DateTime.parse(tokenExpiryStr);
+              final now = DateTime.now();
               
-              final refreshToken = prefs.getString('refresh_token');
-              final userId = prefs.getString('user_id');
+              // Refresh nếu token đã hết hạn HOẶC sắp hết hạn trong 5 phút
+              final isExpired = now.isAfter(tokenExpiry);
+              final isExpiringSoon = now.isAfter(tokenExpiry.subtract(const Duration(minutes: 5)));
               
-              if (refreshToken != null && userId != null) {
+              if (isExpired || isExpiringSoon) {
+                debugPrint('⏰ Token ${isExpired ? "đã hết hạn" : "sắp hết hạn"}, refreshing proactively...');
+                
                 try {
                   // Gọi API refresh token
                   final refreshResponse = await _dio.post(
@@ -60,18 +77,26 @@ class HttpService {
                     await prefs.setString('refresh_token', newRefreshToken);
                     await prefs.setString('auth_token', newAccessToken);
                     
-                    // Cập nhật expiry time mới (refresh trước 5 phút)
+                    // Cập nhật expiry time mới (access token thường có thời hạn 1 giờ, refresh trước 5 phút)
                     final newExpiry = DateTime.now().add(const Duration(minutes: 55));
                     await prefs.setString('token_expiry', newExpiry.toIso8601String());
                     
+                    // Xóa flag needs_reauth nếu có
+                    await prefs.remove('token_needs_reauth');
+                    
                     debugPrint('✅ Token refreshed proactively');
-                    debugPrint('⏰ Next refresh at: $newExpiry');
+                    debugPrint('⏰ New token expiry: $newExpiry');
                     
                     // Cập nhật header với token mới
                     options.headers['Authorization'] = 'Bearer $newAccessToken';
+                  } else {
+                    debugPrint('⚠️ Proactive refresh response invalid');
+                    await prefs.setBool('token_needs_reauth', true);
                   }
                 } catch (e) {
                   debugPrint('❌ Proactive refresh failed: $e');
+                  // Đánh dấu cần reauth nhưng KHÔNG clear session
+                  await prefs.setBool('token_needs_reauth', true);
                 }
               }
             }
@@ -79,7 +104,7 @@ class HttpService {
           
           // Add auth token if available
           final token = prefs.getString('auth_token');
-          if (token != null) {
+          if (token != null && !isPublicEndpoint) {
             options.headers['Authorization'] = 'Bearer $token';
           }
           debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -150,23 +175,29 @@ class HttpService {
                   final newExpiry = DateTime.now().add(const Duration(minutes: 55));
                   await prefs.setString('token_expiry', newExpiry.toIso8601String());
                   
-                  debugPrint('✅ Token refreshed (fallback)');
+                  debugPrint('✅ Token refreshed successfully (fallback)');
+                  debugPrint('⏰ New token expiry: $newExpiry');
                   
                   // Retry request ban đầu với token mới
                   error.requestOptions.headers['Authorization'] = 'Bearer $newAccessToken';
                   final cloneReq = await _dio.fetch(error.requestOptions);
                   return handler.resolve(cloneReq);
+                } else {
+                  debugPrint('⚠️ Refresh response invalid - keeping session but marking token as expired');
+                  // Đánh dấu token expired nhưng KHÔNG clear session
+                  // User vẫn giữ được session, chỉ cần re-login khi cần
+                  await prefs.setBool('token_needs_reauth', true);
                 }
               } catch (e) {
                 debugPrint('❌ Fallback refresh failed: $e');
-                // Clear session nếu refresh thất bại
-                await prefs.remove('access_token');
-                await prefs.remove('refresh_token');
-                await prefs.remove('user_id');
-                await prefs.remove('auth_token');
-                await prefs.remove('token_expiry');
-                debugPrint('🗑️ Session cleared due to refresh failure');
+                // KHÔNG clear session - giữ nguyên session như Facebook
+                // Chỉ đánh dấu cần re-authentication
+                await prefs.setBool('token_needs_reauth', true);
+                debugPrint('⚠️ Token marked as expired - session preserved');
               }
+            } else {
+              debugPrint('⚠️ No refresh token available - marking for reauth');
+              await prefs.setBool('token_needs_reauth', true);
             }
           } else if (error.response?.statusCode == 401 && isPublicEndpoint) {
             debugPrint('⚠️ 401 on public endpoint - không refresh token');
