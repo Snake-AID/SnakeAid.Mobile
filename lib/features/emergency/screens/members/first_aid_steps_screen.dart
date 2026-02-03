@@ -1,103 +1,247 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'symptom_report_screen.dart';
-import 'emergency_tracking_screen.dart';
+import '../../models/snake_detection_response.dart';
+import '../../models/sos_incident_response.dart';
+import '../../repository/snake_ai_repository.dart';
 
-class FirstAidStepsScreen extends StatefulWidget {
-  final String snakeName;
-  final String snakeNameVi;
-  final String venomType;
-  final String snakeImageUrl;
+class FirstAidStepsScreen extends ConsumerStatefulWidget {
+  final DetectionResult? detectionResult;
+  final IncidentData incident;
+  final String recognitionResultId;
 
   const FirstAidStepsScreen({
     super.key,
-    required this.snakeName,
-    required this.snakeNameVi,
-    required this.venomType,
-    required this.snakeImageUrl,
+    this.detectionResult,
+    required this.incident,
+    required this.recognitionResultId,
   });
 
   @override
-  State<FirstAidStepsScreen> createState() => _FirstAidStepsScreenState();
+  ConsumerState<FirstAidStepsScreen> createState() => _FirstAidStepsScreenState();
 }
 
-class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
+class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
   int _currentStep = 0;
   int _remainingSeconds = 135; // 2:15
   Timer? _timer;
   final PageController _pageController = PageController(initialPage: 0);
-
-  final List<StepData> _steps = [
-    StepData(
-      stepNumber: 1,
-      title: 'Băng ép vết cắn',
-      subtitle: 'Neurotoxic Snake',
-      illustrationUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC0O-KUSpq7ElMxfC64QGPeiesPxl453WnUVQvMLn3-p3eNF-PK62D37eJDB5EZZctVcgEiofiRIni_FsWdYmuWEdmS98oWuPwnbmNCugoomQLz1gUaizQPNNhlgbvD678U0vEGluqSZ_2CT1I9PaiPHF5qyoCQpL24j1KURymCr3zmVULTRaeNrdxNT9PKuRoLT6bVAzcvpN32IrQiIAAc7kGgeG50WVcG0OkdvqMLwkIS-DGxdgCDODZ-EOp5_JufZw0gj8H9GQKX',
-      instructions: [
-        'Bắt đầu băng từ vị trí vết cắn',
-        'Băng chặt vừa phải, không quá chặt',
-        'Băng toàn bộ chi bị cắn',
-        'Kiểm tra tuần hoàn - ngón chân/tay vẫn hồng',
-      ],
-      tipTitle: 'Kỹ thuật băng ép đúng cách:',
-      tipDescription: 'Đảm bảo mạch đập vẫn cảm nhận được.',
-      tipImageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCrYdGZdiKWowzB9BK94YCmiQWw3FLDpcHWiKhv83f5D4JIstOymxaIW3f6uFICT5ijq4yNSU1hFI9AjG8Bf54tbeAJPKIBXpu0h6jQoJBLoqrhKXOgbQQkuEPa7o6BUgrLAHgWq9NBWID3JEGEPOQ5vC82nhnjp80KHpps8MO3cZpZvyOLQEfG7sSYcf9law7FwUECIfuBtRN_YnhAwZuxIWIgp1tAcdg5sXQ0djVs65sjmmKKVdGWFrt5QiEtpRG92YRJmWmznQPX',
-    ),
-    StepData(
-      stepNumber: 2,
-      title: 'Giữ nạn nhân bất động',
-      subtitle: 'Neurotoxic Snake',
-      illustrationUrl: null,
-      illustrationIcon: Icons.airline_seat_flat,
-      instructions: [
-        'Giữ cho nạn nhân nằm yên, không di chuyển',
-        'Đặt chi bị cắn thấp hơn tim',
-        'Tránh căng thẳng và hoảng loạn',
-        'Không cho ăn uống gì',
-      ],
-      tipTitle: 'Lưu ý quan trọng:',
-      tipDescription: 'Di chuyển sẽ làm nọc độc lan nhanh hơn trong cơ thể.',
-      tipImageUrl: null,
-    ),
-    StepData(
-      stepNumber: 3,
-      title: 'Gọi cấp cứu ngay',
-      subtitle: 'Neurotoxic Snake',
-      illustrationUrl: null,
-      illustrationIcon: Icons.phone_in_talk,
-      instructions: [
-        'Gọi 115 hoặc số cấp cứu địa phương',
-        'Báo rõ vị trí và tình trạng nạn nhân',
-        'Mô tả con rắn (nếu có thể)',
-        'Không cắt vết cắn hoặc hút nọc độc',
-      ],
-      tipTitle: 'Điều quan trọng:',
-      tipDescription: 'Cung cấp ảnh rắn (nếu có) giúp xác định loài và huyết thanh phù hợp.',
-      tipImageUrl: null,
-    ),
-    StepData(
-      stepNumber: 4,
-      title: 'Đưa đến bệnh viện',
-      subtitle: 'Neurotoxic Snake',
-      illustrationUrl: null,
-      illustrationIcon: Icons.local_hospital,
-      instructions: [
-        'Di chuyển nạn nhân đến bệnh viện có huyết thanh',
-        'Giữ nạn nhân nằm yên trong quá trình vận chuyển',
-        'Theo dõi dấu hiệu sinh tồn',
-        'Mang theo ảnh rắn (nếu đã chụp)',
-      ],
-      tipTitle: 'Thời gian vàng:',
-      tipDescription: 'Cần tiêm huyết thanh trong vòng 2-4 giờ sau khi bị cắn.',
-      tipImageUrl: null,
-    ),
-  ];
+  
+  late List<StepData> _steps;
+  DetectionResult? _detectionResult;
+  bool _isLoading = true;
+  String? _errorMessage;
+  
+  SnakeInfo? get _snake => _detectionResult?.snake;
+  
+  // Get first aid guideline from venom type
+  FirstAidGuideline? get _firstAidGuideline {
+    if (_snake == null || _snake!.speciesVenoms.isEmpty) return null;
+    return _snake!.speciesVenoms.first.venomType.firstAidGuideline;
+  }
 
   @override
   void initState() {
     super.initState();
-    _startTimer();
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    if (widget.detectionResult != null) {
+      // Already have detection result
+      _detectionResult = widget.detectionResult;
+      _buildStepsFromApi();
+      _startTimer();
+      setState(() => _isLoading = false);
+    } else {
+      // Load from API using recognitionResultId
+      await _loadDetectionData();
+    }
+  }
+
+  Future<void> _loadDetectionData() async {
+    try {
+      final repository = ref.read(snakeAiRepositoryProvider);
+      final response = await repository.getDetectionResult(
+        recognitionResultId: widget.recognitionResultId,
+      );
+      
+      if (response.isSuccess && response.data != null && response.data!.results.isNotEmpty) {
+        _detectionResult = response.data!.results.first;
+        _buildStepsFromApi();
+        _startTimer();
+        setState(() {
+          _isLoading = false;
+          _errorMessage = null;
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Không thể tải thông tin rắn. ${response.message}';
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading detection data: $e');
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Lỗi khi tải dữ liệu: $e';
+      });
+    }
+  }
+  
+  void _buildStepsFromApi() {
+    final guideline = _firstAidGuideline;
+    final override = _snake?.firstAidGuidelineOverride;
+    
+    // Handle Replace mode - completely replace with override steps
+    if (override != null && override.mode.toLowerCase() == 'replace') {
+      _steps = [];
+      for (int i = 0; i < override.steps.length; i++) {
+        final step = override.steps[i];
+        _steps.add(StepData(
+          stepNumber: i + 1,
+          title: 'SƠ CỨU KHẨN CẤP',
+          subtitle: _snake?.primaryVenomType ?? 'Nọc rắn',
+          illustrationUrl: null,
+          illustrationIcon: Icons.warning,
+          instructions: [step],
+          tipTitle: 'QUAN TRỌNG:',
+          tipDescription: 'Đây là hướng dẫn đặc biệt cho loài rắn này.',
+          tipImageUrl: null,
+          isOverrideStep: true,
+        ));
+      }
+      return;
+    }
+    
+    if (guideline == null || guideline.content.steps.isEmpty) {
+      // Fallback to default steps
+      _steps = _buildDefaultSteps();
+      return;
+    }
+    
+    // Build steps from API data
+    _steps = [];
+    
+    // Handle Append mode - add highlight note before step 1
+    if (override != null && override.mode.toLowerCase() == 'append' && override.steps.isNotEmpty) {
+      _steps.add(StepData(
+        stepNumber: 0, // Special step number for highlight note
+        title: 'LƯU Ý QUAN TRỌNG',
+        subtitle: _snake?.primaryVenomType ?? 'Nọc rắn',
+        illustrationUrl: null,
+        illustrationIcon: Icons.priority_high,
+        instructions: override.steps,
+        tipTitle: 'CẢNH BÁO:',
+        tipDescription: 'Vui lòng đọc kỹ trước khi thực hiện các bước sơ cứu.',
+        tipImageUrl: null,
+        isHighlightNote: true,
+      ));
+    }
+    
+    final apiSteps = guideline.content.steps;
+    
+    for (int i = 0; i < apiSteps.length; i++) {
+      final step = apiSteps[i];
+      _steps.add(StepData(
+        stepNumber: i + 1,
+        title: _extractTitle(step.text),
+        subtitle: _snake?.primaryVenomType ?? 'Nọc rắn',
+        illustrationUrl: step.mediaUrl.isNotEmpty ? step.mediaUrl : null,
+        illustrationIcon: _getIconForStep(i),
+        instructions: [step.text],
+        tipTitle: 'Lưu ý quan trọng:',
+        tipDescription: guideline.summary,
+        tipImageUrl: null,
+      ));
+    }
+    
+    // Add "Dos" as additional steps
+    if (guideline.content.dos.isNotEmpty) {
+      for (int i = 0; i < guideline.content.dos.length; i++) {
+        final doItem = guideline.content.dos[i];
+        _steps.add(StepData(
+          stepNumber: i + 1,
+          title: 'Nên làm',
+          subtitle: _snake?.primaryVenomType ?? 'Nọc rắn',
+          illustrationUrl: doItem.mediaUrl.isNotEmpty ? doItem.mediaUrl : null,
+          illustrationIcon: Icons.check_circle,
+          instructions: [doItem.text],
+          tipTitle: 'Khuyến cáo:',
+          tipDescription: 'Thực hiện đúng để tăng hiệu quả sơ cứu',
+          tipImageUrl: null,
+          isRecommendation: true,
+        ));
+      }
+    }
+  }
+  
+  String _extractTitle(String text) {
+    // Extract first sentence or first 50 chars as title
+    final firstSentence = text.split('.').first;
+    if (firstSentence.length <= 50) return firstSentence;
+    return text.substring(0, 50) + '...';
+  }
+  
+  IconData _getIconForStep(int index) {
+    switch (index) {
+      case 0: return Icons.healing;
+      case 1: return Icons.airline_seat_flat;
+      case 2: return Icons.phone_in_talk;
+      case 3: return Icons.local_hospital;
+      default: return Icons.medical_services;
+    }
+  }
+  
+  List<StepData> _buildDefaultSteps() {
+    return [
+      StepData(
+        stepNumber: 1,
+        title: 'Băng ép vết cắn',
+        subtitle: _snake?.primaryVenomType ?? 'Nọc rắn',
+        illustrationUrl: null,
+        illustrationIcon: Icons.healing,
+        instructions: [
+          'Bắt đầu băng từ vị trí vết cắn',
+          'Băng chặt vừa phải, không quá chặt',
+          'Băng toàn bộ chi bị cắn',
+        ],
+        tipTitle: 'Kỹ thuật băng ép:',
+        tipDescription: 'Đảm bảo mạch đập vẫn cảm nhận được.',
+        tipImageUrl: null,
+      ),
+      StepData(
+        stepNumber: 2,
+        title: 'Giữ nạn nhân bất động',
+        subtitle: _snake?.primaryVenomType ?? 'Nọc rắn',
+        illustrationUrl: null,
+        illustrationIcon: Icons.airline_seat_flat,
+        instructions: [
+          'Giữ cho nạn nhân nằm yên',
+          'Đặt chi bị cắn thấp hơn tim',
+          'Tránh căng thẳng',
+        ],
+        tipTitle: 'Lưu ý:',
+        tipDescription: 'Di chuyển làm nọc độc lan nhanh.',
+        tipImageUrl: null,
+      ),
+      StepData(
+        stepNumber: 3,
+        title: 'Gọi cấp cứu ngay',
+        subtitle: _snake?.primaryVenomType ?? 'Nọc rắn',
+        illustrationUrl: null,
+        illustrationIcon: Icons.phone_in_talk,
+        instructions: [
+          'Gọi 115 hoặc số cấp cứu',
+          'Báo vị trí và tình trạng',
+          'Mô tả con rắn',
+        ],
+        tipTitle: 'Quan trọng:',
+        tipDescription: 'Cung cấp ảnh rắn giúp xác định huyết thanh.',
+        tipImageUrl: null,
+      ),
+    ];
   }
 
   @override
@@ -139,9 +283,101 @@ class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
-    final currentStepData = _steps[_currentStep];
-    
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8F8F6),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF191910)),
+            onPressed: () => context.pop(),
+          ),
+          title: const Text(
+            'Hướng dẫn sơ cứu',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF191910),
+            ),
+          ),
+          centerTitle: true,
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF228B22),
+          ),
+        ),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8F8F6),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF191910)),
+            onPressed: () => context.pop(),
+          ),
+          title: const Text(
+            'Hướng dẫn sơ cứu',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF191910),
+            ),
+          ),
+          centerTitle: true,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: Color(0xFFDC3545),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _isLoading = true;
+                      _errorMessage = null;
+                    });
+                    _loadDetectionData();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF228B22),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Thử lại'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F8F6),
       body: SafeArea(
@@ -291,10 +527,41 @@ class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
               color: const Color(0xFFE5E7EB),
-              image: DecorationImage(
-                image: NetworkImage(widget.snakeImageUrl),
-                fit: BoxFit.cover,
-              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: (_snake?.imageUrl.isNotEmpty ?? false)
+                  ? Image.network(
+                      _snake!.imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Icon(
+                          Icons.image_not_supported,
+                          size: 40,
+                          color: const Color(0xFF9CA3AF),
+                        );
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Center(
+                          child: CircularProgressIndicator(
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                                : null,
+                            strokeWidth: 2,
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              Color(0xFF228B22),
+                            ),
+                          ),
+                        );
+                      },
+                    )
+                  : Icon(
+                      Icons.healing,
+                      size: 40,
+                      color: const Color(0xFF228B22),
+                    ),
             ),
           ),
           const SizedBox(width: 16),
@@ -305,11 +572,19 @@ class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${widget.snakeNameVi} (${widget.snakeName})',
+                  _snake?.commonName ?? 'Rắn độc',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF191910),
+                  ),
+                ),
+                Text(
+                  _snake?.scientificName ?? '',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                    color: Color(0xFF6B7280),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -321,7 +596,7 @@ class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
                     border: Border.all(color: const Color(0xFFFECACA)),
                   ),
                   child: Text(
-                    widget.venomType,
+                    _snake?.primaryVenomType ?? 'Nọc rắn',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -416,13 +691,35 @@ class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
   }
 
   Widget _buildMainInstructionCard(StepData stepData) {
+    // Special styling for highlight note (Append mode)
+    final isHighlight = stepData.isHighlightNote;
+    final isOverride = stepData.isOverrideStep;
+    
+    final Color bgColor = isHighlight 
+        ? const Color(0xFFFFF3E0) 
+        : isOverride 
+            ? const Color(0xFFFEE2E2)
+            : Colors.white;
+    
+    final Color borderColor = isHighlight 
+        ? const Color(0xFFFFE0B2) 
+        : isOverride 
+            ? const Color(0xFFFECACA)
+            : const Color(0xFFE5E5E5);
+    
+    final Color badgeColor = isHighlight 
+        ? const Color(0xFFE65100) 
+        : isOverride 
+            ? const Color(0xFFDC3545)
+            : const Color(0xFF228B22);
+    
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: bgColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E5E5)),
+        border: Border.all(color: borderColor, width: isHighlight || isOverride ? 2 : 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),
@@ -438,18 +735,24 @@ class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFF228B22).withOpacity(0.1),
+              color: badgeColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: const Color(0xFF228B22).withOpacity(0.2),
+                color: badgeColor.withOpacity(0.2),
               ),
             ),
             child: Text(
-              'BƯỚC ${stepData.stepNumber}',
-              style: const TextStyle(
+              isHighlight 
+                  ? 'LƯU Ý QUAN TRỌNG' 
+                  : isOverride 
+                      ? 'SƠ CỨU ĐẶC BIỆT'
+                      : stepData.isRecommendation
+                          ? 'KHUYẾN CÁO ${stepData.stepNumber}'
+                          : 'BƯỚC ${stepData.stepNumber}',
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF228B22),
+                color: badgeColor,
                 letterSpacing: 0.5,
               ),
             ),
@@ -459,10 +762,10 @@ class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
           // Heading
           Text(
             stepData.title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF191910),
+              color: isHighlight || isOverride ? badgeColor : const Color(0xFF191910),
             ),
           ),
           Text(
@@ -480,9 +783,13 @@ class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
             width: double.infinity,
             height: 200,
             decoration: BoxDecoration(
-              color: const Color(0xFFF3F4F6),
+              color: isHighlight 
+                  ? const Color(0xFFFFE0B2).withOpacity(0.3)
+                  : isOverride 
+                      ? const Color(0xFFFECACA).withOpacity(0.3)
+                      : const Color(0xFFF3F4F6),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
+              border: Border.all(color: borderColor),
               image: stepData.illustrationUrl != null
                   ? DecorationImage(
                       image: NetworkImage(stepData.illustrationUrl!),
@@ -496,7 +803,7 @@ class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
                   ? Icon(
                       stepData.illustrationIcon,
                       size: 80,
-                      color: const Color(0xFF228B22).withOpacity(0.3),
+                      color: badgeColor.withOpacity(0.4),
                     )
                   : Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -528,8 +835,8 @@ class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
                     margin: const EdgeInsets.only(top: 6),
                     width: 8,
                     height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF228B22),
+                    decoration: BoxDecoration(
+                      color: badgeColor,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -537,10 +844,11 @@ class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
                   Expanded(
                     child: Text(
                       entry.value,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
-                        color: Color(0xFF191910),
+                        color: isHighlight || isOverride ? badgeColor : const Color(0xFF191910),
                         height: 1.5,
+                        fontWeight: isHighlight || isOverride ? FontWeight.w600 : FontWeight.normal,
                       ),
                     ),
                   ),
@@ -642,7 +950,13 @@ class _FirstAidStepsScreenState extends State<FirstAidStepsScreen> {
             onPressed: isLastStep 
                 ? () {
                     // Navigate to symptom report
-                    context.pushNamed('symptom_report');
+                    context.pushNamed(
+                      'symptom_report',
+                      extra: {
+                        'incidentId': widget.incident.id,
+                        'recognitionResultId': widget.recognitionResultId,
+                      },
+                    );
                   }
                 : _nextStep,
             style: ElevatedButton.styleFrom(
@@ -721,6 +1035,9 @@ class StepData {
   final String tipTitle;
   final String tipDescription;
   final String? tipImageUrl;
+  final bool isHighlightNote;
+  final bool isOverrideStep;
+  final bool isRecommendation;
 
   StepData({
     required this.stepNumber,
@@ -732,5 +1049,8 @@ class StepData {
     required this.tipTitle,
     required this.tipDescription,
     this.tipImageUrl,
+    this.isHighlightNote = false,
+    this.isOverrideStep = false,
+    this.isRecommendation = false,
   });
 }

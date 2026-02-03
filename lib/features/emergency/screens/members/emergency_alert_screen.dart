@@ -1,23 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
-import 'snake_identification_screen.dart';
+import 'dart:convert';
+import '../../models/sos_incident_response.dart';
+import '../../providers/incident_provider.dart';
+import '../../repository/incident_repository.dart';
 
 /// Emergency Alert Screen - Shows when user presses SOS button
 /// Displays map, searching for rescuers, and safety instructions
-class EmergencyAlertScreen extends StatefulWidget {
-  const EmergencyAlertScreen({super.key});
+class EmergencyAlertScreen extends ConsumerStatefulWidget {
+  final IncidentData? incident;
+  
+  const EmergencyAlertScreen({super.key, this.incident});
 
   @override
-  State<EmergencyAlertScreen> createState() => _EmergencyAlertScreenState();
+  ConsumerState<EmergencyAlertScreen> createState() => _EmergencyAlertScreenState();
 }
 
-class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
+class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
     with TickerProviderStateMixin {
   late AnimationController _radarController;
   late AnimationController _pulseController;
   int _countdown = 60;
   Timer? _countdownTimer;
+  Timer? _refreshTimer;
+  
+  // Incident data - from navigation or provider
+  IncidentData? _currentIncident;
+  
+  // Track if user has provided snake detection and symptoms
+  String? _recognitionResultId;
+  bool _hasSymptomsReport = false;
+  List<String> _symptomsList = [];
 
   final List<RescuerMarker> _rescuers = [
     RescuerMarker(top: 0.30, left: 0.20),
@@ -28,6 +44,28 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
   @override
   void initState() {
     super.initState();
+    
+    // Get incident from parameter or provider
+    _currentIncident = widget.incident ?? ref.read(activeIncidentProvider).incident;
+    
+    if (_currentIncident != null) {
+      debugPrint('🚨 Emergency Alert Screen loaded');
+      debugPrint('📍 Incident ID: ${_currentIncident!.id}');
+      debugPrint('📍 Location: ${_currentIncident!.locationCoordinates.latitude}, ${_currentIncident!.locationCoordinates.longitude}');
+      debugPrint('📍 Status: ${_currentIncident!.status}');
+      
+      // Load tracking data
+      _loadTrackingData();
+      
+      // Refresh incident data from API
+      _refreshIncidentData();
+      
+      // Set up periodic refresh every 10 seconds
+      _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+        _refreshIncidentData();
+      });
+    }
+    
     _radarController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -39,6 +77,66 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
     )..repeat();
 
     _startCountdown();
+  }
+
+  Future<void> _loadTrackingData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final incidentId = _currentIncident!.id;
+      
+      setState(() {
+        _recognitionResultId = prefs.getString('recognition_result_$incidentId');
+        _hasSymptomsReport = prefs.getBool('has_symptoms_$incidentId') ?? false;
+      });
+      
+      debugPrint('📊 Recognition Result ID: $_recognitionResultId');
+      debugPrint('📊 Has Symptoms Report: $_hasSymptomsReport');
+    } catch (e) {
+      debugPrint('❌ Error loading tracking data: $e');
+    }
+  }
+
+  Future<void> _refreshIncidentData() async {
+    try {
+      final repository = ref.read(incidentRepositoryProvider);
+      final response = await repository.getIncident(_currentIncident!.id);
+      
+      if (response.isSuccess && response.data != null) {
+        setState(() {
+          _currentIncident = response.data;
+          _symptomsList = _parseSymptomsReport(response.data!.symptomsReport);
+        });
+        debugPrint('✅ Incident refreshed. Symptoms count: ${_symptomsList.length}');
+      }
+    } catch (e) {
+      final errorMessage = e.toString();
+      debugPrint('❌ Error refreshing incident: $errorMessage');
+      
+      // Nếu gặp lỗi authentication, không hiển thị lỗi cho user
+      // App sẽ tiếp tục hoạt động với data hiện tại
+      // Token refresh sẽ được thử lại ở lần request tiếp theo
+      if (errorMessage.contains('Authentication') || errorMessage.contains('401')) {
+        debugPrint('⚠️ Auth error during refresh - will retry on next cycle');
+      }
+      
+      // Không throw error để app không crash
+      // Incident data hiện tại vẫn được giữ nguyên
+    }
+  }
+
+  List<String> _parseSymptomsReport(String? symptomsReport) {
+    if (symptomsReport == null || symptomsReport.isEmpty) {
+      return [];
+    }
+    
+    try {
+      // symptomsReport is a JSON string like: "[\"symptom1\", \"symptom2\"]"
+      final List<dynamic> decoded = jsonDecode(symptomsReport);
+      return decoded.map((e) => e.toString()).toList();
+    } catch (e) {
+      debugPrint('❌ Error parsing symptoms report: $e');
+      return [];
+    }
   }
 
   void _startCountdown() {
@@ -58,7 +156,27 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
     _radarController.dispose();
     _pulseController.dispose();
     _countdownTimer?.cancel();
+    _refreshTimer?.cancel();
     super.dispose();
+  }
+
+  /// Get current radius from incident data (currentRadiusKm)
+  int get _currentRadius {
+    return _currentIncident?.currentRadiusKm ?? 5;
+  }
+
+  /// Get total rescuers pinged from all sessions
+  int get _totalRescuersPinged {
+    if (_currentIncident == null || _currentIncident!.sessions.isEmpty) {
+      return 0;
+    }
+    return _currentIncident!.sessions
+        .fold(0, (sum, session) => sum + session.rescuersPinged);
+  }
+
+  /// Get current session number
+  int get _currentSessionNumber {
+    return _currentIncident?.currentSessionNumber ?? 1;
   }
 
   @override
@@ -156,11 +274,11 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             'Đang tìm đội cứu hộ gần bạn...',
                             style: TextStyle(
                               color: Colors.white,
@@ -168,22 +286,40 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Row(
                             children: [
-                              Text(
+                              const Text(
                                 'GPS đã kích hoạt',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 12,
                                 ),
                               ),
-                              SizedBox(width: 4),
-                              Icon(
+                              const SizedBox(width: 4),
+                              const Icon(
                                 Icons.check_circle,
                                 color: Colors.white,
                                 size: 14,
                               ),
+                              if (_currentIncident != null) ...[
+                                const SizedBox(width: 8),
+                                const Text(
+                                  '•',
+                                  style: TextStyle(color: Colors.white, fontSize: 12),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '${_currentIncident!.locationCoordinates.latitude.toStringAsFixed(4)}, ${_currentIncident!.locationCoordinates.longitude.toStringAsFixed(4)}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ],
@@ -317,9 +453,11 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Text(
-                            'Đang quét: 3 đội | Cách: 2.1 km',
-                            style: TextStyle(
+                          Text(
+                            _totalRescuersPinged > 0
+                                ? 'Đã ping: $_totalRescuersPinged đội | Bán kính: ${_currentRadius}km'
+                                : 'Đang quét bán kính ${_currentRadius}km...',
+                            style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                               color: Color(0xFF333333),
@@ -391,7 +529,7 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
                         top: 40,
                         left: 20,
                         right: 20,
-                        bottom: 200,
+                        bottom: 320, // Increased to prevent content being hidden by footer
                       ),
                       physics: const ClampingScrollPhysics(),
                       children: [
@@ -406,6 +544,12 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
                         // Safety warnings
                         _buildSafetyWarnings(),
                         const SizedBox(height: 16),
+
+                        // Symptoms report (if available)
+                        if (_symptomsList.isNotEmpty) ...[
+                          _buildSymptomsReportCard(),
+                          const SizedBox(height: 16),
+                        ],
 
                         // Success actions
                         _buildSuccessActions(),
@@ -494,6 +638,9 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
   }
 
   Widget _buildQuickStats() {
+    final rescuersCount = _totalRescuersPinged;
+    final radiusKm = _currentRadius;
+    
     return Container(
       padding: const EdgeInsets.only(bottom: 12),
       decoration: const BoxDecoration(
@@ -501,46 +648,42 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
           bottom: BorderSide(color: Color(0xFFE0E0E0)),
         ),
       ),
-      child: const Row(
+      child: Row(
         children: [
           Text(
-            '3 đội cứu hộ',
-            style: TextStyle(
+            rescuersCount > 0 ? '$rescuersCount đội đã ping' : 'Đang tìm đội cứu hộ',
+            style: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 14,
             ),
           ),
-          SizedBox(width: 12),
-          CircleAvatar(
+          const SizedBox(width: 12),
+          const CircleAvatar(
             radius: 2,
             backgroundColor: Color(0xFFBDBDBD),
           ),
-          SizedBox(width: 12),
-          Text(
-            'Gần nhất: ',
+          const SizedBox(width: 12),
+          const Text(
+            'Bán kính: ',
             style: TextStyle(fontSize: 13, color: Color(0xFF666666)),
           ),
           Text(
-            '2.1km',
-            style: TextStyle(
+            '${radiusKm}km',
+            style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
               color: Color(0xFF228B22),
             ),
           ),
-          SizedBox(width: 12),
-          CircleAvatar(
+          const SizedBox(width: 12),
+          const CircleAvatar(
             radius: 2,
             backgroundColor: Color(0xFFBDBDBD),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Text(
-            'ETA: ',
-            style: TextStyle(fontSize: 13, color: Color(0xFF666666)),
-          ),
-          Text(
-            '8 phút',
-            style: TextStyle(
+            'Vòng ${_currentSessionNumber}',
+            style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
               color: Color(0xFFFF9800),
@@ -552,6 +695,9 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
   }
 
   Widget _buildRescuerStatusCard() {
+    final rescuersCount = _totalRescuersPinged;
+    final hasAssignedRescuer = _currentIncident?.assignedRescuerId != null;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -594,47 +740,24 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
                 ),
               ),
 
-              // Rescuer info
+              // Status info
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Avatar
+                  // Icon
                   Stack(
                     children: [
                       Container(
                         width: 48,
                         height: 48,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE0E0E0),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFFF8E1),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
-                          Icons.person,
-                          color: Color(0xFF888888),
+                          Icons.radar,
+                          color: Color(0xFFFFC107),
                           size: 28,
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFC107),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.white, width: 1.5),
-                          ),
-                          child: const Text(
-                            'WAIT',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
                         ),
                       ),
                     ],
@@ -646,38 +769,24 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Nguyễn Văn A',
-                          style: TextStyle(
+                        Text(
+                          hasAssignedRescuer 
+                              ? 'Đã tìm thấy đội cứu hộ'
+                              : 'Đang tìm đội cứu hộ',
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        const Row(
-                          children: [
-                            Icon(
-                              Icons.star,
-                              color: Color(0xFFFFC107),
-                              size: 14,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              '4.9',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              '(156 đánh giá)',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF888888),
-                              ),
-                            ),
-                          ],
+                        const SizedBox(height: 8),
+                        Text(
+                          rescuersCount > 0
+                              ? 'Đã gửi tín hiệu đến $rescuersCount đội trong bán kính ${_currentRadius}km'
+                              : 'Đang quét bán kính ${_currentRadius}km...',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF666666),
+                          ),
                         ),
                         const SizedBox(height: 12),
                         Row(
@@ -694,9 +803,11 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
                                   color: const Color(0xFFFFECB3),
                                 ),
                               ),
-                              child: const Text(
-                                'Đang chờ phản hồi...',
-                                style: TextStyle(
+                              child: Text(
+                                hasAssignedRescuer 
+                                    ? 'Đang kết nối...'
+                                    : 'Đang chờ phản hồi...',
+                                style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                   color: Color(0xFFE65100),
@@ -723,10 +834,12 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
           ),
         ),
         const SizedBox(height: 8),
-        const Center(
+        Center(
           child: Text(
-            'Đội cứu hộ có 60 giây để phản hồi yêu cầu của bạn',
-            style: TextStyle(
+            rescuersCount > 0
+                ? 'Vòng ping $_currentSessionNumber | Bán kính ${_currentRadius}km'
+                : 'Hệ thống đang tìm kiếm đội cứu hộ gần bạn',
+            style: const TextStyle(
               fontSize: 11,
               color: Color(0xFF999999),
             ),
@@ -930,6 +1043,80 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
     );
   }
 
+  Widget _buildSymptomsReportCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3E0),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFE0B2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.assignment, color: Color(0xFFE65100), size: 20),
+              SizedBox(width: 8),
+              Text(
+                'TRIỆU CHỨNG ĐÃ CUNG CẤP:',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFE65100),
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ..._symptomsList.asMap().entries.map((entry) {
+            final index = entry.key;
+            final symptom = entry.value;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 20,
+                    height: 20,
+                    margin: const EdgeInsets.only(top: 2),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE65100),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${index + 1}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      symptom,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF333333),
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStickyFooter() {
     return Container(
       decoration: const BoxDecoration(
@@ -985,34 +1172,9 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
               ),
               const SizedBox(height: 12),
 
-              // Instructions button
-              OutlinedButton.icon(
-                onPressed: () {
-                  context.goNamed('snake_identification');
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF228B22),
-                  side: const BorderSide(
-                    color: Color(0xFF228B22),
-                    width: 2,
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  minimumSize: const Size(double.infinity, 48),
-                ),
-                icon: const Icon(Icons.camera_alt),
-                label: const Text(
-                  'Cung cấp ảnh rắn để xem hướng dẫn sơ cứu chi tiết',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 2,
-                  textAlign: TextAlign.center,
-                ),
-              ),
+              // Dynamic action buttons based on state
+              ..._buildActionButtons(),
+              
               const SizedBox(height: 8),
 
               // Cancel button
@@ -1049,9 +1211,14 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
             child: const Text('Tiếp tục chờ'),
           ),
           TextButton(
-            onPressed: () {
-              context.pop(); // Close dialog
-              context.goNamed('member_home'); // Go to member_home
+            onPressed: () async {
+              // Clear active incident from provider and local storage
+              await ref.read(activeIncidentProvider.notifier).clearActiveIncident();
+              
+              if (mounted) {
+                context.pop(); // Close dialog
+                context.goNamed('member_home'); // Go to member_home
+              }
             },
             style: TextButton.styleFrom(
               foregroundColor: const Color(0xFFDC3545),
@@ -1061,6 +1228,141 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen>
         ],
       ),
     );
+  }
+
+  List<Widget> _buildActionButtons() {
+    final hasRecognition = _recognitionResultId != null;
+    final hasSymptoms = _hasSymptomsReport;
+
+    if (!hasRecognition) {
+      // Case 1: Chưa có ảnh rắn - Hiển thị "Cung cấp ảnh rắn"
+      return [
+        OutlinedButton.icon(
+          onPressed: () {
+            context.pushNamed(
+              'snake_identification',
+              extra: {'incident': _currentIncident},
+            );
+          },
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF228B22),
+            side: const BorderSide(color: Color(0xFF228B22), width: 2),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            minimumSize: const Size(double.infinity, 48),
+          ),
+          icon: const Icon(Icons.camera_alt),
+          label: const Text(
+            'Cung cấp ảnh rắn để xem hướng dẫn sơ cứu chi tiết',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+            maxLines: 2,
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ];
+    } else if (hasRecognition && !hasSymptoms) {
+      // Case 2: Đã có ảnh rắn, chưa có triệu chứng - Hiển thị 2 nút
+      return [
+        ElevatedButton.icon(
+          onPressed: () {
+            context.pushNamed(
+              'symptom_report',
+              extra: {
+                'incidentId': _currentIncident!.id,
+                'recognitionResultId': _recognitionResultId,
+              },
+            );
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF228B22),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            minimumSize: const Size(double.infinity, 48),
+          ),
+          icon: const Icon(Icons.assignment),
+          label: const Text(
+            'Cung cấp triệu chứng',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          ),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () {
+            context.pushNamed(
+              'first_aid_steps',
+              extra: {
+                'incident': _currentIncident,
+                'recognitionResultId': _recognitionResultId,
+              },
+            );
+          },
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF228B22),
+            side: const BorderSide(color: Color(0xFF228B22), width: 2),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            minimumSize: const Size(double.infinity, 48),
+          ),
+          icon: const Icon(Icons.healing),
+          label: const Text(
+            'Xem lại hướng dẫn sơ cứu',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ];
+    } else {
+      // Case 3: Đã có cả ảnh và triệu chứng - Hiển thị 2 nút xem lại
+      return [
+        ElevatedButton.icon(
+          onPressed: () {
+            context.pushNamed(
+              'first_aid_steps',
+              extra: {
+                'incident': _currentIncident,
+                'recognitionResultId': _recognitionResultId,
+              },
+            );
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF228B22),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            minimumSize: const Size(double.infinity, 48),
+          ),
+          icon: const Icon(Icons.healing),
+          label: const Text(
+            'Xem lại hướng dẫn sơ cứu',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          ),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () {
+            context.pushNamed(
+              'symptom_report',
+              extra: {
+                'incidentId': _currentIncident!.id,
+                'recognitionResultId': _recognitionResultId,
+              },
+            );
+          },
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF228B22),
+            side: const BorderSide(color: Color(0xFF228B22), width: 2),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            minimumSize: const Size(double.infinity, 48),
+          ),
+          icon: const Icon(Icons.assignment),
+          label: const Text(
+            'Cập nhật triệu chứng',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ];
+    }
   }
 }
 
