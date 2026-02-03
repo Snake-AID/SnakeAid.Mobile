@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -7,17 +8,21 @@ import 'dart:io';
 import 'snake_identification_result_screen.dart';
 import 'snake_selection_by_location_screen.dart';
 import '../../../shared/widgets/custom_dialog.dart';
+import '../../models/sos_incident_response.dart';
+import '../../repository/snake_ai_repository.dart';
 
 /// Snake Identification Screen - Camera and image upload for snake identification
-class SnakeIdentificationScreen extends StatefulWidget {
-  const SnakeIdentificationScreen({super.key});
+class SnakeIdentificationScreen extends ConsumerStatefulWidget {
+  final IncidentData? incident;
+  
+  const SnakeIdentificationScreen({super.key, this.incident});
 
   @override
-  State<SnakeIdentificationScreen> createState() =>
+  ConsumerState<SnakeIdentificationScreen> createState() =>
       _SnakeIdentificationScreenState();
 }
 
-class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
+class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationScreen> {
   final ImagePicker _picker = ImagePicker();
   bool _flashOn = false;
   File? _selectedImage;
@@ -28,6 +33,13 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
   @override
   void initState() {
     super.initState();
+    
+    if (widget.incident != null) {
+      debugPrint('📸 Snake ID Screen - Incident ID: ${widget.incident!.id}');
+    } else {
+      debugPrint('⚠️ Snake ID Screen - No incident data');
+    }
+    
     _initializeCamera();
   }
 
@@ -122,8 +134,14 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
     }
   }
 
-  void _processImage() {
+  void _processImage() async {
     if (_selectedImage == null) return;
+    
+    // Check if we have incident data
+    if (widget.incident == null) {
+      _showError('Không tìm thấy thông tin yêu cầu SOS');
+      return;
+    }
 
     // Show loading dialog
     showDialog(
@@ -132,21 +150,52 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
       builder: (context) => const AnalyzingLoadingDialog(),
     );
 
-    // Simulate AI processing then navigate to results
-    Future.delayed(const Duration(seconds: 3), () {
+    try {
+      // Step 1: Upload image
+      final repository = ref.read(snakeAiRepositoryProvider);
+      final uploadResponse = await repository.uploadSnakeImage(
+        incidentId: widget.incident!.id,
+        imageFile: _selectedImage!,
+      );
+
+      if (!uploadResponse.isSuccess || uploadResponse.data == null) {
+        throw Exception(uploadResponse.message);
+      }
+
+      final mediaId = uploadResponse.data!.id;
+      debugPrint('✅ Media ID: $mediaId');
+
+      // Step 2: Detect snake
+      final detectionResponse = await repository.detectSnake(
+        reportMediaId: mediaId,
+      );
+
+      if (!detectionResponse.isSuccess || detectionResponse.data == null) {
+        throw Exception(detectionResponse.message);
+      }
+
       if (mounted) {
         // Close loading dialog
         Navigator.pop(context);
-        
+
         // Navigate to results
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => SnakeIdentificationResultScreen(snakeImage: _selectedImage!),
+            builder: (context) => SnakeIdentificationResultScreen(
+              snakeImage: _selectedImage!,
+              detectionData: detectionResponse.data!,
+              incident: widget.incident!,
+            ),
           ),
         );
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading
+        _showError(e.toString().replaceAll('Exception: ', ''));
+      }
+    }
   }
 
   Future<void> _toggleFlash() async {
@@ -224,7 +273,12 @@ class _SnakeIdentificationScreenState extends State<SnakeIdentificationScreen> {
             label: 'Chọn theo vị trí',
             onPressed: () {
               context.pop();
-              context.goNamed('snake_selection_by_location');
+              context.goNamed(
+                'snake_selection_by_location',
+                extra: {
+                  'incident': widget.incident,
+                },
+              );
             },
             backgroundColor: const Color(0xFF228B22),
             icon: Icons.location_on,

@@ -32,10 +32,6 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.edit_square, color: Color(0xFF6C47C2)),
-            onPressed: () {},
-          ),
-          IconButton(
             icon: const Icon(Icons.settings, color: Color(0xFF6C47C2)),
             onPressed: () {
               context.pushNamed('expert_settings');
@@ -127,19 +123,25 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
                       _buildMenuItem(
                         icon: Icons.star,
                         title: 'Đánh Giá & Phản Hồi',
-                        onTap: () {},
+                        onTap: () {
+                          context.pushNamed('expert_feedback');
+                        },
                       ),
                       const SizedBox(height: 12),
                       _buildMenuItem(
                         icon: Icons.workspace_premium,
                         title: 'Chứng Chỉ & Bằng Cấp',
-                        onTap: () {},
+                        onTap: () {
+                          context.pushNamed('expert_id_documents');
+                        },
                       ),
                       const SizedBox(height: 12),
                       _buildMenuItem(
                         icon: Icons.psychology_alt,
                         title: 'Chuyên Môn & Lĩnh Vực',
-                        onTap: () {},
+                        onTap: () {
+                          context.pushNamed('expert_specialties');
+                        },
                       ),
                       const SizedBox(height: 12),
                       _buildMenuItem(
@@ -344,6 +346,34 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 20),
+
+          // Edit Profile Button
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: OutlinedButton(
+              onPressed: () {
+                context.pushNamed('expert_edit_profile');
+              },
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFF6C47C2), width: 1.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                foregroundColor: const Color(0xFF6C47C2),
+                overlayColor: const Color(0xFF6C47C2).withOpacity(0.1),
+              ),
+              child: const Text(
+                'Chỉnh Sửa Hồ Sơ',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF6C47C2),
+                ),
+              ),
+            ),
           ),
         ],
       ),

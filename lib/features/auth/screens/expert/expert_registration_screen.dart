@@ -1,30 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../models/register_request.dart';
+import '../../repository/auth_repository.dart';
 
 /// Expert Registration Screen
 /// Màn hình đăng ký tài khoản chuyên gia
-class ExpertRegistrationScreen extends StatefulWidget {
+class ExpertRegistrationScreen extends ConsumerStatefulWidget {
   const ExpertRegistrationScreen({super.key});
 
   @override
-  State<ExpertRegistrationScreen> createState() => _ExpertRegistrationScreenState();
+  ConsumerState<ExpertRegistrationScreen> createState() => _ExpertRegistrationScreenState();
 }
 
-class _ExpertRegistrationScreenState extends State<ExpertRegistrationScreen> {
+class _ExpertRegistrationScreenState extends ConsumerState<ExpertRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _specializationController = TextEditingController();
-  final _workplaceController = TextEditingController();
-  final _yearsOfExperienceController = TextEditingController();
+  final _biographyController = TextEditingController();
   
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
+  bool _submitAttempted = false;
   
+  // Password requirements
+  bool _hasMinLength = false;
+  bool _hasLowercase = false;
+  bool _hasUppercase = false;
+  bool _hasDigit = false;
+  bool _hasSpecialChar = false;
   double _passwordStrength = 0.0;
 
   @override
@@ -34,35 +42,29 @@ class _ExpertRegistrationScreenState extends State<ExpertRegistrationScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _specializationController.dispose();
-    _workplaceController.dispose();
-    _yearsOfExperienceController.dispose();
+    _biographyController.dispose();
     super.dispose();
   }
 
-  void _calculatePasswordStrength(String password) {
-    double strength = 0.0;
-    
-    if (password.isEmpty) {
-      strength = 0.0;
-    } else {
-      bool hasLetters = password.contains(RegExp(r'[a-zA-Z]'));
-      bool hasDigits = password.contains(RegExp(r'[0-9]'));
-      bool hasSpecialCharacters = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;/~`]'));
-      
-      if (hasLetters && hasDigits && hasSpecialCharacters) {
-        strength = 1.0;
-      } else if (hasLetters && hasDigits) {
-        strength = 0.66;
-      } else if (hasLetters) {
-        strength = 0.33;
-      } else {
-        strength = 0.0;
-      }
-    }
-    
+  void _checkPasswordRequirements(String password) {
     setState(() {
-      _passwordStrength = strength;
+      _hasMinLength = password.length >= 8;
+      _hasLowercase = password.contains(RegExp(r'[a-z]'));
+      _hasUppercase = password.contains(RegExp(r'[A-Z]'));
+      _hasDigit = password.contains(RegExp(r'[0-9]'));
+      _hasSpecialChar = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;/~`]'));
+      
+      if (password.isEmpty) {
+        _passwordStrength = 0.0;
+      } else if (_hasDigit && (_hasLowercase || _hasUppercase) && _hasSpecialChar) {
+        _passwordStrength = 1.0;
+      } else if (_hasDigit && (_hasLowercase || _hasUppercase)) {
+        _passwordStrength = 0.66;
+      } else if (_hasLowercase || _hasUppercase || _hasDigit) {
+        _passwordStrength = 0.33;
+      } else {
+        _passwordStrength = 0.0;
+      }
     });
   }
 
@@ -188,49 +190,12 @@ class _ExpertRegistrationScreenState extends State<ExpertRegistrationScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Specialization Field
-                _buildTextField(
-                  controller: _specializationController,
-                  label: 'Chuyên môn *',
-                  hint: 'VD: Bác sĩ thú y, Nhà nghiên cứu bò sát...',
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Vui lòng nhập chuyên môn';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // Workplace Field
-                _buildTextField(
-                  controller: _workplaceController,
-                  label: 'Nơi làm việc *',
-                  hint: 'VD: Viện nghiên cứu, Bệnh viện thú y...',
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Vui lòng nhập nơi làm việc';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // Years of Experience Field
-                _buildTextField(
-                  controller: _yearsOfExperienceController,
-                  label: 'Số năm kinh nghiệm',
-                  hint: 'Nhập số năm',
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value != null && value.isNotEmpty) {
-                      final years = int.tryParse(value);
-                      if (years == null || years < 0) {
-                        return 'Vui lòng nhập số hợp lệ';
-                      }
-                    }
-                    return null;
-                  },
+                // Biography Field
+                _buildTextArea(
+                  controller: _biographyController,
+                  label: 'Tiểu sử / Giới thiệu',
+                  hint: 'Giới thiệu ngắn gọn về bản thân, kinh nghiệm và chuyên môn của bạn...',
+                  maxLines: 4,
                 ),
                 const SizedBox(height: 16),
 
@@ -245,7 +210,7 @@ class _ExpertRegistrationScreenState extends State<ExpertRegistrationScreen> {
                       _isPasswordVisible = !_isPasswordVisible;
                     });
                   },
-                  onChanged: (value) => _calculatePasswordStrength(value),
+                  onChanged: (value) => _checkPasswordRequirements(value),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Vui lòng nhập mật khẩu';
@@ -255,6 +220,9 @@ class _ExpertRegistrationScreenState extends State<ExpertRegistrationScreen> {
                     }
                     if (!value.contains(RegExp(r'[a-zA-Z]'))) {
                       return 'Mật khẩu phải có ít nhất 1 chữ cái';
+                    }
+                    if (!value.contains(RegExp(r'[A-Z]'))) {
+                      return 'Mật khẩu phải có ít nhất 1 chữ viết hoa';
                     }
                     if (!value.contains(RegExp(r'[0-9]'))) {
                       return 'Mật khẩu phải có ít nhất 1 chữ số';
@@ -563,12 +531,34 @@ class _ExpertRegistrationScreenState extends State<ExpertRegistrationScreen> {
                   decoration: BoxDecoration(
                     color: _passwordStrength >= 1.0
                         ? const Color(0xFF2ECC40)
-                        : _passwordStrength >= 0.66
-                            ? const Color(0xFF2ECC40).withOpacity(0.3)
-                            : const Color(0xFFDDDDDD),
+                        : const Color(0xFFDDDDDD),
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _buildPasswordRequirement('Ít nhất 8 ký tự', _hasMinLength),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildPasswordRequirement('Có số (0-9)', _hasDigit),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: _buildPasswordRequirement('Ít nhất 1 chữ hoa (A-Z)', _hasUppercase),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildPasswordRequirement('Ký tự đặc biệt (!@#\$...)', _hasSpecialChar),
               ),
             ],
           ),
@@ -577,8 +567,114 @@ class _ExpertRegistrationScreenState extends State<ExpertRegistrationScreen> {
     );
   }
 
+  Widget _buildPasswordRequirement(String requirement, bool isMet) {
+    final color = isMet 
+        ? const Color(0xFF9333EA)
+        : (_submitAttempted 
+            ? const Color(0xFFFF4136)
+            : Colors.grey.shade400);
+    
+    return Row(
+      children: [
+        Icon(
+          isMet ? Icons.check_circle : Icons.cancel,
+          size: 16,
+          color: color,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          requirement,
+          style: TextStyle(
+            fontSize: 12,
+            color: color,
+            fontWeight: isMet ? FontWeight.w500 : FontWeight.normal,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextArea({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    int maxLines = 4,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF333333),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          maxLines: maxLines,
+          validator: validator,
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: const TextStyle(
+              color: Color(0xFFBDBDBD),
+              fontSize: 14,
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(
+                color: Color(0xFFDDDDDD),
+                width: 1,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(
+                color: Color(0xFFDDDDDD),
+                width: 1,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(
+                color: Color(0xFF9333EA),
+                width: 1,
+              ),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(
+                color: Colors.red,
+                width: 1,
+              ),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(
+                color: Colors.red,
+                width: 1,
+              ),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   void _handleContinue() async {
     if (!_formKey.currentState!.validate()) {
+      setState(() {
+        _submitAttempted = true;
+      });
       return;
     }
 
@@ -586,27 +682,70 @@ class _ExpertRegistrationScreenState extends State<ExpertRegistrationScreen> {
       _isLoading = true;
     });
 
-    // TODO: Implement API call
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-
-      // Navigate to credentials screen with registration data
-      context.goNamed(
-        'expert_credentials',
-        extra: {
-          'name': _fullNameController.text,
-          'phone': _phoneController.text,
-          'email': _emailController.text,
-          'password': _passwordController.text,
-          'specialization': _specializationController.text,
-          'workplace': _workplaceController.text,
-          'experience': _yearsOfExperienceController.text,
-        },
+    try {
+      // Tạo request object
+      final registerRequest = RegisterRequest(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        fullName: _fullNameController.text.trim(),
+        phoneNumber: _phoneController.text.trim(),
+        role: 'EXPERT',
+        type: null,
+        biography: _biographyController.text.trim().isEmpty 
+            ? null 
+            : _biographyController.text.trim(),
       );
+
+      // Gọi API register
+      final authRepository = ref.read(authRepositoryProvider);
+      final response = await authRepository.register(registerRequest);
+
+      // Gửi OTP qua email sau khi register thành công
+      try {
+        await authRepository.sendOtp(_emailController.text.trim());
+      } catch (e) {
+        // Nếu send OTP thất bại, vẫn cho phép user tiếp tục
+        debugPrint('⚠️ Send OTP failed but continuing: $e');
+      }
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Hiển thị thông báo thành công
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đăng ký thành công! Mã OTP đã được gửi đến email của bạn'),
+            backgroundColor: Color(0xFF6C47C2),
+          ),
+        );
+
+        // Navigate to OTP verification screen
+        context.goNamed(
+          'otp_verification',
+          extra: {
+            'email': _emailController.text.trim(),
+            'roleRoute': 'expert_login',
+            'themeColor': const Color(0xFF6C47C2),
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        
+        // Hiển thị lỗi
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 }

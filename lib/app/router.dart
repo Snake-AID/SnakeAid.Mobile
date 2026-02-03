@@ -29,6 +29,8 @@ import 'package:snakeaid_mobile/features/emergency/screens/members/snake_filtere
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_confirmation_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/generic_first_aid_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/first_aid_steps_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/models/snake_detection_response.dart';
+import 'package:snakeaid_mobile/features/emergency/models/sos_incident_response.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/symptom_report_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/severity_assessment_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_tracking_screen.dart';
@@ -38,8 +40,18 @@ import 'package:snakeaid_mobile/features/member/screens/messages_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/message_detail_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_home_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_settings_screen.dart';
+import 'package:snakeaid_mobile/features/expert/screens/expert_edit_profile_screen.dart';
+import 'package:snakeaid_mobile/features/expert/screens/expert_id_documents_screen.dart';
+import 'package:snakeaid_mobile/features/expert/screens/expert_specialties_screen.dart';
+import 'package:snakeaid_mobile/features/expert/screens/expert_feedback_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_home_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_settings_screen.dart';
+import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_edit_profile_screen.dart';
+import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_history_screen.dart';
+import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_history_detail_screen.dart';
+import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_income_management_screen.dart';
+import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_feedback_screen.dart';
+import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_id_documents_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_sos_detail_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_navigation_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_arrived_screen.dart' as rescuer_screens;
@@ -129,6 +141,34 @@ final router = GoRouter(
       path: '/expert-settings',
       name: 'expert_settings',
       builder: (context, state) => const ExpertSettingsScreen(),
+    ),
+    
+    // Expert Edit Profile
+    GoRoute(
+      path: '/expert-edit-profile',
+      name: 'expert_edit_profile',
+      builder: (context, state) => const ExpertEditProfileScreen(),
+    ),
+    
+    // Expert ID Documents
+    GoRoute(
+      path: '/expert-id-documents',
+      name: 'expert_id_documents',
+      builder: (context, state) => const ExpertIdDocumentsScreen(),
+    ),
+    
+    // Expert Specialties
+    GoRoute(
+      path: '/expert-specialties',
+      name: 'expert_specialties',
+      builder: (context, state) => const ExpertSpecialtiesScreen(),
+    ),
+    
+    // Expert Feedback
+    GoRoute(
+      path: '/expert-feedback',
+      name: 'expert_feedback',
+      builder: (context, state) => const ExpertFeedbackScreen(),
     ),
     // Note: Expert consultation and emergency routes will be added here
     // as the expert workflow screens are implemented
@@ -234,6 +274,49 @@ final router = GoRouter(
       builder: (context, state) => const RescuerSettingsScreen(),
     ),
     
+    // Rescuer Edit Profile
+    GoRoute(
+      path: '/rescuer-edit-profile',
+      name: 'rescuer_edit_profile',
+      builder: (context, state) => const RescuerEditProfileScreen(),
+    ),
+    
+    // Rescuer History
+    GoRoute(
+      path: '/rescuer-history',
+      name: 'rescuer_history',
+      builder: (context, state) => const RescuerHistoryScreen(),
+    ),
+    GoRoute(
+      path: '/rescuer-history-detail',
+      name: 'rescuer_history_detail',
+      builder: (context, state) {
+        final mission = state.extra as Map<String, dynamic>;
+        return RescuerHistoryDetailScreen(mission: mission);
+      },
+    ),
+    
+    // Rescuer Income Management
+    GoRoute(
+      path: '/rescuer-income-management',
+      name: 'rescuer_income_management',
+      builder: (context, state) => const RescuerIncomeManagementScreen(),
+    ),
+    
+    // Rescuer Feedback
+    GoRoute(
+      path: '/rescuer-feedback',
+      name: 'rescuer_feedback',
+      builder: (context, state) => const RescuerFeedbackScreen(),
+    ),
+    
+    // Rescuer ID Documents
+    GoRoute(
+      path: '/rescuer-id-documents',
+      name: 'rescuer_id_documents',
+      builder: (context, state) => const RescuerIdDocumentsScreen(),
+    ),
+    
     // Rescuer Emergency/SOS Routes
     GoRoute(
       path: '/rescuer-sos-detail',
@@ -275,19 +358,34 @@ final router = GoRouter(
     GoRoute(
       path: '/emergency-alert',
       name: 'emergency_alert',
-      builder: (context, state) => const EmergencyAlertScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return EmergencyAlertScreen(
+          incident: extra?['incident'] as IncidentData?,
+        );
+      },
     ),
     GoRoute(
       path: '/snake-identification',
       name: 'snake_identification',
-      builder: (context, state) => const SnakeIdentificationScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return SnakeIdentificationScreen(
+          incident: extra?['incident'] as IncidentData?,
+        );
+      },
     ),
     // Note: SnakeIdentificationResultScreen requires File snakeImage, not navigable via route name
     // Use Navigator.push with MaterialPageRoute to pass File object
     GoRoute(
       path: '/snake-selection-by-location',
       name: 'snake_selection_by_location',
-      builder: (context, state) => const SnakeSelectionByLocationScreen(),
+      builder: (context, state) {
+        final data = state.extra as Map<String, dynamic>?;
+        return SnakeSelectionByLocationScreen(
+          incident: data?['incident'] as IncidentData?,
+        );
+      },
     ),
     GoRoute(
       path: '/snake-identification-questions',
@@ -329,17 +427,22 @@ final router = GoRouter(
       builder: (context, state) {
         final data = state.extra as Map<String, dynamic>;
         return FirstAidStepsScreen(
-          snakeName: data['snakeName'] as String,
-          snakeNameVi: data['snakeNameVi'] as String,
-          venomType: data['venomType'] as String,
-          snakeImageUrl: data['snakeImageUrl'] as String,
+          detectionResult: data['detectionResult'] as DetectionResult?,
+          incident: data['incident'] as IncidentData,
+          recognitionResultId: data['recognitionResultId'] as String,
         );
       },
     ),
     GoRoute(
       path: '/symptom-report',
       name: 'symptom_report',
-      builder: (context, state) => const SymptomReportScreen(),
+      builder: (context, state) {
+        final data = state.extra as Map<String, dynamic>;
+        return SymptomReportScreen(
+          incidentId: data['incidentId'] as String,
+          recognitionResultId: data['recognitionResultId'] as String?,
+        );
+      },
     ),
     GoRoute(
       path: '/severity-assessment',
@@ -347,10 +450,10 @@ final router = GoRouter(
       builder: (context, state) {
         final data = state.extra as Map<String, dynamic>?;
         return SeverityAssessmentScreen(
-          severityScore: data?['severityScore'] as int? ?? 85,
-          riskFactors: data?['riskFactors'] as List<String>? ?? [],
+          severityLevel: data?['severityLevel'] as int? ?? 0,
+          symptomsReport: data?['symptomsReport'] as List<String>? ?? [],
           timeSinceBite: data?['timeSinceBite'] as String? ?? '15 phút',
-          painLevel: data?['painLevel'] as int? ?? 7,
+          recognitionResultId: data?['recognitionResultId'] as String?,
         );
       },
     ),

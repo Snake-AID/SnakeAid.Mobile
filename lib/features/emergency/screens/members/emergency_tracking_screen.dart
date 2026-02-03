@@ -52,7 +52,7 @@ class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen> {
     return Scaffold(
       body: GestureDetector(
         onDoubleTap: () {
-          context.pushNamed('rescuer_arrived');
+          context.pushNamed('member_rescuer_arrived');
         },
         child: Stack(
           children: [

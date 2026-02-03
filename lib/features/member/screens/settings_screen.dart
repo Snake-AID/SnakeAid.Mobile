@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../auth/repository/auth_repository.dart';
 
 /// Settings Screen - App settings and preferences
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _emergencyAlertsEnabled = true;
   bool _appUpdatesEnabled = false;
   bool _shareLocationEnabled = true;
@@ -258,7 +261,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Quản Lý Dữ Liệu Section (Removed)
+                  // Account Actions Section
+                  _SectionHeader(title: 'Tài Khoản'),
+                  const SizedBox(height: 8),
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        _SettingsItem(
+                          icon: Icons.logout,
+                          title: 'Đăng xuất',
+                          titleColor: const Color(0xFF228B22),
+                          iconColor: const Color(0xFF228B22),
+                          onTap: () {
+                            _showLogoutDialog();
+                          },
+                        ),
+                        Divider(height: 1, indent: 56, color: Colors.grey.shade200),
+                        _SettingsItem(
+                          icon: Icons.delete_outline,
+                          title: 'Xóa tài khoản',
+                          titleColor: const Color(0xFFD32F2F),
+                          iconColor: const Color(0xFFD32F2F),
+                          onTap: () {
+                            _showDeleteAccountDialog();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
 
                   // Footer
                   Center(
@@ -365,11 +401,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Đã đăng xuất')),
+            onPressed: () async {
+              // Lấy navigator và router trước khi async operations
+              final navigator = Navigator.of(context);
+              final router = GoRouter.of(context);
+              
+              // Đóng dialog xác nhận
+              navigator.pop();
+              
+              // Show loading
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (dialogContext) => WillPopScope(
+                  onWillPop: () async => false,
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF228B22),
+                    ),
+                  ),
+                ),
               );
+              
+              try {
+                // Call logout API
+                final authRepository = ref.read(authRepositoryProvider);
+                await authRepository.logout();
+                
+                // Navigate sử dụng router đã lấy trước đó
+                router.go('/role-selection');
+              } catch (e) {
+                // Close loading dialog nếu có lỗi
+                if (mounted) {
+                  navigator.pop();
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(e.toString().replaceAll('Exception: ', '')),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF228B22),
@@ -493,12 +566,16 @@ class _SettingsItem extends StatelessWidget {
   final String title;
   final Widget? trailing;
   final VoidCallback onTap;
+  final Color? titleColor;
+  final Color? iconColor;
 
   const _SettingsItem({
     required this.icon,
     required this.title,
     this.trailing,
     required this.onTap,
+    this.titleColor,
+    this.iconColor,
   });
 
   @override
@@ -514,12 +591,12 @@ class _SettingsItem extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: const Color(0xFFE8F5E9),
+                color: iconColor?.withOpacity(0.1) ?? const Color(0xFFE8F5E9),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 icon,
-                color: const Color(0xFF228B22),
+                color: iconColor ?? const Color(0xFF228B22),
                 size: 22,
               ),
             ),
@@ -527,9 +604,9 @@ class _SettingsItem extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
-                  color: Color(0xFF333333),
+                  color: titleColor ?? const Color(0xFF333333),
                 ),
               ),
             ),

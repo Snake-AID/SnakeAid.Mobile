@@ -478,7 +478,7 @@ class _RescuerMissionSuccessScreenState extends State<RescuerMissionSuccessScree
                                     width: 8,
                                     height: 8,
                                     decoration: const BoxDecoration(
-                                      color: Color(0xFF28A745),
+                                      color: Color(0xFFFF8800),
                                       shape: BoxShape.circle,
                                     ),
                                   ),
@@ -499,8 +499,8 @@ class _RescuerMissionSuccessScreenState extends State<RescuerMissionSuccessScree
                         Switch(
                           value: _isAvailable,
                           onChanged: (value) => setState(() => _isAvailable = value),
-                          activeColor: const Color(0xFF28A745),
-                          activeTrackColor: const Color(0xFF28A745).withOpacity(0.5),
+                          activeColor: const Color(0xFFFF8800),
+                          activeTrackColor: const Color(0xFFFF8800).withOpacity(0.5),
                         ),
                       ],
                     ),
@@ -694,7 +694,7 @@ class _RescuerMissionSuccessScreenState extends State<RescuerMissionSuccessScree
           style: TextStyle(
             fontSize: 14,
             fontWeight: isBold || isHighlighted ? FontWeight.bold : FontWeight.normal,
-            color: isHighlighted ? const Color(0xFF28A745) : const Color(0xFF1C100D),
+            color: isHighlighted ? const Color(0xFFFF8800) : const Color(0xFF1C100D),
           ),
         ),
       ],
@@ -714,10 +714,10 @@ class _RescuerMissionSuccessScreenState extends State<RescuerMissionSuccessScree
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: isCompleted ? const Color(0xFF28A745) : Colors.white,
+                    color: isCompleted ? const Color(0xFFFF8800) : Colors.white,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isCompleted ? const Color(0xFF28A745) : Colors.grey[300]!,
+                      color: isCompleted ? const Color(0xFFFF8800) : Colors.grey[300]!,
                       width: 2,
                     ),
                   ),

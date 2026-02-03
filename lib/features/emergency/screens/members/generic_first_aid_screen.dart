@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'symptom_report_screen.dart';
 
 /// Generic First Aid Screen - Shows general first aid instructions when snake species is unknown
 class GenericFirstAidScreen extends StatelessWidget {

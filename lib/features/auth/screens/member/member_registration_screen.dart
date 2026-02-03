@@ -1,31 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../models/register_request.dart';
+import '../../repository/auth_repository.dart';
 
 /// Member Registration Screen
 /// Màn hình đăng ký tài khoản người dùng
-class MemberRegistrationScreen extends StatefulWidget {
+class MemberRegistrationScreen extends ConsumerStatefulWidget {
   const MemberRegistrationScreen({super.key});
 
   @override
-  State<MemberRegistrationScreen> createState() => _MemberRegistrationScreenState();
+  ConsumerState<MemberRegistrationScreen> createState() => _MemberRegistrationScreenState();
 }
 
-class _MemberRegistrationScreenState extends State<MemberRegistrationScreen> {
+class _MemberRegistrationScreenState extends ConsumerState<MemberRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _birthDateController = TextEditingController();
   
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
-  bool _agreedToTerms = false;
-  String _selectedGender = '';
+  bool _submitAttempted = false; // Track if user attempted to submit
   
-  double _passwordStrength = 0.0; // 0.0 to 1.0
+  // Password requirements
+  bool _hasMinLength = false;
+  bool _hasLowercase = false;
+  bool _hasUppercase = false;
+  bool _hasDigit = false;
+  bool _hasSpecialChar = false;
+  double _passwordStrength = 0.0; // 0.0 = red, 0.5 = yellow, 1.0 = green
 
   @override
   void dispose() {
@@ -34,68 +41,33 @@ class _MemberRegistrationScreenState extends State<MemberRegistrationScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _birthDateController.dispose();
     super.dispose();
   }
 
-  void _calculatePasswordStrength(String password) {
-    double strength = 0.0;
-    
-    if (password.isEmpty) {
-      strength = 0.0;
-    } else {
-      // Check password criteria
-      bool hasLetters = password.contains(RegExp(r'[a-zA-Z]'));
-      bool hasDigits = password.contains(RegExp(r'[0-9]'));
-      bool hasSpecialCharacters = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;/~`]'));
-      
-      // Barem độ mạnh mật khẩu:
-      // Đỏ (Weak - 0.33): Chỉ có chữ cái
-      // Vàng (Medium - 0.66): Có chữ cái + số
-      // Xanh (Strong - 1.0): Có chữ cái + số + ký tự đặc biệt
-      
-      if (hasLetters && hasDigits && hasSpecialCharacters) {
-        // Có đủ: chữ + số + ký tự đặc biệt -> Xanh (Strong)
-        strength = 1.0;
-      } else if (hasLetters && hasDigits) {
-        // Có chữ + số -> Vàng (Medium)
-        strength = 0.66;
-      } else if (hasLetters) {
-        // Chỉ có chữ -> Đỏ (Weak)
-        strength = 0.33;
-      } else {
-        // Không có chữ (chỉ số hoặc ký tự đặc biệt) -> Không hợp lệ
-        strength = 0.0;
-      }
-    }
-    
+  void _checkPasswordRequirements(String password) {
     setState(() {
-      _passwordStrength = strength;
+      _hasMinLength = password.length >= 8;
+      _hasLowercase = password.contains(RegExp(r'[a-z]'));
+      _hasUppercase = password.contains(RegExp(r'[A-Z]'));
+      _hasDigit = password.contains(RegExp(r'[0-9]'));
+      _hasSpecialChar = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;/~`]'));
+      
+      // Tính password strength
+      // Đỏ (0.33): Chỉ có chữ hoặc chỉ số
+      // Vàng (0.66): Có chữ + số
+      // Xanh (1.0): Có chữ + số + ký tự đặc biệt
+      if (password.isEmpty) {
+        _passwordStrength = 0.0;
+      } else if (_hasDigit && (_hasLowercase || _hasUppercase) && _hasSpecialChar) {
+        _passwordStrength = 1.0; // Xanh - có đủ 3
+      } else if (_hasDigit && (_hasLowercase || _hasUppercase)) {
+        _passwordStrength = 0.66; // Vàng - có chữ + số
+      } else if (_hasLowercase || _hasUppercase || _hasDigit) {
+        _passwordStrength = 0.33; // Đỏ - chỉ có 1 loại
+      } else {
+        _passwordStrength = 0.0;
+      }
     });
-  }
-
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime(2000),
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFF228B22),
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null) {
-      setState(() {
-        _birthDateController.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
-      });
-    }
   }
 
   @override
@@ -202,7 +174,7 @@ class _MemberRegistrationScreenState extends State<MemberRegistrationScreen> {
                       _isPasswordVisible = !_isPasswordVisible;
                     });
                   },
-                  onChanged: (value) => _calculatePasswordStrength(value),
+                  onChanged: (value) => _checkPasswordRequirements(value),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Vui lòng nhập mật khẩu';
@@ -213,6 +185,10 @@ class _MemberRegistrationScreenState extends State<MemberRegistrationScreen> {
                     // Check for letters
                     if (!value.contains(RegExp(r'[a-zA-Z]'))) {
                       return 'Mật khẩu phải có ít nhất 1 chữ cái';
+                    }
+                    // Check for uppercase letter
+                    if (!value.contains(RegExp(r'[A-Z]'))) {
+                      return 'Mật khẩu phải có ít nhất 1 chữ viết hoa';
                     }
                     // Check for digits
                     if (!value.contains(RegExp(r'[0-9]'))) {
@@ -244,105 +220,6 @@ class _MemberRegistrationScreenState extends State<MemberRegistrationScreen> {
                     }
                     return null;
                   },
-                ),
-                const SizedBox(height: 16),
-
-                // Birth Date Field
-                _buildTextField(
-                  controller: _birthDateController,
-                  label: 'Ngày sinh',
-                  hint: 'DD/MM/YYYY',
-                  readOnly: true,
-                  suffixIcon: Icons.calendar_today,
-                  onTap: () => _selectDate(context),
-                ),
-                const SizedBox(height: 16),
-
-                // Gender Field
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Giới tính',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF333333),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        _buildGenderOption('Nam', 'male'),
-                        const SizedBox(width: 20),
-                        _buildGenderOption('Nữ', 'female'),
-                        const SizedBox(width: 20),
-                        _buildGenderOption('Khác', 'other'),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Terms Checkbox
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: Checkbox(
-                        value: _agreedToTerms,
-                        onChanged: (value) {
-                          setState(() {
-                            _agreedToTerms = value ?? false;
-                          });
-                        },
-                        activeColor: const Color(0xFF228B22),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _agreedToTerms = !_agreedToTerms;
-                          });
-                        },
-                        child: RichText(
-                          text: const TextSpan(
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF666666),
-                            ),
-                            children: [
-                              TextSpan(text: 'Tôi đồng ý với '),
-                              TextSpan(
-                                text: 'Điều khoản sử dụng',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF228B22),
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                              TextSpan(text: ' và '),
-                              TextSpan(
-                                text: 'Chính sách bảo mật',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF228B22),
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
                 const SizedBox(height: 24),
 
@@ -416,53 +293,6 @@ class _MemberRegistrationScreenState extends State<MemberRegistrationScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildGenderOption(String label, String value) {
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _selectedGender = value;
-        });
-      },
-      child: Row(
-        children: [
-          Container(
-            width: 20,
-            height: 20,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: _selectedGender == value
-                    ? const Color(0xFF228B22)
-                    : const Color(0xFFDDDDDD),
-                width: 2,
-              ),
-            ),
-            child: _selectedGender == value
-                ? Center(
-                    child: Container(
-                      width: 10,
-                      height: 10,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Color(0xFF228B22),
-                      ),
-                    ),
-                  )
-                : null,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF333333),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -641,6 +471,7 @@ class _MemberRegistrationScreenState extends State<MemberRegistrationScreen> {
         ),
         if (showStrengthIndicator) ...[
           const SizedBox(height: 8),
+          // Strength bars
           Row(
             children: [
               Expanded(
@@ -673,12 +504,35 @@ class _MemberRegistrationScreenState extends State<MemberRegistrationScreen> {
                   decoration: BoxDecoration(
                     color: _passwordStrength >= 1.0
                         ? const Color(0xFF2ECC40)
-                        : _passwordStrength >= 0.66
-                            ? const Color(0xFF2ECC40).withOpacity(0.3)
-                            : const Color(0xFFDDDDDD),
+                        : const Color(0xFFDDDDDD),
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Password requirements - 2 hàng
+          Row(
+            children: [
+              Expanded(
+                child: _buildPasswordRequirement('Ít nhất 8 ký tự', _hasMinLength),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildPasswordRequirement('Có số (0-9)', _hasDigit),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: _buildPasswordRequirement('Ít nhất 1 chữ hoa (A-Z)', _hasUppercase),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildPasswordRequirement('Ký tự đặc biệt (!@#\$...)', _hasSpecialChar),
               ),
             ],
           ),
@@ -687,18 +541,40 @@ class _MemberRegistrationScreenState extends State<MemberRegistrationScreen> {
     );
   }
 
+  Widget _buildPasswordRequirement(String requirement, bool isMet) {
+    // Nếu chưa submit, hiển thị xám. Nếu đã submit, hiển thị xanh/đỏ
+    final color = isMet 
+        ? const Color(0xFF228B22) // Xanh khi đạt yêu cầu
+        : (_submitAttempted 
+            ? const Color(0xFFFF4136) // Đỏ khi đã submit mà chưa đạt
+            : Colors.grey.shade400); // Xám khi chưa submit
+    
+    return Row(
+      children: [
+        Icon(
+          isMet ? Icons.check_circle : Icons.cancel,
+          size: 16,
+          color: color,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          requirement,
+          style: TextStyle(
+            fontSize: 12,
+            color: color,
+            fontWeight: isMet ? FontWeight.w500 : FontWeight.normal,
+          ),
+        ),
+      ],
+    );
+  }
+
   void _handleRegistration() async {
     if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    if (!_agreedToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng đồng ý với điều khoản sử dụng'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      // Mark that user attempted to submit
+      setState(() {
+        _submitAttempted = true;
+      });
       return;
     }
 
@@ -706,23 +582,68 @@ class _MemberRegistrationScreenState extends State<MemberRegistrationScreen> {
       _isLoading = true;
     });
 
-    // TODO: Implement registration API call
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-
-      // Navigate to OTP verification screen
-      context.goNamed(
-        'otp_verification',
-        extra: {
-          'email': _emailController.text,
-          'roleRoute': 'member_login',
-          'themeColor': const Color(0xFF228B22),
-        },
+    try {
+      // Tạo request object
+      final registerRequest = RegisterRequest(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        fullName: _fullNameController.text.trim(),
+        phoneNumber: _phoneController.text.trim(),
+        role: 'MEMBER',
+        type: null,
+        biography: null,
       );
+
+      // Gọi API register
+      final authRepository = ref.read(authRepositoryProvider);
+      final response = await authRepository.register(registerRequest);
+
+      // Gửi OTP qua email sau khi register thành công
+      try {
+        await authRepository.sendOtp(_emailController.text.trim());
+      } catch (e) {
+        // Nếu send OTP thất bại, vẫn cho phép user tiếp tục
+        debugPrint('⚠️ Send OTP failed but continuing: $e');
+      }
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Hiển thị thông báo thành công
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đăng ký thành công! Mã OTP đã được gửi đến email của bạn'),
+            backgroundColor: Color(0xFF228B22),
+          ),
+        );
+
+        // Navigate to OTP verification screen
+        context.goNamed(
+          'otp_verification',
+          extra: {
+            'email': _emailController.text.trim(),
+            'roleRoute': 'member_login',
+            'themeColor': const Color(0xFF228B22),
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Hiển thị lỗi
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 }
