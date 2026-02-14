@@ -60,11 +60,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         
         try {
           // Gọi API để verify token
+          // HttpService sẽ tự động refresh token nếu hết hạn
           final authRepository = ref.read(authRepositoryProvider);
           final user = await authRepository.getCurrentUser();
           
           if (user != null) {
-            debugPrint('✅ Session valid, will navigate to home based on role: ${user.role.name}');
+            debugPrint('✅ Session valid (or refreshed), will navigate to home based on role: ${user.role.name}');
             
             // Xác định route dựa vào role (case-insensitive)
             final roleName = user.role.name.toUpperCase();
@@ -83,12 +84,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             }
             _sessionChecked = true;
             return;
+          } else {
+            // getCurrentUser trả về null - có thể do refresh token hết hạn
+            debugPrint('⚠️ Cannot get user info - session may have expired');
+            // Không clear session ở đây vì HttpService đã xử lý
+            // Nếu refresh token hết hạn, HttpService đã clear session rồi
           }
         } catch (e) {
-          debugPrint('⚠️ Token expired or invalid: $e');
-          // Token hết hạn hoặc invalid, clear session
-          final authRepository = ref.read(authRepositoryProvider);
-          await authRepository.clearSession();
+          debugPrint('⚠️ Error verifying session: $e');
+          // Không clear session ở đây
+          // HttpService đã tự động refresh và clear nếu cần
         }
       }
       
