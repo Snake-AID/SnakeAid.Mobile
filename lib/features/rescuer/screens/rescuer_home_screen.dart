@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'rescuer_profile_screen.dart';
 import 'rescuer_income_management_screen.dart';
+import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_available_jobs_screen.dart';
 
 /// Rescuer Home Screen - Dashboard for rescue team members
 class RescuerHomeScreen extends StatefulWidget {
@@ -17,7 +18,7 @@ class _RescuerHomeScreenState extends State<RescuerHomeScreen> {
 
   final List<Widget> _screens = [
     const _HomeTab(),
-    const _MissionsTab(),
+    const RescuerAvailableJobsScreen(),
     const _IncomeTab(),
     const _ProfileTab(),
   ];
