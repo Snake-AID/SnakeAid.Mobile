@@ -1,12 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:async';
-import 'package:snakeaid_mobile/features/auth/repository/auth_repository.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../providers/auth_provider.dart';
 
 /// Splash Screen with loading animation
-/// Màn hình khởi động với thanh loading
+/// Màn hình khởi động với thanh loading và auto session restoration
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
@@ -17,13 +16,12 @@ class SplashScreen extends ConsumerStatefulWidget {
 class _SplashScreenState extends ConsumerState<SplashScreen> {
   double _progress = 0.0;
   Timer? _timer;
-  String? _targetRoute; // Route để navigate sau khi loading xong
-  bool _sessionChecked = false; // Flag để biết đã check session xong chưa
+  bool _hasNavigated = false;
 
   @override
   void initState() {
     super.initState();
-    _checkSessionAndStartLoading();
+    _startLoading();
   }
 
   @override
@@ -32,91 +30,61 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     super.dispose();
   }
 
-  /// Check session trước, sau đó mới bắt đầu animation
-  Future<void> _checkSessionAndStartLoading() async {
-    // Check session ngay khi init
-    await _checkSession();
-    
-    // Sau đó mới bắt đầu loading animation
-    _startLoading();
-  }
+  void _navigateBasedOnAuthState(AuthState authState) {
+    if (_hasNavigated || !mounted) return;
 
-  /// Kiểm tra session và xác định route cần navigate
-  Future<void> _checkSession() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final accessToken = prefs.getString('access_token');
-      final refreshToken = prefs.getString('refresh_token');
-      final userId = prefs.getString('user_id');
-      
-      debugPrint('🔍 Checking saved session...');
-      debugPrint('Access Token: ${accessToken != null ? "exists" : "null"}');
-      debugPrint('Refresh Token: ${refreshToken != null ? "exists" : "null"}');
-      debugPrint('User ID: $userId');
-      
-      // Nếu có access token và refresh token, verify token còn valid không
-      if (accessToken != null && refreshToken != null && userId != null) {
-        debugPrint('✅ Found saved session, verifying token...');
-        
-        try {
-          // Gọi API để verify token
-          final authRepository = ref.read(authRepositoryProvider);
-          final user = await authRepository.getCurrentUser();
-          
-          if (user != null) {
-            debugPrint('✅ Session valid, will navigate to home based on role: ${user.role.name}');
-            
-            // Xác định route dựa vào role (case-insensitive)
-            final roleName = user.role.name.toUpperCase();
-            switch (roleName) {
-              case 'MEMBER':
-                _targetRoute = '/member-home';
-                break;
-              case 'RESCUER':
-                _targetRoute = '/rescuer-home';
-                break;
-              case 'EXPERT':
-                _targetRoute = '/expert-home';
-                break;
-              default:
-                _targetRoute = '/role-selection';
-            }
-            _sessionChecked = true;
-            return;
-          }
-        } catch (e) {
-          debugPrint('⚠️ Token expired or invalid: $e');
-          // Token hết hạn hoặc invalid, clear session
-          final authRepository = ref.read(authRepositoryProvider);
-          await authRepository.clearSession();
-        }
+    _hasNavigated = true;
+
+    String targetRoute;
+
+    if (authState.isAuthenticated && authState.user != null) {
+      // User is authenticated, navigate to home based on role
+      debugPrint(
+        '✅ User authenticated: ${authState.user!.email} (${authState.user!.role.name})',
+      );
+
+      final roleName = authState.user!.role.name.toUpperCase();
+      switch (roleName) {
+        case 'MEMBER':
+          targetRoute = '/member-home';
+          break;
+        case 'RESCUER':
+          targetRoute = '/rescuer-home';
+          break;
+        case 'EXPERT':
+          targetRoute = '/expert-home';
+          break;
+        default:
+          targetRoute = '/role-selection';
       }
-      
-      // Nếu không có session hoặc token invalid, navigate về role selection
-      debugPrint('ℹ️ No valid session, will navigate to role selection');
-      _targetRoute = '/role-selection';
-      _sessionChecked = true;
-    } catch (e) {
-      debugPrint('❌ Error checking session: $e');
-      // Có lỗi, navigate về role selection cho an toàn
-      _targetRoute = '/role-selection';
-      _sessionChecked = true;
+    } else {
+      // No valid session, go to role selection
+      debugPrint('ℹ️ No valid session, navigating to role selection');
+      targetRoute = '/role-selection';
     }
+
+    debugPrint('🚀 Navigating to: $targetRoute');
+    context.go(targetRoute);
   }
 
   void _startLoading() {
-    // Simulate loading progress
+    // Simulate loading progress (runs independently)
     _timer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
       setState(() {
         _progress += 0.02; // Increment 2% every 50ms
-        
+
         if (_progress >= 1.0) {
           timer.cancel();
-          
-          // Navigate sau khi loading animation xong
-          if (_sessionChecked && _targetRoute != null && mounted) {
-            debugPrint('🚀 Navigating to: $_targetRoute');
-            context.go(_targetRoute!);
+
+          // Check if auth provider has finished loading
+          final authState = ref.read(authProvider);
+          if (!authState.isLoading && !_hasNavigated) {
+            _navigateBasedOnAuthState(authState);
           }
         }
       });
@@ -125,6 +93,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch auth state changes
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      // When auth provider finishes loading and progress is complete
+      if (!next.isLoading && _progress >= 1.0 && !_hasNavigated) {
+        _navigateBasedOnAuthState(next);
+      }
+    });
+
+    // Also check immediately if auth already finished loading
+    // (in case listener was setup after loading completed)
+    final authState = ref.watch(authProvider);
+    if (!authState.isLoading && _progress >= 1.0 && !_hasNavigated) {
+      // Use post-frame callback to avoid calling setState during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_hasNavigated) {
+          _navigateBasedOnAuthState(authState);
+        }
+      });
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -167,7 +155,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      
+
                       // App Name
                       const Text(
                         'SnakeAid',
@@ -179,7 +167,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      
+
                       // Tagline
                       const Text(
                         'Cứu hộ rắn cắn thông minh',
@@ -193,7 +181,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                   ),
                 ),
               ),
-              
+
               // Footer Area - Progress Bar and Status
               SizedBox(
                 width: double.infinity,
@@ -223,7 +211,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          
+
                           // Loading Status Text
                           const Text(
                             'Đang khởi động...',
@@ -237,14 +225,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                       ),
                     ),
                     const SizedBox(height: 40),
-                    
+
                     // Version Number
                     const Text(
                       'v1.0.0',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFFCCCCCC),
-                      ),
+                      style: TextStyle(fontSize: 12, color: Color(0xFFCCCCCC)),
                     ),
                     const SizedBox(height: 16),
                   ],
