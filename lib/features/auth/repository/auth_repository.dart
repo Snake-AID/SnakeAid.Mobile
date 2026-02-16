@@ -384,7 +384,7 @@ class AuthRepository {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       debugPrint('🚪 Logging out user...');
 
-      final response = await httpService.post('/api/auth/logout');
+      await httpService.post('/api/auth/logout');
 
       debugPrint('✅ Logout API successful');
 
@@ -399,21 +399,20 @@ class AuthRepository {
       // Dù API thất bại, vẫn clear session local
       await clearSession();
 
-      // Nếu lỗi 401 hoặc 404, không throw exception vì user đã logout
-      if (e.response?.statusCode == 401 || e.response?.statusCode == 404) {
-        debugPrint('⚠️ User already logged out or token invalid');
-        return;
-      }
-
-      throw _handleError(e);
-    } catch (e, stackTrace) {
+      // 🔴 BUG FIX: KHÔNG throw exception - logout phải luôn thành công
+      // User muốn logout → clear session local là đủ
+      debugPrint('✅ Logout local successful despite API error');
+      return;
+    } catch (e) {
       debugPrint('❌ Unexpected error type: ${e.runtimeType}');
       debugPrint('❌ Unexpected error: $e');
 
       // Clear session dù có lỗi
       await clearSession();
 
-      throw Exception('Đăng xuất thất bại. Vui lòng thử lại');
+      // 🔴 BUG FIX: KHÔNG throw - logout phải luôn thành công ở client
+      debugPrint('✅ Logout local successful despite unexpected error');
+      return;
     }
   }
 

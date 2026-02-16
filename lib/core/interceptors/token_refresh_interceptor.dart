@@ -76,8 +76,9 @@ class TokenRefreshInterceptor extends Interceptor {
           return handler.next(err);
         }
       } else {
-        // Refresh thất bại - đánh dấu needs reauth nhưng KHÔNG clear session
-        await _markNeedsReauth();
+        // 🔴 BUG FIX: Refresh thất bại → FORCE LOGOUT
+        debugPrint('🚨 Token refresh failed, forcing session logout...');
+        await _forceLogout();
         return handler.next(err);
       }
     }
@@ -181,11 +182,32 @@ class TokenRefreshInterceptor extends Interceptor {
     return prefs.getString('access_token') ?? prefs.getString('auth_token');
   }
 
-  /// Đánh dấu cần re-authentication (nhưng giữ session)
-  Future<void> _markNeedsReauth() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('token_needs_reauth', true);
-    debugPrint('⚠️ Session preserved, marked for reauth');
+  /// 🔴 Force logout: Clear all session data khi token hết hạn
+  /// Called when refresh token fails or is invalid
+  Future<void> _forceLogout() async {
+    try {
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint('🚨 FORCE LOGOUT: Clearing session due to token expiration');
+
+      final prefs = await SharedPreferences.getInstance();
+
+      // Clear ALL auth-related data
+      await prefs.remove('access_token');
+      await prefs.remove('refresh_token');
+      await prefs.remove('auth_token');
+      await prefs.remove('user_id');
+      await prefs.remove('token_expiry');
+      await prefs.remove('cached_user');
+      await prefs.remove('token_needs_reauth');
+
+      // Set flag to trigger UI logout
+      await prefs.setBool('force_logout_required', true);
+
+      debugPrint('✅ Session cleared, logout flag set');
+      debugPrint('📱 App should redirect to login screen');
+    } catch (e) {
+      debugPrint('❌ Force logout error: $e');
+    }
   }
 
   /// Check if endpoint is public (không cần auth)

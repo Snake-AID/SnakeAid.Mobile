@@ -80,6 +80,42 @@ class AuthNotifier extends StateNotifier<AuthState> {
     });
   }
 
+  /// 🔴 Check if force logout is required (called on-demand, NO polling)
+  ///
+  /// Flow when token expires:
+  /// 1. User makes API call → Token expired → 401
+  /// 2. TokenRefreshInterceptor tries refresh → Refresh fails
+  /// 3. Interceptor calls _forceLogout() → Clears session + Sets 'force_logout_required' flag
+  /// 4. This method detects flag and logs out user
+  ///
+  /// Trigger points (on-demand, not continuous polling):
+  /// - ✅ App init (_loadSavedSession) - Catches flag from previous session
+  /// - ✅ After any API 401 error - Can be called from error handlers
+  /// - ✅ App resume from background - Optional, can be added to lifecycle
+  ///
+  /// Alternative: After interceptor clears tokens, next navigation will
+  /// naturally redirect to login when isAuthenticated check fails.
+  Future<void> checkAndHandleForceLogout() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final forceLogout = prefs.getBool('force_logout_required') ?? false;
+
+      if (forceLogout && state.isAuthenticated) {
+        debugPrint('🚨 Force logout flag detected, logging out...');
+        await prefs.remove('force_logout_required');
+
+        // Clear state without calling logout API (already failed)
+        _cleanupRoleBasedServices();
+        await _clearUserCache();
+        state = AuthState.initial();
+
+        debugPrint('✅ Forced logout completed');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Force logout check error: $e');
+    }
+  }
+
   /// Load saved user session from storage
   /// Called automatically on provider initialization
   /// 🔥 OFFLINE SUPPORT: Load cached user first, then verify with API
@@ -87,6 +123,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       debugPrint('📱 Loading saved session...');
+
+      // 🔴 Check if interceptor flagged force logout (e.g., token refresh failed)
+      await checkAndHandleForceLogout();
+      if (!state.isAuthenticated) {
+        debugPrint('⚠️ Force logout was triggered, skipping session load');
+        return;
+      }
 
       final prefs = await SharedPreferences.getInstance();
       final accessToken = prefs.getString('access_token');
@@ -356,9 +399,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       case UserRole.member:
         debugPrint('👤 User is MEMBER - no special initialization needed');
         break;
-
-      default:
-        debugPrint('⚠️ Unknown role: ${user.role.name}');
     }
   }
 
@@ -477,3 +517,22 @@ final isMemberProvider = Provider<bool>((ref) {
   final role = ref.watch(currentUserRoleProvider);
   return role == UserRole.member;
 });
+
+// ==================== USAGE NOTES ====================
+// 
+// To manually trigger force logout check (optional, usually not needed):
+// 
+// In a widget or error handler:
+//   final authNotifier = ref.read(authProvider.notifier);
+//   await authNotifier.checkAndHandleForceLogout();
+// 
+// This is useful for:
+//   - Global error boundaries catching 401 errors
+//   - App lifecycle events (app resume)
+//   - Manual retry after network errors
+// 
+// However, in most cases this is automatic:
+//   - Checked on app init
+//   - Token cleared → next navigation redirects to login
+// 
+// =====================================================
