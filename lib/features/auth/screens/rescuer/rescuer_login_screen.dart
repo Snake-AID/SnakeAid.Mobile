@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../models/login_request.dart';
-import '../../repository/auth_repository.dart';
+import '../../providers/auth_provider.dart';
 
 /// Rescuer Login Screen
 /// Màn hình đăng nhập cho người cứu hộ
@@ -17,7 +16,7 @@ class _RescuerLoginScreenState extends ConsumerState<RescuerLoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  
+
   bool _isPasswordVisible = false;
   bool _rememberMe = false;
   bool _isLoading = false;
@@ -41,53 +40,38 @@ class _RescuerLoginScreenState extends ConsumerState<RescuerLoginScreen> {
       _isLoading = true;
     });
 
-    try {
-      // Tạo login request
-      final loginRequest = LoginRequest(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+    // Call auth provider login (will auto-connect SignalR for rescuer)
+    final success = await ref
+        .read(authProvider.notifier)
+        .login(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
 
-      // Gọi API login
-      final authRepository = ref.read(authRepositoryProvider);
-      final response = await authRepository.login(loginRequest);
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
 
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+      if (success) {
+        final user = ref.read(currentUserProvider);
 
-        if (response.isSuccess && response.data != null) {
-          // Hiển thị thông báo thành công
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Đăng nhập thành công! Chào mừng ${response.data!.user.fullName}'),
-              backgroundColor: primaryColor,
-            ),
-          );
-
-          // Navigate to rescuer home screen
-          context.goNamed('rescuer_home');
-        } else {
-          // Hiển thị lỗi từ response
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response.message),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-
-        // Hiển thị lỗi
+        // Hiển thị thông báo thành công
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
+            content: Text('Đăng nhập thành công! Chào mừng ${user?.fullName}'),
+            backgroundColor: primaryColor,
+          ),
+        );
+
+        // Navigate to rescuer home screen
+        context.goNamed('rescuer_home');
+      } else {
+        // Hiển thị lỗi từ provider state
+        final error = ref.read(authProvider).error ?? 'Đăng nhập thất bại';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 4),
           ),
@@ -163,10 +147,7 @@ class _RescuerLoginScreenState extends ConsumerState<RescuerLoginScreen> {
                   const SizedBox(height: 4),
                   Text(
                     'Cứu hộ rắn cắn thông minh',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                   ),
                 ],
               ),
@@ -269,7 +250,9 @@ class _RescuerLoginScreenState extends ConsumerState<RescuerLoginScreen> {
                                 if (value == null || value.isEmpty) {
                                   return 'Vui lòng nhập email';
                                 }
-                                final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                                final emailRegex = RegExp(
+                                  r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                                );
                                 if (!emailRegex.hasMatch(value)) {
                                   return 'Email không hợp lệ';
                                 }
@@ -444,9 +427,9 @@ class _RescuerLoginScreenState extends ConsumerState<RescuerLoginScreen> {
                                     height: 24,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      valueColor:
-                                          AlwaysStoppedAnimation<Color>(
-                                              Colors.white),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
                                     ),
                                   )
                                 : const Text(
@@ -470,7 +453,9 @@ class _RescuerLoginScreenState extends ConsumerState<RescuerLoginScreen> {
                               ),
                             ),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
                               child: Text(
                                 'Hoặc đăng nhập bằng',
                                 style: TextStyle(
@@ -498,9 +483,7 @@ class _RescuerLoginScreenState extends ConsumerState<RescuerLoginScreen> {
                                   // TODO: Google login
                                 },
                                 style: OutlinedButton.styleFrom(
-                                  side: BorderSide(
-                                    color: Colors.grey.shade300,
-                                  ),
+                                  side: BorderSide(color: Colors.grey.shade300),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
@@ -536,9 +519,7 @@ class _RescuerLoginScreenState extends ConsumerState<RescuerLoginScreen> {
                                   // TODO: Facebook login
                                 },
                                 style: OutlinedButton.styleFrom(
-                                  side: BorderSide(
-                                    color: Colors.grey.shade300,
-                                  ),
+                                  side: BorderSide(color: Colors.grey.shade300),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),

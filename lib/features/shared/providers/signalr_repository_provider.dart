@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -154,7 +155,7 @@ class LocationServiceNotifier extends StateNotifier<bool> {
         desiredAccuracy: LocationAccuracy.high,
       );
     } catch (e) {
-      print('Error getting location: $e');
+      debugPrint('Error getting location: $e');
       return null;
     }
   }
@@ -199,7 +200,7 @@ class LocationServiceNotifier extends StateNotifier<bool> {
         await _sendLocationUpdate(position);
       }
     } catch (e) {
-      print('Error sending current location: $e');
+      debugPrint('Error sending current location: $e');
     }
   }
 
@@ -215,11 +216,11 @@ class LocationServiceNotifier extends StateNotifier<bool> {
         position.longitude,
       );
 
-      print(
+      debugPrint(
         'Location update sent: ${position.latitude}, ${position.longitude}',
       );
     } catch (e) {
-      print('Error sending location update: $e');
+      debugPrint('Error sending location update: $e');
     }
   }
 
@@ -229,7 +230,7 @@ class LocationServiceNotifier extends StateNotifier<bool> {
       final repository = _ref.read(signalRRepositoryProvider);
       await repository.requestLocationUpdate(userId);
     } catch (e) {
-      print('Error requesting location from user: $e');
+      debugPrint('Error requesting location from user: $e');
     }
   }
 
@@ -239,7 +240,7 @@ class LocationServiceNotifier extends StateNotifier<bool> {
       final repository = _ref.read(signalRRepositoryProvider);
       await repository.broadcastLatestLocations();
     } catch (e) {
-      print('Error broadcasting latest locations: $e');
+      debugPrint('Error broadcasting latest locations: $e');
     }
   }
 

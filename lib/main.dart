@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:snakeaid_mobile/core/services/notification_service.dart';
 import 'package:snakeaid_mobile/features/shared/screens/location_tracker_screen.dart';
 import 'package:snakeaid_mobile/features/shared/screens/signalr_test_screen.dart';
@@ -32,6 +33,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables
+  await dotenv.load(fileName: ".env");
 
   // // Initialize Firebase
   // await Firebase.initializeApp();
