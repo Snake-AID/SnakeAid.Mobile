@@ -16,7 +16,7 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
   final TextEditingController _notesController = TextEditingController();
   final TextEditingController _feedbackController = TextEditingController();
   int _rating = 0;
-  bool _willTransportPatient = false;
+  final bool _willTransportPatient = false;
   final List<File> _snakeImages = [];
   final List<File> _evidenceImages = [];
   final ImagePicker _picker = ImagePicker();
@@ -419,7 +419,7 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: DropdownButtonFormField<String>(
-                            value: _patientOutcome,
+                            initialValue: _patientOutcome,
                             decoration: const InputDecoration(
                               border: InputBorder.none,
                               contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),

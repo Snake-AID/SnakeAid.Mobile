@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../providers/tracking_provider.dart';
 import 'rescuer_profile_screen.dart';
 import 'rescuer_income_management_screen.dart';
 
@@ -13,7 +16,7 @@ class RescuerHomeScreen extends StatefulWidget {
 
 class _RescuerHomeScreenState extends State<RescuerHomeScreen> {
   int _selectedIndex = 0;
-  bool _isOnline = true;
+  final bool _isOnline = true;
 
   final List<Widget> _screens = [
     const _HomeTab(),
@@ -58,7 +61,9 @@ class _RescuerHomeScreenState extends State<RescuerHomeScreen> {
 
   Widget _buildNavItem(int index, IconData icon, String label) {
     final isSelected = _selectedIndex == index;
-    final color = isSelected ? const Color(0xFFFF6B35) : const Color(0xFF999999);
+    final color = isSelected
+        ? const Color(0xFFFF6B35)
+        : const Color(0xFF999999);
 
     return InkWell(
       onTap: () {
@@ -71,12 +76,7 @@ class _RescuerHomeScreenState extends State<RescuerHomeScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: color,
-              size: 28,
-              weight: isSelected ? 700 : 400,
-            ),
+            Icon(icon, color: color, size: 28, weight: isSelected ? 700 : 400),
             const SizedBox(height: 4),
             Text(
               label,
@@ -94,14 +94,15 @@ class _RescuerHomeScreenState extends State<RescuerHomeScreen> {
 }
 
 // Home Tab
-class _HomeTab extends StatefulWidget {
+class _HomeTab extends ConsumerStatefulWidget {
   const _HomeTab();
 
   @override
-  State<_HomeTab> createState() => _HomeTabState();
+  ConsumerState<_HomeTab> createState() => _HomeTabState();
 }
 
-class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin {
+class _HomeTabState extends ConsumerState<_HomeTab>
+    with SingleTickerProviderStateMixin {
   bool _isOnline = true;
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnimation;
@@ -113,12 +114,45 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     );
-    
+
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-    
+
     _pulseController.repeat(reverse: true);
+
+    // Auto start tracking if online
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_isOnline) {
+        _startTracking();
+      }
+    });
+  }
+
+  Future<void> _startTracking() async {
+    final signalRService = ref.read(rescuerSignalRServiceProvider);
+    final locationManager = ref.read(locationManagerProvider);
+
+    try {
+      await signalRService.connect();
+
+      final prefs = await SharedPreferences.getInstance();
+      // Adjust the key according to how your auth saves the userId or get from another provider
+      final userId = prefs.getString('user_id') ?? 'rescuer-temp-id';
+
+      await signalRService.joinAsRescuer(userId);
+      await locationManager.startTracking(userId);
+    } catch (e) {
+      debugPrint("Failed to start tracking: $e");
+    }
+  }
+
+  void _stopTracking() {
+    final locationManager = ref.read(locationManagerProvider);
+    final signalRService = ref.read(rescuerSignalRServiceProvider);
+
+    locationManager.stopTracking();
+    signalRService.disconnect();
   }
 
   @override
@@ -175,232 +209,235 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ),
+                      ],
+                    ),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF6B35),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.person,
+                        color: Colors.white,
+                        size: 24,
                       ),
                     ),
                   ],
                 ),
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF6B35),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.person,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Content
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Status Card
-                  _buildStatusCard(),
-                  const SizedBox(height: 24),
-
-                  // Stats Section
-                  const Text(
-                    'Thống Kê Hôm Nay',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF333333),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildStatsGrid(),
-                  const SizedBox(height: 24),
-
-                  // Current Mission
-                  const Text(
-                    'Nhiệm Vụ Hiện Tại',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF333333),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildCurrentMission(),
-                  const SizedBox(height: 24),
-
-                  // Recent Requests
-                  const Text(
-                    'Yêu Cầu Gần Đây',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF333333),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildRecentRequests(),
-                  const SizedBox(height: 24),
-
-                  // Quick Access
-                  const Text(
-                    'Truy Cập Nhanh',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF333333),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildQuickAccess(),
-                ],
               ),
-            ),
-          ),
-        ],
-      ),
 
-      // Floating SOS Alert Button with Animation
-      Positioned(
-        right: 16,
-        bottom: 80,
-        child: AnimatedBuilder(
-          animation: _pulseAnimation,
-          builder: (context, child) {
-            return Transform.scale(
-              scale: _pulseAnimation.value,
-              child: GestureDetector(
-                onTap: () => _showEmergencyRequestBottomSheet(context),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(40),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFDC3545).withOpacity(0.6),
-                        blurRadius: 20,
-                        spreadRadius: 5,
-                        offset: const Offset(0, 4),
+              // Content
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Status Card
+                      _buildStatusCard(),
+                      const SizedBox(height: 24),
+
+                      // Stats Section
+                      const Text(
+                        'Thống Kê Hôm Nay',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF333333),
+                        ),
                       ),
-                      BoxShadow(
-                        color: const Color(0xFFDC3545).withOpacity(0.3),
-                        blurRadius: 40,
-                        spreadRadius: 10,
-                        offset: const Offset(0, 8),
+                      const SizedBox(height: 16),
+                      _buildStatsGrid(),
+                      const SizedBox(height: 24),
+
+                      // Current Mission
+                      const Text(
+                        'Nhiệm Vụ Hiện Tại',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF333333),
+                        ),
                       ),
+                      const SizedBox(height: 16),
+                      _buildCurrentMission(),
+                      const SizedBox(height: 24),
+
+                      // Recent Requests
+                      const Text(
+                        'Yêu Cầu Gần Đây',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF333333),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildRecentRequests(),
+                      const SizedBox(height: 24),
+
+                      // Quick Access
+                      const Text(
+                        'Truy Cập Nhanh',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF333333),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildQuickAccess(),
                     ],
                   ),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFFF1744), Color(0xFFDC3545)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(30),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
+                ),
+              ),
+            ],
+          ),
+
+          // Floating SOS Alert Button with Animation
+          Positioned(
+            right: 16,
+            bottom: 80,
+            child: AnimatedBuilder(
+              animation: _pulseAnimation,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _pulseAnimation.value,
+                  child: GestureDetector(
+                    onTap: () => _showEmergencyRequestBottomSheet(context),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(40),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFDC3545).withOpacity(0.6),
+                            blurRadius: 20,
+                            spreadRadius: 5,
+                            offset: const Offset(0, 4),
                           ),
-                          child: const Center(
-                            child: Text(
-                              'SOS',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFFDC3545),
-                                letterSpacing: 0.3,
-                              ),
-                            ),
+                          BoxShadow(
+                            color: const Color(0xFFDC3545).withOpacity(0.3),
+                            blurRadius: 40,
+                            spreadRadius: 10,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFF1744), Color(0xFFDC3545)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.3),
+                            width: 1.5,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.2),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: const Center(
+                                child: Text(
+                                  'SOS',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFFDC3545),
+                                    letterSpacing: 0.3,
                                   ),
                                 ),
-                                const SizedBox(width: 4),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Text(
+                                      'BẠN CÓ ĐƠN',
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 1),
                                 const Text(
-                                  'BẠN CÓ ĐƠN',
+                                  'KHẨN CẤP',
                                   style: TextStyle(
-                                    fontSize: 9,
+                                    fontSize: 13,
                                     color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.5,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.8,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black26,
+                                        offset: Offset(0, 1),
+                                        blurRadius: 3,
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 1),
-                            const Text(
-                              'KHẨN CẤP',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.8,
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black26,
-                                    offset: Offset(0, 1),
-                                    blurRadius: 3,
-                                  ),
-                                ],
-                              ),
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.arrow_forward_ios,
+                              color: Colors.white,
+                              size: 14,
                             ),
                           ],
                         ),
-                        const SizedBox(width: 8),
-                        const Icon(
-                          Icons.arrow_forward_ios,
-                          color: Colors.white,
-                          size: 14,
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -431,7 +468,9 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                     width: 12,
                     height: 12,
                     decoration: BoxDecoration(
-                      color: _isOnline ? const Color(0xFF10B981) : const Color(0xFF999999),
+                      color: _isOnline
+                          ? const Color(0xFF10B981)
+                          : const Color(0xFF999999),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -456,7 +495,9 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: _isOnline ? const Color(0xFF10B981) : const Color(0xFF999999),
+                        color: _isOnline
+                            ? const Color(0xFF10B981)
+                            : const Color(0xFF999999),
                       ),
                     ),
                     const Row(
@@ -481,11 +522,16 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
               ),
               Switch(
                 value: _isOnline,
-                activeColor: const Color(0xFFFF6B35),
+                activeThumbColor: const Color(0xFFFF6B35),
                 onChanged: (value) {
                   setState(() {
                     _isOnline = value;
                   });
+                  if (value) {
+                    _startTracking();
+                  } else {
+                    _stopTracking();
+                  }
                 },
               ),
             ],
@@ -495,10 +541,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
           const SizedBox(height: 8),
           const Text(
             'Hoạt động lần cuối: 2 phút trước',
-            style: TextStyle(
-              fontSize: 12,
-              color: Color(0xFFAAAAAA),
-            ),
+            style: TextStyle(fontSize: 12, color: Color(0xFFAAAAAA)),
           ),
         ],
       ),
@@ -610,10 +653,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
               SizedBox(width: 4),
               Text(
                 '123 Nguyễn Huệ, Q.1',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF666666),
-                ),
+                style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
               ),
             ],
           ),
@@ -624,10 +664,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
               SizedBox(width: 4),
               Text(
                 'Thời gian: 18 phút',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF666666),
-                ),
+                style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
               ),
             ],
           ),
@@ -653,10 +690,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
               ),
               child: const Text(
                 'Tiếp Tục',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
           ),
@@ -728,16 +762,16 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
             children: [
               Text(
                 time,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF999999),
-                ),
+                style: const TextStyle(fontSize: 11, color: Color(0xFF999999)),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: statusColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
@@ -808,7 +842,9 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
           color: const Color(0xFFFF6B35),
           onTap: () {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Hướng dẫn an toàn - Đang phát triển')),
+              const SnackBar(
+                content: Text('Hướng dẫn an toàn - Đang phát triển'),
+              ),
             );
           },
         ),
@@ -861,11 +897,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                   : const Color(0xFFF0F0F0),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 28,
-            ),
+            child: Icon(icon, color: color, size: 28),
           ),
           const SizedBox(height: 8),
           SizedBox(
@@ -930,10 +962,7 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFDC3545),
-          width: 2,
-        ),
+        border: Border.all(color: const Color(0xFFDC3545), width: 2),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFFDC3545).withOpacity(0.3),
@@ -1093,10 +1122,7 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
                 children: [
                   const Text(
                     'Phản hồi trong:',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF666666),
-                    ),
+                    style: TextStyle(fontSize: 13, color: Color(0xFF666666)),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -1110,10 +1136,7 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
                   const SizedBox(height: 4),
                   const Text(
                     'Bệnh nhân đang chờ',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF999999),
-                    ),
+                    style: TextStyle(fontSize: 12, color: Color(0xFF999999)),
                   ),
                 ],
               ),
@@ -1139,10 +1162,7 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
                 ),
                 child: const Text(
                   'CHẤP NHẬN',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -1157,20 +1177,14 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
                 },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF666666),
-                  side: const BorderSide(
-                    color: Color(0xFFDDDDDD),
-                    width: 1,
-                  ),
+                  side: const BorderSide(color: Color(0xFFDDDDDD), width: 1),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
                 child: const Text(
                   'Xem Chi Tiết',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 ),
               ),
             ),
@@ -1181,10 +1195,7 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
               },
               child: const Text(
                 'Từ chối',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF999999),
-                ),
+                style: TextStyle(fontSize: 14, color: Color(0xFF999999)),
               ),
             ),
           ],
@@ -1193,8 +1204,12 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String text,
-      {Color? valueColor, bool bold = false}) {
+  Widget _buildInfoRow(
+    IconData icon,
+    String text, {
+    Color? valueColor,
+    bool bold = false,
+  }) {
     return Row(
       children: [
         Container(
@@ -1204,11 +1219,7 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
             color: const Color(0xFFF0F0F0),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(
-            icon,
-            size: 18,
-            color: const Color(0xFF666666),
-          ),
+          child: Icon(icon, size: 18, color: const Color(0xFF666666)),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -1236,10 +1247,7 @@ class _MissionsTab extends StatelessWidget {
       child: Text(
         'Nhiệm Vụ\n(Đang phát triển)',
         textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 18,
-          color: Color(0xFF666666),
-        ),
+        style: TextStyle(fontSize: 18, color: Color(0xFF666666)),
       ),
     );
   }

@@ -600,12 +600,9 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
             ),
             DialogAction(
               label: 'Xác nhận hủy',
-              backgroundColor: selectedReason != null ? const Color(0xFFDC3545) : const Color(0xFFCCCCCC),
+              backgroundColor: const Color(0xFFCCCCCC),
               onPressed: () {
-                if (selectedReason != null) {
-                  Navigator.of(dialogContext).pop();
-                  context.pop();
-                }
+                
               },
             ),
           ],
