@@ -4,10 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:vibration/vibration.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../models/rescue_request.dart';
 import '../models/sos_incident_response.dart';
 import '../repository/incident_repository.dart';
 import '../providers/rescuer_emergency_provider.dart';
+import '../../../core/services/nominatim_service.dart';
 
 /// Rescue Request Modal - Can be minimized to bubble
 /// Displays rescue request and fetches incident details via HTTP
@@ -32,6 +35,12 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
   bool _isAccepting = false;
   IncidentData? _incident;
   String? _errorMessage;
+
+  // Map & Location
+  final MapController _mapController = MapController();
+  String? _locationAddress;
+  bool _isLoadingAddress = true;
+  final NominatimService _nominatimService = NominatimService();
 
   int _remainingSeconds = 60;
   Timer? _countdownTimer;
@@ -78,6 +87,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
     _audioPlayer.dispose();
     _pulseController.dispose();
     _bubbleController.dispose();
+    // MapController (flutter_map) doesn't need dispose
     super.dispose();
   }
 
@@ -96,6 +106,12 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
           _incident = response.data;
           _isLoadingIncident = false;
         });
+
+        // Fetch address from coordinates
+        _fetchLocationAddress(
+          _incident!.locationCoordinates.latitude,
+          _incident!.locationCoordinates.longitude,
+        );
       } else {
         setState(() {
           _errorMessage = 'Không thể tải thông tin sự cố';
@@ -108,6 +124,39 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
         _errorMessage =
             'Lỗi khi tải thông tin: ${e.toString().replaceAll('Exception: ', '')}';
         _isLoadingIncident = false;
+      });
+    }
+  }
+
+  Future<void> _fetchLocationAddress(double lat, double lon) async {
+    try {
+      setState(() {
+        _isLoadingAddress = true;
+      });
+
+      debugPrint('🗺️ Fetching address for: $lat, $lon');
+
+      // geocoding address
+      final address = await _nominatimService.reverseGeocode(lat, lon);
+
+      if (address != null && address.isNotEmpty) {
+        setState(() {
+          _locationAddress = address;
+          _isLoadingAddress = false;
+        });
+
+        debugPrint('✅ Address: $address');
+      } else {
+        setState(() {
+          _locationAddress = 'Không tìm thấy địa chỉ';
+          _isLoadingAddress = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Failed to fetch address: $e');
+      setState(() {
+        _locationAddress = 'Lỗi khi tải địa chỉ';
+        _isLoadingAddress = false;
       });
     }
   }
@@ -140,8 +189,6 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
     try {
       await _audioPlayer.setReleaseMode(ReleaseMode.loop);
       await _audioPlayer.setVolume(0.5);
-      // Play system sound as fallback (add custom sound later)
-      // await _audioPlayer.play(AssetSource('sounds/emergency_alarm.mp3'));
     } catch (e) {
       debugPrint('Failed to play alarm: $e');
     }
@@ -153,7 +200,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
 
   Future<void> _vibrate() async {
     try {
-      if (await Vibration.hasVibrator() ?? false) {
+      if (await Vibration.hasVibrator()) {
         Vibration.vibrate(pattern: [0, 300, 100, 300]);
       }
     } catch (e) {
@@ -508,25 +555,115 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
   Widget _buildIncidentDetails() {
     if (_incident == null) return const SizedBox();
 
+    final lat = _incident!.locationCoordinates.latitude;
+    final lon = _incident!.locationCoordinates.longitude;
+    final latLng = LatLng(lat, lon);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Map section
+          Container(
+            height: 200,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: latLng,
+                initialZoom: 15.0,
+                minZoom: 10.0,
+                maxZoom: 18.0,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                ),
+              ),
+              children: [
+                // Maptile
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.snakeaid.mobile',
+                  maxZoom: 19,
+                  tileBuilder: (context, tileWidget, tile) {
+                    // Add subtle attribution watermark
+                    return DecoratedBox(
+                      decoration: const BoxDecoration(),
+                      child: tileWidget,
+                    );
+                  },
+                ),
+
+                // Emergency location marker
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: latLng,
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.topCenter,
+                      child: const Icon(
+                        Icons.location_pin,
+                        size: 40,
+                        color: Color(0xFFD32F2F),
+                        shadows: [
+                          Shadow(
+                            blurRadius: 4,
+                            color: Colors.black38,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.7),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(4),
+                      ),
+                    ),
+                    child: const Text(
+                      '© OpenStreetMap',
+                      style: TextStyle(fontSize: 8, color: Colors.black54),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Address card
+          _buildInfoCard(
+            icon: Icons.place,
+            title: 'Địa điểm',
+            value: _isLoadingAddress
+                ? 'Đang tải địa chỉ...'
+                : (_locationAddress ?? 'Không xác định'),
+            subtitle:
+                'Tọa độ: ${lat.toStringAsFixed(6)}, ${lon.toStringAsFixed(6)}',
+            color: const Color(0xFF4CAF50),
+          ),
+          const SizedBox(height: 12),
+
           _buildInfoCard(
             icon: Icons.radio_button_checked,
             title: 'Bán kính tìm kiếm',
             value: widget.request.formattedRadius,
             color: const Color(0xFF2196F3),
-          ),
-          const SizedBox(height: 12),
-
-          _buildInfoCard(
-            icon: Icons.place,
-            title: 'Địa điểm',
-            value:
-                '${_incident!.locationCoordinates.latitude.toStringAsFixed(4)}, ${_incident!.locationCoordinates.longitude.toStringAsFixed(4)}',
-            color: const Color(0xFF4CAF50),
           ),
           const SizedBox(height: 12),
 
@@ -566,6 +703,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
     required IconData icon,
     required String title,
     required String value,
+    String? subtitle,
     required Color color,
   }) {
     return Container(
@@ -598,10 +736,17 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
                 Text(
                   value,
                   style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                  ),
+                ],
               ],
             ),
           ),
