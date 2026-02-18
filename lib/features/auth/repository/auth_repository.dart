@@ -330,7 +330,7 @@ class AuthRepository {
       }
       
       throw _handleError(e);
-    } catch (e, stackTrace) {
+    } catch (e) {
       debugPrint('❌ Unexpected error type: ${e.runtimeType}');
       debugPrint('❌ Unexpected error: $e');
       

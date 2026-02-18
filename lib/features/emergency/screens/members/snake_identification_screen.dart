@@ -368,7 +368,7 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
 
                   // Viewfinder Frame
                   Expanded(
-                    child: Container(
+                    child: SizedBox(
                       width: double.infinity,
                       height: double.infinity,
                       child: Stack(

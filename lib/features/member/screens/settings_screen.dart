@@ -668,7 +668,7 @@ class _SettingsSwitchItem extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: const Color(0xFF228B22),
+            activeThumbColor: const Color(0xFF228B22),
           ),
         ],
       ),

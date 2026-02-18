@@ -70,12 +70,10 @@ class _SeverityAssessmentScreenState extends ConsumerState<SeverityAssessmentScr
           // Collect all dos from all venom types
           final allDos = <FirstAidStep>[];
           for (var venom in venoms) {
-            if (venom.venomType.firstAidGuideline != null) {
-              final dos = venom.venomType.firstAidGuideline!.content.dos;
-              debugPrint('  - ${venom.venomType.name}: ${dos.length} dos items');
-              allDos.addAll(dos);
-            }
-          }
+            final dos = venom.venomType.firstAidGuideline.content.dos;
+            debugPrint('  - ${venom.venomType.name}: ${dos.length} dos items');
+            allDos.addAll(dos);
+                    }
 
           debugPrint('✅ Total dos loaded: ${allDos.length}');
           setState(() {
