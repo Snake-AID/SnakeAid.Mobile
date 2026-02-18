@@ -181,7 +181,7 @@ class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
     // Extract first sentence or first 50 chars as title
     final firstSentence = text.split('.').first;
     if (firstSentence.length <= 50) return firstSentence;
-    return text.substring(0, 50) + '...';
+    return '${text.substring(0, 50)}...';
   }
   
   IconData _getIconForStep(int index) {
@@ -855,7 +855,7 @@ class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
                 ],
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );

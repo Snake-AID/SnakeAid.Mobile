@@ -453,7 +453,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                     _isAvailable = value;
                   });
                 },
-                activeColor: const Color(0xFF6C47C2),
+                activeThumbColor: const Color(0xFF6C47C2),
               ),
             ],
           ),

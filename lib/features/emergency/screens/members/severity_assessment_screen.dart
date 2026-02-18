@@ -348,7 +348,7 @@ class _SeverityAssessmentScreenState extends ConsumerState<SeverityAssessmentScr
                   ],
                 ),
               );
-            }).toList(),
+            }),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.only(top: 16),

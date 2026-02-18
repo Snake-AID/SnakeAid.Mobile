@@ -76,7 +76,7 @@ class _LocationTrackerScreenState extends ConsumerState<LocationTrackerScreen> {
                       const SizedBox(width: AppTheme.spacingSmall),
                       Expanded(
                         child: Text(
-                          '${userInfo.userName}',
+                          userInfo.userName,
                           style: Theme.of(context).textTheme.bodyLarge
                               ?.copyWith(
                                 fontWeight: FontWeight.bold,
@@ -351,7 +351,7 @@ class _LocationTrackerScreenState extends ConsumerState<LocationTrackerScreen> {
                             ],
                           ),
                         );
-                      }).toList(),
+                      }),
                     ] else
                       Padding(
                         padding: EdgeInsets.symmetric(

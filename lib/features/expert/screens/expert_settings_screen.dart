@@ -124,7 +124,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                       if (!isLast) const Divider(height: 1),
                     ],
                   );
-                }).toList(),
+                }),
               ],
             ),
             Padding(
