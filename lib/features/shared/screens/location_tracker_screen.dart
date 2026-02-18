@@ -8,7 +8,7 @@ import '../models/Class.dart';
 import '../providers/signalr_repository_provider.dart';
 
 class LocationTrackerScreen extends ConsumerStatefulWidget {
-  const LocationTrackerScreen({Key? key}) : super(key: key);
+  const LocationTrackerScreen({super.key});
 
   @override
   ConsumerState<LocationTrackerScreen> createState() =>

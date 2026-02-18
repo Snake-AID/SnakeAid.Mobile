@@ -6,7 +6,7 @@ import '../models/Class.dart';
 import '../providers/signalr_repository_provider.dart';
 
 class SignalRTestScreen extends ConsumerStatefulWidget {
-  const SignalRTestScreen({Key? key}) : super(key: key);
+  const SignalRTestScreen({super.key});
 
   @override
   ConsumerState<SignalRTestScreen> createState() => _SignalRTestScreenState();

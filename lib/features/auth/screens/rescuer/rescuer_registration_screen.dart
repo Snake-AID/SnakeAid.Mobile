@@ -23,7 +23,7 @@ class _RescuerRegistrationScreenState extends ConsumerState<RescuerRegistrationS
   
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
-  bool _isLoading = false;
+  final bool _isLoading = false;
   bool _submitAttempted = false;
   
   String _rescuerType = 'Emergency'; // Emergency, SnakeCatching, Both

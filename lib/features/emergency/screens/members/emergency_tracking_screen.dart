@@ -14,8 +14,8 @@ class EmergencyTrackingScreen extends StatefulWidget {
 
 class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen> {
   int _remainingSeconds = 330; // 5:30
-  int _estimatedMinutes = 8;
-  double _distanceKm = 2.1;
+  final int _estimatedMinutes = 8;
+  final double _distanceKm = 2.1;
   Timer? _timer;
   bool _showWhileWaitingExpanded = false;
 
