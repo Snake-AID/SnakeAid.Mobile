@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:signalr_netcore/signalr_client.dart';
 import '../models/Class.dart';
 

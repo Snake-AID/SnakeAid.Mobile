@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import '../widgets/sos_button.dart';
 import '../widgets/quick_action_buttons.dart';
-import '../../emergency/screens/members/emergency_alert_screen.dart';
 import '../widgets/quick_action_cards.dart';
 import '../widgets/secondary_menu_grid.dart';
 import '../widgets/notification_bar.dart';

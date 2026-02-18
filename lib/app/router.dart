@@ -22,7 +22,6 @@ import 'package:snakeaid_mobile/features/auth/screens/reset_password_screen.dart
 import 'package:snakeaid_mobile/features/auth/screens/password_reset_success_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_alert_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_identification_screen.dart';
-import 'package:snakeaid_mobile/features/emergency/screens/members/snake_identification_result_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_selection_by_location_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_identification_questions_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_filtered_results_screen.dart';

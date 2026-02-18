@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'symptom_report_screen.dart';
 import '../../../shared/widgets/custom_dialog.dart';
-import 'first_aid_steps_screen.dart';
-import 'snake_identification_questions_screen.dart';
 
 /// Snake Confirmation Screen - Verify identified snake species
 class SnakeConfirmationScreen extends StatefulWidget {

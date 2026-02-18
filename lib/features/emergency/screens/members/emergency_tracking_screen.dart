@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:async';
-import 'first_aid_steps_screen.dart';
-import 'rescuer_arrived_screen.dart';
 import '../../../shared/widgets/chat_screen.dart';
 
 class EmergencyTrackingScreen extends StatefulWidget {

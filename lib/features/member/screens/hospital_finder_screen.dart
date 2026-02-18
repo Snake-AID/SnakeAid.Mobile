@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 /// Hospital Finder Screen - Find nearby hospitals with antivenom
 class HospitalFinderScreen extends StatefulWidget {

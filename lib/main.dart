@@ -3,10 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:snakeaid_mobile/core/services/notification_service.dart';
-import 'package:snakeaid_mobile/features/shared/screens/location_tracker_screen.dart';
-import 'package:snakeaid_mobile/features/shared/screens/signalr_test_screen.dart';
-import 'core/services/background_notification_service.dart';
-import 'core/services/fcm_service.dart';
 import 'app/router.dart';
 import 'app/theme.dart';
 

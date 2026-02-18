@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../models/register_request.dart';
-import '../../repository/auth_repository.dart';
 
 /// Rescuer Registration Screen
 /// Màn hình đăng ký tài khoản người cứu hộ
