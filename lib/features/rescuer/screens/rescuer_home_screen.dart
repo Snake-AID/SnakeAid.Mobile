@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../providers/tracking_provider.dart';
+import 'package:go_router/go_router.dart';
 import 'rescuer_profile_screen.dart';
 import 'rescuer_income_management_screen.dart';
+import '../../emergency/providers/rescuer_emergency_provider.dart';
+import '../../emergency/widgets/rescue_request_modal.dart';
 
 /// Rescuer Home Screen - Dashboard for rescue team members
-class RescuerHomeScreen extends StatefulWidget {
+class RescuerHomeScreen extends ConsumerStatefulWidget {
   const RescuerHomeScreen({super.key});
 
   @override
-  State<RescuerHomeScreen> createState() => _RescuerHomeScreenState();
+  ConsumerState<RescuerHomeScreen> createState() => _RescuerHomeScreenState();
 }
 
-class _RescuerHomeScreenState extends State<RescuerHomeScreen> {
+class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
   int _selectedIndex = 0;
-  final bool _isOnline = true;
+  bool _isOnline = true;
 
   final List<Widget> _screens = [
     const _HomeTab(),
@@ -27,6 +27,97 @@ class _RescuerHomeScreenState extends State<RescuerHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Listen for new rescue requests
+    ref.listen<AsyncValue<dynamic>>(newRescueRequestStreamProvider, (
+      previous,
+      next,
+    ) {
+      debugPrint(
+        '👂 [GLOBAL] newRescueRequestStreamProvider listener triggered!',
+      );
+      debugPrint('   Previous: $previous');
+      debugPrint('   Next: $next');
+
+      next.whenData((request) {
+        debugPrint('🚨 [GLOBAL] NEW RESCUE REQUEST: ${request.requestId}');
+        ref.read(activeRescueRequestProvider.notifier).setRequest(request);
+        _showEmergencyAlert(request);
+      });
+    });
+
+    // Listen for request taken by others
+    ref.listen<AsyncValue<dynamic>>(requestTakenStreamProvider, (
+      previous,
+      next,
+    ) {
+      next.whenData((requestId) {
+        debugPrint('⚠️ [GLOBAL] Request taken by another rescuer: $requestId');
+
+        final activeRequest = ref.read(activeRescueRequestProvider).request;
+        if (activeRequest?.requestId == requestId) {
+          ref.read(activeRescueRequestProvider.notifier).clearRequest();
+
+          // Dismiss modal if open
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Nhiệm vụ đã được nhận bởi người khác'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      });
+    });
+
+    // Listen for request expired
+    ref.listen<AsyncValue<dynamic>>(requestExpiredStreamProvider, (
+      previous,
+      next,
+    ) {
+      next.whenData((requestId) {
+        debugPrint('⏰ [GLOBAL] Request expired: $requestId');
+
+        final activeRequest = ref.read(activeRescueRequestProvider).request;
+        if (activeRequest?.requestId == requestId) {
+          ref.read(activeRescueRequestProvider.notifier).clearRequest();
+
+          // Dismiss modal if open
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          }
+        }
+      });
+    });
+
+    // Listen for request cancelled
+    ref.listen<AsyncValue<dynamic>>(requestCancelledStreamProvider, (
+      previous,
+      next,
+    ) {
+      next.whenData((requestId) {
+        debugPrint('❌ [GLOBAL] Request cancelled: $requestId');
+
+        final activeRequest = ref.read(activeRescueRequestProvider).request;
+        if (activeRequest?.requestId == requestId) {
+          ref.read(activeRescueRequestProvider.notifier).clearRequest();
+
+          // Dismiss modal if open
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Yêu cầu đã bị hủy'),
+              backgroundColor: Colors.grey,
+            ),
+          );
+        }
+      });
+    });
     return Scaffold(
       backgroundColor: const Color(0xFFF8F6F5),
       body: _screens[_selectedIndex],
@@ -55,6 +146,27 @@ class _RescuerHomeScreenState extends State<RescuerHomeScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Show emergency alert modal - works across all tabs
+  void _showEmergencyAlert(dynamic request) {
+    debugPrint('🚨 [GLOBAL] Showing emergency alert modal...');
+
+    // Show modal popup (can be minimized)
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      useRootNavigator: true,
+      barrierColor: Colors.transparent,
+      builder: (context) => RescueRequestModal(
+        request: request,
+        onDismiss: () {
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          }
+        },
       ),
     );
   }
@@ -101,11 +213,9 @@ class _HomeTab extends ConsumerStatefulWidget {
   ConsumerState<_HomeTab> createState() => _HomeTabState();
 }
 
-class _HomeTabState extends ConsumerState<_HomeTab>
-    with SingleTickerProviderStateMixin {
+class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin {
   bool _isOnline = true;
-  late final AnimationController _pulseController;
-  late final Animation<double> _pulseAnimation;
+  String? _rescuerId;
 
   @override
   void initState() {
@@ -114,45 +224,12 @@ class _HomeTabState extends ConsumerState<_HomeTab>
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     );
-
+    
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-
+    
     _pulseController.repeat(reverse: true);
-
-    // Auto start tracking if online
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_isOnline) {
-        _startTracking();
-      }
-    });
-  }
-
-  Future<void> _startTracking() async {
-    final signalRService = ref.read(rescuerSignalRServiceProvider);
-    final locationManager = ref.read(locationManagerProvider);
-
-    try {
-      await signalRService.connect();
-
-      final prefs = await SharedPreferences.getInstance();
-      // Adjust the key according to how your auth saves the userId or get from another provider
-      final userId = prefs.getString('user_id') ?? 'rescuer-temp-id';
-
-      await signalRService.joinAsRescuer(userId);
-      await locationManager.startTracking(userId);
-    } catch (e) {
-      debugPrint("Failed to start tracking: $e");
-    }
-  }
-
-  void _stopTracking() {
-    final locationManager = ref.read(locationManagerProvider);
-    final signalRService = ref.read(rescuerSignalRServiceProvider);
-
-    locationManager.stopTracking();
-    signalRService.disconnect();
   }
 
   @override
@@ -163,6 +240,10 @@ class _HomeTabState extends ConsumerState<_HomeTab>
 
   @override
   Widget build(BuildContext context) {
+    // Watch rescue mode state
+    final rescueModeState = ref.watch(rescueModeProvider);
+    _isOnline = rescueModeState.isActive && rescueModeState.isConnected;
+
     return SafeArea(
       child: Stack(
         children: [
@@ -283,166 +364,165 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                       _buildRecentRequests(),
                       const SizedBox(height: 24),
 
-                      // Quick Access
-                      const Text(
-                        'Truy Cập Nhanh',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF333333),
-                        ),
+                  // Quick Access
+                  const Text(
+                    'Truy Cập Nhanh',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF333333),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildQuickAccess(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+
+      // Floating SOS Alert Button with Animation
+      Positioned(
+        right: 16,
+        bottom: 80,
+        child: AnimatedBuilder(
+          animation: _pulseAnimation,
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _pulseAnimation.value,
+              child: GestureDetector(
+                onTap: () => _showEmergencyRequestBottomSheet(context),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(40),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFDC3545).withOpacity(0.6),
+                        blurRadius: 20,
+                        spreadRadius: 5,
+                        offset: const Offset(0, 4),
                       ),
-                      const SizedBox(height: 16),
-                      _buildQuickAccess(),
+                      BoxShadow(
+                        color: const Color(0xFFDC3545).withOpacity(0.3),
+                        blurRadius: 40,
+                        spreadRadius: 10,
+                        offset: const Offset(0, 8),
+                      ),
                     ],
                   ),
-                ),
-              ),
-            ],
-          ),
-
-          // Floating SOS Alert Button with Animation
-          Positioned(
-            right: 16,
-            bottom: 80,
-            child: AnimatedBuilder(
-              animation: _pulseAnimation,
-              builder: (context, child) {
-                return Transform.scale(
-                  scale: _pulseAnimation.value,
-                  child: GestureDetector(
-                    onTap: () => _showEmergencyRequestBottomSheet(context),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(40),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFDC3545).withOpacity(0.6),
-                            blurRadius: 20,
-                            spreadRadius: 5,
-                            offset: const Offset(0, 4),
-                          ),
-                          BoxShadow(
-                            color: const Color(0xFFDC3545).withOpacity(0.3),
-                            blurRadius: 40,
-                            spreadRadius: 10,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFF1744), Color(0xFFDC3545)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFFF1744), Color(0xFFDC3545)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.3),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
                               ),
-                              child: const Center(
-                                child: Text(
-                                  'SOS',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w900,
-                                    color: Color(0xFFDC3545),
-                                    letterSpacing: 0.3,
-                                  ),
-                                ),
+                            ],
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'SOS',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFDC3545),
+                                letterSpacing: 0.3,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
                               children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 6,
-                                      height: 6,
-                                      decoration: const BoxDecoration(
-                                        color: Colors.white,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    const Text(
-                                      'BẠN CÓ ĐƠN',
-                                      style: TextStyle(
-                                        fontSize: 9,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w600,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 1),
-                                const Text(
-                                  'KHẨN CẤP',
-                                  style: TextStyle(
-                                    fontSize: 13,
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: const BoxDecoration(
                                     color: Colors.white,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.8,
-                                    shadows: [
-                                      Shadow(
-                                        color: Colors.black26,
-                                        offset: Offset(0, 1),
-                                        blurRadius: 3,
-                                      ),
-                                    ],
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Text(
+                                  'BẠN CÓ ĐƠN',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.5,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(width: 8),
-                            const Icon(
-                              Icons.arrow_forward_ios,
-                              color: Colors.white,
-                              size: 14,
+                            const SizedBox(height: 1),
+                            const Text(
+                              'KHẨN CẤP',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.8,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black26,
+                                    offset: Offset(0, 1),
+                                    blurRadius: 3,
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        const Icon(
+                          Icons.arrow_forward_ios,
+                          color: Colors.white,
+                          size: 14,
+                        ),
+                      ],
                     ),
                   ),
-                );
-              },
-            ),
-          ),
-        ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    ],
       ),
     );
   }
 
   Widget _buildStatusCard() {
+    final rescueModeState = ref.watch(rescueModeProvider);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -452,7 +532,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
-            offset: const Offset(0, 2),
+            offset: const Offset(0, -2),
           ),
         ],
       ),
@@ -491,26 +571,28 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _isOnline ? 'ĐANG ONLINE' : 'OFFLINE',
+                      rescueModeState.isConnecting
+                          ? 'ĐANG KẾT NỐI...'
+                          : (_isOnline ? 'ĐANG ONLINE' : 'OFFLINE'),
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: _isOnline
-                            ? const Color(0xFF10B981)
-                            : const Color(0xFF999999),
+                        color: _isOnline ? const Color(0xFF10B981) : const Color(0xFF999999),
                       ),
                     ),
-                    const Row(
+                    Row(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.location_on,
                           size: 14,
                           color: Color(0xFF999999),
                         ),
-                        SizedBox(width: 4),
+                        const SizedBox(width: 4),
                         Text(
-                          'Quận 1, TP.HCM',
-                          style: TextStyle(
+                          rescueModeState.isActive
+                              ? 'Sẵn sàng nhận yêu cầu'
+                              : 'Vui lòng bật chế độ cứu hộ',
+                          style: const TextStyle(
                             fontSize: 13,
                             color: Color(0xFF999999),
                           ),
@@ -522,26 +604,53 @@ class _HomeTabState extends ConsumerState<_HomeTab>
               ),
               Switch(
                 value: _isOnline,
-                activeThumbColor: const Color(0xFFFF6B35),
+                activeColor: const Color(0xFFFF6B35),
                 onChanged: (value) {
                   setState(() {
                     _isOnline = value;
                   });
-                  if (value) {
-                    _startTracking();
-                  } else {
-                    _stopTracking();
-                  }
                 },
               ),
             ],
           ),
+          if (rescueModeState.error != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFEBEE),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    size: 16,
+                    color: Color(0xFFD32F2F),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      rescueModeState.error!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFFD32F2F),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           const Divider(),
           const SizedBox(height: 8),
           const Text(
             'Hoạt động lần cuối: 2 phút trước',
-            style: TextStyle(fontSize: 12, color: Color(0xFFAAAAAA)),
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFFAAAAAA),
+            ),
           ),
         ],
       ),
@@ -962,7 +1071,10 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFDC3545), width: 2),
+        border: Border.all(
+          color: const Color(0xFFDC3545),
+          width: 2,
+        ),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFFDC3545).withOpacity(0.3),
@@ -1122,7 +1234,10 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
                 children: [
                   const Text(
                     'Phản hồi trong:',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF666666)),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF666666),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -1136,7 +1251,10 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
                   const SizedBox(height: 4),
                   const Text(
                     'Bệnh nhân đang chờ',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF999999)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF999999),
+                    ),
                   ),
                 ],
               ),
@@ -1162,7 +1280,10 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
                 ),
                 child: const Text(
                   'CHẤP NHẬN',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -1177,14 +1298,20 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
                 },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF666666),
-                  side: const BorderSide(color: Color(0xFFDDDDDD), width: 1),
+                  side: const BorderSide(
+                    color: Color(0xFFDDDDDD),
+                    width: 1,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
                 child: const Text(
                   'Xem Chi Tiết',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),
@@ -1195,7 +1322,10 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
               },
               child: const Text(
                 'Từ chối',
-                style: TextStyle(fontSize: 14, color: Color(0xFF999999)),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF999999),
+                ),
               ),
             ),
           ],
@@ -1204,12 +1334,8 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
     );
   }
 
-  Widget _buildInfoRow(
-    IconData icon,
-    String text, {
-    Color? valueColor,
-    bool bold = false,
-  }) {
+  Widget _buildInfoRow(IconData icon, String text,
+      {Color? valueColor, bool bold = false}) {
     return Row(
       children: [
         Container(
@@ -1219,7 +1345,11 @@ class _EmergencyRequestSheetState extends State<_EmergencyRequestSheet> {
             color: const Color(0xFFF0F0F0),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, size: 18, color: const Color(0xFF666666)),
+          child: Icon(
+            icon,
+            size: 18,
+            color: const Color(0xFF666666),
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
