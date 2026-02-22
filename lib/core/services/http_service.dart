@@ -122,8 +122,8 @@ class HttpService {
       if (!isAlive) {
         throw DioException(
           requestOptions: RequestOptions(path: ''),
-          type: DioExceptionType.connectionTimeout,
-          error: 'Connection timeout (Health Check Failed)',
+          type: DioExceptionType.connectionError,
+          error: 'HEALTH_CHECK_FAILED',
         );
       }
     }
@@ -144,6 +144,9 @@ class HttpService {
         return 'Request đã bị hủy.';
 
       case DioExceptionType.connectionError:
+        if (error.error == 'HEALTH_CHECK_FAILED') {
+          return 'Máy chủ đang bảo trì hoặc không thể kết nối. Vui lòng thử lại sau.';
+        }
         return 'Không thể kết nối tới server. Kiểm tra kết nối mạng.';
 
       case DioExceptionType.unknown:
