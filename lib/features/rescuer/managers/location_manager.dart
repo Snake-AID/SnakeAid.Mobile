@@ -1,7 +1,7 @@
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import '../services/rescuer_signalr_service.dart';
+import '../../../core/services/rescuer_signalr_service.dart';
 
 class LocationManager {
   final RescuerSignalRService _signalRService;
