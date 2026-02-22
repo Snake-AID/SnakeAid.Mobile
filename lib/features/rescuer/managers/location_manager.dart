@@ -38,10 +38,21 @@ class LocationManager {
       distanceFilter: 10, // Only push if moved 10 meters
     );
 
+    // Prevent duplicate subscriptions
+    await _positionStreamSubscription?.cancel();
+    _positionStreamSubscription = null;
+
     _positionStreamSubscription =
         Geolocator.getPositionStream(locationSettings: locationSettings).listen(
           (Position position) {
             _handleNewPosition(userId, position);
+          },
+          onError: (error) {
+            debugPrint("❌ Location stream error for user $userId: $error");
+          },
+          onDone: () {
+            debugPrint("ℹ️ Location stream closed for user $userId");
+            _positionStreamSubscription = null;
           },
         );
 
@@ -62,11 +73,13 @@ class LocationManager {
   }
 
   void _sendLocation(String userId, Position position) {
-    _signalRService.updateLocation(
-      userId,
-      position.latitude,
-      position.longitude,
-    );
+    _signalRService
+        .updateLocation(userId, position.latitude, position.longitude)
+        .catchError((error) {
+          debugPrint(
+            "❌ Failed to push location to SignalR for user $userId: $error",
+          );
+        });
   }
 
   void stopTracking() {

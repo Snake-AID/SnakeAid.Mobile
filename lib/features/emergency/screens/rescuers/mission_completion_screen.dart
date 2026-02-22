@@ -7,7 +7,8 @@ class MissionCompletionScreen extends StatefulWidget {
   const MissionCompletionScreen({super.key});
 
   @override
-  State<MissionCompletionScreen> createState() => _MissionCompletionScreenState();
+  State<MissionCompletionScreen> createState() =>
+      _MissionCompletionScreenState();
 }
 
 class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
@@ -156,7 +157,10 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF1C100D)),
+                    icon: const Icon(
+                      Icons.arrow_back_ios,
+                      color: Color(0xFF1C100D),
+                    ),
                     onPressed: () => context.pop(),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -322,10 +326,15 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                                       ),
                                       const SizedBox(height: 4),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: const Color(0xFFDC3545),
-                                          borderRadius: BorderRadius.circular(6),
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
                                         ),
                                         child: const Text(
                                           'CỰC ĐỘC',
@@ -346,7 +355,10 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                         ),
                         const SizedBox(height: 16),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFF28A745).withOpacity(0.15),
                             borderRadius: BorderRadius.circular(8),
@@ -388,9 +400,7 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.grey.withOpacity(0.2),
-                      ),
+                      border: Border.all(color: Colors.grey.withOpacity(0.2)),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.05),
@@ -419,10 +429,13 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: DropdownButtonFormField<String>(
-                            initialValue: _patientOutcome,
+                            value: _patientOutcome,
                             decoration: const InputDecoration(
                               border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
                             ),
                             items: const [
                               DropdownMenuItem(
@@ -478,9 +491,7 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.grey.withOpacity(0.2),
-                      ),
+                      border: Border.all(color: Colors.grey.withOpacity(0.2)),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.05),
@@ -519,18 +530,20 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                           child: ListView(
                             scrollDirection: Axis.horizontal,
                             children: [
-                              ..._snakeImages.map((image) => Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.file(
-                                    image,
-                                    width: 80,
-                                    height: 80,
-                                    fit: BoxFit.cover,
+                              ..._snakeImages.map(
+                                (image) => Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.file(
+                                      image,
+                                      width: 80,
+                                      height: 80,
+                                      fit: BoxFit.cover,
+                                    ),
                                   ),
                                 ),
-                              )),
+                              ),
                               GestureDetector(
                                 onTap: () => _pickImage(true),
                                 child: Container(
@@ -589,18 +602,20 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       children: [
-                        ..._evidenceImages.map((image) => Padding(
-                          padding: const EdgeInsets.only(right: 12),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.file(
-                              image,
-                              width: 96,
-                              height: 96,
-                              fit: BoxFit.cover,
+                        ..._evidenceImages.map(
+                          (image) => Padding(
+                            padding: const EdgeInsets.only(right: 12),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.file(
+                                image,
+                                width: 96,
+                                height: 96,
+                                fit: BoxFit.cover,
+                              ),
                             ),
                           ),
-                        )),
+                        ),
                         GestureDetector(
                           onTap: () => _pickImage(false),
                           child: Container(
@@ -692,7 +707,8 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                           child: Column(
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Text(
                                     'Phí dịch vụ',
@@ -728,7 +744,8 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                               ),
                               const SizedBox(height: 12),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Text(
                                     'Thời gian thực hiện',
@@ -768,7 +785,9 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                               Container(
                                 padding: const EdgeInsets.all(4),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFFD54F).withOpacity(0.3),
+                                  color: const Color(
+                                    0xFFFFD54F,
+                                  ).withOpacity(0.3),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: const Icon(
@@ -804,9 +823,7 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.grey.withOpacity(0.2),
-                      ),
+                      border: Border.all(color: Colors.grey.withOpacity(0.2)),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.05),
@@ -852,9 +869,13 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                             return GestureDetector(
                               onTap: () => setState(() => _rating = index + 1),
                               child: Icon(
-                                _rating > index ? Icons.star : Icons.star_border,
+                                _rating > index
+                                    ? Icons.star
+                                    : Icons.star_border,
                                 size: 36,
-                                color: _rating > index ? const Color(0xFFFFC107) : const Color(0xFFCCCCCC),
+                                color: _rating > index
+                                    ? const Color(0xFFFFC107)
+                                    : const Color(0xFFCCCCCC),
                               ),
                             );
                           }),
@@ -899,10 +920,7 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
             decoration: BoxDecoration(
               color: const Color(0xFFF8F7F5),
               border: Border(
-                top: BorderSide(
-                  color: Colors.grey.withOpacity(0.2),
-                  width: 1,
-                ),
+                top: BorderSide(color: Colors.grey.withOpacity(0.2), width: 1),
               ),
             ),
             child: SafeArea(
@@ -943,10 +961,7 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Color(0xFF666666),
-          ),
+          style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
         ),
         const Spacer(),
         Flexible(
@@ -978,11 +993,7 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(
-            icon,
-            size: 18,
-            color: const Color(0xFF666666),
-          ),
+          child: Icon(icon, size: 18, color: const Color(0xFF666666)),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -1021,7 +1032,9 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: _snakeStatus == label ? const Color(0xFFFF8800) : const Color(0xFFCCCCCC),
+                  color: _snakeStatus == label
+                      ? const Color(0xFFFF8800)
+                      : const Color(0xFFCCCCCC),
                   width: 2,
                 ),
               ),
@@ -1042,10 +1055,7 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF1C100D),
-                ),
+                style: const TextStyle(fontSize: 14, color: Color(0xFF1C100D)),
               ),
             ),
           ],
