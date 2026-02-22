@@ -38,9 +38,13 @@ class LocationManager {
       distanceFilter: 10, // Only push if moved 10 meters
     );
 
-    // Prevent duplicate subscriptions
+    // Prevent duplicate subscriptions and stale throttle state
     await _positionStreamSubscription?.cancel();
     _positionStreamSubscription = null;
+
+    _throttleTimer?.cancel();
+    _throttleTimer = null;
+    _isThrottled = false;
 
     _positionStreamSubscription =
         Geolocator.getPositionStream(locationSettings: locationSettings).listen(
