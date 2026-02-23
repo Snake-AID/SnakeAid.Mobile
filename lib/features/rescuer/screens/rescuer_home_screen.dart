@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'rescuer_profile_screen.dart';
 import 'rescuer_income_management_screen.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../emergency/providers/rescuer_emergency_provider.dart';
 import '../../emergency/widgets/rescue_request_modal.dart';
 import '../providers/tracking_provider.dart';
@@ -615,17 +616,31 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                 onChanged: (value) async {
                   try {
                     final notifier = ref.read(rescueModeProvider.notifier);
-                    // Temporarily using a placeholder UUID if user ID is not available from auth provider yet
-                    // To do: Retrieve the actual ID from the active authProvider state in a robust way
-                    const String fallbackUserId =
-                        "b8d810a9-f00e-40af-9812-d8c03d159187";
+
+                    // Retrieve the actual ID from the active authProvider
+                    final user = ref.read(currentUserProvider);
+                    if (user == null) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Lỗi: Không tìm thấy thông tin phiên đăng nhập.',
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
+                    final String actualUserId = user.id;
 
                     if (value) {
-                      await notifier.startRescueMode(fallbackUserId);
+                      await notifier.startRescueMode(actualUserId);
                       // Start location tracking
                       await ref
                           .read(locationManagerProvider)
-                          .startTracking(fallbackUserId);
+                          .startTracking(actualUserId);
                     } else {
                       await notifier.stopRescueMode();
                       ref.read(locationManagerProvider).stopTracking();
