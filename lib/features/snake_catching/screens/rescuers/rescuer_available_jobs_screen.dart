@@ -15,6 +15,49 @@ class _RescuerAvailableJobsScreenState extends State<RescuerAvailableJobsScreen>
   bool _isOnline = true;
   String _selectedFilter = 'Gần nhất'; // Gần nhất, Mới nhất, Giá cao
 
+  // Mock data cho "Đơn đã nhận"
+  final List<Map<String, dynamic>> _acceptedJobs = [
+    {
+      'id': '101',
+      'title': 'Rắn Hổ Mang',
+      'distance': '3.2 km',
+      'timeAccepted': '2 giờ trước',
+      'image': 'https://picsum.photos/400/310',
+      'danger': 'ĐỘC MẠNH',
+      'dangerLevel': 'Cao',
+      'address': '88 Trần Hưng Đạo, Quận 5, TP.HCM',
+      'price': '600.000',
+      'status': 'Đang di chuyển', // Đang di chuyển, Đang thực hiện, Hoàn thành
+      'estimatedTime': '15 phút',
+    },
+    {
+      'id': '102',
+      'title': 'Rắn Cạp Nong',
+      'distance': '5.1 km',
+      'timeAccepted': '3 giờ trước',
+      'image': 'https://picsum.photos/400/311',
+      'danger': 'TRUNG BÌNH',
+      'dangerLevel': 'Trung Bình',
+      'address': '456 Nguyễn Thái Học, Quận 1, TP.HCM',
+      'price': '400.000',
+      'status': 'Đang thực hiện',
+      'estimatedTime': 'Đang xử lý',
+    },
+    {
+      'id': '103',
+      'title': 'Rắn Lục',
+      'distance': '2.8 km',
+      'timeAccepted': '5 giờ trước',
+      'image': 'https://picsum.photos/400/312',
+      'danger': 'YẾU',
+      'dangerLevel': 'Thấp',
+      'address': '99 Lê Duẩn, Quận 1, TP.HCM',
+      'price': '300.000',
+      'status': 'Hoàn thành',
+      'estimatedTime': 'Đã xong',
+    },
+  ];
+
   // Mock data cho 3 nhóm khu vực
   final Map<String, List<Map<String, dynamic>>> _jobsByArea = {
     'GẦN BẠN (10KM)': [
@@ -119,12 +162,15 @@ class _RescuerAvailableJobsScreenState extends State<RescuerAvailableJobsScreen>
             // Header
             _buildHeader(),
             
-            // Filter Sort Options
-            _buildFilterSortRow(),
+            // Tab Selector (Đơn có thể nhận / Đơn đã nhận)
+            _buildTabSelector(),
             
-            // Job List by Area
+            // Filter Sort Options (chỉ hiện khi xem "Đơn có thể nhận")
+            if (_showAvailableJobs) _buildFilterSortRow(),
+            
+            // Job List
             Expanded(
-              child: _buildJobListByArea(),
+              child: _showAvailableJobs ? _buildJobListByArea() : _buildAcceptedJobsList(),
             ),
           ],
         ),
@@ -134,65 +180,151 @@ class _RescuerAvailableJobsScreenState extends State<RescuerAvailableJobsScreen>
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
       color: Colors.white,
       child: Row(
         children: [
           const Text(
-            'Đơn Có Thể Nhận',
+            'Nhiệm Vụ',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF333333),
+              color: Color(0xFF1A1A1A),
             ),
           ),
           const Spacer(),
           
-          // Online Status Toggle
+          // Online Status Toggle - Compact
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            height: 32,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             decoration: BoxDecoration(
-              color: _isOnline ? const Color(0xFFFF6B35).withOpacity(0.1) : const Color(0xFFF0F0F0),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: _isOnline ? const Color(0xFFFF6B35) : const Color(0xFFDDDDDD),
-                width: 1,
-              ),
+              color: _isOnline ? const Color(0xFFFF6B35).withOpacity(0.1) : const Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: _isOnline ? const Color(0xFFFF6B35) : const Color(0xFF999999),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 6),
                 Text(
-                  'TRỰC TUYẾN',
+                  _isOnline ? 'Trực tuyến' : 'Ngoại tuyến',
                   style: TextStyle(
                     fontSize: 12,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                     color: _isOnline ? const Color(0xFFFF6B35) : const Color(0xFF999999),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Switch(
-                  value: _isOnline,
-                  onChanged: (value) {
-                    setState(() {
-                      _isOnline = value;
-                    });
-                  },
-                  activeColor: const Color(0xFFFF6B35),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                Transform.scale(
+                  scale: 0.7,
+                  child: Switch(
+                    value: _isOnline,
+                    onChanged: (value) {
+                      setState(() {
+                        _isOnline = value;
+                      });
+                    },
+                    activeColor: const Color(0xFFFF6B35),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
           
           // Menu Icon
           IconButton(
-            icon: const Icon(Icons.more_horiz, color: Color(0xFF333333)),
+            icon: const Icon(Icons.more_vert, color: Color(0xFF666666), size: 20),
             onPressed: () {
               // TODO: Show menu
             },
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTabSelector() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      color: Colors.white,
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F5F5),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        padding: const EdgeInsets.all(4),
+        child: Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showAvailableJobs = true;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: _showAvailableJobs 
+                        ? const Color(0xFFFF6B35) 
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'Đơn Có Thể Nhận',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: _showAvailableJobs 
+                          ? Colors.white 
+                          : const Color(0xFF666666),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showAvailableJobs = false;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: !_showAvailableJobs 
+                        ? const Color(0xFFFF6B35) 
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'Đơn Đã Nhận',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: !_showAvailableJobs 
+                          ? Colors.white 
+                          : const Color(0xFF666666),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -201,12 +333,10 @@ class _RescuerAvailableJobsScreenState extends State<RescuerAvailableJobsScreen>
     final filters = ['Gần nhất', 'Mới nhất', 'Giá cao'];
     
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       color: Colors.white,
       child: Row(
         children: [
-          const Icon(Icons.navigation, color: Color(0xFFFF6B35), size: 20),
-          const SizedBox(width: 8),
           ...filters.map((filter) {
             final isSelected = _selectedFilter == filter;
             return Padding(
@@ -218,21 +348,21 @@ class _RescuerAvailableJobsScreenState extends State<RescuerAvailableJobsScreen>
                   });
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFFFF6B35).withOpacity(0.1) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
+                    color: isSelected ? const Color(0xFFFF6B35) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isSelected ? const Color(0xFFFF6B35) : const Color(0xFFDDDDDD),
+                      color: isSelected ? const Color(0xFFFF6B35) : const Color(0xFFE0E0E0),
                       width: 1,
                     ),
                   ),
                   child: Text(
                     filter,
                     style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                      color: isSelected ? const Color(0xFFFF6B35) : const Color(0xFF666666),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.white : const Color(0xFF666666),
                     ),
                   ),
                 ),
@@ -240,7 +370,14 @@ class _RescuerAvailableJobsScreenState extends State<RescuerAvailableJobsScreen>
             );
           }).toList(),
           const Spacer(),
-          const Icon(Icons.tune, color: Color(0xFF666666), size: 20),
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Icon(Icons.tune, color: Color(0xFF666666), size: 18),
+          ),
         ],
       ),
     );
@@ -715,6 +852,347 @@ class _RescuerAvailableJobsScreenState extends State<RescuerAvailableJobsScreen>
         return const Color(0xFF28A745);
       default:
         return const Color(0xFF999999);
+    }
+  }
+
+  // Build danh sách đơn đã nhận
+  Widget _buildAcceptedJobsList() {
+    if (_acceptedJobs.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.assignment_outlined,
+              size: 80,
+              color: Colors.grey[300],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Chưa có đơn nào được nhận',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 8, bottom: 16),
+      itemCount: _acceptedJobs.length,
+      itemBuilder: (context, index) {
+        final job = _acceptedJobs[index];
+        return _buildAcceptedJobCard(job);
+      },
+    );
+  }
+
+  // Build card cho đơn đã nhận
+  Widget _buildAcceptedJobCard(Map<String, dynamic> job) {
+    final Color dangerColor = _getDangerColor(job['danger']);
+    final Color statusColor = _getStatusColor(job['status']);
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header với status badge
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                // Status Badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: statusColor, width: 1.5),
+                  ),
+                  child: Text(
+                    job['status'].toString().toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: statusColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                
+                // Time Accepted
+                Row(
+                  children: [
+                    const Icon(Icons.access_time, size: 14, color: Color(0xFF999999)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Nhận ${job['timeAccepted']}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF999999),
+                      ),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                
+                // Menu
+                const Icon(Icons.more_horiz, color: Color(0xFF999999), size: 20),
+              ],
+            ),
+          ),
+          
+          // Snake Image with Danger Badge
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: double.infinity,
+                    height: 180,
+                    color: const Color(0xFFF0F0F0),
+                    child: Image.network(
+                      job['image'],
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Center(
+                          child: Icon(Icons.image, size: 60, color: Color(0xFFCCCCCC)),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                
+                // Danger Badge
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: dangerColor,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning, size: 14, color: Colors.white),
+                        const SizedBox(width: 4),
+                        Text(
+                          job['danger'],
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Title
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              job['title'],
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF333333),
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Address
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0F0F0),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(Icons.location_on, size: 18, color: Color(0xFFFF6B35)),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        job['address'],
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF666666),
+                          height: 1.4,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.near_me, size: 14, color: Color(0xFF28A745)),
+                          const SizedBox(width: 4),
+                          Text(
+                            job['distance'],
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF28A745),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Price & Estimated Time
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                Text(
+                  '${job['price']}đ',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFFF6B35),
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0F0F0),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.timer_outlined, size: 14, color: Color(0xFF666666)),
+                      const SizedBox(width: 4),
+                      Text(
+                        job['estimatedTime'],
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF666666),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Action Button
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  // TODO: Navigate to job detail or tracking screen
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: statusColor,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _getActionButtonText(job['status']),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      _getActionButtonIcon(job['status']),
+                      size: 18,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getStatusColor(String status) {
+    // Tất cả đều dùng màu cam thống nhất
+    return const Color(0xFFFF6B35);
+  }
+
+  String _getActionButtonText(String status) {
+    switch (status) {
+      case 'Đang di chuyển':
+        return 'XEM CHỈ ĐƯỜNG';
+      case 'Đang thực hiện':
+        return 'TIẾP TỤC XỬ LÝ';
+      case 'Hoàn thành':
+        return 'XEM CHI TIẾT';
+      default:
+        return 'XEM THÊM';
+    }
+  }
+
+  IconData _getActionButtonIcon(String status) {
+    switch (status) {
+      case 'Đang di chuyển':
+        return Icons.navigation;
+      case 'Đang thực hiện':
+        return Icons.play_arrow;
+      case 'Hoàn thành':
+        return Icons.check_circle;
+      default:
+        return Icons.arrow_forward;
     }
   }
 }
