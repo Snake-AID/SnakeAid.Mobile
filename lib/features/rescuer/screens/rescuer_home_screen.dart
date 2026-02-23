@@ -6,6 +6,7 @@ import 'rescuer_profile_screen.dart';
 import 'rescuer_income_management_screen.dart';
 import '../../emergency/providers/rescuer_emergency_provider.dart';
 import '../../emergency/widgets/rescue_request_modal.dart';
+import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_available_jobs_screen.dart';
 
 /// Rescuer Home Screen - Dashboard for rescue team members
 class RescuerHomeScreen extends ConsumerStatefulWidget {
@@ -20,7 +21,7 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
 
   final List<Widget> _screens = [
     const _HomeTab(),
-    const _MissionsTab(),
+    const RescuerAvailableJobsScreen(),
     const _IncomeTab(),
     const _ProfileTab(),
   ];

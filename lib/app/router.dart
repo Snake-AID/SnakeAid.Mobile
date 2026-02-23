@@ -45,6 +45,8 @@ import 'package:snakeaid_mobile/features/expert/screens/expert_id_documents_scre
 import 'package:snakeaid_mobile/features/expert/screens/expert_specialties_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_feedback_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_home_screen.dart';
+import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_available_jobs_screen.dart';
+import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_request_detail_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_settings_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_edit_profile_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_history_screen.dart';
@@ -265,6 +267,23 @@ final router = GoRouter(
       path: '/rescuer-home',
       name: 'rescuer_home',
       builder: (context, state) => const RescuerHomeScreen(),
+    ),
+    
+    // Rescuer Available Jobs
+    GoRoute(
+      path: '/rescuer-available-jobs',
+      name: 'rescuer_available_jobs',
+      builder: (context, state) => const RescuerAvailableJobsScreen(),
+    ),
+    
+    // Rescuer Request Detail
+    GoRoute(
+      path: '/rescuer-request-detail',
+      name: 'rescuer_request_detail',
+      builder: (context, state) {
+        final requestData = state.extra as Map<String, dynamic>;
+        return RescuerRequestDetailScreen(requestData: requestData);
+      },
     ),
     
     // Rescuer Settings
