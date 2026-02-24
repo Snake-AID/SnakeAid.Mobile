@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 /// Secondary menu grid (2x3) - Professional design
 class SecondaryMenuGrid extends StatelessWidget {
@@ -16,7 +17,7 @@ class SecondaryMenuGrid extends StatelessWidget {
                 icon: Icons.support_agent,
                 label: 'Tư vấn\nchuyên gia',
                 hasStatusDot: true,
-                onTap: () {},
+                onTap: () => context.push('/expert-list'),
               ),
               const SizedBox(width: 12),
               _MenuItem(

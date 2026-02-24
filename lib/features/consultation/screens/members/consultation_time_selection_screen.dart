@@ -1,0 +1,615 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../providers/expert_detail_provider.dart';
+
+// Primary color constant
+const Color _primaryColor = Color(0xFF228B22);
+const Color _backgroundColor = Color(0xFFF6F8F6);
+
+/// Time Slot model
+class TimeSlot {
+  final String startTime;
+  final String endTime;
+  final bool isAvailable;
+
+  const TimeSlot({
+    required this.startTime,
+    required this.endTime,
+    required this.isAvailable,
+  });
+
+  String get displayText => '$startTime - $endTime';
+}
+
+/// Date model for horizontal scroller
+class AvailableDate {
+  final DateTime date;
+  final String dayLabel;
+  final bool hasAvailability;
+
+  AvailableDate({
+    required this.date,
+    required this.dayLabel,
+    required this.hasAvailability,
+  });
+}
+
+/// Consultation Time Selection Screen
+/// Allows users to select date, time slot, and duration for consultation
+class ConsultationTimeSelectionScreen extends ConsumerStatefulWidget {
+  final String expertId;
+
+  const ConsultationTimeSelectionScreen({
+    super.key,
+    required this.expertId,
+  });
+
+  @override
+  ConsumerState<ConsultationTimeSelectionScreen> createState() =>
+      _ConsultationTimeSelectionScreenState();
+}
+
+class _ConsultationTimeSelectionScreenState
+    extends ConsumerState<ConsultationTimeSelectionScreen> {
+  int? _selectedDateIndex;
+  int? _selectedTimeSlotIndex;
+
+  // Mock available dates (next 7 days)
+  late List<AvailableDate> _availableDates;
+
+  // Mock time slots
+  final List<TimeSlot> _timeSlots = const [
+    TimeSlot(startTime: '09:00', endTime: '09:30', isAvailable: true),
+    TimeSlot(startTime: '09:30', endTime: '10:00', isAvailable: true),
+    TimeSlot(startTime: '10:00', endTime: '10:30', isAvailable: true),
+    TimeSlot(startTime: '10:30', endTime: '11:00', isAvailable: true),
+    TimeSlot(startTime: '11:00', endTime: '11:30', isAvailable: false),
+    TimeSlot(startTime: '11:30', endTime: '12:00', isAvailable: true),
+    TimeSlot(startTime: '14:00', endTime: '14:30', isAvailable: true),
+    TimeSlot(startTime: '14:30', endTime: '15:00', isAvailable: false),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeDates();
+  }
+
+  void _initializeDates() {
+    final now = DateTime.now();
+    _availableDates = List.generate(7, (index) {
+      final date = now.add(Duration(days: index));
+      final dayLabel = _getDayLabel(date);
+      final hasAvailability = index != 2 && index != 5; // Mock: some days unavailable
+
+      return AvailableDate(
+        date: date,
+        dayLabel: dayLabel,
+        hasAvailability: hasAvailability,
+      );
+    });
+  }
+
+  String _getDayLabel(DateTime date) {
+    final weekday = date.weekday;
+    switch (weekday) {
+      case DateTime.monday:
+        return 'T.HAI';
+      case DateTime.tuesday:
+        return 'T.BA';
+      case DateTime.wednesday:
+        return 'T.TƯ';
+      case DateTime.thursday:
+        return 'T.NĂM';
+      case DateTime.friday:
+        return 'T.SÁU';
+      case DateTime.saturday:
+        return 'T.BẢY';
+      case DateTime.sunday:
+        return 'CN';
+      default:
+        return '';
+    }
+  }
+
+  String _getFullDayLabel(DateTime date) {
+    final weekday = date.weekday;
+    switch (weekday) {
+      case DateTime.monday:
+        return 'Thứ Hai';
+      case DateTime.tuesday:
+        return 'Thứ Ba';
+      case DateTime.wednesday:
+        return 'Thứ Tư';
+      case DateTime.thursday:
+        return 'Thứ Năm';
+      case DateTime.friday:
+        return 'Thứ Sáu';
+      case DateTime.saturday:
+        return 'Thứ Bảy';
+      case DateTime.sunday:
+        return 'Chủ Nhật';
+      default:
+        return '';
+    }
+  }
+
+  String _formatDate(DateTime date, {bool includeYear = true}) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final year = date.year.toString();
+    final dayLabel = _getFullDayLabel(date);
+    
+    if (includeYear) {
+      return '$dayLabel, $day/$month/$year';
+    } else {
+      return '$dayLabel, $day/$month';
+    }
+  }
+
+  void _handleContinue() {
+    if (_selectedDateIndex == null || _selectedTimeSlotIndex == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng chọn ngày và giờ tư vấn')),
+      );
+      return;
+    }
+
+    final selectedDate = _availableDates[_selectedDateIndex!];
+    final selectedTimeSlot = _timeSlots[_selectedTimeSlotIndex!];
+
+    // Navigate to documents screen with consultation details
+    context.push(
+      '/consultation-documents/${widget.expertId}',
+      extra: {
+        'consultationType': 'scheduled',
+        'selectedDate': _formatDate(selectedDate.date),
+        'selectedTime': '${selectedTimeSlot.startTime} (30 phút)',
+        'duration': '30 phút',
+        'price': '150,000 VNĐ',
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(expertDetailProvider(widget.expertId));
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      backgroundColor: _backgroundColor,
+      appBar: AppBar(
+        backgroundColor: _backgroundColor,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF1F2937)),
+          onPressed: () => context.pop(),
+        ),
+        title: const Text(
+          'Chọn Thời Gian',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1F2937),
+          ),
+        ),
+        centerTitle: true,
+      ),
+      body: state.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : state.expert == null
+              ? const Center(child: Text('Không tìm thấy chuyên gia'))
+              : Column(
+                  children: [
+                    // Main scrollable content
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                children: [
+                                  // Expert Profile Card
+                                  _buildExpertProfile(
+                                      context, state.expert!, theme),
+                                ],
+                              ),
+                            ),
+
+                            // Horizontal Date Scroller
+                            _buildDateScroller(theme),
+
+                            // Available Times Section
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: _buildAvailableTimesSection(theme),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Bottom Summary & Actions
+                    if (_selectedDateIndex != null &&
+                        _selectedTimeSlotIndex != null)
+                      _buildBottomSummary(theme),
+                  ],
+                ),
+    );
+  }
+
+  /// Build expert profile summary card
+  Widget _buildExpertProfile(BuildContext context, expert, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Avatar
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              image: expert.avatarUrl != null
+                  ? DecorationImage(
+                      image: CachedNetworkImageProvider(expert.avatarUrl!),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+              color: expert.avatarUrl == null ? Colors.grey[300] : null,
+            ),
+            child: expert.avatarUrl == null
+                ? Icon(Icons.person, size: 28, color: Colors.grey[600])
+                : null,
+          ),
+          const SizedBox(width: 16),
+
+          // Expert info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  expert.displayName,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  expert.specialties.first,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build horizontal date scroller
+  Widget _buildDateScroller(ThemeData theme) {
+    return Container(
+      height: 100,
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: _availableDates.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final dateItem = _availableDates[index];
+          final isSelected = _selectedDateIndex == index;
+
+          return InkWell(
+            onTap: () {
+              setState(() {
+                _selectedDateIndex = index;
+                _selectedTimeSlotIndex = null; // Reset time selection
+              });
+            },
+            child: Container(
+              width: 60,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? _primaryColor.withOpacity(0.2)
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isSelected ? _primaryColor : Colors.transparent,
+                  width: 2,
+                ),
+                boxShadow: [
+                  if (!isSelected)
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                ],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    dateItem.dayLabel,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: isSelected
+                          ? theme.colorScheme.onSurface
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${dateItem.date.day}',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: isSelected
+                          ? theme.colorScheme.onSurface
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: dateItem.hasAvailability
+                          ? _primaryColor
+                          : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Build available times section
+  Widget _buildAvailableTimesSection(ThemeData theme) {
+    if (_selectedDateIndex == null) {
+      return Container(
+        padding: const EdgeInsets.all(32),
+        child: Center(
+          child: Text(
+            'Vui lòng chọn ngày để xem giờ khả dụng',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    final selectedDate = _availableDates[_selectedDateIndex!];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Giờ Khả Dụng - ${_formatDate(selectedDate.date, includeYear: false)}',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 2.5,
+          ),
+          itemCount: _timeSlots.length,
+          itemBuilder: (context, index) {
+            final timeSlot = _timeSlots[index];
+            final isSelected = _selectedTimeSlotIndex == index;
+
+            return InkWell(
+              onTap: timeSlot.isAvailable
+                  ? () {
+                      setState(() {
+                        _selectedTimeSlotIndex = index;
+                      });
+                    }
+                  : null,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: !timeSlot.isAvailable
+                      ? Colors.grey.shade100
+                      : isSelected
+                          ? _primaryColor
+                          : Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: !timeSlot.isAvailable
+                        ? Colors.transparent
+                        : isSelected
+                            ? _primaryColor
+                            : Colors.grey.shade300,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  timeSlot.displayText,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: !timeSlot.isAvailable
+                        ? Colors.grey.shade400
+                        : isSelected
+                            ? Colors.white
+                            : theme.colorScheme.onSurface,
+                    decoration: !timeSlot.isAvailable
+                        ? TextDecoration.lineThrough
+                        : null,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Build bottom summary and action buttons
+  Widget _buildBottomSummary(ThemeData theme) {
+    final selectedDate = _availableDates[_selectedDateIndex!];
+    final selectedTimeSlot = _timeSlots[_selectedTimeSlotIndex!];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Bạn Đã Chọn',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Date
+              Row(
+                children: [
+                  Icon(
+                    Icons.calendar_month,
+                    size: 20,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    _formatDate(selectedDate.date),
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Time
+              Row(
+                children: [
+                  Icon(
+                    Icons.schedule,
+                    size: 20,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    '${selectedTimeSlot.displayText} (30 phút)',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Price
+              Row(
+                children: [
+                  Icon(
+                    Icons.payments,
+                    size: 20,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    '150,000 VNĐ',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: _primaryColor,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Divider
+              Divider(color: Colors.grey.shade200),
+              const SizedBox(height: 16),
+
+              // Continue button
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton(
+                  onPressed: _handleContinue,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _primaryColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Tiếp Tục',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Back button
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: TextButton(
+                  onPressed: () => context.pop(),
+                  child: Text(
+                    'Quay lại',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

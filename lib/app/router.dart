@@ -61,6 +61,12 @@ import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_supp
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/find_hospital_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/mission_completion_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_mission_success_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/expert_list_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/expert_profile_detail_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/service_selection_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/consultation_documents_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/consultation_time_selection_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/payment_confirmation_screen.dart';
 
 /// App routing configuration using go_router
 final router = GoRouter(
@@ -260,6 +266,86 @@ final router = GoRouter(
       path: '/member-home',
       name: 'member_home',
       builder: (context, state) => const MainScaffold(initialIndex: 0),
+    ),
+    
+    // === CONSULTATION ROUTES ===
+    // Expert List
+    GoRoute(
+      path: '/expert-list',
+      name: 'expert_list',
+      builder: (context, state) => const ExpertListScreen(),
+    ),
+    
+    // Expert Profile Detail
+    GoRoute(
+      path: '/expert-detail/:expertId',
+      name: 'expert_detail',
+      builder: (context, state) {
+        final expertId = state.pathParameters['expertId']!;
+        return ExpertProfileDetailScreen(expertId: expertId);
+      },
+    ),
+    
+    // Service Selection
+    GoRoute(
+      path: '/service-selection/:expertId',
+      name: 'service_selection',
+      builder: (context, state) {
+        final expertId = state.pathParameters['expertId']!;
+        return ServiceSelectionScreen(expertId: expertId);
+      },
+    ),
+    
+    // Consultation Time Selection (for scheduled consultation)
+    GoRoute(
+      path: '/consultation-time-selection/:expertId',
+      name: 'consultation_time_selection',
+      builder: (context, state) {
+        final expertId = state.pathParameters['expertId']!;
+        return ConsultationTimeSelectionScreen(expertId: expertId);
+      },
+    ),
+    
+    // Consultation Documents Upload
+    GoRoute(
+      path: '/consultation-documents/:expertId',
+      name: 'consultation_documents',
+      builder: (context, state) {
+        final expertId = state.pathParameters['expertId']!;
+        final extraData = state.extra as Map<String, dynamic>?;
+        
+        return ConsultationDocumentsScreen(
+          expertId: expertId,
+          consultationType: extraData?['consultationType'],
+          selectedDate: extraData?['selectedDate'],
+          selectedTime: extraData?['selectedTime'],
+          duration: extraData?['duration'],
+          price: extraData?['price'],
+        );
+      },
+    ),
+    
+    // Payment Confirmation
+    GoRoute(
+      path: '/payment-confirmation/:expertId',
+      name: 'payment_confirmation',
+      builder: (context, state) {
+        final expertId = state.pathParameters['expertId']!;
+        final extraData = state.extra as Map<String, dynamic>?;
+        
+        return PaymentConfirmationScreen(
+          expertId: expertId,
+          consultationType: extraData?['consultationType'],
+          selectedDate: extraData?['selectedDate'],
+          selectedTime: extraData?['selectedTime'],
+          duration: extraData?['duration'],
+          price: extraData?['price'],
+          hasDocuments: extraData?['hasDocuments'] ?? false,
+          uploadedImagesCount: extraData?['uploadedImagesCount'] ?? 0,
+          problemDescription: extraData?['problemDescription'],
+          questions: extraData?['questions'],
+        );
+      },
     ),
     
     // === RESCUER APP ROUTES ===

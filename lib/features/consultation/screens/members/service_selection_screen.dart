@@ -1,0 +1,427 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../providers/expert_detail_provider.dart';
+
+// Primary color constant
+const Color _primaryColor = Color(0xFF228B22);
+const Color _backgroundColor = Color(0xFFF6F8F6);
+
+/// Service Selection Screen
+/// Allows users to choose between instant consultation or scheduled appointment
+class ServiceSelectionScreen extends ConsumerWidget {
+  final String expertId;
+
+  const ServiceSelectionScreen({
+    super.key,
+    required this.expertId,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(expertDetailProvider(expertId));
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      backgroundColor: _backgroundColor,
+      appBar: AppBar(
+        backgroundColor: _backgroundColor.withOpacity(0.8),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF333333)),
+          onPressed: () => context.pop(),
+        ),
+        title: const Text(
+          'Chọn Loại Tư Vấn',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF333333)
+          ),
+        ),
+        centerTitle: true,
+      ),
+      body: state.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : state.expert == null
+              ? const Center(child: Text('Không tìm thấy chuyên gia'))
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      // Expert Profile Card
+                      _buildExpertProfile(context, state.expert!, theme),
+                      const SizedBox(height: 16),
+
+                      // Instant Consultation Card
+                      _buildInstantConsultationCard(context, state.expert!, theme),
+                      const SizedBox(height: 16),
+
+                      // Scheduled Consultation Card
+                      _buildScheduledConsultationCard(context, state.expert!, theme),
+                      const SizedBox(height: 16),
+
+                      // Info Box
+                      _buildInfoBox(theme),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                ),
+    );
+  }
+
+  /// Build expert profile summary card
+  Widget _buildExpertProfile(BuildContext context, expert, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Avatar
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              image: expert.avatarUrl != null
+                  ? DecorationImage(
+                      image: CachedNetworkImageProvider(expert.avatarUrl!),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+              color: expert.avatarUrl == null ? Colors.grey[300] : null,
+            ),
+            child: expert.avatarUrl == null
+                ? Icon(Icons.person, size: 24, color: Colors.grey[600])
+                : null,
+          ),
+          const SizedBox(width: 12),
+
+          // Info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  expert.displayName,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Chuyên gia ${expert.primarySpecialty}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build instant consultation card
+  Widget _buildInstantConsultationCard(BuildContext context, expert, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Colors.grey.shade200,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.amber[50],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.bolt,
+                  color: Colors.amber[500],
+                  size: 20,
+                ),
+              ),
+              if (expert.isOnline)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Đang Online',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: _primaryColor,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Title & Description
+          Text(
+            'Tư Vấn Ngay',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Chuyên gia sẽ phản hồi trong 2 phút',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Price
+          Text(
+            '200,000 VNĐ',
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: _primaryColor,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Divider
+          Divider(color: Colors.grey.shade200),
+          const SizedBox(height: 16),
+
+          // Benefits
+          _buildBenefit(Icons.check_circle, 'Phản hồi tức thì', theme),
+          const SizedBox(height: 12),
+          _buildBenefit(Icons.check_circle, 'Chat hoặc video call', theme),
+          const SizedBox(height: 12),
+          _buildBenefit(Icons.check_circle, 'Không cần đặt trước', theme),
+          const SizedBox(height: 20),
+
+          // Action Button
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: FilledButton(
+              onPressed: () {
+                // Navigate to documents screen for instant consultation
+                context.push(
+                  '/consultation-documents/${expert.userId}',
+                  extra: {
+                    'consultationType': 'instant',
+                    'price': '200,000 VNĐ',
+                  },
+                );
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: _primaryColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Chọn Tư Vấn Ngay',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build scheduled consultation card
+  Widget _buildScheduledConsultationCard(BuildContext context, expert, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Colors.grey.shade200,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.calendar_month,
+              color: Colors.blue[500],
+              size: 20,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Title & Description
+          Text(
+            'Đặt Lịch Tư Vấn',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Chọn thời gian phù hợp với bạn',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Price
+          Text(
+            '150,000 VNĐ',
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: _primaryColor,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Divider
+          Divider(color: Colors.grey.shade200),
+          const SizedBox(height: 16),
+
+          // Benefits
+          _buildBenefit(Icons.check_circle, 'Linh hoạt thời gian', theme),
+          const SizedBox(height: 12),
+          _buildBenefit(Icons.check_circle, 'Chuẩn bị trước câu hỏi', theme),
+          const SizedBox(height: 12),
+          _buildBenefit(Icons.check_circle, 'Nhắc nhở trước 30 phút', theme),
+          const SizedBox(height: 20),
+
+          // Action Button
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton(
+              onPressed: () {
+                // Navigate to time selection screen
+                context.push('/consultation-time-selection/${expert.userId}');
+              },
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: _primaryColor, width: 2),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                'Chọn Đặt Lịch',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: _primaryColor,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build benefit item
+  Widget _buildBenefit(IconData icon, String text, ThemeData theme) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          color: _primaryColor,
+          size: 20,
+        ),
+        const SizedBox(width: 12),
+        Text(
+          text,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Build info box
+  Widget _buildInfoBox(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.amber[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border(
+          left: BorderSide(
+            color: Colors.amber,
+            width: 4,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.info_outline,
+            color: Colors.amber[700],
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Bạn chỉ thanh toán sau khi hoàn thành tư vấn.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: Colors.grey[800],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
