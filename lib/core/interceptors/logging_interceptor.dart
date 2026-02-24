@@ -8,9 +8,22 @@ class LoggingInterceptor extends Interceptor {
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     if (kDebugMode) {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      debugPrint('📤 REQUEST [${options.method}] => ${options.path}');
+      debugPrint(
+        '📤 REQUEST [${options.method}] => ${options.baseUrl}${options.path}',
+      );
       if (options.queryParameters.isNotEmpty) {
         debugPrint('📋 Query: ${options.queryParameters}');
+      }
+      if (options.headers.isNotEmpty) {
+        // Mask sensitive headers
+        final maskedHeaders = Map<String, dynamic>.from(options.headers);
+        if (maskedHeaders.containsKey('Authorization')) {
+          final auth = maskedHeaders['Authorization'].toString();
+          maskedHeaders['Authorization'] = auth.length > 14
+              ? '${auth.substring(0, 10)}...${auth.substring(auth.length - 4)}'
+              : auth;
+        }
+        debugPrint('📋 Headers: $maskedHeaders');
       }
       if (options.data != null) {
         debugPrint('📋 Body: ${options.data}');

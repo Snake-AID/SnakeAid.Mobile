@@ -64,11 +64,9 @@ class AuthState {
 /// Handles login, logout, session restoration, and user state
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _authRepository;
-  final Ref _ref;
 
-  AuthNotifier({required AuthRepository authRepository, required Ref ref})
+  AuthNotifier({required AuthRepository authRepository})
     : _authRepository = authRepository,
-      _ref = ref,
       super(const AuthState(isLoading: true)) {
     // Load saved session on initialization
     _loadSavedSession().then((_) {
@@ -93,26 +91,34 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// - ✅ After any API 401 error - Can be called from error handlers
   /// - ✅ App resume from background - Optional, can be added to lifecycle
   ///
-  /// Alternative: After interceptor clears tokens, next navigation will
-  /// naturally redirect to login when isAuthenticated check fails.
-  Future<void> checkAndHandleForceLogout() async {
+  /// Returns true if force logout was triggered (skip session load)
+  Future<bool> checkAndHandleForceLogout() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final forceLogout = prefs.getBool('force_logout_required') ?? false;
 
-      if (forceLogout && state.isAuthenticated) {
-        debugPrint('🚨 Force logout flag detected, logging out...');
+      if (forceLogout) {
+        debugPrint('🚨 Force logout flag detected, clearing session...');
         await prefs.remove('force_logout_required');
 
-        // Clear state without calling logout API (already failed)
-        _cleanupRoleBasedServices();
+        // Clear all session data
         await _clearUserCache();
+        await prefs.remove('access_token');
+        await prefs.remove('refresh_token');
+        await prefs.remove('user_id');
+        await prefs.remove('token_expiry');
+
+        // Clear state
         state = AuthState.initial();
 
         debugPrint('✅ Forced logout completed');
+        return true; // Flag was set, skip session load
       }
+
+      return false; // No flag, continue with session load
     } catch (e) {
       debugPrint('⚠️ Force logout check error: $e');
+      return false; // On error, continue with session load
     }
   }
 
@@ -125,8 +131,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       debugPrint('📱 Loading saved session...');
 
       // 🔴 Check if interceptor flagged force logout (e.g., token refresh failed)
-      await checkAndHandleForceLogout();
-      if (!state.isAuthenticated) {
+      final wasForceLoggedOut = await checkAndHandleForceLogout();
+      if (wasForceLoggedOut) {
         debugPrint('⚠️ Force logout was triggered, skipping session load');
         return;
       }
@@ -134,6 +140,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final prefs = await SharedPreferences.getInstance();
       final accessToken = prefs.getString('access_token');
       final userId = prefs.getString('user_id');
+
+      // 🔍 DEBUG: Log all stored keys
+      debugPrint('🔍 DEBUG: Checking SharedPreferences...');
+      debugPrint(
+        '  - access_token: ${accessToken != null ? "EXISTS (${accessToken.length} chars)" : "NULL"}',
+      );
+      debugPrint('  - user_id: ${userId ?? "NULL"}');
+      debugPrint(
+        '  - refresh_token: ${prefs.getString('refresh_token') != null ? "EXISTS" : "NULL"}',
+      );
+      debugPrint(
+        '  - cached_user: ${prefs.getString('cached_user') != null ? "EXISTS" : "NULL"}',
+      );
+      debugPrint(
+        '  - token_expiry: ${prefs.getString('token_expiry') ?? "NULL"}',
+      );
 
       if (accessToken != null && userId != null) {
         debugPrint('✅ Found saved session for user: $userId');
@@ -153,34 +175,56 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
           // Trigger role-based services (will fail gracefully if offline)
           _initializeRoleBasedServices(cachedUser);
+        } else {
+          debugPrint('⚠️ No cached user found, but tokens exist');
+          debugPrint('⚠️ This may indicate User.fromJson() failed');
         }
 
-        // 🔥 STEP 2: Verify token with API in background (needs online)
-        try {
-          final user = await _authRepository.getCurrentUser();
+        // 🔥 STEP 2: Verify token with API in background (only if token not expired)
+        // This prevents unnecessary 401 errors on app startup with expired tokens
+        final tokenExpiryStr = prefs.getString('token_expiry');
+        final shouldVerify =
+            tokenExpiryStr != null &&
+            DateTime.now().isBefore(DateTime.parse(tokenExpiryStr));
 
-          if (user != null) {
-            // Update with fresh data from API
-            state = state.copyWith(user: user);
+        if (shouldVerify) {
+          try {
+            debugPrint('🔍 Verifying session with API...');
+            final user = await _authRepository.getCurrentUser();
 
-            // Update cache with fresh data
-            await _saveUserToCache(user);
+            if (user != null) {
+              // Update with fresh data from API
+              state = state.copyWith(user: user);
 
-            debugPrint('✅ User data refreshed from API');
+              // Update cache with fresh data
+              await _saveUserToCache(user);
 
-            // Re-trigger services in case role changed
-            _initializeRoleBasedServices(user);
+              debugPrint('✅ User data refreshed from API');
+
+              // Re-trigger services in case role changed
+              _initializeRoleBasedServices(user);
+            }
+          } catch (e) {
+            debugPrint('⚠️ Failed to verify token with API: $e');
+            debugPrint('📱 Continuing with cached user data (offline mode)');
+            // Don't throw - keep using cached data
           }
-        } catch (e) {
-          debugPrint('⚠️ Failed to verify token with API (offline mode)');
-          debugPrint('📱 Continuing with cached user data');
-          // Don't throw - keep using cached data
+        } else {
+          debugPrint('⏰ Token expired or not set');
+          debugPrint(
+            '📱 Using cached user data (will refresh on next API call)',
+          );
+          // Token expired, but we keep cached user for offline mode
+          // Next API call will trigger 401 → interceptor will try refresh
         }
       } else {
-        debugPrint('ℹ️ No saved session found');
+        debugPrint('ℹ️ No saved session found (missing tokens)');
+        debugPrint('  - Missing access_token: ${accessToken == null}');
+        debugPrint('  - Missing user_id: ${userId == null}');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('❌ Failed to load session: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
       // Don't throw, just start with empty state
     }
   }
@@ -410,10 +454,27 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userJson = jsonEncode(user.toJson());
-      await prefs.setString('cached_user', userJson);
-      debugPrint('💾 User cached for offline use');
-    } catch (e) {
+
+      debugPrint('💾 Caching user...');
+      debugPrint('💾 User ID: ${user.id}');
+      debugPrint('💾 User email: ${user.email}');
+      debugPrint('💾 User role: ${user.role.name}');
+      debugPrint('💾 JSON length: ${userJson.length} chars');
+
+      final saved = await prefs.setString('cached_user', userJson);
+
+      if (saved) {
+        debugPrint('✅ User cached successfully for offline use');
+
+        // Verify immediately
+        final verified = prefs.getString('cached_user');
+        debugPrint('✅ Verified cache exists: ${verified != null}');
+      } else {
+        debugPrint('❌ Failed to cache user (setString returned false)');
+      }
+    } catch (e, stackTrace) {
       debugPrint('⚠️ Failed to cache user: $e');
+      debugPrint('⚠️ Stack trace: $stackTrace');
       // Don't throw - caching is optional feature
     }
   }
@@ -426,17 +487,27 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final userJson = prefs.getString('cached_user');
 
       if (userJson == null) {
-        debugPrint('ℹ️ No cached user found');
+        debugPrint('ℹ️ No cached user found in SharedPreferences');
         return null;
       }
 
+      debugPrint('📦 Found cached user JSON (${userJson.length} chars)');
+      debugPrint(
+        '📦 JSON preview: ${userJson.substring(0, userJson.length > 100 ? 100 : userJson.length)}...',
+      );
+
       final userMap = jsonDecode(userJson) as Map<String, dynamic>;
+      debugPrint('📦 Decoded JSON to Map: $userMap');
+
       final user = User.fromJson(userMap);
 
       debugPrint('📦 Loaded user from cache: ${user.email}');
+      debugPrint('📦 User role: ${user.role.name}');
+      debugPrint('📦 User ID: ${user.id}');
       return user;
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('⚠️ Failed to load cached user: $e');
+      debugPrint('⚠️ Stack trace: $stackTrace');
       return null;
     }
   }
@@ -479,7 +550,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 /// Manages user session and auth operations
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final authRepository = ref.watch(authRepositoryProvider);
-  return AuthNotifier(authRepository: authRepository, ref: ref);
+  return AuthNotifier(authRepository: authRepository);
 });
 
 /// Computed: Is user authenticated?

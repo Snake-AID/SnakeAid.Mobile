@@ -174,17 +174,9 @@ class AuthRepository {
         await _saveSession(
           accessToken: loginResponse.data!.accessToken,
           refreshToken: loginResponse.data!.refreshToken,
-          userData: {
-            'id': loginResponse.data!.user.id,
-            'email': loginResponse.data!.user.email,
-            'fullName': loginResponse.data!.user.fullName,
-            'avatarUrl': loginResponse.data!.user.avatarUrl,
-            'role': loginResponse.data!.user.role,
-            'isActive': loginResponse.data!.user.isActive,
-          },
           userId: loginResponse.data!.user.id,
         );
-        debugPrint('✅ Session saved');
+        debugPrint('✅ Session saved (tokens only)');
       }
 
       return loginResponse;
@@ -247,14 +239,18 @@ class AuthRepository {
   }
 
   /// Save session data to local storage
-  /// Includes tokens AND full user data for offline support
+  /// Saves tokens and expiry time only
+  /// 🔥 Cached user is managed separately by auth_provider
   Future<void> _saveSession({
     required String accessToken,
     required String refreshToken,
     required String userId,
-    Map<String, dynamic>? userData, // Optional user data to cache
   }) async {
     final prefs = await SharedPreferences.getInstance();
+
+    debugPrint('💾 Saving session...');
+    debugPrint('  - userId: $userId');
+
     await prefs.setString('access_token', accessToken);
     await prefs.setString('refresh_token', refreshToken);
     await prefs.setString('user_id', userId);
@@ -263,21 +259,14 @@ class AuthRepository {
       accessToken,
     ); // For backward compatibility
 
-    // 💾 Save user data for offline access
-    if (userData != null) {
-      final userJson = jsonEncode(userData);
-      await prefs.setString('cached_user', userJson);
-      debugPrint('💾 User data cached for offline access');
-    }
-
     // Lưu thời gian hết hạn (để refresh proactively)
     final expiryTime = DateTime.now().add(
       const Duration(minutes: 55),
     ); // Refresh trước 5 phút
     await prefs.setString('token_expiry', expiryTime.toIso8601String());
 
-    debugPrint('💾 Session saved: userId=$userId');
-    debugPrint('💾 Token will be refreshed at: $expiryTime');
+    debugPrint('✅ Session saved: userId=$userId');
+    debugPrint('✅ Token expiry: $expiryTime');
   }
 
   /// Get saved session data
