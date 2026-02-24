@@ -3,18 +3,22 @@ import 'dart:async';
 import 'package:go_router/go_router.dart';
 
 class RescuerSupportScreen extends StatefulWidget {
-  const RescuerSupportScreen({super.key});
+  final String missionId;
+  final String incidentId;
+
+  const RescuerSupportScreen({
+    super.key,
+    required this.missionId,
+    required this.incidentId,
+  });
 
   @override
   State<RescuerSupportScreen> createState() => _RescuerSupportScreenState();
 }
 
 class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
-  int _currentStep = 2;
-  final int _totalSteps = 5;
   int _selectedTab = 0;
-  final List<bool> _stepChecks = [true, true, false, false, false];
-  int _elapsedSeconds = 754; // 12:34
+  int _elapsedSeconds = 0;
   Timer? _timer;
 
   final List<String> _tabs = [
@@ -92,7 +96,10 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFF8800).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
@@ -185,9 +192,21 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            _buildStatusChip('Ý thức: Tỉnh táo', const Color(0xFF28A745), true),
-                            _buildStatusChip('Hô hấp: Bình thường', const Color(0xFF28A745), true),
-                            _buildStatusChip('Đau: 7/10', const Color(0xFFFFC107), false),
+                            _buildStatusChip(
+                              'Ý thức: Tỉnh táo',
+                              const Color(0xFF28A745),
+                              true,
+                            ),
+                            _buildStatusChip(
+                              'Hô hấp: Bình thường',
+                              const Color(0xFF28A745),
+                              true,
+                            ),
+                            _buildStatusChip(
+                              'Đau: 7/10',
+                              const Color(0xFFFFC107),
+                              false,
+                            ),
                           ],
                         ),
                         const SizedBox(height: 12),
@@ -210,7 +229,6 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
                     ),
                   ),
 
-
                   // Tabs
                   Container(
                     decoration: BoxDecoration(
@@ -229,11 +247,16 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
                           return GestureDetector(
                             onTap: () => setState(() => _selectedTab = index),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
                               decoration: BoxDecoration(
                                 border: Border(
                                   bottom: BorderSide(
-                                    color: isSelected ? const Color(0xFFFF8800) : Colors.transparent,
+                                    color: isSelected
+                                        ? const Color(0xFFFF8800)
+                                        : Colors.transparent,
                                     width: 2,
                                   ),
                                 ),
@@ -242,8 +265,12 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
                                 _tabs[index],
                                 style: TextStyle(
                                   fontSize: 14,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                  color: isSelected ? const Color(0xFFFF8800) : const Color(0xFF999999),
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.w500,
+                                  color: isSelected
+                                      ? const Color(0xFFFF8800)
+                                      : const Color(0xFF999999),
                                 ),
                               ),
                             ),
@@ -255,7 +282,7 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
 
                   const SizedBox(height: 16),
 
-                  // Step Content
+                  // First Aid Content
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -272,22 +299,6 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF0F0F0),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            'BƯỚC $_currentStep / $_totalSteps',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF666666),
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
                         const SizedBox(height: 16),
                         Row(
                           children: [
@@ -354,86 +365,6 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
                               ],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _stepChecks[_currentStep - 1] = !_stepChecks[_currentStep - 1];
-                            });
-                          },
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 22,
-                                height: 22,
-                                decoration: BoxDecoration(
-                                  color: _stepChecks[_currentStep - 1] ? const Color(0xFF28A745) : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                    color: _stepChecks[_currentStep - 1] ? const Color(0xFF28A745) : const Color(0xFFCCCCCC),
-                                    width: 2,
-                                  ),
-                                ),
-                                child: _stepChecks[_currentStep - 1]
-                                    ? const Icon(Icons.check, size: 16, color: Colors.white)
-                                    : null,
-                              ),
-                              const SizedBox(width: 12),
-                              const Text(
-                                'Hoàn thành bước này',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF28A745),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: _currentStep > 1 ? () {
-                                  setState(() => _currentStep--);
-                                } : null,
-                                icon: const Icon(Icons.arrow_back, size: 18),
-                                label: const Text('Bước Trước'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFF666666),
-                                  side: BorderSide(
-                                    color: Colors.grey.withOpacity(0.3),
-                                    width: 1.5,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: _currentStep < _totalSteps ? () {
-                                  setState(() => _currentStep++);
-                                } : null,
-                                label: const Text('Bước Tiếp'),
-                                icon: const Icon(Icons.arrow_forward, size: 18),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFFF8800),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
                         ),
                       ],
                     ),
@@ -604,52 +535,186 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
             ),
           ),
 
-          // Bottom Action Bar
+          // Bottom Action Bar with Two Options
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8F7F5),
+              color: Colors.white,
               border: Border(
-                top: BorderSide(
-                  color: Colors.grey.withOpacity(0.2),
-                  width: 1,
-                ),
+                top: BorderSide(color: Colors.grey.withOpacity(0.2), width: 1),
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -2),
+                ),
+              ],
             ),
             child: SafeArea(
               top: false,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 54,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        context.pushNamed('mission_completion');
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFF8800),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'HOÀN THÀNH HỖ TRỢ',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+                  // Info banner
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(8),
                     ),
+                    child: const Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Color(0xFFFF8800),
+                          size: 18,
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Nạn nhân có cần vận chuyển đến bệnh viện?',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF1C100D),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Two action buttons
+                  Row(
+                    children: [
+                      // Complete mission button
+                      Expanded(
+                        child: SizedBox(
+                          height: 54,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              _showCompletionConfirmation(needHospital: false);
+                            },
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF28A745),
+                              side: const BorderSide(
+                                color: Color(0xFF28A745),
+                                width: 2,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Hoàn thành',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  'Không cần bệnh viện',
+                                  style: TextStyle(fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Find hospital button
+                      Expanded(
+                        child: SizedBox(
+                          height: 54,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              context.push(
+                                '/rescuer/find-hospital',
+                                extra: {
+                                  'missionId': widget.missionId,
+                                  'incidentId': widget.incidentId,
+                                },
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFF8800),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Tìm bệnh viện',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  'Cần vận chuyển',
+                                  style: TextStyle(fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCompletionConfirmation({required bool needHospital}) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Hoàn thành nhiệm vụ?',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1C100D),
+          ),
+        ),
+        content: const Text(
+          'Xác nhận hoàn thành sơ cứu và kết thúc nhiệm vụ. Bạn có chắc chắn?',
+          style: TextStyle(fontSize: 14, color: Color(0xFF666666), height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              context.push(
+                '/rescuer/mission-completion',
+                extra: {
+                  'missionId': widget.missionId,
+                  'needHospital': needHospital,
+                },
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF28A745),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Xác nhận'),
           ),
         ],
       ),
@@ -676,15 +741,10 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
           ),
           if (hasDropdown) ...[
             const SizedBox(width: 4),
-            Icon(
-              Icons.keyboard_arrow_down,
-              size: 16,
-              color: color,
-            ),
+            Icon(Icons.keyboard_arrow_down, size: 16, color: color),
           ],
         ],
       ),
     );
   }
 }
-

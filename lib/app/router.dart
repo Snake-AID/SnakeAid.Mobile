@@ -34,7 +34,8 @@ import 'package:snakeaid_mobile/features/emergency/models/sos_incident_response.
 import 'package:snakeaid_mobile/features/emergency/screens/members/symptom_report_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/severity_assessment_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_tracking_screen.dart';
-import 'package:snakeaid_mobile/features/emergency/screens/members/rescuer_arrived_screen.dart' as member_screens;
+import 'package:snakeaid_mobile/features/emergency/screens/members/rescuer_arrived_screen.dart'
+    as member_screens;
 import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_service_completion_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/messages_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/message_detail_screen.dart';
@@ -53,12 +54,15 @@ import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_income_manageme
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_feedback_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_id_documents_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_sos_detail_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_mission_detail_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_navigation_screen.dart';
-import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_arrived_screen.dart' as rescuer_screens;
+import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_arrived_screen.dart'
+    as rescuer_screens;
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_support_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/find_hospital_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/mission_completion_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_mission_success_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/models/route_navigation_data.dart';
 
 /// App routing configuration using go_router
 final router = GoRouter(
@@ -75,7 +79,7 @@ final router = GoRouter(
       name: 'role_selection',
       builder: (context, state) => const RoleSelectionScreen(),
     ),
-    
+
     // Member Auth Routes
     GoRoute(
       path: '/member-login',
@@ -87,7 +91,7 @@ final router = GoRouter(
       name: 'member_registration',
       builder: (context, state) => const MemberRegistrationScreen(),
     ),
-    
+
     // Rescuer Auth Routes
     GoRoute(
       path: '/rescuer-login',
@@ -107,7 +111,7 @@ final router = GoRouter(
         return RescuerTermsScreen(registrationData: data);
       },
     ),
-    
+
     // Expert Auth Routes
     GoRoute(
       path: '/expert-login',
@@ -127,14 +131,14 @@ final router = GoRouter(
         return ExpertCredentialsScreen(registrationData: data);
       },
     ),
-    
+
     // Expert Home
     GoRoute(
       path: '/expert-home',
       name: 'expert_home',
       builder: (context, state) => const ExpertHomeScreen(),
     ),
-    
+
     // === EXPERT APP ROUTES ===
     // Expert Settings
     GoRoute(
@@ -142,28 +146,28 @@ final router = GoRouter(
       name: 'expert_settings',
       builder: (context, state) => const ExpertSettingsScreen(),
     ),
-    
+
     // Expert Edit Profile
     GoRoute(
       path: '/expert-edit-profile',
       name: 'expert_edit_profile',
       builder: (context, state) => const ExpertEditProfileScreen(),
     ),
-    
+
     // Expert ID Documents
     GoRoute(
       path: '/expert-id-documents',
       name: 'expert_id_documents',
       builder: (context, state) => const ExpertIdDocumentsScreen(),
     ),
-    
+
     // Expert Specialties
     GoRoute(
       path: '/expert-specialties',
       name: 'expert_specialties',
       builder: (context, state) => const ExpertSpecialtiesScreen(),
     ),
-    
+
     // Expert Feedback
     GoRoute(
       path: '/expert-feedback',
@@ -172,7 +176,7 @@ final router = GoRouter(
     ),
     // Note: Expert consultation and emergency routes will be added here
     // as the expert workflow screens are implemented
-    
+
     // Common Auth Routes
     GoRoute(
       path: '/otp-verification',
@@ -252,35 +256,35 @@ final router = GoRouter(
         );
       },
     ),
-    
+
     // === MEMBER APP ROUTES ===
     GoRoute(
       path: '/member-home',
       name: 'member_home',
       builder: (context, state) => const MainScaffold(initialIndex: 0),
     ),
-    
+
     // === RESCUER APP ROUTES ===
     GoRoute(
       path: '/rescuer-home',
       name: 'rescuer_home',
       builder: (context, state) => const RescuerHomeScreen(),
     ),
-    
+
     // Rescuer Settings
     GoRoute(
       path: '/rescuer-settings',
       name: 'rescuer_settings',
       builder: (context, state) => const RescuerSettingsScreen(),
     ),
-    
+
     // Rescuer Edit Profile
     GoRoute(
       path: '/rescuer-edit-profile',
       name: 'rescuer_edit_profile',
       builder: (context, state) => const RescuerEditProfileScreen(),
     ),
-    
+
     // Rescuer History
     GoRoute(
       path: '/rescuer-history',
@@ -295,28 +299,28 @@ final router = GoRouter(
         return RescuerHistoryDetailScreen(mission: mission);
       },
     ),
-    
+
     // Rescuer Income Management
     GoRoute(
       path: '/rescuer-income-management',
       name: 'rescuer_income_management',
       builder: (context, state) => const RescuerIncomeManagementScreen(),
     ),
-    
+
     // Rescuer Feedback
     GoRoute(
       path: '/rescuer-feedback',
       name: 'rescuer_feedback',
       builder: (context, state) => const RescuerFeedbackScreen(),
     ),
-    
+
     // Rescuer ID Documents
     GoRoute(
       path: '/rescuer-id-documents',
       name: 'rescuer_id_documents',
       builder: (context, state) => const RescuerIdDocumentsScreen(),
     ),
-    
+
     // Rescuer Emergency/SOS Routes
     GoRoute(
       path: '/rescuer-sos-detail',
@@ -324,9 +328,24 @@ final router = GoRouter(
       builder: (context, state) => const RescuerSosDetailScreen(),
     ),
     GoRoute(
-      path: '/rescuer-navigation',
+      path: '/rescuer/mission-detail/:missionId',
+      name: 'rescuer_mission_detail',
+      builder: (context, state) {
+        final missionId = state.pathParameters['missionId']!;
+        return RescuerMissionDetailScreen(missionId: missionId);
+      },
+    ),
+    GoRoute(
+      path: '/rescuer/navigation',
       name: 'rescuer_navigation',
-      builder: (context, state) => const RescuerNavigationScreen(),
+      builder: (context, state) {
+        final data = state.extra as Map<String, dynamic>;
+        return RescuerNavigationScreen(
+          missionId: data['missionId'] as String,
+          mission: data['mission'],
+          routeData: data['routeData'] as RouteNavigationData?,
+        );
+      },
     ),
     GoRoute(
       path: '/rescuer-arrived',
@@ -336,12 +355,24 @@ final router = GoRouter(
     GoRoute(
       path: '/rescuer-support',
       name: 'rescuer_support',
-      builder: (context, state) => const RescuerSupportScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return RescuerSupportScreen(
+          missionId: extra?['missionId'] as String? ?? '',
+          incidentId: extra?['incidentId'] as String? ?? '',
+        );
+      },
     ),
     GoRoute(
       path: '/find-hospital',
       name: 'find_hospital',
-      builder: (context, state) => const FindHospitalScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return FindHospitalScreen(
+          missionId: extra?['missionId'] as String? ?? '',
+          incidentId: extra?['incidentId'] as String? ?? '',
+        );
+      },
     ),
     GoRoute(
       path: '/mission-completion',
@@ -353,7 +384,7 @@ final router = GoRouter(
       name: 'mission_success',
       builder: (context, state) => const RescuerMissionSuccessScreen(),
     ),
-    
+
     // === EMERGENCY ROUTES ===
     GoRoute(
       path: '/emergency-alert',
@@ -411,7 +442,8 @@ final router = GoRouter(
           scientificName: data['scientificName'] as String,
           isPoisonous: data['isPoisonous'] as bool,
           imageUrl: data['imageUrl'] as String?,
-          features: (data['features'] as List<dynamic>).cast<IdentificationFeature>(),
+          features: (data['features'] as List<dynamic>)
+              .cast<IdentificationFeature>(),
           matchedFeaturesCount: data['matchedFeaturesCount'] as int,
         );
       },
@@ -472,7 +504,7 @@ final router = GoRouter(
       name: 'emergency_completion',
       builder: (context, state) => const EmergencyServiceCompletionScreen(),
     ),
-    
+
     // === MEMBER ROUTES ===
     GoRoute(
       path: '/messages',
@@ -487,7 +519,7 @@ final router = GoRouter(
         return MessageDetailScreen(thread: thread);
       },
     ),
-    
+
     // === SHARED/UTILS ROUTES ===
     GoRoute(
       path: '/location-tracker',
