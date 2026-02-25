@@ -218,7 +218,7 @@ class _WithdrawMoneyScreenState extends State<WithdrawMoneyScreen> {
                                 _amountController.text = amount.toString();
                               },
                             );
-                          }).toList(),
+                          }),
                           _QuickAmountButton(
                             amount: 1250000,
                             label: 'Tất cả',
@@ -241,7 +241,7 @@ class _WithdrawMoneyScreenState extends State<WithdrawMoneyScreen> {
                       const SizedBox(height: 12),
                       // Bank Dropdown
                       DropdownButtonFormField<String>(
-                        value: _selectedBank,
+                        initialValue: _selectedBank,
                         decoration: InputDecoration(
                           labelText: 'Ngân hàng',
                           prefixIcon: const Icon(Icons.account_balance),

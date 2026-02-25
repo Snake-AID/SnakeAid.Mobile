@@ -653,7 +653,7 @@ class _AddContactDialogState extends State<_AddContactDialog> {
                 const SizedBox(height: 16),
                 // Relationship Dropdown
                 DropdownButtonFormField<String>(
-                  value: _selectedRelationship,
+                  initialValue: _selectedRelationship,
                   decoration: InputDecoration(
                     labelText: 'Mối quan hệ',
                     prefixIcon: const Icon(Icons.people_outline),

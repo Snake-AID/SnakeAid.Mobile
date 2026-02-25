@@ -6,7 +6,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:camera/camera.dart';
 import 'dart:io';
 import 'snake_identification_result_screen.dart';
-import 'snake_selection_by_location_screen.dart';
 import '../../../shared/widgets/custom_dialog.dart';
 import '../../models/sos_incident_response.dart';
 import '../../repository/snake_ai_repository.dart';
@@ -369,7 +368,7 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
 
                   // Viewfinder Frame
                   Expanded(
-                    child: Container(
+                    child: SizedBox(
                       width: double.infinity,
                       height: double.infinity,
                       child: Stack(

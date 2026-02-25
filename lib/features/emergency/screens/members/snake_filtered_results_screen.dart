@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'snake_confirmation_screen.dart';
-import 'symptom_report_screen.dart';
-import 'generic_first_aid_screen.dart';
 
 /// Snake Filtered Results Screen - Shows filtered snake results based on questionnaire answers
 class SnakeFilteredResultsScreen extends StatelessWidget {

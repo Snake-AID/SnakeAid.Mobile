@@ -124,7 +124,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                       if (!isLast) const Divider(height: 1),
                     ],
                   );
-                }).toList(),
+                }),
               ],
             ),
             Padding(
@@ -668,7 +668,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                 _scheduleEnabled[day] = value;
               });
             },
-            activeColor: const Color(0xFF6C47C2),
+            activeThumbColor: const Color(0xFF6C47C2),
           ),
         ],
       ),
@@ -766,7 +766,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: const Color(0xFF6C47C2),
+            activeThumbColor: const Color(0xFF6C47C2),
           ),
         ],
       ),

@@ -546,7 +546,7 @@ class _ExpertEditProfileScreenState extends State<ExpertEditProfileScreen> {
                 ),
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );

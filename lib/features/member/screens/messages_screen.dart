@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'message_detail_screen.dart';
 
 /// Messages Screen - List of conversations
 class MessagesScreen extends StatefulWidget {

@@ -7,12 +7,12 @@ class ServiceCompletionScreen extends StatefulWidget {
   final double totalCost;
 
   const ServiceCompletionScreen({
-    Key? key,
+    super.key,
     required this.snakeNameVi,
     required this.rescuerName,
     required this.responseTimeMinutes,
     required this.totalCost,
-  }) : super(key: key);
+  });
 
   @override
   State<ServiceCompletionScreen> createState() =>

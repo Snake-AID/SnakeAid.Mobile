@@ -1,8 +1,20 @@
 # SnakeAid.Mobile
 
-````dart
+> ## 🚨 Local Development Connection Issue
+>
+> If you are running the backend locally (`http://<your-ip>:8080`) but the Mobile App (Real device) throws **Connection Timeout** or **SocketException**, your Windows Firewall is likely blocking incoming connections to port 8080.
+>
+> **Quick Fix:** Run PowerShell as Administrator and execute this command:
+>
+> ```powershell
+> New-NetFirewallRule -DisplayName "Allow Port 8080" -Direction Inbound -LocalPort 8080 -Protocol TCP -Action Allow
+> ```
+>
+> Expected output: `Enabled: True`, `Action: Allow`. Restart your app after applying this rule.
+
+```dart
 lib/
-├── core/                          # Core utilities 
+├── core/                          # Core utilities
 │   ├── config/
 │   │   ├── app_config.dart
 │   │   ├── route_config.dart
@@ -30,7 +42,7 @@ lib/
 ├── features/                      # Feature-based modules
 │   ├── auth/                     # Authentication
 │   │   ├── models/
-│   │   │   ├── account.dart      
+│   │   │   ├── account.dart
 │   │   │   └── user_profile.dart
 │   │   ├── providers/
 │   │   │   ├── auth_provider.dart
@@ -201,4 +213,4 @@ lib/
 │   └── theme.dart              # App theme
 │
 └── main.dart
-````
+```
