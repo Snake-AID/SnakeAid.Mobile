@@ -1,30 +1,13 @@
 /// API endpoint constants for SnakeAid backend
+/// Base URL được định nghĩa trong http_provider.dart
+/// 
+/// NOTE: File này hiện không được sử dụng.
+/// Các API endpoints được gọi trực tiếp trong repositories.
+/// Giữ lại để tham khảo hoặc sử dụng trong tương lai.
 class ApiConstants {
-  // Base URL - Update when backend is ready
-  static const String baseUrl = 'https://api.snakeaid.com';
+  // Prevent instantiation
+  ApiConstants._();
   
-  // ==================== AUTH ENDPOINTS ====================
-  
-  /// POST - Login with email and password
-  static const String login = '/auth/login';
-  
-  /// POST - Register new user
-  static const String register = '/auth/register';
-  
-  /// POST - Logout current user
-  static const String logout = '/auth/logout';
-  
-  /// POST - Request password reset
-  static const String resetPassword = '/auth/reset-password';
-  
-  /// POST - Verify email with OTP
-  static const String verifyEmail = '/auth/verify-email';
-  
-  /// GET - Get current user profile
-  static const String profile = '/auth/profile';
-  
-  /// PUT - Update user profile
-  static const String updateProfile = '/auth/profile';
-  
-  
+  // Base URL is defined in http_provider.dart
+  // Current: https://snakeaid.duykhiem.id.vn
 }
