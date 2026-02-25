@@ -270,14 +270,14 @@ final router = GoRouter(
       name: 'rescuer_home',
       builder: (context, state) => const RescuerHomeScreen(),
     ),
-    
+
     // Rescuer Available Jobs
     GoRoute(
       path: '/rescuer-available-jobs',
       name: 'rescuer_available_jobs',
       builder: (context, state) => const RescuerAvailableJobsScreen(),
     ),
-    
+
     // Rescuer Request Detail
     GoRoute(
       path: '/rescuer-request-detail',
@@ -287,7 +287,7 @@ final router = GoRouter(
         return RescuerRequestDetailScreen(requestData: requestData);
       },
     ),
-    
+
     // Rescuer Settings
     GoRoute(
       path: '/rescuer-settings',
