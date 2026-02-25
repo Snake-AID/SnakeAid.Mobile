@@ -378,6 +378,43 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                       ),
                       const SizedBox(height: 16),
                       _buildQuickAccess(),
+                      const SizedBox(height: 24),
+                      Container(
+                        color: Colors.purple.shade50,
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '🎥 Video Call Demonstration',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.purple,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () =>
+                                    context.push('/demo-video-call'),
+                                icon: const Icon(Icons.video_camera_front),
+                                label: const Text(
+                                  'Mở màn hình Video Call Demonstration',
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.purple,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
