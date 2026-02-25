@@ -6,6 +6,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
 import '../repository/auth_repository.dart';
+import '../models/refresh_token_request.dart';
 
 /// Splash Screen with loading animation
 /// Màn hình khởi động với thanh loading và auto session restoration
@@ -67,13 +68,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       final hasNetwork = await _checkNetworkAvailability();
 
       if (hasNetwork) {
-        debugPrint('📶 Network available - Validating session with backend...');
+        debugPrint('📶 Network available - Refreshing token...');
 
-        // Proactively validate session (like Facebook does)
-        final isSessionValid = await _validateSessionProactively();
+        // Proactively refresh token để lấy access token mới
+        final refreshSuccess = await _refreshTokenProactively(
+          authState.user!.id,
+        );
 
-        if (!isSessionValid) {
-          debugPrint('🚨 Session validation failed - Token expired');
+        if (!refreshSuccess) {
+          debugPrint('🚨 Token refresh failed - Session expired');
           debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
           if (!mounted) return;
@@ -86,13 +89,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           return;
         }
 
-        debugPrint('✅ Session valid - Continuing to home');
+        debugPrint('✅ Token refreshed successfully - Continuing to home');
       } else {
-        debugPrint(
-          '📵 Offline mode - Skipping validation, loading cached data',
-        );
+        debugPrint('📵 Offline mode - Using cached token');
         debugPrint('   → User can browse cached content');
-        debugPrint('   → Will validate on next API call');
+        debugPrint('   → Will refresh token on next API call');
       }
 
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -174,40 +175,54 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     }
   }
 
-  /// Validate session proactively by calling backend (Facebook pattern)
-  /// Returns true if session is valid, false if logout needed
-  Future<bool> _validateSessionProactively() async {
-    if (_isValidatingSession) return true; // Avoid duplicate validation
+  /// Refresh token proactively when online
+  /// Returns true if refresh successful, false if logout needed
+  Future<bool> _refreshTokenProactively(String userId) async {
+    if (_isValidatingSession) return true; // Avoid duplicate calls
 
     _isValidatingSession = true;
 
     try {
-      // Try to get current user from backend (validates token)
-      final authRepository = ref.read(authRepositoryProvider);
-      final user = await authRepository.getCurrentUser();
+      // Get current refresh token
+      final prefs = await SharedPreferences.getInstance();
+      final refreshToken = prefs.getString('refresh_token');
 
-      if (user != null) {
-        debugPrint('   ✅ Backend confirmed session is valid');
+      if (refreshToken == null) {
+        debugPrint('   ⚠️ No refresh token found');
+        _isValidatingSession = false;
+        return false;
+      }
+
+      // Call refresh token API
+      final authRepository = ref.read(authRepositoryProvider);
+      final request = RefreshTokenRequest(
+        userId: userId,
+        refreshToken: refreshToken,
+      );
+      final response = await authRepository.refreshToken(request);
+
+      if (response.data != null) {
+        debugPrint('   ✅ Token refreshed successfully');
+        debugPrint('   → New access token received');
         _isValidatingSession = false;
         return true;
       }
 
-      // getCurrentUser returned null → Check if interceptor set force_logout flag
-      final prefs = await SharedPreferences.getInstance();
+      // Refresh failed → Check force_logout flag
       final forceLogout = prefs.getBool('force_logout_required') ?? false;
 
       if (forceLogout) {
-        debugPrint('   🚨 Force logout flag detected - Both tokens expired');
+        debugPrint('   🚨 Force logout flag detected - Refresh token expired');
         await prefs.remove('force_logout_required');
         _isValidatingSession = false;
         return false;
       }
 
-      debugPrint('   ⚠️ Could not validate session, but no force logout');
+      debugPrint('   ⚠️ Could not refresh token, but no force logout');
       _isValidatingSession = false;
-      return true; // Uncertain, allow navigation (will fail on next API call)
+      return true; // Uncertain, allow navigation
     } catch (e) {
-      debugPrint('   ⚠️ Session validation error: $e');
+      debugPrint('   ⚠️ Token refresh error: $e');
 
       // Check force_logout flag (may have been set by interceptor)
       try {
@@ -394,7 +409,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                           // Loading Status Text
                           Text(
                             _isValidatingSession
-                                ? 'Đang xác thực phiên...'
+                                ? 'Đang làm mới phiên...'
                                 : 'Đang khởi động...',
                             style: const TextStyle(
                               fontSize: 14,

@@ -67,12 +67,24 @@ class TokenRefreshInterceptor extends Interceptor {
 
     // Fallback refresh: Nếu gặp 401, thử refresh token và retry
     if (err.response?.statusCode == 401) {
-      debugPrint('🔄 Got 401, attempting fallback token refresh...');
-
       final refreshResult = await _fallbackRefresh();
 
       if (refreshResult == RefreshResult.success) {
-        // Retry request với token mới
+        final isFormData =
+            err.requestOptions.data is FormData ||
+            err.requestOptions.headers['Content-Type']?.toString().contains(
+                  'multipart/form-data',
+                ) ==
+                true;
+
+        if (isFormData) {
+          // Return error với updated token, để caller tự retry
+          final token = await _getAccessToken();
+          err.requestOptions.headers['Authorization'] = 'Bearer $token';
+          return handler.next(err);
+        }
+
+        // Retry request với token mới (non-FormData only)
         try {
           final token = await _getAccessToken();
           err.requestOptions.headers['Authorization'] = 'Bearer $token';
@@ -121,7 +133,31 @@ class TokenRefreshInterceptor extends Interceptor {
           !isExpired;
 
       if (isExpiringSoon) {
-        debugPrint('⏰ Token expiring soon, proactive refresh...');
+        debugPrint('⏰ Token expiring soon, checking connectivity...');
+
+        // Check connectivity TRƯỚC khi refresh
+        try {
+          final connectivityResults = await Connectivity().checkConnectivity();
+          final isOffline =
+              connectivityResults.isEmpty ||
+              connectivityResults.every(
+                (result) => result == ConnectivityResult.none,
+              );
+
+          if (isOffline) {
+            debugPrint('📵 Offline mode - skipping proactive refresh');
+            debugPrint('   → Will attempt refresh when network is available');
+            return; // ← Skip refresh khi offline
+          }
+
+          debugPrint(
+            '📶 Network available (${connectivityResults.first.name}), proceeding with proactive refresh...',
+          );
+        } catch (e) {
+          // If connectivity check fails, proceed anyway
+          debugPrint('⚠️ Connectivity check failed: $e, attempting refresh...');
+        }
+
         final result = await _refreshToken();
 
         if (result != RefreshResult.success) {
