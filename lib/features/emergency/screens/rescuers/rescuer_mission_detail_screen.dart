@@ -28,14 +28,11 @@ class RescuerMissionDetailScreen extends ConsumerStatefulWidget {
 
 class _RescuerMissionDetailScreenState
     extends ConsumerState<RescuerMissionDetailScreen> {
-  final MapController _mapController = MapController();
   Timer? _elapsedTimer;
   Duration _elapsedTime = Duration.zero;
   StreamSubscription<Position>? _locationSubscription;
   RouteNavigationData? _routeData; // Route data from OpenRouteService
-  bool _isLoadingRoute = false;
   String? _routeError;
-  bool _hasRedirected = false; // Prevent multiple redirects
 
   @override
   void initState() {
@@ -176,26 +173,9 @@ class _RescuerMissionDetailScreenState
       );
     }
 
-    // For Preparing state: show details with small map preview
-    // For other states: redirect to appropriate screen
+    // Allow user to view details in any status
+    // No auto-redirect - let user choose to navigate
     final status = mission.missionStatus;
-    if (status == MissionStatus.enRoute && !_hasRedirected) {
-      // Should be in Navigation Screen - redirect if accidentally here
-      _hasRedirected = true; // Set flag to prevent multiple redirects
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        debugPrint('🔄 Auto-redirect to Navigation Screen (EnRoute state)');
-        debugPrint('   Route data available: ${state.routeData != null}');
-
-        context.replace(
-          '/rescuer/navigation',
-          extra: {
-            'missionId': mission.id,
-            'mission': mission,
-            'routeData': state.routeData, // Pass routeData from provider
-          },
-        );
-      });
-    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7F5),
@@ -206,8 +186,10 @@ class _RescuerMissionDetailScreenState
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  // Small preview map for Preparing state
-                  if (status == MissionStatus.preparing)
+                  // Small preview map - show for active missions
+                  if (status == MissionStatus.preparing ||
+                      status == MissionStatus.enRoute ||
+                      status == MissionStatus.rescuerArrived)
                     _buildPreviewMapSection(mission, state),
                   _buildActionButton(mission, state),
                   const SizedBox(height: 16),
@@ -236,17 +218,21 @@ class _RescuerMissionDetailScreenState
         statusColor = const Color(0xFF2196F3);
         statusText = 'ĐANG DI CHUYỂN';
         break;
-      case MissionStatus.arrived:
+      case MissionStatus.rescuerArrived:
         statusColor = const Color(0xFF4CAF50);
         statusText = 'ĐÃ ĐẾN NƠI';
-        break;
-      case MissionStatus.inProgress:
-        statusColor = const Color(0xFFFF6B35);
-        statusText = 'ĐANG XỬ LÝ';
         break;
       case MissionStatus.missionCompleted:
         statusColor = const Color(0xFF10B981);
         statusText = 'HOÀN THÀNH';
+        break;
+      case MissionStatus.missionUncompleted:
+        statusColor = const Color(0xFFF59E0B);
+        statusText = 'CHƯA HOÀN THÀNH';
+        break;
+      case MissionStatus.missionAborted:
+        statusColor = const Color(0xFFEF4444);
+        statusText = 'ĐÃ HỦY BỎ';
         break;
       case MissionStatus.cancelled:
         statusColor = const Color(0xFF9E9E9E);
@@ -504,246 +490,43 @@ class _RescuerMissionDetailScreenState
     );
   }
 
-  Widget _buildMapSection(
-    DetailRescueMissionResponse mission,
-    MissionDetailState state,
-  ) {
-    final incidentLat = mission.incident.locationCoordinates.latitude;
-    final incidentLon = mission.incident.locationCoordinates.longitude;
-    final incidentLatLng = LatLng(incidentLat, incidentLon);
-
-    return Container(
-      height: 300,
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: incidentLatLng,
-              initialZoom: 14.0,
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.snakeaid.mobile',
-              ),
-              // Route polyline (blue line from rescuer to victim)
-              if (_routeData != null && _routeData!.isNotEmpty)
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: _routeData!.points,
-                      strokeWidth: 4.0,
-                      color: const Color(0xFF2196F3),
-                      borderStrokeWidth: 2.0,
-                      borderColor: Colors.white,
-                    ),
-                  ],
-                ),
-              MarkerLayer(
-                markers: [
-                  // Victim location (red pin)
-                  Marker(
-                    point: incidentLatLng,
-                    width: 40,
-                    height: 40,
-                    child: const Icon(
-                      Icons.location_pin,
-                      color: Colors.red,
-                      size: 40,
-                    ),
-                  ),
-                  // Rescuer location (blue dot)
-                  if (state.rescuerLocation != null)
-                    Marker(
-                      point: LatLng(
-                        state.rescuerLocation!.latitude,
-                        state.rescuerLocation!.longitude,
-                      ),
-                      width: 30,
-                      height: 30,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2196F3),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
-          // Distance & ETA overlay
-          if (state.distanceKm != null && state.etaMinutes != null)
-            Positioned(
-              top: 16,
-              left: 16,
-              right: 16,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 8,
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.navigation,
-                          size: 20,
-                          color: Color(0xFF2196F3),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          DistanceUtils.formatDistance(state.distanceKm!),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Container(width: 1, height: 20, color: Colors.grey[300]),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.access_time,
-                          size: 20,
-                          color: Color(0xFF2196F3),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          DistanceUtils.formatETA(state.etaMinutes!),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          // Open navigation button
-          Positioned(
-            bottom: 16,
-            right: 16,
-            child: ElevatedButton.icon(
-              onPressed: () => _openNavigation(incidentLat, incidentLon),
-              icon: const Icon(Icons.navigation, color: Colors.white),
-              label: const Text('Chỉ đường'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2196F3),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-              ),
-            ),
-          ),
-          // Route loading indicator
-          if (_isLoadingRoute)
-            Positioned(
-              bottom: 16,
-              left: 16,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 8,
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Color(0xFF2196F3),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Đang tính đường...',
-                      style: TextStyle(fontSize: 13, color: Colors.grey[700]),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          // Route error indicator
-          if (_routeError != null)
-            Positioned(
-              bottom: 16,
-              left: 16,
-              right: 80,
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red[300]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.error, color: Colors.red[700], size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _routeError!,
-                        style: TextStyle(fontSize: 12, color: Colors.red[700]),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildActionButton(
     DetailRescueMissionResponse mission,
     MissionDetailState state,
   ) {
     final status = mission.missionStatus;
+
+    // Special handling for EnRoute: show only navigation button
+    // "Đã đến nơi" should only be pressed in Navigation Screen to avoid conflict
+    if (status == MissionStatus.enRoute) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => _navigateToNavigation(mission, state),
+            icon: const Icon(Icons.navigation, color: Colors.white),
+            label: const Text(
+              'QUAY LẠI ĐIỀU HƯỚNG',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF8800),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Standard single button for other statuses
     String buttonText;
     Color buttonColor;
     IconData buttonIcon;
@@ -756,13 +539,7 @@ class _RescuerMissionDetailScreenState
         buttonIcon = Icons.directions_car;
         onPressed = state.isUpdatingStatus ? null : () => _startMission();
         break;
-      case MissionStatus.enRoute:
-        buttonText = 'ĐÃ ĐẾN NƠI';
-        buttonColor = const Color(0xFF4CAF50);
-        buttonIcon = Icons.check_circle;
-        onPressed = state.isUpdatingStatus ? null : () => _markArrival();
-        break;
-      case MissionStatus.arrived:
+      case MissionStatus.rescuerArrived:
         buttonText = 'BẮT ĐẦU XỬ LÝ';
         buttonColor = const Color(0xFFFF6B35);
         buttonIcon = Icons.local_hospital;
@@ -1516,19 +1293,6 @@ class _RescuerMissionDetailScreenState
     }
   }
 
-  Future<void> _openNavigation(double lat, double lon) async {
-    final url = 'https://www.google.com/maps/dir/?api=1&destination=$lat,$lon';
-    final uri = Uri.parse(url);
-
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    } catch (e) {
-      debugPrint('❌ Failed to open navigation: $e');
-    }
-  }
-
   Future<void> _startMission() async {
     // First, fetch route from OpenRouteService
     await _fetchRoute();
@@ -1602,7 +1366,6 @@ class _RescuerMissionDetailScreenState
     }
 
     setState(() {
-      _isLoadingRoute = true;
       _routeError = null;
     });
 
@@ -1645,7 +1408,6 @@ class _RescuerMissionDetailScreenState
                     ),
                   ],
           );
-          _isLoadingRoute = false;
         });
 
         // Save routeData to provider
@@ -1668,7 +1430,6 @@ class _RescuerMissionDetailScreenState
       if (mounted) {
         setState(() {
           _routeError = e.message;
-          _isLoadingRoute = false;
         });
         debugPrint('❌ OpenRoute API Error: ${e.message}');
         debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -1677,62 +1438,10 @@ class _RescuerMissionDetailScreenState
       if (mounted) {
         setState(() {
           _routeError = 'Lỗi không xác định: $e';
-          _isLoadingRoute = false;
         });
         debugPrint('❌ Route fetch error: $e');
         debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       }
-    }
-  }
-
-  Future<void> _markArrival() async {
-    // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Xác nhận đã đến nơi?'),
-        content: const Text(
-          'Bạn đã đến hiện trường chưa? Nạn nhân sẽ được thông báo.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Chưa đến'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4CAF50),
-            ),
-            child: const Text('Xác nhận'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    final success = await ref
-        .read(missionDetailProvider.notifier)
-        .markArrival();
-
-    if (!mounted) return;
-
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Đã xác nhận đến nơi'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } else {
-      final error = ref.read(missionDetailProvider).error;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error ?? 'Lỗi khi xác nhận đến nơi'),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
   }
 
@@ -1782,76 +1491,289 @@ class _RescuerMissionDetailScreenState
     );
   }
 
+  void _navigateToNavigation(
+    DetailRescueMissionResponse mission,
+    MissionDetailState state,
+  ) {
+    // Route data is already in provider, no need to fetch again
+    debugPrint('🗺️ Navigating to Navigation Screen from Detail');
+    debugPrint('   Route data available: ${state.routeData != null}');
+
+    context.push(
+      '/rescuer/navigation',
+      extra: {
+        'missionId': mission.id,
+        'mission': mission,
+        'routeData': state.routeData, // Get from provider
+      },
+    );
+  }
+
   void _showAbortDialog(DetailRescueMissionResponse mission) {
-    final reasonController = TextEditingController();
+    // Only allow abort for Preparing and EnRoute statuses
+    if (mission.missionStatus != MissionStatus.preparing &&
+        mission.missionStatus != MissionStatus.enRoute) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Chỉ có thể hủy nhiệm vụ khi đang chuẩn bị hoặc đang di chuyển'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    String? selectedReason;
+    final customReasonController = TextEditingController();
+    bool showCustomField = false;
+
+    final abortReasons = [
+      'Phương tiện gặp sự cố',
+      'Có việc khẩn cấp',
+      'Không thể tiếp cận địa điểm',
+      'Bệnh nhân hủy yêu cầu',
+      'Điều kiện thời tiết nguy hiểm',
+      'Lý do khác',
+    ];
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Hủy nhiệm vụ?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Vui lòng cho biết lý do hủy nhiệm vụ:'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(
-                hintText: 'Lý do hủy nhiệm vụ',
-                border: OutlineInputBorder(),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.warning_rounded,
+                  color: Colors.red,
+                  size: 24,
+                ),
               ),
-              maxLines: 3,
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Hủy nhiệm vụ?',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Vui lòng chọn lý do hủy nhiệm vụ:',
+                  style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
+                ),
+                const SizedBox(height: 16),
+                // Radio buttons for abort reasons
+                ...abortReasons.map((reason) {
+                  final isSelected = selectedReason == reason;
+                  final isOther = reason == 'Lý do khác';
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          selectedReason = reason;
+                          showCustomField = isOther;
+                          if (!isOther) {
+                            customReasonController.clear();
+                          }
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? const Color(0xFFFF8800).withOpacity(0.1)
+                              : Colors.transparent,
+                          border: Border.all(
+                            color: isSelected
+                                ? const Color(0xFFFF8800)
+                                : Colors.grey.shade300,
+                            width: isSelected ? 2 : 1,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isSelected
+                                      ? const Color(0xFFFF8800)
+                                      : Colors.grey.shade400,
+                                  width: 2,
+                                ),
+                              ),
+                              child: isSelected
+                                  ? Center(
+                                      child: Container(
+                                        width: 10,
+                                        height: 10,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFFFF8800),
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                reason,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                  color: isSelected
+                                      ? const Color(0xFF1C100D)
+                                      : const Color(0xFF666666),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+
+                // Custom reason text field
+                if (showCustomField) ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: customReasonController,
+                    decoration: InputDecoration(
+                      hintText: 'Nhập lý do cụ thể...',
+                      hintStyle: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF999999),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFFF8800),
+                          width: 2,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                    ),
+                    maxLines: 3,
+                    maxLength: 500,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Quay lại',
+                style: TextStyle(
+                  color: Color(0xFF666666),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                // Validate selection
+                if (selectedReason == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Vui lòng chọn lý do hủy nhiệm vụ'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
+                // Get final reason
+                String finalReason = selectedReason!;
+                if (showCustomField) {
+                  final customReason = customReasonController.text.trim();
+                  if (customReason.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Vui lòng nhập lý do cụ thể'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+                  finalReason = customReason;
+                }
+
+                Navigator.pop(context);
+
+                final success = await ref
+                    .read(missionDetailProvider.notifier)
+                    .abortMission(finalReason);
+
+                if (!mounted) return;
+
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ Đã hủy nhiệm vụ'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  context.pop(); // Go back to previous screen
+                } else {
+                  final error = ref.read(missionDetailProvider).error;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(error ?? 'Lỗi khi hủy nhiệm vụ'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Xác nhận hủy',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Quay lại'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (reasonController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Vui lòng nhập lý do'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-
-              Navigator.pop(context);
-
-              final success = await ref
-                  .read(missionDetailProvider.notifier)
-                  .abortMission(reasonController.text.trim());
-
-              if (!mounted) return;
-
-              if (success) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('✅ Đã hủy nhiệm vụ'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-                context.pop(); // Go back to previous screen
-              } else {
-                final error = ref.read(missionDetailProvider).error;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(error ?? 'Lỗi khi hủy nhiệm vụ'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Xác nhận hủy'),
-          ),
-        ],
       ),
     );
   }

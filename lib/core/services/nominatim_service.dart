@@ -2,10 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 /// Nominatim Service - FREE OpenStreetMap Geocoding
-/// No API key required, no billing needed
-///
-/// Rate limit: 1 request per second (enforced automatically)
-/// Usage policy: https://operations.osmfoundation.org/policies/nominatim/
 class NominatimService {
   final Dio _dio;
 
@@ -16,14 +12,8 @@ class NominatimService {
   NominatimService({Dio? dio}) : _dio = dio ?? Dio();
 
   /// Reverse geocoding: Convert coordinates to human-readable address
-  ///
-  /// FREE service, no API key needed
-  /// Rate limit: Max 1 request per second (auto-enforced)
-  ///
-  /// Returns formatted address or null if failed
   Future<String?> reverseGeocode(double lat, double lon) async {
     try {
-      // ⚠️ RATE LIMITING: Wait if last request was < 1 second ago
       await _enforceRateLimit();
 
       debugPrint('🗺️ Nominatim: Fetching address for ($lat, $lon)');
@@ -35,11 +25,10 @@ class NominatimService {
           'lon': lon.toStringAsFixed(6),
           'format': 'json',
           'addressdetails': 1,
-          'accept-language': 'vi', // Prefer Vietnamese
+          'accept-language': 'vi',
         },
         options: Options(
           headers: {
-            // Required by Nominatim usage policy
             'User-Agent':
                 'SnakeAid/1.0 (Emergency Response App; Contact: admin@snakeaid.com)',
           },
@@ -153,10 +142,6 @@ class NominatimService {
     _lastRequestTime = DateTime.now();
   }
 
-  /// Search for places by query (forward geocoding)
-  ///
-  /// Example: "Ho Chi Minh City" → List of coordinates
-  /// Rate limit: 1 request per second
   Future<List<NominatimPlace>> search(String query) async {
     try {
       await _enforceRateLimit();

@@ -76,46 +76,6 @@ class RescueMissionRepository {
     }
   }
 
-  /// Update mission status (generic endpoint)
-  ///
-  /// Gọi API PATCH /api/rescue-missions/{missionId}/status
-  /// Body: { "status": "EnRoute", "cancellationReason": "..." }
-  ///
-  /// Valid transitions:
-  /// - Preparing → EnRoute, Cancelled
-  /// - EnRoute → RescuerArrived, MissionAborted
-  /// - RescuerArrived → MissionCompleted, MissionUncompleted, MissionAborted
-  Future<void> updateMissionStatus({
-    required String missionId,
-    required String status,
-    String? cancellationReason,
-  }) async {
-    try {
-      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      debugPrint('🔄 Updating mission status: $missionId');
-      debugPrint('📊 New status: $status');
-
-      final request = UpdateMissionStatusRequest(
-        status: status,
-        cancellationReason: cancellationReason,
-      );
-
-      await httpService.put(
-        '/api/rescue-missions/$missionId/status',
-        data: request.toJson(),
-      );
-
-      debugPrint('✅ Mission status updated successfully');
-    } on DioException catch (e) {
-      debugPrint('❌ Update mission status failed: ${e.message}');
-      debugPrint('❌ Response: ${e.response?.data}');
-      throw _handleError(e);
-    } catch (e) {
-      debugPrint('❌ Unexpected error: $e');
-      throw Exception('Lỗi khi cập nhật trạng thái nhiệm vụ');
-    }
-  }
-
   /// Start mission (Preparing → EnRoute)
   ///
   /// Gọi API PATCH /api/rescue-missions/{missionId}/start
@@ -202,8 +162,7 @@ class RescueMissionRepository {
       debugPrint('❌ Aborting mission: $missionId');
       debugPrint('📝 Reason: $reason');
 
-      final request = UpdateMissionStatusRequest(
-        status: 'MissionAborted',
+      final request = CancelMissionRequest(
         cancellationReason: reason,
       );
 
@@ -236,8 +195,7 @@ class RescueMissionRepository {
       debugPrint('🚫 User cancelling mission: $missionId');
       debugPrint('📝 Reason: $reason');
 
-      final request = UpdateMissionStatusRequest(
-        status: 'Cancelled',
+      final request = CancelMissionRequest(
         cancellationReason: reason,
       );
 

@@ -238,3 +238,18 @@ class UpdateMissionStatusRequest {
 
   Map<String, dynamic> toJson() => _$UpdateMissionStatusRequestToJson(this);
 }
+
+/// Cancel/Abort Mission Request
+/// Used for abort and cancel mission endpoints
+@JsonSerializable()
+class CancelMissionRequest {
+  @JsonKey(name: 'cancellationReason')
+  final String? cancellationReason;
+
+  CancelMissionRequest({this.cancellationReason});
+
+  factory CancelMissionRequest.fromJson(Map<String, dynamic> json) =>
+      _$CancelMissionRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$CancelMissionRequestToJson(this);
+}

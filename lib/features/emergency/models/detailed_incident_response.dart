@@ -573,9 +573,10 @@ enum RescuerType {
 enum MissionStatus {
   preparing('Preparing'),
   enRoute('EnRoute'),
-  arrived('Arrived'),
-  inProgress('InProgress'),
+  rescuerArrived('RescuerArrived'),
   missionCompleted('MissionCompleted'),
+  missionUncompleted('MissionUncompleted'),
+  missionAborted('MissionAborted'),
   cancelled('Cancelled');
 
   final String value;
@@ -594,12 +595,14 @@ enum MissionStatus {
         return 'Đang chuẩn bị';
       case MissionStatus.enRoute:
         return 'Đang di chuyển';
-      case MissionStatus.arrived:
+      case MissionStatus.rescuerArrived:
         return 'Đã đến nơi';
-      case MissionStatus.inProgress:
-        return 'Đang thực hiện';
       case MissionStatus.missionCompleted:
         return 'Hoàn thành';
+      case MissionStatus.missionUncompleted:
+        return 'Chưa hoàn thành';
+      case MissionStatus.missionAborted:
+        return 'Đã hủy bỏ';
       case MissionStatus.cancelled:
         return 'Đã hủy';
     }

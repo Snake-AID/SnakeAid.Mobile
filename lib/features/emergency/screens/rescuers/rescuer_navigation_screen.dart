@@ -13,7 +13,7 @@ import '../../providers/mission_detail_provider.dart';
 class RescuerNavigationScreen extends ConsumerStatefulWidget {
   final String missionId;
   final DetailRescueMissionResponse mission;
-  final RouteNavigationData? routeData;
+  final RouteNavigationData? routeData; // Optional, fallback to provider
 
   const RescuerNavigationScreen({
     super.key,
@@ -49,6 +49,16 @@ class _RescuerNavigationScreenState
   bool _isOffRoute = false; // Off-route detection flag
   bool _hasShownOffRouteAlert = false; // Prevent spam alerts
 
+  RouteNavigationData? _getRouteData() {
+    // Try widget parameter first, then fallback to provider
+    if (widget.routeData != null) {
+      return widget.routeData;
+    }
+    // Get from provider if not passed as parameter
+    final routeFromProvider = ref.read(missionDetailProvider).routeData;
+    return routeFromProvider;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -56,15 +66,19 @@ class _RescuerNavigationScreenState
     debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     debugPrint('🗺️ Navigation Screen Initialized');
     debugPrint('   Mission ID: ${widget.missionId}');
-    debugPrint('   Route data available: ${widget.routeData != null}');
-    if (widget.routeData != null) {
-      debugPrint('   Route points: ${widget.routeData!.points.length}');
-      debugPrint('   Distance: ${widget.routeData!.formattedDistance}');
-      debugPrint('   Duration: ${widget.routeData!.formattedDuration}');
-      debugPrint('   First point: ${widget.routeData!.points.first}');
-      debugPrint('   Last point: ${widget.routeData!.points.last}');
+
+    final routeData = _getRouteData();
+    debugPrint('   Route data available: ${routeData != null}');
+    if (routeData != null) {
+      debugPrint('   Route points: ${routeData.points.length}');
+      debugPrint('   Distance: ${routeData.formattedDistance}');
+      debugPrint('   Duration: ${routeData.formattedDuration}');
+      debugPrint('   First point: ${routeData.points.first}');
+      debugPrint('   Last point: ${routeData.points.last}');
     } else {
-      debugPrint('   ⚠️ WARNING: routeData is NULL!');
+      debugPrint(
+        '   ⚠️ WARNING: routeData is NULL in both parameter and provider!',
+      );
     }
     debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
@@ -100,9 +114,10 @@ class _RescuerNavigationScreenState
   }
 
   void _fitBoundsToRoute() {
-    if (widget.routeData == null || widget.routeData!.isEmpty) return;
+    final routeData = _getRouteData();
+    if (routeData == null || routeData.isEmpty) return;
 
-    final points = widget.routeData!.points;
+    final points = routeData.points;
 
     // Calculate bounds
     double minLat = points.first.latitude;
@@ -239,7 +254,8 @@ class _RescuerNavigationScreenState
     // ============================================
     // 🧭 POSITION TRACKING & TURN-BY-TURN
     // ============================================
-    if (widget.routeData != null && widget.routeData!.steps.isNotEmpty) {
+    final routeData = _getRouteData();
+    if (routeData != null && routeData.steps.isNotEmpty) {
       // Update distance to next maneuver
       _updateDistanceToNextManeuver(position);
 
@@ -265,7 +281,9 @@ class _RescuerNavigationScreenState
 
   /// Calculate distance to next maneuver point
   void _updateDistanceToNextManeuver(Position position) {
-    final steps = widget.routeData!.steps;
+    final routeData = _getRouteData();
+    if (routeData == null) return;
+    final steps = routeData.steps;
 
     // If we're on the last step or past all steps, show distance to destination
     if (_currentStepIndex >= steps.length - 1) {
@@ -291,7 +309,9 @@ class _RescuerNavigationScreenState
 
   /// Check if rescuer passed the next maneuver point and switch to next step
   void _checkAndSwitchToNextStep(Position position) {
-    final steps = widget.routeData!.steps;
+    final routeData = _getRouteData();
+    if (routeData == null) return;
+    final steps = routeData.steps;
 
     // Don't switch if we're already on the last step
     if (_currentStepIndex >= steps.length - 1) return;
@@ -337,7 +357,9 @@ class _RescuerNavigationScreenState
 
   /// Check if rescuer is off-route (too far from polyline)
   void _checkOffRoute(Position position) {
-    final routePoints = widget.routeData!.points;
+    final routeData = _getRouteData();
+    if (routeData == null) return;
+    final routePoints = routeData.points;
     if (routePoints.isEmpty) return;
 
     // Find closest point on route polyline
@@ -473,11 +495,11 @@ class _RescuerNavigationScreenState
               ),
 
               // Route polyline (if available)
-              if (widget.routeData != null && widget.routeData!.isNotEmpty)
+              if (_getRouteData() != null && _getRouteData()!.isNotEmpty)
                 PolylineLayer(
                   polylines: [
                     Polyline(
-                      points: widget.routeData!.points,
+                      points: _getRouteData()!.points,
                       strokeWidth: 6.0, // Increased from 4.0 for visibility
                       color: const Color(0xFFFF8800),
                       borderColor: Colors.white,
@@ -489,12 +511,11 @@ class _RescuerNavigationScreenState
                 // Debug: Show message if no route
                 Builder(
                   builder: (context) {
+                    final routeData = _getRouteData();
                     debugPrint('⚠️ WARNING: Route polyline NOT displayed');
+                    debugPrint('   routeData is null: ${routeData == null}');
                     debugPrint(
-                      '   routeData is null: ${widget.routeData == null}',
-                    );
-                    debugPrint(
-                      '   routeData is empty: ${widget.routeData?.isEmpty ?? true}',
+                      '   routeData is empty: ${routeData?.isEmpty ?? true}',
                     );
                     return const SizedBox.shrink();
                   },
@@ -733,7 +754,7 @@ class _RescuerNavigationScreenState
                             // Distance countdown to next maneuver
                             if (_distanceToNextManeuver != null &&
                                 _currentStepIndex <
-                                    (widget.routeData?.steps.length ?? 0) - 1)
+                                    (_getRouteData()?.steps.length ?? 0) - 1)
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 8,
@@ -756,20 +777,19 @@ class _RescuerNavigationScreenState
                               ),
                             if (_distanceToNextManeuver != null &&
                                 _currentStepIndex <
-                                    (widget.routeData?.steps.length ?? 0) - 1)
+                                    (_getRouteData()?.steps.length ?? 0) - 1)
                               const SizedBox(width: 8),
                             // Instruction icon
-                            if (widget.routeData != null &&
-                                widget.routeData!.steps.isNotEmpty)
+                            if (_getRouteData() != null &&
+                                _getRouteData()!.steps.isNotEmpty)
                               Text(
-                                widget
-                                    .routeData!
+                                _getRouteData()!
                                     .steps[_currentStepIndex]
                                     .directionIcon,
                                 style: const TextStyle(fontSize: 16),
                               ),
-                            if (widget.routeData != null &&
-                                widget.routeData!.steps.isNotEmpty)
+                            if (_getRouteData() != null &&
+                                _getRouteData()!.steps.isNotEmpty)
                               const SizedBox(width: 6),
                             // Instruction text
                             Expanded(
@@ -779,13 +799,11 @@ class _RescuerNavigationScreenState
                                     : (_distanceToVictim != null &&
                                               _distanceToVictim! < 0.1
                                           ? 'Đã đến gần nạn nhân! 🎯'
-                                          : (widget.routeData != null &&
-                                                    widget
-                                                        .routeData!
+                                          : (_getRouteData() != null &&
+                                                    _getRouteData()!
                                                         .steps
                                                         .isNotEmpty
-                                                ? widget
-                                                      .routeData!
+                                                ? _getRouteData()!
                                                       .steps[_currentStepIndex]
                                                       .instruction
                                                 : 'Vị trí nạn nhân')),
@@ -1065,7 +1083,7 @@ class _RescuerNavigationScreenState
                               Icons.info_outline,
                               const Color(0xFF666666),
                               () {
-                                context.pushNamed('rescuer_sos_detail');
+                                context.pop();
                               },
                             ),
                             const SizedBox(width: 8),
@@ -1125,7 +1143,8 @@ class _RescuerNavigationScreenState
 
   Widget _buildArrivalButton() {
     // Enable button only when within 100m (0.1km)
-    final canArrive = _distanceToVictim != null && _distanceToVictim! < 0.1;
+    // final canArrive = _distanceToVictim != null && _distanceToVictim! < 0.1;
+    final canArrive = true; // testing: enable nút arrival dù đang cách xa
     final isEnabled =
         canArrive ||
         !_hasInitialPosition; // Enable if no GPS yet (user can manually confirm)

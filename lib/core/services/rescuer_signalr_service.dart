@@ -478,27 +478,6 @@ class RescuerSignalRService {
     }
   }
 
-  // /// Get list of currently connected rescuers
-  // ///
-  // /// Backend will respond via 'ConnectedRescuers' event
-  // Future<void> getConnectedRescuers() async {
-  //   if (_hubConnection == null || !isConnected) {
-  //     debugPrint('⚠️ Cannot get connected rescuers: Not connected');
-  //     return;
-  //   }
-
-  //   try {
-  //     debugPrint('👥 Requesting connected rescuers list...');
-
-  //     await _hubConnection!.invoke('GetConnectedRescuers');
-
-  //     debugPrint('✅ Request sent, waiting for response...');
-  //     // Response will come via 'ConnectedRescuers' event listener
-  //   } catch (e) {
-  //     debugPrint('❌ Failed to get connected rescuers: $e');
-  //   }
-  // }
-
   /// Disconnect from hub
   Future<void> disconnect() async {
     try {

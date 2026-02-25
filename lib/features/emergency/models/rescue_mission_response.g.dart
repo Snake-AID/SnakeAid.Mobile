@@ -115,3 +115,13 @@ Map<String, dynamic> _$UpdateMissionStatusRequestToJson(
   'status': instance.status,
   'cancellationReason': instance.cancellationReason,
 };
+
+CancelMissionRequest _$CancelMissionRequestFromJson(
+  Map<String, dynamic> json,
+) => CancelMissionRequest(
+  cancellationReason: json['cancellationReason'] as String?,
+);
+
+Map<String, dynamic> _$CancelMissionRequestToJson(
+  CancelMissionRequest instance,
+) => <String, dynamic>{'cancellationReason': instance.cancellationReason};
