@@ -1447,7 +1447,7 @@ class _RescuerMissionDetailScreenState
 
   void _navigateToSupport(DetailRescueMissionResponse mission) {
     context.push(
-      '/rescuer/mission-support',
+      '/rescuer/support',
       extra: {'missionId': mission.id, 'incidentId': mission.incidentId},
     );
   }
@@ -1515,7 +1515,9 @@ class _RescuerMissionDetailScreenState
         mission.missionStatus != MissionStatus.enRoute) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Chỉ có thể hủy nhiệm vụ khi đang chuẩn bị hoặc đang di chuyển'),
+          content: Text(
+            'Chỉ có thể hủy nhiệm vụ khi đang chuẩn bị hoặc đang di chuyển',
+          ),
           backgroundColor: Colors.red,
         ),
       );

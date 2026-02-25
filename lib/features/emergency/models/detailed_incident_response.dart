@@ -428,7 +428,7 @@ class SnakeAIDetectMedia {
       referenceType: MediaReferenceType.fromString(
         json['referenceType'] ?? 'Incident',
       ),
-      purpose: MediaPurpose.fromString(json['purpose'] ?? 'SnakeDetection'),
+      purpose: MediaPurpose.fromString(json['purpose'] ?? 'Evidence'),
       isProcessed: json['isProcessed'] ?? false,
       processedAt: json['processedAt'] != null
           ? DateTime.parse(json['processedAt'])
@@ -612,7 +612,7 @@ enum MissionStatus {
 /// Media Reference Type
 enum MediaReferenceType {
   incident('Incident'),
-  mission('Mission');
+  rescueMission('RescueMission');
 
   final String value;
   const MediaReferenceType(this.value);
@@ -627,9 +627,8 @@ enum MediaReferenceType {
 
 /// Media Purpose
 enum MediaPurpose {
-  snakeDetection('SnakeDetection'),
-  evidencePhoto('EvidencePhoto'),
-  reportPhoto('ReportPhoto');
+  evidence('Evidence'),
+  snakeIdentification('SnakeIdentification');
 
   final String value;
   const MediaPurpose(this.value);
@@ -637,7 +636,7 @@ enum MediaPurpose {
   static MediaPurpose fromString(String value) {
     return MediaPurpose.values.firstWhere(
       (e) => e.value.toLowerCase() == value.toLowerCase(),
-      orElse: () => MediaPurpose.snakeDetection,
+      orElse: () => MediaPurpose.evidence,
     );
   }
 }

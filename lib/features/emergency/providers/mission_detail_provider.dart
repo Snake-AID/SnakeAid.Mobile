@@ -180,14 +180,21 @@ class MissionDetailNotifier extends StateNotifier<MissionDetailState> {
     }
   }
 
-  /// Complete mission (RescuerArrived → MissionCompleted)
-  Future<bool> completeMission() async {
+  /// Complete mission with evidence photos (RescuerArrived → MissionCompleted)
+  Future<bool> completeMission({
+    required List<String> evidenceMediaIds,
+    String? completionNotes,
+  }) async {
     if (state.mission == null) return false;
 
     state = state.copyWith(isUpdatingStatus: true, error: '');
 
     try {
-      await _repository.completeMission(state.mission!.id);
+      await _repository.completeMission(
+        missionId: state.mission!.id,
+        evidenceMediaIds: evidenceMediaIds,
+        completionNotes: completionNotes,
+      );
 
       // Reload mission to get updated status
       await loadMissionDetail(

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/http_provider.dart';
 import '../../../core/services/http_service.dart';
 import '../models/rescue_mission_response.dart';
+import '../models/report_media_response.dart';
 
 /// Provider for RescueMissionRepository
 final rescueMissionRepositoryProvider = Provider<RescueMissionRepository>((
@@ -126,21 +127,43 @@ class RescueMissionRepository {
 
   /// Complete mission (RescuerArrived → MissionCompleted)
   ///
-  /// Gọi API PUT /api/rescue-missions/{missionId}/complete
+  /// Gọi API PATCH /api/rescue-missions/{missionId}/complete
+  /// Body: { evidenceMediaIds: [...], completionNotes: "..." }
+  ///
   /// Automatically updates incident status to Finished
-  Future<void> completeMission(String missionId) async {
+  ///
+  /// Requirements:
+  /// - Mission must be in RescuerArrived status
+  /// - At least 1 evidence photo required
+  /// - All media must belong to this mission with Purpose=Evidence
+  Future<void> completeMission({
+    required String missionId,
+    required List<String> evidenceMediaIds,
+    String? completionNotes,
+  }) async {
     try {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       debugPrint('✔️ Completing mission: $missionId');
+      debugPrint('📸 Evidence photos: ${evidenceMediaIds.length}');
+      if (completionNotes != null) {
+        debugPrint('📝 Notes: $completionNotes');
+      }
+
+      final request = CompleteMissionRequest(
+        evidenceMediaIds: evidenceMediaIds,
+        completionNotes: completionNotes,
+      );
 
       await httpService.patch(
         '/api/rescue-missions/$missionId/complete',
-        data: {},
+        data: request.toJson(),
       );
 
       debugPrint('✅ Mission completed - incident marked as finished');
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     } on DioException catch (e) {
       debugPrint('❌ Complete mission failed: ${e.message}');
+      debugPrint('❌ Response: ${e.response?.data}');
       throw _handleError(e);
     } catch (e) {
       debugPrint('❌ Unexpected error: $e');
@@ -162,9 +185,7 @@ class RescueMissionRepository {
       debugPrint('❌ Aborting mission: $missionId');
       debugPrint('📝 Reason: $reason');
 
-      final request = CancelMissionRequest(
-        cancellationReason: reason,
-      );
+      final request = CancelMissionRequest(cancellationReason: reason);
 
       await httpService.patch(
         '/api/rescue-missions/$missionId/abort',
@@ -195,9 +216,7 @@ class RescueMissionRepository {
       debugPrint('🚫 User cancelling mission: $missionId');
       debugPrint('📝 Reason: $reason');
 
-      final request = CancelMissionRequest(
-        cancellationReason: reason,
-      );
+      final request = CancelMissionRequest(cancellationReason: reason);
 
       await httpService.patch(
         '/api/rescue-missions/$missionId/cancel',

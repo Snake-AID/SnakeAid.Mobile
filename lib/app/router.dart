@@ -367,12 +367,12 @@ final router = GoRouter(
       },
     ),
     GoRoute(
-      path: '/rescuer-arrived',
+      path: '/rescuer/arrived',
       name: 'rescuer_arrived',
       builder: (context, state) => const rescuer_screens.RescuerArrivedScreen(),
     ),
     GoRoute(
-      path: '/rescuer-support',
+      path: '/rescuer/support',
       name: 'rescuer_support',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>?;
@@ -383,8 +383,8 @@ final router = GoRouter(
       },
     ),
     GoRoute(
-      path: '/find-hospital',
-      name: 'find_hospital',
+      path: '/rescuer/find-hospital',
+      name: 'rescuer_find_hospital',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>?;
         return FindHospitalScreen(
@@ -394,13 +394,18 @@ final router = GoRouter(
       },
     ),
     GoRoute(
-      path: '/mission-completion',
-      name: 'mission_completion',
-      builder: (context, state) => const MissionCompletionScreen(),
+      path: '/rescuer/mission-completion',
+      name: 'rescuer_mission_completion',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return MissionCompletionScreen(
+          missionId: extra?['missionId'] as String? ?? '',
+        );
+      },
     ),
     GoRoute(
-      path: '/mission-success',
-      name: 'mission_success',
+      path: '/rescuer/mission-success',
+      name: 'rescuer_mission_success',
       builder: (context, state) => const RescuerMissionSuccessScreen(),
     ),
 
