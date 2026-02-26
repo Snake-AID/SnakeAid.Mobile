@@ -74,6 +74,7 @@ class RescueRequest {
 }
 
 /// Response from accepting a rescue request
+/// Matches backend RequestAccepted event structure
 @JsonSerializable()
 class AcceptRequestResponse {
   @JsonKey(name: 'isSuccess')
@@ -82,8 +83,17 @@ class AcceptRequestResponse {
   @JsonKey(name: 'message')
   final String message;
 
+  @JsonKey(name: 'requestId')
+  final String? requestId;
+
+  @JsonKey(name: 'incidentId')
+  final String? incidentId;
+
   @JsonKey(name: 'missionId')
   final String? missionId;
+
+  @JsonKey(name: 'acceptedAt')
+  final DateTime? acceptedAt;
 
   @JsonKey(name: 'error')
   final String? error;
@@ -91,7 +101,10 @@ class AcceptRequestResponse {
   AcceptRequestResponse({
     required this.isSuccess,
     required this.message,
+    this.requestId,
+    this.incidentId,
     this.missionId,
+    this.acceptedAt,
     this.error,
   });
 

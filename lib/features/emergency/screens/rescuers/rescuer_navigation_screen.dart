@@ -1,33 +1,95 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:async';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../../shared/widgets/custom_dialog.dart';
+import '../../models/rescue_mission_response.dart';
+import '../../models/route_navigation_data.dart';
+import '../../providers/mission_detail_provider.dart';
 
-class RescuerNavigationScreen extends StatefulWidget {
-  const RescuerNavigationScreen({super.key});
+class RescuerNavigationScreen extends ConsumerStatefulWidget {
+  final String missionId;
+  final DetailRescueMissionResponse mission;
+  final RouteNavigationData? routeData; // Optional, fallback to provider
+
+  const RescuerNavigationScreen({
+    super.key,
+    required this.missionId,
+    required this.mission,
+    this.routeData,
+  });
 
   @override
-  State<RescuerNavigationScreen> createState() => _RescuerNavigationScreenState();
+  ConsumerState<RescuerNavigationScreen> createState() =>
+      _RescuerNavigationScreenState();
 }
 
-class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with TickerProviderStateMixin {
+class _RescuerNavigationScreenState
+    extends ConsumerState<RescuerNavigationScreen>
+    with TickerProviderStateMixin {
   late AnimationController _pulseController;
   late AnimationController _bluePulseController;
   late Animation<double> _pulseAnimation;
   late Animation<double> _bluePulseAnimation;
-  double _distance = 1.8;
-  int _estimatedTime = 6;
+  late MapController _mapController;
+
+  StreamSubscription<Position>? _positionSubscription;
+  Position? _currentPosition;
+  double? _distanceToVictim;
+  int? _estimatedTime;
+  bool _isFollowingUser = true; // Auto-follow mode like Google Maps
+  bool _hasInitialPosition = false; // Track if we got first position
+
+  // Position tracking & turn-by-turn navigation
+  int _currentStepIndex = 0; // Current instruction step
+  double? _distanceToNextManeuver; // Distance to next turn (meters)
+  bool _isOffRoute = false; // Off-route detection flag
+  bool _hasShownOffRouteAlert = false; // Prevent spam alerts
+
+  RouteNavigationData? _getRouteData() {
+    // Try widget parameter first, then fallback to provider
+    if (widget.routeData != null) {
+      return widget.routeData;
+    }
+    // Get from provider if not passed as parameter
+    final routeFromProvider = ref.read(missionDetailProvider).routeData;
+    return routeFromProvider;
+  }
 
   @override
   void initState() {
     super.initState();
-    
+
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    debugPrint('🗺️ Navigation Screen Initialized');
+    debugPrint('   Mission ID: ${widget.missionId}');
+
+    final routeData = _getRouteData();
+    debugPrint('   Route data available: ${routeData != null}');
+    if (routeData != null) {
+      debugPrint('   Route points: ${routeData.points.length}');
+      debugPrint('   Distance: ${routeData.formattedDistance}');
+      debugPrint('   Duration: ${routeData.formattedDuration}');
+      debugPrint('   First point: ${routeData.points.first}');
+      debugPrint('   Last point: ${routeData.points.last}');
+    } else {
+      debugPrint(
+        '   ⚠️ WARNING: routeData is NULL in both parameter and provider!',
+      );
+    }
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+    _mapController = MapController();
+
     // Red pin pulse animation
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat(reverse: true);
-    
+
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
@@ -37,142 +99,544 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat();
-    
+
     _bluePulseAnimation = Tween<double>(begin: 1.0, end: 3.0).animate(
       CurvedAnimation(parent: _bluePulseController, curve: Curves.easeOut),
     );
 
-    // Simulate distance and time updates
-    _startSimulation();
+    // Start real-time location tracking
+    _startLocationTracking();
+
+    // Fit bounds to show entire route initially
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fitBoundsToRoute();
+    });
   }
 
-  void _startSimulation() {
-    Timer.periodic(const Duration(seconds: 3), (timer) {
-      if (mounted && _distance > 0) {
-        setState(() {
-          _distance = (_distance - 0.1).clamp(0, 2.1);
-          _estimatedTime = (_distance * 3.33).round();
-        });
+  void _fitBoundsToRoute() {
+    final routeData = _getRouteData();
+    if (routeData == null || routeData.isEmpty) return;
+
+    final points = routeData.points;
+
+    // Calculate bounds
+    double minLat = points.first.latitude;
+    double maxLat = points.first.latitude;
+    double minLng = points.first.longitude;
+    double maxLng = points.first.longitude;
+
+    for (final point in points) {
+      if (point.latitude < minLat) minLat = point.latitude;
+      if (point.latitude > maxLat) maxLat = point.latitude;
+      if (point.longitude < minLng) minLng = point.longitude;
+      if (point.longitude > maxLng) maxLng = point.longitude;
+    }
+
+    // Add padding
+    final latPadding = (maxLat - minLat) * 0.2;
+    final lngPadding = (maxLng - minLng) * 0.2;
+
+    final bounds = LatLngBounds(
+      LatLng(minLat - latPadding, minLng - lngPadding),
+      LatLng(maxLat + latPadding, maxLng + lngPadding),
+    );
+
+    _mapController.fitCamera(
+      CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50)),
+    );
+
+    debugPrint('🗺️ Map bounds fitted to route');
+  }
+
+  void _startLocationTracking() async {
+    debugPrint('📍 Starting location tracking...');
+
+    // Check permission
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cần quyền truy cập vị trí để dẫn đường'),
+          ),
+        );
       }
+      return;
+    }
+
+    // Get initial position immediately
+    try {
+      final initialPosition = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      if (mounted) {
+        setState(() {
+          _currentPosition = initialPosition;
+          _hasInitialPosition = true;
+          _updateDistanceAndETA(initialPosition);
+        });
+
+        debugPrint(
+          '✅ Initial position acquired: ${initialPosition.latitude}, ${initialPosition.longitude}',
+        );
+
+        // Center on user initially if following
+        if (_isFollowingUser) {
+          _mapController.move(
+            LatLng(initialPosition.latitude, initialPosition.longitude),
+            16.0,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Could not get initial position: $e');
+    }
+
+    // Start tracking
+    _positionSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 10, // Update every 10 meters
+          ),
+        ).listen((Position position) {
+          if (mounted) {
+            setState(() {
+              _currentPosition = position;
+              if (!_hasInitialPosition) {
+                _hasInitialPosition = true;
+              }
+              _updateDistanceAndETA(position);
+            });
+
+            // Auto-follow user like Google Maps
+            if (_isFollowingUser) {
+              _mapController.move(
+                LatLng(position.latitude, position.longitude),
+                _mapController.camera.zoom, // Keep current zoom
+              );
+            }
+
+            // Update provider with current location
+            ref
+                .read(missionDetailProvider.notifier)
+                .updateRescuerLocation(position);
+          }
+        });
+  }
+
+  void _updateDistanceAndETA(Position position) {
+    // Calculate distance to victim
+    final previousDistance = _distanceToVictim;
+
+    _distanceToVictim =
+        Geolocator.distanceBetween(
+          position.latitude,
+          position.longitude,
+          widget.mission.incident.locationCoordinates.latitude,
+          widget.mission.incident.locationCoordinates.longitude,
+        ) /
+        1000; // Convert to km
+
+    // Estimate time (assuming average speed of 30 km/h)
+    if (_distanceToVictim != null) {
+      _estimatedTime = (_distanceToVictim! * 2).round(); // minutes
+    }
+
+    // ============================================
+    // 🧭 POSITION TRACKING & TURN-BY-TURN
+    // ============================================
+    final routeData = _getRouteData();
+    if (routeData != null && routeData.steps.isNotEmpty) {
+      // Update distance to next maneuver
+      _updateDistanceToNextManeuver(position);
+
+      // Auto-switch to next step when passing maneuver point
+      _checkAndSwitchToNextStep(position);
+
+      // Off-route detection
+      _checkOffRoute(position);
+    }
+
+    // Auto-suggest arrival when very close (100 meters = 0.1km)
+    if (_distanceToVictim != null &&
+        _distanceToVictim! < 0.1 &&
+        (previousDistance == null || previousDistance >= 0.1)) {
+      // Show arrival confirmation automatically
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _showArrivedConfirmation(context);
+        }
+      });
+    }
+  }
+
+  /// Calculate distance to next maneuver point
+  void _updateDistanceToNextManeuver(Position position) {
+    final routeData = _getRouteData();
+    if (routeData == null) return;
+    final steps = routeData.steps;
+
+    // If we're on the last step or past all steps, show distance to destination
+    if (_currentStepIndex >= steps.length - 1) {
+      _distanceToNextManeuver = _distanceToVictim! * 1000; // Convert to meters
+      return;
+    }
+
+    // Get next step's maneuver location
+    final nextStep = steps[_currentStepIndex + 1];
+    if (nextStep.maneuverLocation != null) {
+      _distanceToNextManeuver = Geolocator.distanceBetween(
+        position.latitude,
+        position.longitude,
+        nextStep.maneuverLocation!.latitude,
+        nextStep.maneuverLocation!.longitude,
+      );
+
+      debugPrint(
+        '📏 Distance to next maneuver: ${_distanceToNextManeuver!.toStringAsFixed(0)}m',
+      );
+    }
+  }
+
+  /// Check if rescuer passed the next maneuver point and switch to next step
+  void _checkAndSwitchToNextStep(Position position) {
+    final routeData = _getRouteData();
+    if (routeData == null) return;
+    final steps = routeData.steps;
+
+    // Don't switch if we're already on the last step
+    if (_currentStepIndex >= steps.length - 1) return;
+
+    final nextStep = steps[_currentStepIndex + 1];
+
+    // Check if we're close to the next maneuver point (within 20 meters)
+    if (nextStep.maneuverLocation != null) {
+      final distanceToManeuver = Geolocator.distanceBetween(
+        position.latitude,
+        position.longitude,
+        nextStep.maneuverLocation!.latitude,
+        nextStep.maneuverLocation!.longitude,
+      );
+
+      // Switch to next instruction when within 20m of maneuver point
+      if (distanceToManeuver < 20) {
+        setState(() {
+          _currentStepIndex++;
+        });
+
+        debugPrint(
+          '🔄 Switched to step ${_currentStepIndex + 1}/${steps.length}',
+        );
+        debugPrint('   Instruction: ${steps[_currentStepIndex].instruction}');
+
+        // Show notification for new instruction
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${steps[_currentStepIndex].directionIcon} ${steps[_currentStepIndex].instruction}',
+              ),
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: const Color(0xFFFF8800),
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  /// Check if rescuer is off-route (too far from polyline)
+  void _checkOffRoute(Position position) {
+    final routeData = _getRouteData();
+    if (routeData == null) return;
+    final routePoints = routeData.points;
+    if (routePoints.isEmpty) return;
+
+    // Find closest point on route polyline
+    double minDistance = double.infinity;
+    for (final point in routePoints) {
+      final distance = Geolocator.distanceBetween(
+        position.latitude,
+        position.longitude,
+        point.latitude,
+        point.longitude,
+      );
+      if (distance < minDistance) {
+        minDistance = distance;
+      }
+    }
+
+    // Off-route threshold: 50 meters
+    final wasOffRoute = _isOffRoute;
+    _isOffRoute = minDistance > 50;
+
+    // Show alert when going off-route (only once)
+    if (_isOffRoute && !wasOffRoute && !_hasShownOffRouteAlert) {
+      _hasShownOffRouteAlert = true;
+
+      debugPrint(
+        '⚠️ OFF ROUTE! Distance to route: ${minDistance.toStringAsFixed(0)}m',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.warning, color: Colors.white),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Bạn đang đi sai đường! Vui lòng quay lại tuyến đường.',
+                  ),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 5),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: const Color(0xFFDC3545),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
+          ),
+        );
+      }
+    }
+
+    // Reset alert flag when back on route
+    if (!_isOffRoute && wasOffRoute) {
+      _hasShownOffRouteAlert = false;
+      debugPrint('✅ Back on route!');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Đã quay lại đúng đường!'),
+              ],
+            ),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Color(0xFF4CAF50),
+          ),
+        );
+      }
+    }
+  }
+
+  void _toggleFollowUser() {
+    setState(() {
+      _isFollowingUser = !_isFollowingUser;
     });
+
+    if (_isFollowingUser && _currentPosition != null) {
+      _mapController.move(
+        LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+        16.0,
+      );
+    }
   }
 
   @override
   void dispose() {
+    _positionSubscription?.cancel();
     _pulseController.dispose();
     _bluePulseController.dispose();
+    _mapController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
-    
+
     return Scaffold(
       body: Stack(
         children: [
-          // Map Background
-          Container(
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: NetworkImage(
-                  'https://lh3.googleusercontent.com/aida-public/AB6AXuBLXTTBMslsflM1W9wf7x61aij5Sft34Xx8hJGwWASfVYWAiEO5VG8FlFs4PlCdc0jF5pFeMZBDxCk6WtiCzprlAri0zYmZB63jhZUfFx8k14Gq2SnswqFdB6SY_Mck623LS5OZoS1pWsXhoyiAvCXsyCW6a5p4C2ECoqNjhIFIWJZkxLQX9regEpnW6eoDj9aBUHazhUEYc7XW9cKDq7B7xftcae3UFAW5uo6vt2KNLBlx_3dmx4arOdOei29mEurn0yWv2N3HgTM',
-                ),
-                fit: BoxFit.cover,
+          // Full-screen Map with Route
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: LatLng(
+                widget.mission.incident.locationCoordinates.latitude,
+                widget.mission.incident.locationCoordinates.longitude,
               ),
-            ),
-          ),
-
-          // Patient Location Marker (Red Pin with Pulse)
-          Positioned(
-            top: MediaQuery.of(context).size.height * 0.2,
-            left: MediaQuery.of(context).size.width * 0.5 - 24,
-            child: AnimatedBuilder(
-              animation: _pulseAnimation,
-              builder: (context, child) {
-                return Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Pulse effect
-                    Transform.scale(
-                      scale: _pulseAnimation.value,
-                      child: Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDC3545).withOpacity(0.3),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                    // Pin icon
-                    const Icon(
-                      Icons.location_on,
-                      color: Color(0xFFDC3545),
-                      size: 48,
-                      shadows: [
-                        Shadow(
-                          color: Colors.black26,
-                          blurRadius: 10,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                  ],
-                );
+              initialZoom: 14.0,
+              interactionOptions: const InteractionOptions(
+                flags: InteractiveFlag.all,
+              ),
+              // Disable follow mode when user manually moves map
+              onPositionChanged: (position, hasGesture) {
+                if (hasGesture && _isFollowingUser) {
+                  setState(() => _isFollowingUser = false);
+                }
               },
             ),
-          ),
+            children: [
+              // OpenStreetMap tiles
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.snakeaid.snakeaid_mobile',
+              ),
 
-          // Rescuer Current Location (Blue Dot with Pulse)
-          Positioned(
-            bottom: MediaQuery.of(context).size.height * 0.35,
-            left: MediaQuery.of(context).size.width * 0.5 - 8,
-            child: AnimatedBuilder(
-              animation: _bluePulseAnimation,
-              builder: (context, child) {
-                final scale = _bluePulseAnimation.value;
-                final opacity = 1.0 - (_bluePulseAnimation.value - 1.0) / 2.0;
-                
-                return Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Outer pulse
-                    Transform.scale(
-                      scale: scale,
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: const Color(0xFF007AFF).withOpacity(opacity.clamp(0.0, 1.0)),
-                            width: 2,
-                          ),
-                          color: const Color(0xFF007AFF).withOpacity((0.3 * opacity).clamp(0.0, 1.0)),
-                        ),
-                      ),
-                    ),
-                    // Inner dot
-                    Container(
-                      width: 16,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF007AFF),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
-                            blurRadius: 6,
-                          ),
-                        ],
-                      ),
+              // Route polyline (if available)
+              if (_getRouteData() != null && _getRouteData()!.isNotEmpty)
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: _getRouteData()!.points,
+                      strokeWidth: 6.0, // Increased from 4.0 for visibility
+                      color: const Color(0xFFFF8800),
+                      borderColor: Colors.white,
+                      borderStrokeWidth: 2.0,
                     ),
                   ],
-                );
-              },
-            ),
+                )
+              else
+                // Debug: Show message if no route
+                Builder(
+                  builder: (context) {
+                    final routeData = _getRouteData();
+                    debugPrint('⚠️ WARNING: Route polyline NOT displayed');
+                    debugPrint('   routeData is null: ${routeData == null}');
+                    debugPrint(
+                      '   routeData is empty: ${routeData?.isEmpty ?? true}',
+                    );
+                    return const SizedBox.shrink();
+                  },
+                ),
+
+              // Markers for rescuer and victim
+              MarkerLayer(
+                markers: [
+                  // Victim location marker (red pin)
+                  Marker(
+                    point: LatLng(
+                      widget.mission.incident.locationCoordinates.latitude,
+                      widget.mission.incident.locationCoordinates.longitude,
+                    ),
+                    width: 48,
+                    height: 48,
+                    child: AnimatedBuilder(
+                      animation: _pulseAnimation,
+                      builder: (context, child) {
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Pulse effect
+                            Transform.scale(
+                              scale: _pulseAnimation.value,
+                              child: Container(
+                                width: 64,
+                                height: 64,
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFFDC3545,
+                                  ).withOpacity(0.3),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                            // Pin icon
+                            const Icon(
+                              Icons.location_on,
+                              color: Color(0xFFDC3545),
+                              size: 48,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black26,
+                                  blurRadius: 10,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+
+                  // Rescuer location marker (blue dot)
+                  if (_currentPosition != null)
+                    Marker(
+                      point: LatLng(
+                        _currentPosition!.latitude,
+                        _currentPosition!.longitude,
+                      ),
+                      width: 32,
+                      height: 32,
+                      child: AnimatedBuilder(
+                        animation: _bluePulseAnimation,
+                        builder: (context, child) {
+                          final scale = _bluePulseAnimation.value;
+                          final opacity =
+                              1.0 - (_bluePulseAnimation.value - 1.0) / 2.0;
+
+                          return Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Outer pulse
+                              Transform.scale(
+                                scale: scale,
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: const Color(
+                                        0xFF007AFF,
+                                      ).withOpacity(opacity.clamp(0.0, 1.0)),
+                                      width: 2,
+                                    ),
+                                    color: const Color(0xFF007AFF).withOpacity(
+                                      (0.3 * opacity).clamp(0.0, 1.0),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Inner dot
+                              Container(
+                                width: 16,
+                                height: 16,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF007AFF),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.3),
+                                      blurRadius: 6,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ],
           ),
 
           // Top Bar - Simple Back and SOS
@@ -210,7 +674,10 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
                   ),
                   const Spacer(),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFDC3545),
                       borderRadius: BorderRadius.circular(20),
@@ -244,16 +711,21 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
             ),
           ),
 
-          // Info Bar - Minimal
+          // Info Bar - Turn-by-turn with distance countdown
           Positioned(
             top: 80,
             left: 16,
             right: 16,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: _isOffRoute
+                    ? const Color(0xFFFFEBEE) // Red tint when off-route
+                    : Colors.white,
                 borderRadius: BorderRadius.circular(12),
+                border: _isOffRoute
+                    ? Border.all(color: const Color(0xFFDC3545), width: 2)
+                    : null,
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.08),
@@ -264,32 +736,106 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.navigation,
-                    color: Color(0xFFFF8800),
-                    size: 18,
+                  Icon(
+                    _isOffRoute ? Icons.warning : Icons.navigation,
+                    color: _isOffRoute
+                        ? const Color(0xFFDC3545)
+                        : const Color(0xFFFF8800),
+                    size: 20,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          '123 Nguyễn Huệ, Quận 1',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1C100D),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        // Distance countdown + instruction
+                        Row(
+                          children: [
+                            // Distance countdown to next maneuver
+                            if (_distanceToNextManeuver != null &&
+                                _currentStepIndex <
+                                    (_getRouteData()?.steps.length ?? 0) - 1)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFF8800),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  _distanceToNextManeuver! < 1000
+                                      ? '${_distanceToNextManeuver!.toStringAsFixed(0)}m'
+                                      : '${(_distanceToNextManeuver! / 1000).toStringAsFixed(1)}km',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            if (_distanceToNextManeuver != null &&
+                                _currentStepIndex <
+                                    (_getRouteData()?.steps.length ?? 0) - 1)
+                              const SizedBox(width: 8),
+                            // Instruction icon
+                            if (_getRouteData() != null &&
+                                _getRouteData()!.steps.isNotEmpty)
+                              Text(
+                                _getRouteData()!
+                                    .steps[_currentStepIndex]
+                                    .directionIcon,
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                            if (_getRouteData() != null &&
+                                _getRouteData()!.steps.isNotEmpty)
+                              const SizedBox(width: 6),
+                            // Instruction text
+                            Expanded(
+                              child: Text(
+                                _isOffRoute
+                                    ? 'Đang đi sai đường!'
+                                    : (_distanceToVictim != null &&
+                                              _distanceToVictim! < 0.1
+                                          ? 'Đã đến gần nạn nhân! 🎯'
+                                          : (_getRouteData() != null &&
+                                                    _getRouteData()!
+                                                        .steps
+                                                        .isNotEmpty
+                                                ? _getRouteData()!
+                                                      .steps[_currentStepIndex]
+                                                      .instruction
+                                                : 'Vị trí nạn nhân')),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: _isOffRoute
+                                      ? const Color(0xFFDC3545)
+                                      : (_distanceToVictim != null &&
+                                                _distanceToVictim! < 0.1
+                                            ? const Color(0xFF28A745)
+                                            : const Color(0xFF1C100D)),
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 4),
+                        // Distance & ETA to destination
                         Text(
-                          '${_distance.toStringAsFixed(1)} km • $_estimatedTime phút',
-                          style: const TextStyle(
+                          _distanceToVictim != null && _estimatedTime != null
+                              ? '${_distanceToVictim!.toStringAsFixed(1)} km • $_estimatedTime phút${_isOffRoute ? " • Ngoài tuyến đường" : ""}'
+                              : _hasInitialPosition
+                              ? 'Đang tính khoảng cách...'
+                              : 'Đang lấy vị trí của bạn...',
+                          style: TextStyle(
                             fontSize: 11,
-                            color: Color(0xFF999999),
+                            color: _isOffRoute
+                                ? const Color(0xFFDC3545)
+                                : const Color(0xFF999999),
                           ),
                         ),
                       ],
@@ -306,6 +852,43 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
             top: screenHeight * 0.5 - 60,
             child: Column(
               children: [
+                // Re-center / Follow button (like Google Maps)
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: _isFollowingUser
+                        ? const Color(0xFF007AFF) // Blue when following
+                        : Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _toggleFollowUser,
+                      customBorder: const CircleBorder(),
+                      child: Icon(
+                        _isFollowingUser
+                            ? Icons
+                                  .my_location // Filled when following
+                            : Icons.location_searching, // Outline when not
+                        size: 20,
+                        color: _isFollowingUser
+                            ? Colors.white
+                            : const Color(0xFF666666),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Zoom in button
                 Container(
                   width: 44,
                   height: 44,
@@ -323,17 +906,26 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: () {},
+                      onTap: () {
+                        final currentZoom = _mapController.camera.zoom;
+                        _mapController.move(
+                          _mapController.camera.center,
+                          currentZoom + 1,
+                        );
+                        // Disable follow mode when manually zooming
+                        setState(() => _isFollowingUser = false);
+                      },
                       customBorder: const CircleBorder(),
                       child: const Icon(
-                        Icons.my_location,
+                        Icons.add,
                         size: 20,
                         color: Color(0xFF666666),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
+                // Zoom out button
                 Container(
                   width: 44,
                   height: 44,
@@ -351,10 +943,18 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: () {},
+                      onTap: () {
+                        final currentZoom = _mapController.camera.zoom;
+                        _mapController.move(
+                          _mapController.camera.center,
+                          currentZoom - 1,
+                        );
+                        // Disable follow mode when manually zooming
+                        setState(() => _isFollowingUser = false);
+                      },
                       customBorder: const CircleBorder(),
                       child: const Icon(
-                        Icons.add,
+                        Icons.remove,
                         size: 20,
                         color: Color(0xFF666666),
                       ),
@@ -398,7 +998,7 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  
+
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                     child: Column(
@@ -420,22 +1020,23 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
                               ),
                             ),
                             const SizedBox(width: 12),
-                            const Expanded(
+                            Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Nguyễn Văn A',
-                                    style: TextStyle(
+                                    widget.mission.user.account?.fullName ??
+                                        'Nạn nhân',
+                                    style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                       color: Color(0xFF1C100D),
                                     ),
                                   ),
-                                  SizedBox(height: 2),
+                                  const SizedBox(height: 2),
                                   Text(
-                                    '⚠️ NGUY KỊCH • Rắn hổ mang',
-                                    style: TextStyle(
+                                    '${widget.mission.incident.getSeverityText()} • Rắn độc',
+                                    style: const TextStyle(
                                       fontSize: 12,
                                       color: Color(0xFFDC3545),
                                       fontWeight: FontWeight.w600,
@@ -454,7 +1055,9 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
                               child: Material(
                                 color: Colors.transparent,
                                 child: InkWell(
-                                  onTap: () {},
+                                  onTap: () {
+                                    // TODO: Call victim
+                                  },
                                   customBorder: const CircleBorder(),
                                   child: const Icon(
                                     Icons.call,
@@ -466,63 +1069,21 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
                             ),
                           ],
                         ),
-                        
+
                         const SizedBox(height: 16),
                         const Divider(height: 1, color: Color(0xFFF0F0F0)),
                         const SizedBox(height: 16),
-                        
+
                         // Action Buttons
                         Row(
                           children: [
-                            Expanded(
-                              flex: 2,
-                              child: Container(
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFF8800),
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFFFF8800).withOpacity(0.25),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(12),
-                                    onTap: () => _showArrivedConfirmation(context),
-                                    child: const Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.check_circle,
-                                          color: Colors.white,
-                                          size: 20,
-                                        ),
-                                        SizedBox(width: 8),
-                                        Text(
-                                          'Đã đến nơi',
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
+                            Expanded(flex: 2, child: _buildArrivalButton()),
                             const SizedBox(width: 12),
                             _buildCompactButton(
                               Icons.info_outline,
                               const Color(0xFF666666),
                               () {
-                                context.pushNamed('rescuer_sos_detail');
+                                context.pop();
                               },
                             ),
                             const SizedBox(width: 8),
@@ -540,7 +1101,102 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
               ),
             ),
           ),
+
+          // Loading overlay when waiting for GPS
+          if (!_hasInitialPosition)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black54,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Color(0xFFFF8800),
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'Đang lấy vị trí của bạn...',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF666666),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildArrivalButton() {
+    // Enable button only when within 100m (0.1km)
+    // final canArrive = _distanceToVictim != null && _distanceToVictim! < 0.1;
+    final canArrive = true; // testing: enable nút arrival dù đang cách xa
+    final isEnabled =
+        canArrive ||
+        !_hasInitialPosition; // Enable if no GPS yet (user can manually confirm)
+
+    return Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: isEnabled
+            ? const Color(0xFFFF8800)
+            : const Color(0xFFCCCCCC), // Gray when disabled
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: isEnabled
+            ? [
+                BoxShadow(
+                  color: const Color(0xFFFF8800).withOpacity(0.25),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : [],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: isEnabled
+              ? () => _showArrivedConfirmation(context)
+              : null, // Disable tap when too far
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                canArrive ? Icons.check_circle : Icons.location_on,
+                color: isEnabled ? Colors.white : const Color(0xFF999999),
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                canArrive
+                    ? 'Đã đến nơi'
+                    : (_distanceToVictim != null
+                          ? 'Còn ${(_distanceToVictim! * 1000).toStringAsFixed(0)}m'
+                          : 'Đã đến nơi'),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: isEnabled ? Colors.white : const Color(0xFF999999),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -552,77 +1208,117 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color.withOpacity(0.2),
-          width: 1,
-        ),
+        border: Border.all(color: color.withOpacity(0.2), width: 1),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
-          child: Icon(
-            icon,
-            color: color,
-            size: 22,
-          ),
+          child: Icon(icon, color: color, size: 22),
         ),
       ),
     );
   }
 
   void _showCancelTripDialog(BuildContext context) {
-    String? selectedReason;
-    
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext dialogContext) => StatefulBuilder(
-        builder: (context, setState) => CustomDialog(
-          icon: Icons.cancel_outlined,
-          iconBackgroundColor: const Color(0xFFFFEBEE),
-          iconColor: const Color(0xFFDC3545),
-          title: 'Hủy Chuyến Cứu Hộ?',
-          description: 'Vui lòng chọn lý do hủy chuyến để chúng tôi cải thiện dịch vụ',
-          extraContent: [
-            _buildReasonOption('Không thể đến địa điểm', 'location', selectedReason, setState),
-            _buildReasonOption('Bệnh nhân không liên lạc được', 'contact', selectedReason, setState),
-            _buildReasonOption('Có việc khẩn cấp khác', 'urgent', selectedReason, setState),
-            _buildReasonOption('Tình trạng không nghiêm trọng', 'not_serious', selectedReason, setState),
-            _buildReasonOption('Lý do khác', 'other', selectedReason, setState),
-          ],
-          actions: [
-            DialogAction(
-              label: 'Quay lại',
-              isOutlined: true,
-              onPressed: () => context.pop(),
-            ),
-            DialogAction(
-              label: 'Xác nhận hủy',
-              backgroundColor: const Color(0xFFCCCCCC),
-              onPressed: () {
-                
-              },
-            ),
-          ],
-        ),
-      ),
+      builder: (BuildContext dialogContext) {
+        String? selectedReason;
+
+        return StatefulBuilder(
+          builder: (context, setState) => CustomDialog(
+            icon: Icons.cancel_outlined,
+            iconBackgroundColor: const Color(0xFFFFEBEE),
+            iconColor: const Color(0xFFDC3545),
+            title: 'Hủy Chuyến Cứu Hộ?',
+            description:
+                'Vui lòng chọn lý do hủy chuyến để chúng tôi cải thiện dịch vụ',
+            extraContent: [
+              _buildReasonOption(
+                'Không thể đến địa điểm',
+                'location',
+                selectedReason,
+                (value) {
+                  setState(() => selectedReason = value);
+                },
+              ),
+              _buildReasonOption(
+                'Bệnh nhân không liên lạc được',
+                'contact',
+                selectedReason,
+                (value) {
+                  setState(() => selectedReason = value);
+                },
+              ),
+              _buildReasonOption(
+                'Có việc khẩn cấp khác',
+                'urgent',
+                selectedReason,
+                (value) {
+                  setState(() => selectedReason = value);
+                },
+              ),
+              _buildReasonOption(
+                'Tình trạng không nghiêm trọng',
+                'not_serious',
+                selectedReason,
+                (value) {
+                  setState(() => selectedReason = value);
+                },
+              ),
+              _buildReasonOption('Lý do khác', 'other', selectedReason, (
+                value,
+              ) {
+                setState(() => selectedReason = value);
+              }),
+            ],
+            actions: [
+              DialogAction(
+                label: 'Quay lại',
+                isOutlined: true,
+                onPressed: () => context.pop(),
+              ),
+              DialogAction(
+                label: 'Xác nhận hủy',
+                backgroundColor: const Color(0xFFDC3545),
+                onPressed: () {
+                  if (selectedReason != null) {
+                    Navigator.of(dialogContext).pop();
+                    context.pop();
+                  }
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildReasonOption(String label, String value, String? selectedReason, StateSetter setState) {
+  Widget _buildReasonOption(
+    String label,
+    String value,
+    String? selectedReason,
+    Function(String) onSelect,
+  ) {
     final isSelected = selectedReason == value;
     return InkWell(
-      onTap: () => setState(() => selectedReason = value),
+      onTap: () => onSelect(value),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFF8800).withOpacity(0.1) : Colors.white,
+          color: isSelected
+              ? const Color(0xFFFF8800).withOpacity(0.1)
+              : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? const Color(0xFFFF8800) : const Color(0xFFE5E5E5),
+            color: isSelected
+                ? const Color(0xFFFF8800)
+                : const Color(0xFFE5E5E5),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -634,7 +1330,9 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? const Color(0xFFFF8800) : const Color(0xFFCCCCCC),
+                  color: isSelected
+                      ? const Color(0xFFFF8800)
+                      : const Color(0xFFCCCCCC),
                   width: 2,
                 ),
                 color: isSelected ? const Color(0xFFFF8800) : Colors.white,
@@ -668,7 +1366,8 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
         iconBackgroundColor: const Color(0xFFD4EDDA),
         iconColor: const Color(0xFFFF8800),
         title: 'Xác Nhận Đã Đến Nơi?',
-        description: 'Sau khi xác nhận, bệnh nhân sẽ được thông báo và bạn có thể bắt đầu hỗ trợ.',
+        description:
+            'Sau khi xác nhận, bệnh nhân sẽ được thông báo và bạn có thể bắt đầu hỗ trợ.',
         extraContent: [
           Container(
             padding: const EdgeInsets.all(12),
@@ -684,10 +1383,7 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
                 Expanded(
                   child: Text(
                     'Đảm bảo bạn đã ở đúng vị trí trước khi xác nhận',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF856404),
-                    ),
+                    style: TextStyle(fontSize: 13, color: Color(0xFF856404)),
                   ),
                 ),
               ],
@@ -698,14 +1394,68 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
           DialogAction(
             label: 'Chưa đến',
             isOutlined: true,
-            onPressed: () => context.pop(),
+            onPressed: () => Navigator.pop(dialogContext),
           ),
           DialogAction(
             label: 'Xác nhận',
             backgroundColor: const Color(0xFFFF8800),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(dialogContext);
-              context.pushNamed('rescuer_arrived');
+
+              // Show loading
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color(0xFFFF8800),
+                    ),
+                  ),
+                ),
+              );
+
+              // Call markArrival from provider
+              try {
+                final success = await ref
+                    .read(missionDetailProvider.notifier)
+                    .markArrival();
+
+                if (mounted) {
+                  Navigator.pop(context); // Close loading
+
+                  if (success) {
+                    // Navigate to support screen
+                    context.pushNamed(
+                      'rescuer_support',
+                      extra: {
+                        'missionId': widget.missionId,
+                        'incidentId': widget.mission.incidentId,
+                      },
+                    );
+                  } else {
+                    // Show error
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Không thể cập nhật trạng thái. Vui lòng thử lại.',
+                        ),
+                        backgroundColor: Color(0xFFDC3545),
+                      ),
+                    );
+                  }
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.pop(context); // Close loading
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Lỗi: ${e.toString()}'),
+                      backgroundColor: const Color(0xFFDC3545),
+                    ),
+                  );
+                }
+              }
             },
           ),
         ],
@@ -713,4 +1463,3 @@ class _RescuerNavigationScreenState extends State<RescuerNavigationScreen> with 
     );
   }
 }
-

@@ -26,8 +26,13 @@ class RescuerSignalRService {
   final _requestTakenController = StreamController<String>.broadcast();
   final _requestExpiredController = StreamController<String>.broadcast();
   final _requestCancelledController = StreamController<String>.broadcast();
+  final _requestAcceptedController =
+      StreamController<AcceptRequestResponse>.broadcast();
   final _connectionStateController =
       StreamController<HubConnectionState>.broadcast();
+
+  // Completers for pending accept requests (requestId -> Completer)
+  final Map<String, Completer<AcceptRequestResponse>> _pendingAccepts = {};
 
   // Streams for UI to listen
   Stream<RescueRequest> get newRequestStream => _newRequestController.stream;
@@ -35,6 +40,8 @@ class RescuerSignalRService {
   Stream<String> get requestExpiredStream => _requestExpiredController.stream;
   Stream<String> get requestCancelledStream =>
       _requestCancelledController.stream;
+  Stream<AcceptRequestResponse> get requestAcceptedStream =>
+      _requestAcceptedController.stream;
   Stream<HubConnectionState> get connectionStateStream =>
       _connectionStateController.stream;
 
@@ -250,14 +257,40 @@ class RescuerSignalRService {
         if (arguments == null || arguments.isEmpty) return;
 
         final data = arguments[0] as Map<String, dynamic>;
-        debugPrint('✅ Request accepted confirmation from server');
-        debugPrint('   RequestId: ${data['requestId']}');
-        debugPrint('   Message: ${data['message']}');
+        debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        debugPrint('✅ REQUEST ACCEPTED confirmation from server');
+        debugPrint('📋 Request ID: ${data['requestId']}');
+        debugPrint('🚑 Incident ID: ${data['incidentId']}');
+        debugPrint('📝 Mission ID: ${data['missionId']}');
+        debugPrint('⏰ Accepted At: ${data['acceptedAt']}');
+        debugPrint('💬 Message: ${data['message']}');
 
-        // You can add callback here if needed
-        // e.g., navigate to mission screen
-      } catch (e) {
+        // Parse response
+        final requestId = data['requestId'] as String;
+        final response = AcceptRequestResponse(
+          isSuccess: true,
+          message:
+              data['message'] as String? ?? 'Request accepted successfully',
+          requestId: requestId,
+          incidentId: data['incidentId'] as String?,
+          missionId: data['missionId'] as String?,
+          acceptedAt: data['acceptedAt'] != null
+              ? DateTime.parse(data['acceptedAt'] as String)
+              : null,
+        );
+
+        // Complete pending request
+        final completer = _pendingAccepts.remove(requestId);
+        if (completer != null && !completer.isCompleted) {
+          completer.complete(response);
+          debugPrint('✅ Completed completer for request: $requestId');
+        }
+
+        // Broadcast to stream
+        _requestAcceptedController.add(response);
+      } catch (e, stackTrace) {
         debugPrint('❌ Error parsing RequestAccepted event: $e');
+        debugPrint('Stack trace: $stackTrace');
       }
     });
 
@@ -267,11 +300,30 @@ class RescuerSignalRService {
         if (arguments == null || arguments.isEmpty) return;
 
         final data = arguments[0] as Map<String, dynamic>;
-        debugPrint('❌ Request error from server');
-        debugPrint('   RequestId: ${data['requestId']}');
-        debugPrint('   Error: ${data['error']}');
+        final requestId = data['requestId'] as String;
+        final error = data['error'] as String;
 
-        // Handle error (e.g., show error dialog)
+        debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        debugPrint('❌ REQUEST ERROR from server');
+        debugPrint('📋 Request ID: $requestId');
+        debugPrint('⚠️ Error: $error');
+
+        // Create error response
+        final response = AcceptRequestResponse(
+          isSuccess: false,
+          message: error,
+          requestId: requestId,
+          error: error,
+        );
+
+        // Complete pending request with error
+        final completer = _pendingAccepts.remove(requestId);
+        if (completer != null && !completer.isCompleted) {
+          completer.complete(response);
+          debugPrint(
+            '✅ Completed completer with error for request: $requestId',
+          );
+        }
       } catch (e) {
         debugPrint('❌ Error parsing RequestError event: $e');
       }
@@ -310,8 +362,8 @@ class RescuerSignalRService {
 
   /// Accept a rescue request
   ///
-  /// Returns true if accepted successfully
-  /// Returns false if race condition (someone else accepted first)
+  /// Invokes AcceptRequest on backend and waits for RequestAccepted/RequestError event
+  /// Backend sends response via SignalR event instead of return value
   Future<AcceptRequestResponse> acceptRequest(
     String requestId,
     String rescuerId,
@@ -330,32 +382,50 @@ class RescuerSignalRService {
         );
       }
 
-      // Parse String to Guid format for backend
-      // Backend expects: AcceptRequest(Guid requestId, Guid rescuerId)
-      final requestGuid = requestId; // Keep as string, SignalR will serialize
-      final rescuerGuid = rescuerId;
+      // Create completer to wait for RequestAccepted/RequestError event
+      final completer = Completer<AcceptRequestResponse>();
+      _pendingAccepts[requestId] = completer;
+      debugPrint('📝 Created completer for request: $requestId');
 
-      // Invoke AcceptRequest method on hub
-      final result = await _hubConnection!.invoke(
-        'AcceptRequest',
-        args: <Object>[requestGuid, rescuerGuid],
-      );
+      try {
+        // Invoke AcceptRequest method on hub (no return value expected)
+        await _hubConnection!.invoke(
+          'AcceptRequest',
+          args: <Object>[requestId, rescuerId],
+        );
 
-      debugPrint('✅ Accept request result: $result');
+        debugPrint('✅ AcceptRequest invoked, waiting for response event...');
 
-      if (result is Map<String, dynamic>) {
-        return AcceptRequestResponse.fromJson(result);
+        // Wait for RequestAccepted or RequestError event (20 second timeout)
+        final response = await completer.future.timeout(
+          const Duration(seconds: 20),
+          onTimeout: () {
+            debugPrint('⏰ Timeout waiting for RequestAccepted event');
+            return AcceptRequestResponse(
+              isSuccess: false,
+              message: 'Timeout: Backend không phản hồi trong 20 giây',
+              error: 'TIMEOUT',
+              requestId: requestId,
+            );
+          },
+        );
+
+        debugPrint('✅ Received response from event');
+        debugPrint('   Success: ${response.isSuccess}');
+        debugPrint('   Mission ID: ${response.missionId}');
+        debugPrint('   Incident ID: ${response.incidentId}');
+
+        return response;
+      } finally {
+        // Clean up completer if still pending
+        _pendingAccepts.remove(requestId);
       }
-
-      // Default success response
-      return AcceptRequestResponse(
-        isSuccess: true,
-        message: 'Request accepted successfully',
-        missionId: requestId,
-      );
     } catch (e, stackTrace) {
       debugPrint('❌ Failed to accept request: $e');
       debugPrint('Stack trace: $stackTrace');
+
+      // Clean up completer
+      _pendingAccepts.remove(requestId);
 
       // Check if it's a race condition error
       final errorMessage = e.toString().toLowerCase();
@@ -366,6 +436,7 @@ class RescuerSignalRService {
           isSuccess: false,
           message: 'Nhiệm vụ đã được nhận bởi người khác',
           error: 'RACE_CONDITION',
+          requestId: requestId,
         );
       }
 
@@ -373,6 +444,7 @@ class RescuerSignalRService {
         isSuccess: false,
         message: 'Không thể nhận nhiệm vụ. Vui lòng thử lại.',
         error: e.toString(),
+        requestId: requestId,
       );
     }
   }
@@ -405,27 +477,6 @@ class RescuerSignalRService {
       debugPrint('❌ Failed to update location: $e');
     }
   }
-
-  // /// Get list of currently connected rescuers
-  // ///
-  // /// Backend will respond via 'ConnectedRescuers' event
-  // Future<void> getConnectedRescuers() async {
-  //   if (_hubConnection == null || !isConnected) {
-  //     debugPrint('⚠️ Cannot get connected rescuers: Not connected');
-  //     return;
-  //   }
-
-  //   try {
-  //     debugPrint('👥 Requesting connected rescuers list...');
-
-  //     await _hubConnection!.invoke('GetConnectedRescuers');
-
-  //     debugPrint('✅ Request sent, waiting for response...');
-  //     // Response will come via 'ConnectedRescuers' event listener
-  //   } catch (e) {
-  //     debugPrint('❌ Failed to get connected rescuers: $e');
-  //   }
-  // }
 
   /// Disconnect from hub
   Future<void> disconnect() async {
@@ -476,12 +527,14 @@ class RescuerSignalRService {
   }
 
   /// Dispose service and close streams
+  /// Dispose service and close streams
   void dispose() {
     disconnect();
     _newRequestController.close();
     _requestTakenController.close();
     _requestExpiredController.close();
     _requestCancelledController.close();
+    _requestAcceptedController.close();
     _connectionStateController.close();
   }
 }

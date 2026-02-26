@@ -1,26 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import '../../repository/media_repository.dart';
+import '../../providers/mission_detail_provider.dart';
 
-class MissionCompletionScreen extends StatefulWidget {
-  const MissionCompletionScreen({super.key});
+class MissionCompletionScreen extends ConsumerStatefulWidget {
+  final String missionId;
+
+  const MissionCompletionScreen({super.key, required this.missionId});
 
   @override
-  State<MissionCompletionScreen> createState() =>
+  ConsumerState<MissionCompletionScreen> createState() =>
       _MissionCompletionScreenState();
 }
 
-class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
+class _MissionCompletionScreenState
+    extends ConsumerState<MissionCompletionScreen> {
   String _patientOutcome = 'Ổn định - Không cần cấp cứu';
-  String _snakeStatus = 'Đã bắt và thả về môi trường';
   final TextEditingController _notesController = TextEditingController();
   final TextEditingController _feedbackController = TextEditingController();
   int _rating = 0;
-  final bool _willTransportPatient = false;
-  final List<File> _snakeImages = [];
   final List<File> _evidenceImages = [];
   final ImagePicker _picker = ImagePicker();
+
+  // Upload state
+  bool _isUploading = false;
+  String _uploadStatus = '';
+  int _uploadedCount = 0;
+  void Function(void Function())? _dialogSetState; // For updating dialog
+
+  static const int minEvidencePhotos = 1;
+  static const int maxEvidencePhotos = 3;
 
   @override
   void dispose() {
@@ -29,16 +41,155 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
     super.dispose();
   }
 
-  Future<void> _pickImage(bool isSnakeImage) async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.camera);
+  Future<void> _pickImage() async {
+    // Check max limit
+    if (_evidenceImages.length >= maxEvidencePhotos) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Chỉ có thể upload tối đa $maxEvidencePhotos ảnh bằng chứng',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 85, // Compress to reduce size
+    );
+
     if (image != null) {
       setState(() {
-        if (isSnakeImage) {
-          _snakeImages.add(File(image.path));
-        } else {
-          _evidenceImages.add(File(image.path));
-        }
+        _evidenceImages.add(File(image.path));
       });
+    }
+  }
+
+  void _removeImage(int index) {
+    setState(() {
+      _evidenceImages.removeAt(index);
+    });
+  }
+
+  Future<void> _handleComplete() async {
+    // Validation: Must have at least 1 evidence photo
+    if (_evidenceImages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng chụp ít nhất 1 ảnh bằng chứng'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    _showConfirmationDialog();
+  }
+
+  Future<void> _uploadAndComplete() async {
+    setState(() {
+      _isUploading = true;
+      _uploadedCount = 0;
+      _uploadStatus = 'Đang chuẩn bị upload...';
+    });
+
+    try {
+      final mediaRepository = ref.read(mediaRepositoryProvider);
+      final List<String> evidenceMediaIds = [];
+
+      // Upload each evidence photo
+      for (int i = 0; i < _evidenceImages.length; i++) {
+        final newStatus = 'Đang upload ảnh ${i + 1}/${_evidenceImages.length}...';
+        setState(() {
+          _uploadStatus = newStatus;
+        });
+        // Update dialog if it's open
+        _dialogSetState?.call(() {
+          _uploadStatus = newStatus;
+        });
+
+        final mediaId = await mediaRepository.uploadEvidencePhoto(
+          imageFile: _evidenceImages[i],
+          missionId: widget.missionId,
+        );
+
+        evidenceMediaIds.add(mediaId);
+
+        final newCount = i + 1;
+        setState(() {
+          _uploadedCount = newCount;
+        });
+        // Update dialog if it's open
+        _dialogSetState?.call(() {
+          _uploadedCount = newCount;
+        });
+      }
+
+      // All photos uploaded, now complete mission
+      final completionStatus = 'Đang hoàn thành nhiệm vụ...';
+      setState(() {
+        _uploadStatus = completionStatus;
+      });
+      // Update dialog if it's open
+      _dialogSetState?.call(() {
+        _uploadStatus = completionStatus;
+      });
+
+      final success = await ref
+          .read(missionDetailProvider.notifier)
+          .completeMission(
+            evidenceMediaIds: evidenceMediaIds,
+            completionNotes: _notesController.text.trim().isEmpty
+                ? null
+                : _notesController.text.trim(),
+          );
+
+      if (!mounted) return;
+
+      setState(() {
+        _isUploading = false;
+      });
+
+      // Close progress dialog and clear dialogSetState
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      _dialogSetState = null;
+
+      if (success) {
+        // Success! Navigate to success screen
+        context.go('/rescuer/mission-success');
+      } else {
+        // Show error
+        final error = ref.read(missionDetailProvider).error;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error ?? 'Lỗi khi hoàn thành nhiệm vụ'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+
+        // Close progress dialog and clear dialogSetState
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+        _dialogSetState = null;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -75,10 +226,10 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Sau khi xác nhận, nhiệm vụ sẽ được đóng và thanh toán sẽ được xử lý trong 24 giờ.',
+              Text(
+                'Bạn đã upload ${_evidenceImages.length} ảnh bằng chứng. Sau khi xác nhận, nhiệm vụ sẽ được hoàn thành và không thể chỉnh sửa.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
                   color: Color(0xFF666666),
                   height: 1.5,
@@ -109,8 +260,8 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.pop(dialogContext);
-                        // TODO: Submit mission completion
-                        context.go('/mission-success');
+                        _showUploadProgressDialog();
+                        _uploadAndComplete();
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFFF8800),
@@ -127,6 +278,54 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                 ],
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showUploadProgressDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => WillPopScope(
+        onWillPop: () async => false,
+        child: Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: StatefulBuilder(
+              builder: (context, setDialogState) {
+                // Store the setDialogState so we can call it from _uploadAndComplete
+                _dialogSetState = setDialogState;
+                
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(color: Color(0xFFFF8800)),
+                    const SizedBox(height: 20),
+                    Text(
+                      _uploadStatus,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    if (_uploadedCount > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          '$_uploadedCount/${_evidenceImages.length} ảnh',
+                          style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -485,167 +684,137 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
 
                   const SizedBox(height: 16),
 
-                  // Snake Status Card
+                  // Evidence Photos (Required)
+                  Row(
+                    children: [
+                      const Text(
+                        'Ảnh Bằng Chứng',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1C100D),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'Bắt buộc',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tối thiểu $minEvidencePhotos ảnh, tối đa $maxEvidencePhotos ảnh (${_evidenceImages.length}/$maxEvidencePhotos)',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.withOpacity(0.2)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                      border: Border.all(
+                        color: _evidenceImages.isEmpty
+                            ? Colors.red.withOpacity(0.3)
+                            : Colors.grey.withOpacity(0.2),
+                      ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Tình Trạng Rắn',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1C100D),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _buildRadioOption('Đã bắt và thả về môi trường'),
-                        _buildRadioOption('Đã bắt và giao nộp'),
-                        _buildRadioOption('Rắn đã rời đi'),
-                        _buildRadioOption('Không tìm thấy rắn'),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Upload ảnh xác nhận:',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF666666),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          height: 80,
-                          child: ListView(
-                            scrollDirection: Axis.horizontal,
-                            children: [
-                              ..._snakeImages.map(
-                                (image) => Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: ClipRRect(
+                    child: SizedBox(
+                      height: 120,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          ..._evidenceImages.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final image = entry.value;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 12),
+                              child: Stack(
+                                children: [
+                                  ClipRRect(
                                     borderRadius: BorderRadius.circular(12),
                                     child: Image.file(
                                       image,
-                                      width: 80,
-                                      height: 80,
+                                      width: 120,
+                                      height: 120,
                                       fit: BoxFit.cover,
                                     ),
                                   ),
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: () => _pickImage(true),
-                                child: Container(
-                                  width: 80,
-                                  height: 80,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF0F0F0),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: Colors.grey.withOpacity(0.3),
-                                      width: 2,
-                                      style: BorderStyle.solid,
-                                    ),
-                                  ),
-                                  child: const Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.add,
-                                        color: Color(0xFF999999),
-                                        size: 28,
-                                      ),
-                                      SizedBox(height: 4),
-                                      Text(
-                                        'Thêm ảnh',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Color(0xFF999999),
+                                  Positioned(
+                                    top: 4,
+                                    right: 4,
+                                    child: GestureDetector(
+                                      onTap: () => _removeImage(index),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.red,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.close,
+                                          color: Colors.white,
+                                          size: 16,
                                         ),
                                       ),
-                                    ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                          if (_evidenceImages.length < maxEvidencePhotos)
+                            GestureDetector(
+                              onTap: _pickImage,
+                              child: Container(
+                                width: 120,
+                                height: 120,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF0F0F0),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.grey.withOpacity(0.3),
+                                    width: 2,
+                                    style: BorderStyle.solid,
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Evidence Photos
-                  const Text(
-                    'Ảnh Chứng Từ',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1C100D),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 96,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        ..._evidenceImages.map(
-                          (image) => Padding(
-                            padding: const EdgeInsets.only(right: 12),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.file(
-                                image,
-                                width: 96,
-                                height: 96,
-                                fit: BoxFit.cover,
+                                child: const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.camera_alt,
+                                      color: Color(0xFF999999),
+                                      size: 32,
+                                    ),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      'Chụp ảnh',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF999999),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () => _pickImage(false),
-                          child: Container(
-                            width: 96,
-                            height: 96,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF0F0F0),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.add_a_photo,
-                                  color: Color(0xFF999999),
-                                  size: 32,
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Thêm Ảnh',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF999999),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
 
@@ -929,7 +1098,7 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton(
-                  onPressed: _showConfirmationDialog,
+                  onPressed: _isUploading ? null : _handleComplete,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFF8800),
                     foregroundColor: Colors.white,
@@ -937,45 +1106,31 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
+                    disabledBackgroundColor: Colors.grey,
                   ),
-                  child: const Text(
-                    'XÁC NHẬN HOÀN THÀNH',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
+                  child: _isUploading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'XÁC NHẬN HOÀN THÀNH',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
                 ),
               ),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value, Color valueColor) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
-        ),
-        const Spacer(),
-        Flexible(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: valueColor,
-            ),
-            textAlign: TextAlign.right,
-          ),
-        ),
-      ],
     );
   }
 
@@ -1016,51 +1171,6 @@ class _MissionCompletionScreenState extends State<MissionCompletionScreen> {
           textAlign: TextAlign.right,
         ),
       ],
-    );
-  }
-
-  Widget _buildRadioOption(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: GestureDetector(
-        onTap: () => setState(() => _snakeStatus = label),
-        child: Row(
-          children: [
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: _snakeStatus == label
-                      ? const Color(0xFFFF8800)
-                      : const Color(0xFFCCCCCC),
-                  width: 2,
-                ),
-              ),
-              child: _snakeStatus == label
-                  ? Center(
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFFF8800),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(fontSize: 14, color: Color(0xFF1C100D)),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

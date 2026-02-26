@@ -31,7 +31,12 @@ AcceptRequestResponse _$AcceptRequestResponseFromJson(
 ) => AcceptRequestResponse(
   isSuccess: json['isSuccess'] as bool,
   message: json['message'] as String,
+  requestId: json['requestId'] as String?,
+  incidentId: json['incidentId'] as String?,
   missionId: json['missionId'] as String?,
+  acceptedAt: json['acceptedAt'] == null
+      ? null
+      : DateTime.parse(json['acceptedAt'] as String),
   error: json['error'] as String?,
 );
 
@@ -40,6 +45,9 @@ Map<String, dynamic> _$AcceptRequestResponseToJson(
 ) => <String, dynamic>{
   'isSuccess': instance.isSuccess,
   'message': instance.message,
+  'requestId': instance.requestId,
+  'incidentId': instance.incidentId,
   'missionId': instance.missionId,
+  'acceptedAt': instance.acceptedAt?.toIso8601String(),
   'error': instance.error,
 };

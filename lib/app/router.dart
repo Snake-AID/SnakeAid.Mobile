@@ -60,6 +60,7 @@ import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_income_manageme
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_feedback_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_id_documents_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_sos_detail_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_mission_detail_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_navigation_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_arrived_screen.dart'
     as rescuer_screens;
@@ -68,6 +69,7 @@ import 'package:snakeaid_mobile/features/emergency/screens/rescuers/find_hospita
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/mission_completion_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_mission_success_screen.dart';
 import 'package:snakeaid_mobile/features/video_call/screens/demo_video_call_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/models/route_navigation_data.dart';
 
 /// App routing configuration using go_router
 final router = GoRouter(
@@ -296,7 +298,7 @@ final router = GoRouter(
         );
       },
     ),
-    
+
     // === MEMBER SNAKE CATCHING ROUTES ===
     // Snake Quantity Selection
     GoRoute(
@@ -304,7 +306,7 @@ final router = GoRouter(
       name: 'snake_quantity_selection',
       builder: (context, state) => const SnakeQuantitySelectionScreen(),
     ),
-    
+
     // Snake Report Detail
     GoRoute(
       path: '/snake-report-detail/:quantity',
@@ -314,7 +316,7 @@ final router = GoRouter(
         return SnakeReportDetailScreen(quantity: quantity);
       },
     ),
-    
+
     // Snake Catching Success
     GoRoute(
       path: '/snake-catching-success',
@@ -324,7 +326,7 @@ final router = GoRouter(
         return SnakeCatchingSuccessScreen(requestData: requestData);
       },
     ),
-    
+
     // Activity Detail
     GoRoute(
       path: '/activity-detail/:requestId',
@@ -392,31 +394,67 @@ final router = GoRouter(
       builder: (context, state) => const RescuerSosDetailScreen(),
     ),
     GoRoute(
-      path: '/rescuer-navigation',
-      name: 'rescuer_navigation',
-      builder: (context, state) => const RescuerNavigationScreen(),
+      path: '/rescuer/mission-detail/:missionId',
+      name: 'rescuer_mission_detail',
+      builder: (context, state) {
+        final missionId = state.pathParameters['missionId']!;
+        return RescuerMissionDetailScreen(missionId: missionId);
+      },
     ),
     GoRoute(
-      path: '/rescuer-arrived',
+      path: '/rescuer/navigation',
+      name: 'rescuer_navigation',
+      builder: (context, state) {
+        final data = state.extra as Map<String, dynamic>;
+        return RescuerNavigationScreen(
+          missionId: data['missionId'] as String,
+          mission: data['mission'],
+          routeData: data['routeData'] as RouteNavigationData?,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/rescuer/arrived',
       name: 'rescuer_arrived',
       builder: (context, state) => const rescuer_screens.RescuerArrivedScreen(),
     ),
     GoRoute(
-      path: '/rescuer-support',
+      path: '/rescuer/support',
       name: 'rescuer_support',
-      builder: (context, state) => const RescuerSupportScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return RescuerSupportScreen(
+          missionId: extra?['missionId'] as String? ?? '',
+          incidentId: extra?['incidentId'] as String? ?? '',
+        );
+      },
     ),
     GoRoute(
-      path: '/find-hospital',
-      name: 'find_hospital',
-      builder: (context, state) => const FindHospitalScreen(),
+      path: '/rescuer/find-hospital',
+      name: 'rescuer_find_hospital',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return FindHospitalScreen(
+          missionId: extra?['missionId'] as String? ?? '',
+          incidentId: extra?['incidentId'] as String? ?? '',
+        );
+      },
     ),
     GoRoute(
-      path: '/mission-completion',
-      name: 'mission_completion',
-      builder: (context, state) => const MissionCompletionScreen(),
+      path: '/rescuer/mission-completion',
+      name: 'rescuer_mission_completion',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return MissionCompletionScreen(
+          missionId: extra?['missionId'] as String? ?? '',
+        );
+      },
     ),
-    // /mission-success route is navigated to via MaterialPageRoute (requires requestData + missionId)
+    GoRoute(
+      path: '/rescuer/mission-success',
+      name: 'rescuer_mission_success',
+      builder: (context, state) => const RescuerMissionSuccessScreen(),
+    ),
 
     // === EMERGENCY ROUTES ===
     GoRoute(

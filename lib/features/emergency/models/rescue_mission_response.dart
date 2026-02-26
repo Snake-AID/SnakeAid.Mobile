@@ -1,0 +1,255 @@
+import 'package:json_annotation/json_annotation.dart';
+import 'detailed_incident_response.dart';
+
+part 'rescue_mission_response.g.dart';
+
+/// Mission Detail API Response (with envelope)
+/// Wraps DetailRescueMissionResponse with status info
+class MissionDetailResponse {
+  final int statusCode;
+  final String message;
+  final bool isSuccess;
+  final DetailRescueMissionResponse? data;
+  final dynamic error;
+
+  MissionDetailResponse({
+    required this.statusCode,
+    required this.message,
+    required this.isSuccess,
+    this.data,
+    this.error,
+  });
+
+  factory MissionDetailResponse.fromJson(Map<String, dynamic> json) {
+    return MissionDetailResponse(
+      statusCode: json['status_code'] ?? 0,
+      message: json['message'] ?? '',
+      isSuccess: json['is_success'] ?? false,
+      data: json['data'] != null
+          ? DetailRescueMissionResponse.fromJson(json['data'])
+          : null,
+      error: json['error'],
+    );
+  }
+}
+
+/// Detail Rescue Mission Response
+/// Full mission data for rescuer mission detail screen
+@JsonSerializable(explicitToJson: true)
+class DetailRescueMissionResponse {
+  // Mission basic info
+  @JsonKey(name: 'id')
+  final String id;
+
+  @JsonKey(name: 'incidentId')
+  final String incidentId;
+
+  @JsonKey(name: 'rescuerId')
+  final String rescuerId;
+
+  @JsonKey(name: 'status')
+  final String status;
+
+  @JsonKey(name: 'price')
+  final double price;
+
+  @JsonKey(name: 'createdAt')
+  final DateTime createdAt;
+
+  @JsonKey(name: 'startedAt')
+  final DateTime? startedAt;
+
+  @JsonKey(name: 'arrivedAt')
+  final DateTime? arrivedAt;
+
+  @JsonKey(name: 'completedAt')
+  final DateTime? completedAt;
+
+  @JsonKey(name: 'updatedAt')
+  final DateTime? updatedAt;
+
+  // Mission details
+  @JsonKey(name: 'notes')
+  final String? notes;
+
+  @JsonKey(name: 'cancellationReason')
+  final String? cancellationReason;
+
+  // Cost tracking
+  @JsonKey(name: 'estimatedCost')
+  final double? estimatedCost;
+
+  @JsonKey(name: 'actualCost')
+  final double? actualCost;
+
+  // Distance from rescuer to incident (calculated on demand)
+  @JsonKey(name: 'distanceKm')
+  final double? distanceKm;
+
+  // Related entities
+  @JsonKey(name: 'incident')
+  final BriefIncidentForMission incident;
+
+  @JsonKey(name: 'rescuer')
+  final BriefRescuerProfile rescuer;
+
+  @JsonKey(name: 'user')
+  final BriefMemberProfile user;
+
+  DetailRescueMissionResponse({
+    required this.id,
+    required this.incidentId,
+    required this.rescuerId,
+    required this.status,
+    required this.price,
+    required this.createdAt,
+    this.startedAt,
+    this.arrivedAt,
+    this.completedAt,
+    this.updatedAt,
+    this.notes,
+    this.cancellationReason,
+    this.estimatedCost,
+    this.actualCost,
+    this.distanceKm,
+    required this.incident,
+    required this.rescuer,
+    required this.user,
+  });
+
+  factory DetailRescueMissionResponse.fromJson(Map<String, dynamic> json) =>
+      _$DetailRescueMissionResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$DetailRescueMissionResponseToJson(this);
+
+  // Computed properties
+  MissionStatus get missionStatus => MissionStatus.fromString(status);
+
+  String get formattedPrice =>
+      '${price.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} VNĐ';
+
+  Duration? get elapsedTime {
+    if (startedAt == null) return null;
+    final endTime = completedAt ?? DateTime.now();
+    return endTime.difference(startedAt!);
+  }
+
+  String? get formattedElapsedTime {
+    final elapsed = elapsedTime;
+    if (elapsed == null) return null;
+
+    final hours = elapsed.inHours;
+    final minutes = elapsed.inMinutes % 60;
+
+    if (hours > 0) {
+      return '$hours giờ $minutes phút';
+    }
+    return '$minutes phút';
+  }
+}
+
+/// Brief Incident Response for Mission
+/// Subset of incident data needed for mission detail
+@JsonSerializable(explicitToJson: true)
+class BriefIncidentForMission {
+  @JsonKey(name: 'id')
+  final String id;
+
+  @JsonKey(name: 'locationCoordinates')
+  final GeoPointCoordinates locationCoordinates;
+
+  @JsonKey(name: 'status')
+  final String status;
+
+  @JsonKey(name: 'symptomsReport')
+  final String? symptomsReport;
+
+  @JsonKey(name: 'severityLevel')
+  final int? severityLevel;
+
+  @JsonKey(name: 'incidentOccurredAt')
+  final DateTime? incidentOccurredAt;
+
+  @JsonKey(name: 'assignedAt')
+  final DateTime? assignedAt;
+
+  @JsonKey(name: 'currentSessionNumber')
+  final int currentSessionNumber;
+
+  @JsonKey(name: 'currentRadiusKm')
+  final int currentRadiusKm;
+
+  @JsonKey(name: 'media')
+  final List<SnakeAIDetectMedia> media;
+
+  BriefIncidentForMission({
+    required this.id,
+    required this.locationCoordinates,
+    required this.status,
+    this.symptomsReport,
+    this.severityLevel,
+    this.incidentOccurredAt,
+    this.assignedAt,
+    required this.currentSessionNumber,
+    required this.currentRadiusKm,
+    required this.media,
+  });
+
+  factory BriefIncidentForMission.fromJson(Map<String, dynamic> json) =>
+      _$BriefIncidentForMissionFromJson(json);
+
+  Map<String, dynamic> toJson() => _$BriefIncidentForMissionToJson(this);
+
+  // Computed properties
+  IncidentStatus get incidentStatus => IncidentStatus.fromString(status);
+
+  String get formattedRadius => '${currentRadiusKm}km';
+
+  String getSeverityText() {
+    if (severityLevel == null) return 'Chưa xác định';
+    if (severityLevel! >= 4) return 'Nghiêm trọng';
+    if (severityLevel! >= 3) return 'Cao';
+    if (severityLevel! >= 2) return 'Trung bình';
+    return 'Thấp';
+  }
+
+  String getSeverityColorHex() {
+    if (severityLevel == null) return '9E9E9E';
+    if (severityLevel! >= 4) return 'D32F2F';
+    if (severityLevel! >= 3) return 'FF9800';
+    if (severityLevel! >= 2) return 'FFC107';
+    return '4CAF50';
+  }
+}
+
+/// Update Mission Status Request
+@JsonSerializable()
+class UpdateMissionStatusRequest {
+  @JsonKey(name: 'status')
+  final String status;
+
+  @JsonKey(name: 'cancellationReason')
+  final String? cancellationReason;
+
+  UpdateMissionStatusRequest({required this.status, this.cancellationReason});
+
+  factory UpdateMissionStatusRequest.fromJson(Map<String, dynamic> json) =>
+      _$UpdateMissionStatusRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$UpdateMissionStatusRequestToJson(this);
+}
+
+/// Cancel/Abort Mission Request
+/// Used for abort and cancel mission endpoints
+@JsonSerializable()
+class CancelMissionRequest {
+  @JsonKey(name: 'cancellationReason')
+  final String? cancellationReason;
+
+  CancelMissionRequest({this.cancellationReason});
+
+  factory CancelMissionRequest.fromJson(Map<String, dynamic> json) =>
+      _$CancelMissionRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$CancelMissionRequestToJson(this);
+}

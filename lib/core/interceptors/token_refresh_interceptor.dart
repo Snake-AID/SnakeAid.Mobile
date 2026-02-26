@@ -1,11 +1,19 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+
+/// Result từ refresh token operation
+enum RefreshResult {
+  success, // Refresh thành công
+  invalidToken, // Refresh token không hợp lệ (401)
+  networkError, // Lỗi network/server (giữ session)
+}
 
 /// Interceptor xử lý token refresh tự động
-/// - Proactive refresh: Refresh token TRƯỚC khi hết hạn (5 phút trước)
+/// - Proactive refresh: Refresh token TRƯỚC khi hết hạn (5-10 phút trước)
 /// - Fallback refresh: Retry khi gặp 401 Unauthorized
-/// - Session preservation: KHÔNG force logout, giữ session như Facebook
+/// - Session preservation: KHÔNG force logout khi network error (offline-first)
 class TokenRefreshInterceptor extends Interceptor {
   final Dio dio;
 
@@ -59,12 +67,24 @@ class TokenRefreshInterceptor extends Interceptor {
 
     // Fallback refresh: Nếu gặp 401, thử refresh token và retry
     if (err.response?.statusCode == 401) {
-      debugPrint('🔄 Got 401, attempting fallback token refresh...');
+      final refreshResult = await _fallbackRefresh();
 
-      final refreshed = await _fallbackRefresh();
+      if (refreshResult == RefreshResult.success) {
+        final isFormData =
+            err.requestOptions.data is FormData ||
+            err.requestOptions.headers['Content-Type']?.toString().contains(
+                  'multipart/form-data',
+                ) ==
+                true;
 
-      if (refreshed) {
-        // Retry request với token mới
+        if (isFormData) {
+          // Return error với updated token, để caller tự retry
+          final token = await _getAccessToken();
+          err.requestOptions.headers['Authorization'] = 'Bearer $token';
+          return handler.next(err);
+        }
+
+        // Retry request với token mới (non-FormData only)
         try {
           final token = await _getAccessToken();
           err.requestOptions.headers['Authorization'] = 'Bearer $token';
@@ -75,11 +95,27 @@ class TokenRefreshInterceptor extends Interceptor {
           debugPrint('❌ Retry after refresh failed: $e');
           return handler.next(err);
         }
-      } else {
-        // 🔴 BUG FIX: Refresh thất bại → FORCE LOGOUT
-        debugPrint('🚨 Token refresh failed, forcing session logout...');
+      } else if (refreshResult == RefreshResult.invalidToken) {
+        // 🔴 Refresh token không hợp lệ → Force logout
+        debugPrint('🚨 Refresh token invalid, forcing logout...');
         await _forceLogout();
         return handler.next(err);
+      } else {
+        // RefreshResult.networkError → GIỮ session, convert to network error
+        debugPrint(
+          '⚠️ Refresh failed due to network, keeping session for offline mode',
+        );
+        debugPrint('   → Converting 401 to network error for better UX');
+
+        // Convert authentication error to network error for better user experience
+        final networkError = DioException(
+          requestOptions: err.requestOptions,
+          type: DioExceptionType.connectionTimeout,
+          message:
+              'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.',
+          error: 'Token refresh timeout - keeping session for offline mode',
+        );
+        return handler.next(networkError);
       }
     }
 
@@ -87,6 +123,8 @@ class TokenRefreshInterceptor extends Interceptor {
   }
 
   /// Proactive refresh: Refresh token nếu sắp hết hạn
+  /// 🔥 CHỈ refresh khi SẮP hết hạn, KHÔNG refresh khi ĐÃ hết hạn
+  /// (để tránh clear session khi offline/network error)
   Future<void> _proactiveRefreshIfNeeded() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -97,36 +135,73 @@ class TokenRefreshInterceptor extends Interceptor {
       final tokenExpiry = DateTime.parse(tokenExpiryStr);
       final now = DateTime.now();
 
-      // Refresh nếu token đã hết hạn HOẶC sắp hết hạn trong 5 phút
+      // 🔴 CHỈ refresh khi token SẮP hết hạn (5-10 phút trước)
+      // KHÔNG refresh nếu đã hết hạn (để giữ session cho offline mode)
       final isExpired = now.isAfter(tokenExpiry);
-      final isExpiringSoon = now.isAfter(
-        tokenExpiry.subtract(const Duration(minutes: 5)),
-      );
+      final isExpiringSoon =
+          now.isAfter(tokenExpiry.subtract(const Duration(minutes: 10))) &&
+          !isExpired;
 
-      if (isExpired || isExpiringSoon) {
+      if (isExpiringSoon) {
+        debugPrint('⏰ Token expiring soon, checking connectivity...');
+
+        // Check connectivity TRƯỚC khi refresh
+        try {
+          final connectivityResults = await Connectivity().checkConnectivity();
+          final isOffline =
+              connectivityResults.isEmpty ||
+              connectivityResults.every(
+                (result) => result == ConnectivityResult.none,
+              );
+
+          if (isOffline) {
+            debugPrint('📵 Offline mode - skipping proactive refresh');
+            debugPrint('   → Will attempt refresh when network is available');
+            return; // ← Skip refresh khi offline
+          }
+
+          debugPrint(
+            '📶 Network available (${connectivityResults.first.name}), proceeding with proactive refresh...',
+          );
+        } catch (e) {
+          // If connectivity check fails, proceed anyway
+          debugPrint('⚠️ Connectivity check failed: $e, attempting refresh...');
+        }
+
+        final result = await _refreshToken();
+
+        if (result != RefreshResult.success) {
+          debugPrint(
+            '⚠️ Proactive refresh failed: $result, will retry on next request',
+          );
+          // KHÔNG force logout - giữ session cho offline mode
+        }
+      } else if (isExpired) {
         debugPrint(
-          '⏰ Token ${isExpired ? "expired" : "expiring soon"}, proactive refresh...',
+          '⏰ Token expired, waiting for 401 to trigger fallback refresh',
         );
-        await _refreshToken();
+        // KHÔNG force logout - chờ request thất bại rồi fallback refresh
       }
     } catch (e) {
       debugPrint('⚠️ Proactive refresh check failed: $e');
+      // KHÔNG force logout - giữ session
     }
   }
 
   /// Fallback refresh: Gọi khi gặp 401
-  Future<bool> _fallbackRefresh() async {
+  Future<RefreshResult> _fallbackRefresh() async {
     try {
       debugPrint('🔄 Fallback token refresh...');
       return await _refreshToken();
     } catch (e) {
       debugPrint('❌ Fallback refresh failed: $e');
-      return false;
+      return RefreshResult.networkError;
     }
   }
 
-  /// Thực hiện refresh token
-  Future<bool> _refreshToken() async {
+  /// Thực hiện refresh token với connectivity awareness
+  /// Checks network state before making API call to avoid unnecessary timeouts
+  Future<RefreshResult> _refreshToken() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final refreshToken = prefs.getString('refresh_token');
@@ -134,13 +209,45 @@ class TokenRefreshInterceptor extends Interceptor {
 
       if (refreshToken == null || userId == null) {
         debugPrint('⚠️ No refresh token or userId available');
-        return false;
+        return RefreshResult.invalidToken;
       }
 
-      // Call refresh API
+      // 🔥 Check connectivity BEFORE calling API (fast fail if offline)
+      try {
+        final connectivityResults = await Connectivity().checkConnectivity();
+        final isOffline =
+            connectivityResults.isEmpty ||
+            connectivityResults.every(
+              (result) => result == ConnectivityResult.none,
+            );
+
+        if (isOffline) {
+          debugPrint(
+            '📵 No network connection, skipping refresh (offline mode)',
+          );
+          debugPrint('   → Keeping session for offline access to cached data');
+          return RefreshResult
+              .networkError; // ← Fast fail, don't wait for timeout
+        }
+
+        debugPrint(
+          '📶 Network available (${connectivityResults.first.name}), proceeding with refresh...',
+        );
+      } catch (e) {
+        // If connectivity check fails, proceed with API call anyway
+        debugPrint(
+          '⚠️ Connectivity check failed: $e, proceeding with refresh...',
+        );
+      }
+
+      // Call refresh API (only when network is available)
       final response = await dio.post(
         '/api/auth/refresh',
         data: {'userId': userId, 'refreshToken': refreshToken},
+        options: Options(
+          receiveTimeout: const Duration(seconds: 10),
+          sendTimeout: const Duration(seconds: 5),
+        ),
       );
 
       // Parse response
@@ -165,14 +272,27 @@ class TokenRefreshInterceptor extends Interceptor {
         debugPrint('✅ Token refreshed successfully');
         debugPrint('⏰ New expiry: $newExpiry');
 
-        return true;
+        return RefreshResult.success;
       }
 
       debugPrint('⚠️ Refresh response invalid');
-      return false;
+      return RefreshResult.invalidToken;
+    } on DioException catch (e) {
+      // Phân biệt giữa network error và invalid token
+      if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
+        // Server rejected token → Token thật sự invalid
+        debugPrint('🚨 Refresh token invalid (${e.response?.statusCode})');
+        debugPrint('   → Token expired or revoked, will force logout');
+        return RefreshResult.invalidToken;
+      }
+
+      // Network/server errors → Keep session for offline mode
+      debugPrint('⚠️ Token refresh network error: ${e.type}');
+      debugPrint('   → Keeping session, user can access cached data');
+      return RefreshResult.networkError;
     } catch (e) {
-      debugPrint('❌ Token refresh failed: $e');
-      return false;
+      debugPrint('❌ Token refresh unexpected error: $e');
+      return RefreshResult.networkError;
     }
   }
 
