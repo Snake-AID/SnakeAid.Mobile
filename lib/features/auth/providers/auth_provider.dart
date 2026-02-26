@@ -140,6 +140,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final prefs = await SharedPreferences.getInstance();
       final accessToken = prefs.getString('access_token');
       final userId = prefs.getString('user_id');
+      final refreshToken = prefs.getString('refresh_token');
 
       // 🔍 DEBUG: Log all stored keys
       debugPrint('🔍 DEBUG: Checking SharedPreferences...');
@@ -148,7 +149,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       debugPrint('  - user_id: ${userId ?? "NULL"}');
       debugPrint(
-        '  - refresh_token: ${prefs.getString('refresh_token') != null ? "EXISTS" : "NULL"}',
+        '  - refresh_token: ${refreshToken != null ? "EXISTS" : "NULL"}',
       );
       debugPrint(
         '  - cached_user: ${prefs.getString('cached_user') != null ? "EXISTS" : "NULL"}',
@@ -157,7 +158,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         '  - token_expiry: ${prefs.getString('token_expiry') ?? "NULL"}',
       );
 
-      if (accessToken != null && userId != null) {
+      // 🔴 CRITICAL: Must have all required tokens to restore session
+      // If refresh_token is missing, session cannot be refreshed → force login
+      if (accessToken != null && userId != null && refreshToken != null) {
         debugPrint('✅ Found saved session for user: $userId');
 
         // 🔥 STEP 1: Load cached user data first (works offline)
@@ -220,6 +223,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       } else {
         debugPrint('ℹ️ No saved session found (missing tokens)');
         debugPrint('  - Missing access_token: ${accessToken == null}');
+        debugPrint('  - Missing refresh_token: ${refreshToken == null}');
         debugPrint('  - Missing user_id: ${userId == null}');
       }
     } catch (e, stackTrace) {

@@ -101,11 +101,21 @@ class TokenRefreshInterceptor extends Interceptor {
         await _forceLogout();
         return handler.next(err);
       } else {
-        // RefreshResult.networkError → GIỮ session, return error
+        // RefreshResult.networkError → GIỮ session, convert to network error
         debugPrint(
           '⚠️ Refresh failed due to network, keeping session for offline mode',
         );
-        return handler.next(err);
+        debugPrint('   → Converting 401 to network error for better UX');
+
+        // Convert authentication error to network error for better user experience
+        final networkError = DioException(
+          requestOptions: err.requestOptions,
+          type: DioExceptionType.connectionTimeout,
+          message:
+              'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.',
+          error: 'Token refresh timeout - keeping session for offline mode',
+        );
+        return handler.next(networkError);
       }
     }
 

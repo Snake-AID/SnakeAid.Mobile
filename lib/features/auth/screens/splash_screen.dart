@@ -237,8 +237,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         }
       } catch (_) {}
 
+      // Check if error is 401/Unauthorized (refresh token expired)
+      final errorString = e.toString().toLowerCase();
+      if (errorString.contains('401') ||
+          errorString.contains('unauthorized') ||
+          errorString.contains('phiên đăng nhập hết hạn')) {
+        debugPrint('   🚨 Refresh token expired (401/Unauthorized detected)');
+        debugPrint('   → Forcing logout to require re-authentication');
+        _isValidatingSession = false;
+        return false;
+      }
+
       _isValidatingSession = false;
-      return true; // On error, allow navigation (offline-first)
+      return true; // On network error, allow navigation (offline-first)
     }
   }
 
