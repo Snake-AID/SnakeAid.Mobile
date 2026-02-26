@@ -130,11 +130,7 @@ class MemberHomeScreen extends ConsumerWidget {
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                     child: QuickActionButtons(
                       onCameraPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Camera AI - Đang phát triển'),
-                          ),
-                        );
+                        context.push('/snake-quantity-selection');
                       },
                       onCall115Pressed: () {
                         ScaffoldMessenger.of(context).showSnackBar(

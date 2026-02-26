@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../member/screens/home_screen.dart';
-import '../../member/screens/hospital_finder_screen.dart';
+import '../../member/screens/activity_screen.dart';
 import '../../member/screens/messages_screen.dart';
 import '../../member/screens/profile_screen.dart';
 
@@ -43,7 +43,7 @@ class _MainScaffoldState extends State<MainScaffold> {
         index: _currentIndex,
         children: const [
           MemberHomeScreen(),
-          HospitalFinderScreen(),
+          ActivityScreen(),
           MessagesScreen(),
           ProfileScreen(),
         ],
@@ -76,8 +76,8 @@ class _MainScaffoldState extends State<MainScaffold> {
                 onTap: () => _onTabTapped(0),
               ),
               _NavItem(
-                icon: Icons.local_hospital_outlined,
-                label: 'Bệnh viện',
+                icon: Icons.list_alt,
+                label: 'Hoạt động',
                 isActive: _currentIndex == 1,
                 onTap: () => _onTabTapped(1),
               ),
