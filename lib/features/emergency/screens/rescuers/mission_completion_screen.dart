@@ -29,6 +29,7 @@ class _MissionCompletionScreenState
   bool _isUploading = false;
   String _uploadStatus = '';
   int _uploadedCount = 0;
+  void Function(void Function())? _dialogSetState; // For updating dialog
 
   static const int minEvidencePhotos = 1;
   static const int maxEvidencePhotos = 3;
@@ -100,9 +101,13 @@ class _MissionCompletionScreenState
 
       // Upload each evidence photo
       for (int i = 0; i < _evidenceImages.length; i++) {
+        final newStatus = 'Đang upload ảnh ${i + 1}/${_evidenceImages.length}...';
         setState(() {
-          _uploadStatus =
-              'Đang upload ảnh ${i + 1}/${_evidenceImages.length}...';
+          _uploadStatus = newStatus;
+        });
+        // Update dialog if it's open
+        _dialogSetState?.call(() {
+          _uploadStatus = newStatus;
         });
 
         final mediaId = await mediaRepository.uploadEvidencePhoto(
@@ -112,14 +117,24 @@ class _MissionCompletionScreenState
 
         evidenceMediaIds.add(mediaId);
 
+        final newCount = i + 1;
         setState(() {
-          _uploadedCount = i + 1;
+          _uploadedCount = newCount;
+        });
+        // Update dialog if it's open
+        _dialogSetState?.call(() {
+          _uploadedCount = newCount;
         });
       }
 
       // All photos uploaded, now complete mission
+      final completionStatus = 'Đang hoàn thành nhiệm vụ...';
       setState(() {
-        _uploadStatus = 'Đang hoàn thành nhiệm vụ...';
+        _uploadStatus = completionStatus;
+      });
+      // Update dialog if it's open
+      _dialogSetState?.call(() {
+        _uploadStatus = completionStatus;
       });
 
       final success = await ref
@@ -136,6 +151,12 @@ class _MissionCompletionScreenState
       setState(() {
         _isUploading = false;
       });
+
+      // Close progress dialog and clear dialogSetState
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      _dialogSetState = null;
 
       if (success) {
         // Success! Navigate to success screen
@@ -155,6 +176,12 @@ class _MissionCompletionScreenState
         setState(() {
           _isUploading = false;
         });
+
+        // Close progress dialog and clear dialogSetState
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+        _dialogSetState = null;
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -269,28 +296,35 @@ class _MissionCompletionScreenState
           ),
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(color: Color(0xFFFF8800)),
-                const SizedBox(height: 20),
-                Text(
-                  _uploadStatus,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                if (_uploadedCount > 0)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      '$_uploadedCount/${_evidenceImages.length} ảnh',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            child: StatefulBuilder(
+              builder: (context, setDialogState) {
+                // Store the setDialogState so we can call it from _uploadAndComplete
+                _dialogSetState = setDialogState;
+                
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(color: Color(0xFFFF8800)),
+                    const SizedBox(height: 20),
+                    Text(
+                      _uploadStatus,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                  ),
-              ],
+                    if (_uploadedCount > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          '$_uploadedCount/${_evidenceImages.length} ảnh',
+                          style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
           ),
         ),
