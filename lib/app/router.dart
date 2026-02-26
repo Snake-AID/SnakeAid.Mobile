@@ -38,6 +38,7 @@ import 'package:snakeaid_mobile/features/emergency/screens/members/rescuer_arriv
 import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_service_completion_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/messages_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/message_detail_screen.dart';
+import 'package:snakeaid_mobile/features/member/screens/activity_detail_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_home_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_settings_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_edit_profile_screen.dart';
@@ -47,6 +48,10 @@ import 'package:snakeaid_mobile/features/expert/screens/expert_feedback_screen.d
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_home_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_available_jobs_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_request_detail_screen.dart';
+import 'package:snakeaid_mobile/features/snake_catching/screens/members/snake_quantity_selection_screen.dart';
+import 'package:snakeaid_mobile/features/snake_catching/screens/members/snake_report_detail_screen.dart';
+import 'package:snakeaid_mobile/features/snake_catching/screens/members/snake_catching_success_screen.dart';
+import 'package:snakeaid_mobile/features/snake_catching/models/snake_catching_request.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_settings_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_edit_profile_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_history_screen.dart';
@@ -278,11 +283,53 @@ final router = GoRouter(
     
     // Rescuer Request Detail
     GoRoute(
-      path: '/rescuer-request-detail',
+      path: '/rescuer-request-detail/:requestId',
       name: 'rescuer_request_detail',
       builder: (context, state) {
-        final requestData = state.extra as Map<String, dynamic>;
-        return RescuerRequestDetailScreen(requestData: requestData);
+        final requestId = state.pathParameters['requestId']!;
+        final requestData = state.extra as SnakeCatchingRequestData?;
+        return RescuerRequestDetailScreen(
+          requestId: requestId,
+          requestData: requestData,
+        );
+      },
+    ),
+    
+    // === MEMBER SNAKE CATCHING ROUTES ===
+    // Snake Quantity Selection
+    GoRoute(
+      path: '/snake-quantity-selection',
+      name: 'snake_quantity_selection',
+      builder: (context, state) => const SnakeQuantitySelectionScreen(),
+    ),
+    
+    // Snake Report Detail
+    GoRoute(
+      path: '/snake-report-detail/:quantity',
+      name: 'snake_report_detail',
+      builder: (context, state) {
+        final quantity = state.pathParameters['quantity'] ?? 'single';
+        return SnakeReportDetailScreen(quantity: quantity);
+      },
+    ),
+    
+    // Snake Catching Success
+    GoRoute(
+      path: '/snake-catching-success',
+      name: 'snake_catching_success',
+      builder: (context, state) {
+        final requestData = state.extra as SnakeCatchingRequestData;
+        return SnakeCatchingSuccessScreen(requestData: requestData);
+      },
+    ),
+    
+    // Activity Detail
+    GoRoute(
+      path: '/activity-detail/:requestId',
+      name: 'activity_detail',
+      builder: (context, state) {
+        final requestId = state.pathParameters['requestId']!;
+        return ActivityDetailScreen(requestId: requestId);
       },
     ),
     
@@ -367,11 +414,7 @@ final router = GoRouter(
       name: 'mission_completion',
       builder: (context, state) => const MissionCompletionScreen(),
     ),
-    GoRoute(
-      path: '/mission-success',
-      name: 'mission_success',
-      builder: (context, state) => const RescuerMissionSuccessScreen(),
-    ),
+    // /mission-success route is navigated to via MaterialPageRoute (requires requestData + missionId)
     
     // === EMERGENCY ROUTES ===
     GoRoute(
