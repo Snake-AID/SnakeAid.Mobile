@@ -45,5 +45,19 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Deep link for PayOS payment callback -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>snakeaid</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>snakeaid</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
