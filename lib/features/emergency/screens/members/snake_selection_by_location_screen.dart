@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'symptom_report_screen.dart';
 import 'snake_confirmation_screen.dart';
-import 'snake_identification_questions_screen.dart';
 import '../../models/sos_incident_response.dart';
 
 /// Snake Selection by Location Screen - Manual snake selection when no image available

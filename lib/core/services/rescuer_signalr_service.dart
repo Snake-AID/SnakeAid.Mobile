@@ -153,13 +153,17 @@ class RescuerSignalRService {
         debugPrint('📋 Request data: $data');
 
         final request = RescueRequest.fromJson(data);
-        
+
         // 🔍 UTC TIME VALIDATION
         debugPrint('✅ Parsed request: ${request.requestId}');
         debugPrint('📍 Radius: ${request.formattedRadius}');
         debugPrint('⏰ Expires in: ${request.remainingSeconds}s');
-        debugPrint('🌐 ExpiredAt (UTC): ${request.expiredAt.toUtc().toIso8601String()}');
-        debugPrint('🕒 Current time (UTC): ${DateTime.now().toUtc().toIso8601String()}');
+        debugPrint(
+          '🌐 ExpiredAt (UTC): ${request.expiredAt.toUtc().toIso8601String()}',
+        );
+        debugPrint(
+          '🕒 Current time (UTC): ${DateTime.now().toUtc().toIso8601String()}',
+        );
         debugPrint('📊 ExpiredAt isUtc: ${request.expiredAt.isUtc}');
 
         // Broadcast to listeners
@@ -232,9 +236,9 @@ class RescuerSignalRService {
 
         final data = arguments[0] as Map<String, dynamic>;
         debugPrint('✅ Joined RescuerHub successfully');
-        debugPrint('   UserId: ${data['UserId']}');
-        debugPrint('   ConnectionId: ${data['ConnectionId']}');
-        debugPrint('   Message: ${data['Message']}');
+        debugPrint('   UserId: ${data['userId']}');
+        debugPrint('   ConnectionId: ${data['connectionId']}');
+        debugPrint('   Message: ${data['message']}');
       } catch (e) {
         debugPrint('❌ Error parsing Joined event: $e');
       }
@@ -247,8 +251,8 @@ class RescuerSignalRService {
 
         final data = arguments[0] as Map<String, dynamic>;
         debugPrint('✅ Request accepted confirmation from server');
-        debugPrint('   RequestId: ${data['RequestId']}');
-        debugPrint('   Message: ${data['Message']}');
+        debugPrint('   RequestId: ${data['requestId']}');
+        debugPrint('   Message: ${data['message']}');
 
         // You can add callback here if needed
         // e.g., navigate to mission screen
@@ -264,8 +268,8 @@ class RescuerSignalRService {
 
         final data = arguments[0] as Map<String, dynamic>;
         debugPrint('❌ Request error from server');
-        debugPrint('   RequestId: ${data['RequestId']}');
-        debugPrint('   Error: ${data['Error']}');
+        debugPrint('   RequestId: ${data['requestId']}');
+        debugPrint('   Error: ${data['error']}');
 
         // Handle error (e.g., show error dialog)
       } catch (e) {
@@ -280,8 +284,8 @@ class RescuerSignalRService {
 
         final data = arguments[0] as Map<String, dynamic>;
         debugPrint('📍 Location update confirmed');
-        debugPrint('   UserId: ${data['UserId']}');
-        debugPrint('   Lat: ${data['Latitude']}, Lng: ${data['Longitude']}');
+        debugPrint('   UserId: ${data['userId']}');
+        debugPrint('   Lat: ${data['latitude']}, Lng: ${data['longitude']}');
       } catch (e) {
         debugPrint('❌ Error parsing LocationUpdated event: $e');
       }
@@ -293,8 +297,8 @@ class RescuerSignalRService {
         if (arguments == null || arguments.isEmpty) return;
 
         final data = arguments[0] as Map<String, dynamic>;
-        final count = data['Count'] as int;
-        final rescuerIds = (data['RescuerIds'] as List).cast<String>();
+        final count = data['count'] as int;
+        final rescuerIds = (data['rescuerIds'] as List?)?.cast<String>() ?? [];
 
         debugPrint('👥 Connected rescuers: $count');
         debugPrint('   IDs: ${rescuerIds.join(', ')}');

@@ -26,14 +26,14 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
   bool _equipmentReminders = true;
   bool _reviewNotifications = false;
   bool _vibration = true;
-  String _notificationSound = 'Urgent';
+  final String _notificationSound = 'Urgent';
 
   // Map Settings
-  String _mapProvider = 'Google Maps';
+  final String _mapProvider = 'Google Maps';
   bool _showTraffic = true;
   bool _avoidHighways = false;
   bool _avoidTollRoads = true;
-  String _voiceLanguage = 'Tiếng Việt';
+  final String _voiceLanguage = 'Tiếng Việt';
 
   @override
   Widget build(BuildContext context) {
@@ -693,7 +693,7 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: const Color(0xFFFF8800),
+            activeThumbColor: const Color(0xFFFF8800),
             activeTrackColor: const Color(0xFFFF8800).withOpacity(0.5),
           ),
         ],
@@ -738,7 +738,7 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
                 Switch(
                   value: true,
                   onChanged: null,
-                  activeColor: const Color(0xFFFF8800),
+                  activeThumbColor: const Color(0xFFFF8800),
                 ),
               ],
             ),

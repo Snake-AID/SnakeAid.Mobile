@@ -499,7 +499,7 @@ class _RescuerMissionSuccessScreenState extends State<RescuerMissionSuccessScree
                         Switch(
                           value: _isAvailable,
                           onChanged: (value) => setState(() => _isAvailable = value),
-                          activeColor: const Color(0xFFFF8800),
+                          activeThumbColor: const Color(0xFFFF8800),
                           activeTrackColor: const Color(0xFFFF8800).withOpacity(0.5),
                         ),
                       ],

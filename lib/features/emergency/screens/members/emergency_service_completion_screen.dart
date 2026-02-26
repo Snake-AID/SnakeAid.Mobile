@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../shared/widgets/chat_screen.dart';
 import 'payment_success_screen.dart';
 
 /// Emergency Service Completion Screen - Payment & Rating

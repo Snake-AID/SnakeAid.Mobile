@@ -677,7 +677,7 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
                 _isAvailable = value;
               });
             },
-            activeColor: const Color(0xFF6C47C2),
+            activeThumbColor: const Color(0xFF6C47C2),
           ),
         ],
       ),

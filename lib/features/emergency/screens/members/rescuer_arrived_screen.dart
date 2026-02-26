@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/widgets/chat_screen.dart';
-import 'emergency_service_completion_screen.dart';
 
 class RescuerArrivedScreen extends StatefulWidget {
   const RescuerArrivedScreen({super.key});

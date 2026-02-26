@@ -586,7 +586,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: value,
+          initialValue: value,
           decoration: InputDecoration(
             hintText: placeholder,
             hintStyle: const TextStyle(color: Color(0xFF888888)),

@@ -45,6 +45,15 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Video call permissions (LiveKit) -->
+	<key>NSCameraUsageDescription</key>
+	<string>SnakeAid uses your camera for video consultation</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>SnakeAid uses your microphone for video consultation</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	<!-- Deep link for PayOS payment callback -->
 	<key>CFBundleURLTypes</key>
 	<array>

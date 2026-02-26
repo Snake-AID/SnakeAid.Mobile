@@ -207,7 +207,7 @@ class _ExpertSpecialtiesScreenState extends State<ExpertSpecialtiesScreen> {
             return _buildSnakeCard(
               name: snake['name'] as String,
               latin: snake['latin'] as String,
-              level: snake['level'] as String?,
+              level: snake['level'],
               imageUrl: snake['image'] as String,
               isSelected: isSelected,
               onTap: () {

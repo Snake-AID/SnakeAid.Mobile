@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../services/health_check_service.dart';
 import '../interceptors/token_refresh_interceptor.dart';
 import '../interceptors/logging_interceptor.dart';
 
@@ -8,8 +9,9 @@ import '../interceptors/logging_interceptor.dart';
 class HttpService {
   late final Dio _dio;
   final String baseUrl;
+  final HealthCheckService? healthCheckService;
 
-  HttpService({required this.baseUrl}) {
+  HttpService({required this.baseUrl, this.healthCheckService}) {
     _dio = Dio(
       BaseOptions(
         baseUrl: baseUrl,
@@ -37,6 +39,7 @@ class HttpService {
     Map<String, dynamic>? queryParameters,
     Options? options,
   }) async {
+    await _performHealthCheck();
     try {
       final response = await _dio.get(
         path,
@@ -56,6 +59,7 @@ class HttpService {
     Map<String, dynamic>? queryParameters,
     Options? options,
   }) async {
+    await _performHealthCheck();
     try {
       final response = await _dio.post(
         path,
@@ -76,6 +80,7 @@ class HttpService {
     Map<String, dynamic>? queryParameters,
     Options? options,
   }) async {
+    await _performHealthCheck();
     try {
       final response = await _dio.put(
         path,
@@ -116,6 +121,7 @@ class HttpService {
     Map<String, dynamic>? queryParameters,
     Options? options,
   }) async {
+    await _performHealthCheck();
     try {
       final response = await _dio.delete(
         path,
@@ -126,6 +132,20 @@ class HttpService {
       return response;
     } on DioException catch (e) {
       throw _handleError(e);
+    }
+  }
+
+  /// Perform health check before request
+  Future<void> _performHealthCheck() async {
+    if (healthCheckService != null) {
+      final isAlive = await healthCheckService!.isServerAlive();
+      if (!isAlive) {
+        throw DioException(
+          requestOptions: RequestOptions(path: ''),
+          type: DioExceptionType.connectionError,
+          error: 'HEALTH_CHECK_FAILED',
+        );
+      }
     }
   }
 
@@ -144,6 +164,9 @@ class HttpService {
         return 'Request đã bị hủy.';
 
       case DioExceptionType.connectionError:
+        if (error.error == 'HEALTH_CHECK_FAILED') {
+          return 'Máy chủ đang bảo trì hoặc không thể kết nối. Vui lòng thử lại sau.';
+        }
         return 'Không thể kết nối tới server. Kiểm tra kết nối mạng.';
 
       case DioExceptionType.unknown:

@@ -768,7 +768,7 @@ class _RescuerEditProfileScreenState extends State<RescuerEditProfileScreen> {
             border: Border.all(color: const Color(0xFFDDDDDD)),
           ),
           child: DropdownButtonFormField<String>(
-            value: value,
+            initialValue: value,
             decoration: const InputDecoration(
               border: InputBorder.none,
               contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),

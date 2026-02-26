@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'expert_profile_screen.dart';
 
 /// Expert Home Screen - Dashboard for snake experts
@@ -55,7 +56,9 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 
   Widget _buildNavItem(int index, IconData icon, String label) {
     final isSelected = _selectedIndex == index;
-    final color = isSelected ? const Color(0xFF6C47C2) : const Color(0xFF999999);
+    final color = isSelected
+        ? const Color(0xFF6C47C2)
+        : const Color(0xFF999999);
 
     return InkWell(
       onTap: () {
@@ -68,12 +71,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: color,
-              size: 28,
-              weight: isSelected ? 700 : 400,
-            ),
+            Icon(icon, color: color, size: 28, weight: isSelected ? 700 : 400),
             const SizedBox(height: 4),
             Text(
               label,
@@ -98,7 +96,8 @@ class _HomeTab extends StatefulWidget {
   State<_HomeTab> createState() => _HomeTabState();
 }
 
-class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin {
+class _HomeTabState extends State<_HomeTab>
+    with SingleTickerProviderStateMixin {
   bool _isAvailable = true;
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnimation;
@@ -110,11 +109,11 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     );
-    
+
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-    
+
     _pulseController.repeat(reverse: true);
   }
 
@@ -163,7 +162,10 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                 Stack(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.notifications, color: Color(0xFF2D2D2D)),
+                      icon: const Icon(
+                        Icons.notifications,
+                        color: Color(0xFF2D2D2D),
+                      ),
                       onPressed: () {},
                     ),
                     Positioned(
@@ -287,6 +289,41 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                     snake: 'Chưa xác định',
                     hasImage: false,
                   ),
+                  const SizedBox(height: 12),
+                  Container(
+                    color: Colors.purple.shade50,
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '🎥 Video Call Demonstration',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.purple,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () => context.push('/demo-video-call'),
+                            icon: const Icon(Icons.video_camera_front),
+                            label: const Text(
+                              'Mở màn hình Video Call Demonstration',
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.purple,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                   const SizedBox(height: 100),
                 ]),
               ),
@@ -318,7 +355,10 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                       ],
                     ),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [Color(0xFFDC3545), Color(0xFFC82333)],
@@ -409,11 +449,17 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                     width: 12,
                     height: 12,
                     decoration: BoxDecoration(
-                      color: _isAvailable ? const Color(0xFF28A745) : Colors.grey,
+                      color: _isAvailable
+                          ? const Color(0xFF28A745)
+                          : Colors.grey,
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: (_isAvailable ? const Color(0xFF28A745) : Colors.grey).withOpacity(0.5),
+                          color:
+                              (_isAvailable
+                                      ? const Color(0xFF28A745)
+                                      : Colors.grey)
+                                  .withOpacity(0.5),
                           blurRadius: 8,
                           spreadRadius: 2,
                         ),
@@ -435,7 +481,9 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        _isAvailable ? 'Sẵn Sàng Nhận Tư Vấn' : 'Không Khả Dụng',
+                        _isAvailable
+                            ? 'Sẵn Sàng Nhận Tư Vấn'
+                            : 'Không Khả Dụng',
                         style: const TextStyle(
                           fontSize: 16,
                           color: Color(0xFF6C47C2),
@@ -453,7 +501,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                     _isAvailable = value;
                   });
                 },
-                activeColor: const Color(0xFF6C47C2),
+                activeThumbColor: const Color(0xFF6C47C2),
               ),
             ],
           ),
@@ -462,18 +510,12 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
             padding: const EdgeInsets.only(left: 12),
             decoration: const BoxDecoration(
               border: Border(
-                left: BorderSide(
-                  color: Color(0xFFF0F0F0),
-                  width: 2,
-                ),
+                left: BorderSide(color: Color(0xFFF0F0F0), width: 2),
               ),
             ),
             child: const Text(
               'Bạn sẽ nhận thông báo khi có yêu cầu khẩn cấp từ Rescuer',
-              style: TextStyle(
-                fontSize: 13,
-                color: Color(0xFF666666),
-              ),
+              style: TextStyle(fontSize: 13, color: Color(0xFF666666)),
             ),
           ),
         ],
@@ -527,10 +569,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                 padding: EdgeInsets.only(bottom: 6),
                 child: Text(
                   'VNĐ',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.white70,
-                  ),
+                  style: TextStyle(fontSize: 18, color: Colors.white70),
                 ),
               ),
             ],
@@ -539,12 +578,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
           Container(
             padding: const EdgeInsets.only(top: 16),
             decoration: const BoxDecoration(
-              border: Border(
-                top: BorderSide(
-                  color: Colors.white24,
-                  width: 1,
-                ),
-              ),
+              border: Border(top: BorderSide(color: Colors.white24, width: 1)),
             ),
             child: Row(
               children: [
@@ -563,17 +597,9 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                   ),
                 ),
                 const SizedBox(width: 16),
-                Container(
-                  width: 1,
-                  height: 16,
-                  color: Colors.white30,
-                ),
+                Container(width: 1, height: 16, color: Colors.white30),
                 const SizedBox(width: 16),
-                const Icon(
-                  Icons.star,
-                  color: Color(0xFFFFC107),
-                  size: 18,
-                ),
+                const Icon(Icons.star, color: Color(0xFFFFC107), size: 18),
                 const SizedBox(width: 6),
                 const Text(
                   '4.8',
@@ -585,7 +611,10 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
@@ -626,15 +655,40 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
       mainAxisSpacing: 12,
       childAspectRatio: 1.6,
       children: [
-        _buildStatCard('Đang Chờ', '5', Icons.hourglass_top, const Color(0xFFFFC107)),
-        _buildStatCard('Hoàn Thành', '3', Icons.check_circle, const Color(0xFF28A745)),
-        _buildStatCard('Lịch Hẹn', '12', Icons.calendar_month, const Color(0xFF6C47C2)),
-        _buildStatCard('Phản Hồi', '95%', Icons.thumb_up, const Color(0xFF6C47C2)),
+        _buildStatCard(
+          'Đang Chờ',
+          '5',
+          Icons.hourglass_top,
+          const Color(0xFFFFC107),
+        ),
+        _buildStatCard(
+          'Hoàn Thành',
+          '3',
+          Icons.check_circle,
+          const Color(0xFF28A745),
+        ),
+        _buildStatCard(
+          'Lịch Hẹn',
+          '12',
+          Icons.calendar_month,
+          const Color(0xFF6C47C2),
+        ),
+        _buildStatCard(
+          'Phản Hồi',
+          '95%',
+          Icons.thumb_up,
+          const Color(0xFF6C47C2),
+        ),
       ],
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color iconColor) {
+  Widget _buildStatCard(
+    String label,
+    String value,
+    IconData icon,
+    Color iconColor,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -693,10 +747,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: const Border(
-          left: BorderSide(
-            color: Color(0xFF6C47C2),
-            width: 6,
-          ),
+          left: BorderSide(color: Color(0xFF6C47C2), width: 6),
         ),
         boxShadow: [
           BoxShadow(
@@ -728,7 +779,10 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFF6C47C2).withOpacity(0.1),
                             borderRadius: BorderRadius.circular(4),
@@ -747,7 +801,11 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.schedule, size: 14, color: Color(0xFF999999)),
+                        const Icon(
+                          Icons.schedule,
+                          size: 14,
+                          color: Color(0xFF999999),
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           date,
@@ -786,8 +844,16 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: hasImage
-                      ? const Icon(Icons.dangerous, color: Color(0xFFDC3545), size: 24)
-                      : const Icon(Icons.image_not_supported, color: Color(0xFF999999), size: 20),
+                      ? const Icon(
+                          Icons.dangerous,
+                          color: Color(0xFFDC3545),
+                          size: 24,
+                        )
+                      : const Icon(
+                          Icons.image_not_supported,
+                          color: Color(0xFF999999),
+                          size: 20,
+                        ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -836,10 +902,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
               ),
               child: const Text(
                 'Xem Chi Tiết',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
               ),
             ),
           ),
@@ -859,10 +922,7 @@ class _ConsultationsTab extends StatelessWidget {
       child: Text(
         'Tư Vấn\n(Đang phát triển)',
         textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 18,
-          color: Color(0xFF666666),
-        ),
+        style: TextStyle(fontSize: 18, color: Color(0xFF666666)),
       ),
     );
   }
@@ -878,10 +938,7 @@ class _IncomeTab extends StatelessWidget {
       child: Text(
         'Thu Nhập\n(Đang phát triển)',
         textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 18,
-          color: Color(0xFF666666),
-        ),
+        style: TextStyle(fontSize: 18, color: Color(0xFF666666)),
       ),
     );
   }
@@ -929,7 +986,7 @@ class _UrgentRequestSheet extends StatelessWidget {
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                
+
                 Row(
                   children: [
                     Container(
@@ -946,29 +1003,36 @@ class _UrgentRequestSheet extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     const Expanded(
-                     child: Center(
-                      child: Text(
-                        'YÊU CẦU KHẨN CẤP',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          letterSpacing: 0.5,
+                      child: Center(
+                        child: Text(
+                          'YÊU CẦU KHẨN CẤP',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
                     ),
-                    ),
                     IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                      icon: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 28,
+                      ),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                
+
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
@@ -1052,11 +1116,7 @@ class _UrgentRequestSheet extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Icon(
-                      Icons.verified,
-                      color: Colors.blue[500],
-                      size: 18,
-                    ),
+                    Icon(Icons.verified, color: Colors.blue[500], size: 18),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -1071,18 +1131,11 @@ class _UrgentRequestSheet extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(
-                      Icons.star,
-                      color: Color(0xFFFFA500),
-                      size: 14,
-                    ),
+                    const Icon(Icons.star, color: Color(0xFFFFA500), size: 14),
                     const SizedBox(width: 6),
                     const Text(
                       '(234 đánh giá)',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF999999),
-                      ),
+                      style: TextStyle(fontSize: 12, color: Color(0xFF999999)),
                     ),
                   ],
                 ),
@@ -1091,10 +1144,7 @@ class _UrgentRequestSheet extends StatelessWidget {
                   padding: const EdgeInsets.only(left: 8),
                   decoration: const BoxDecoration(
                     border: Border(
-                      left: BorderSide(
-                        color: Color(0xFFDC3545),
-                        width: 2,
-                      ),
+                      left: BorderSide(color: Color(0xFFDC3545), width: 2),
                     ),
                   ),
                   child: const Column(
@@ -1102,7 +1152,11 @@ class _UrgentRequestSheet extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.location_on, size: 16, color: Color(0xFFDC3545)),
+                          Icon(
+                            Icons.location_on,
+                            size: 16,
+                            color: Color(0xFFDC3545),
+                          ),
                           SizedBox(width: 4),
                           Text(
                             'Quận 1, TP.HCM',
@@ -1170,14 +1224,10 @@ class _UrgentRequestSheet extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
             ),
             child: const Center(
-              child: Icon(
-                Icons.dangerous,
-                size: 100,
-                color: Color(0xFFDC3545),
-              ),
+              child: Icon(Icons.dangerous, size: 100, color: Color(0xFFDC3545)),
             ),
           ),
-          
+
           Positioned(
             bottom: 16,
             left: 16,
@@ -1186,7 +1236,10 @@ class _UrgentRequestSheet extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFA500),
                     borderRadius: BorderRadius.circular(12),
@@ -1217,7 +1270,10 @@ class _UrgentRequestSheet extends StatelessWidget {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(8),
@@ -1243,7 +1299,10 @@ class _UrgentRequestSheet extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(8),
@@ -1284,10 +1343,7 @@ class _UrgentRequestSheet extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: const Border(
-          left: BorderSide(
-            color: Color(0xFFDC3545),
-            width: 4,
-          ),
+          left: BorderSide(color: Color(0xFFDC3545), width: 4),
         ),
         boxShadow: [
           BoxShadow(
@@ -1324,7 +1380,7 @@ class _UrgentRequestSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          
+
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -1354,15 +1410,28 @@ class _UrgentRequestSheet extends StatelessWidget {
                     children: [
                       Row(
                         children: List.generate(12, (index) {
-                          final heights = [8.0, 16.0, 12.0, 20.0, 24.0, 12.0, 16.0, 8.0, 12.0, 8.0, 8.0, 8.0];
+                          final heights = [
+                            8.0,
+                            16.0,
+                            12.0,
+                            20.0,
+                            24.0,
+                            12.0,
+                            16.0,
+                            8.0,
+                            12.0,
+                            8.0,
+                            8.0,
+                            8.0,
+                          ];
                           final isPlayed = index < 8;
                           return Container(
                             width: 3,
                             height: heights[index],
                             margin: const EdgeInsets.only(right: 2),
                             decoration: BoxDecoration(
-                              color: isPlayed 
-                                  ? const Color(0xFFDC3545) 
+                              color: isPlayed
+                                  ? const Color(0xFFDC3545)
                                   : const Color(0xFFCCCCCC),
                               borderRadius: BorderRadius.circular(2),
                             ),
@@ -1385,7 +1454,7 @@ class _UrgentRequestSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           Row(
             children: [
               Expanded(
@@ -1394,10 +1463,7 @@ class _UrgentRequestSheet extends StatelessWidget {
                   icon: const Icon(Icons.photo_library, size: 20),
                   label: const Text(
                     'Ảnh Khác (3)',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1416,10 +1482,7 @@ class _UrgentRequestSheet extends StatelessWidget {
                   icon: const Icon(Icons.map, size: 20),
                   label: const Text(
                     'Bản Đồ',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1465,11 +1528,7 @@ class _UrgentRequestSheet extends StatelessWidget {
             child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.monetization_on,
-                  color: Color(0xFF28A745),
-                  size: 20,
-                ),
+                Icon(Icons.monetization_on, color: Color(0xFF28A745), size: 20),
                 SizedBox(width: 8),
                 Text(
                   'Bạn sẽ nhận 500K VNĐ cho tư vấn này',
@@ -1483,7 +1542,7 @@ class _UrgentRequestSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           Row(
             children: [
               Expanded(
@@ -1499,10 +1558,7 @@ class _UrgentRequestSheet extends StatelessWidget {
                   ),
                   child: const Text(
                     'Từ Chối',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -1514,10 +1570,7 @@ class _UrgentRequestSheet extends StatelessWidget {
                   icon: const Icon(Icons.check_circle, size: 22),
                   label: const Text(
                     'Chấp Nhận Ngay',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFDC3545),

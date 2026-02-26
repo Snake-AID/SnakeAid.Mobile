@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'snake_filtered_results_screen.dart';
 
 /// Snake Identification Questions Screen - Multi-step questionnaire for accurate identification
 class SnakeIdentificationQuestionsScreen extends StatefulWidget {

@@ -44,6 +44,9 @@ dependencies:
   # Networking
   dio: ^5.4.0
 
+  # Video Call (LiveKit)
+  livekit_client: ^2.5.4
+
   # State Management
   flutter_riverpod: ^2.5.1
 
