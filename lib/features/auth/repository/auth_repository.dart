@@ -387,7 +387,6 @@ class AuthRepository {
 
       // Dù API thất bại, vẫn clear session local
       await clearSession();
-
       // 🔴 BUG FIX: KHÔNG throw exception - logout phải luôn thành công
       // User muốn logout → clear session local là đủ
       debugPrint('✅ Logout local successful despite API error');

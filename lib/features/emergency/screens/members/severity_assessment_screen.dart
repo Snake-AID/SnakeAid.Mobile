@@ -20,10 +20,12 @@ class SeverityAssessmentScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<SeverityAssessmentScreen> createState() => _SeverityAssessmentScreenState();
+  ConsumerState<SeverityAssessmentScreen> createState() =>
+      _SeverityAssessmentScreenState();
 }
 
-class _SeverityAssessmentScreenState extends ConsumerState<SeverityAssessmentScreen> {
+class _SeverityAssessmentScreenState
+    extends ConsumerState<SeverityAssessmentScreen> {
   late String _assessmentTime;
   List<FirstAidStep> _dosActions = [];
   bool _isLoadingDos = false;
@@ -32,13 +34,14 @@ class _SeverityAssessmentScreenState extends ConsumerState<SeverityAssessmentScr
   void initState() {
     super.initState();
     final now = DateTime.now();
-    _assessmentTime = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-    
+    _assessmentTime =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
     debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     debugPrint('📊 Severity Assessment Screen');
     debugPrint('Recognition Result ID: ${widget.recognitionResultId}');
     debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
+
     // Load dos from API if recognitionResultId is provided
     if (widget.recognitionResultId != null) {
       _loadFirstAidDos();
@@ -64,16 +67,23 @@ class _SeverityAssessmentScreenState extends ConsumerState<SeverityAssessmentScr
         if (results.isNotEmpty) {
           final snake = results.first.snake;
           final venoms = snake.speciesVenoms;
-          
+
           debugPrint('✅ Found ${venoms.length} venom types');
-          
+
           // Collect all dos from all venom types
           final allDos = <FirstAidStep>[];
           for (var venom in venoms) {
-            if (venom.venomType.firstAidGuideline != null) {
-              final dos = venom.venomType.firstAidGuideline!.content.dos;
-              debugPrint('  - ${venom.venomType.name}: ${dos.length} dos items');
-              allDos.addAll(dos);
+            try {
+              final dos = venom.venomType.firstAidGuideline.content.dos;
+              // ignore: unnecessary_null_comparison
+              if (dos != null) {
+                debugPrint(
+                  '  - ${venom.venomType.name}: ${dos.length} dos items',
+                );
+                allDos.addAll(dos);
+              }
+            } catch (e) {
+              debugPrint('⚠️ Missing dos data for ${venom.venomType.name}');
             }
           }
 
@@ -85,7 +95,7 @@ class _SeverityAssessmentScreenState extends ConsumerState<SeverityAssessmentScr
           return;
         }
       }
-      
+
       debugPrint('⚠️ No data in response');
     } catch (e) {
       debugPrint('❌ Error loading dos: $e');
@@ -148,20 +158,14 @@ class _SeverityAssessmentScreenState extends ConsumerState<SeverityAssessmentScr
             child: Center(
               child: Text(
                 'Phân tích lúc $_assessmentTime',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF6B7280),
-                ),
+                style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
               ),
             ),
           ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(
-            height: 1,
-            color: const Color(0xFFE5E5E5),
-          ),
+          child: Container(height: 1, color: const Color(0xFFE5E5E5)),
         ),
       ),
       body: Column(
@@ -276,10 +280,7 @@ class _SeverityAssessmentScreenState extends ConsumerState<SeverityAssessmentScr
           const SizedBox(height: 8),
           Text(
             'Dựa trên triệu chứng và phân tích ảnh',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
           ),
         ],
       ),
@@ -318,22 +319,18 @@ class _SeverityAssessmentScreenState extends ConsumerState<SeverityAssessmentScr
           if (symptoms.isEmpty)
             Text(
               'Chưa có triệu chứng nào được ghi nhận',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             )
           else
             ...symptoms.asMap().entries.map((entry) {
               return Padding(
-                padding: EdgeInsets.only(bottom: entry.key < symptoms.length - 1 ? 12 : 0),
+                padding: EdgeInsets.only(
+                  bottom: entry.key < symptoms.length - 1 ? 12 : 0,
+                ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      '❗',
-                      style: TextStyle(fontSize: 18),
-                    ),
+                    const Text('❗', style: TextStyle(fontSize: 18)),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -348,14 +345,12 @@ class _SeverityAssessmentScreenState extends ConsumerState<SeverityAssessmentScr
                   ],
                 ),
               );
-            }).toList(),
+            }),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.only(top: 16),
             decoration: const BoxDecoration(
-              border: Border(
-                top: BorderSide(color: Color(0xFFE5E5E5)),
-              ),
+              border: Border(top: BorderSide(color: Color(0xFFE5E5E5))),
             ),
             child: Row(
               children: [
@@ -433,7 +428,9 @@ class _SeverityAssessmentScreenState extends ConsumerState<SeverityAssessmentScr
           const SizedBox(height: 16),
           ...List.generate(actions.length, (index) {
             return Padding(
-              padding: EdgeInsets.only(bottom: index < actions.length - 1 ? 12 : 0),
+              padding: EdgeInsets.only(
+                bottom: index < actions.length - 1 ? 12 : 0,
+              ),
               child: _buildActionItem(index + 1, actions[index]),
             );
           }),
@@ -494,9 +491,7 @@ class _SeverityAssessmentScreenState extends ConsumerState<SeverityAssessmentScr
             offset: const Offset(0, -4),
           ),
         ],
-        border: const Border(
-          top: BorderSide(color: Color(0xFFE5E5E5)),
-        ),
+        border: const Border(top: BorderSide(color: Color(0xFFE5E5E5))),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -524,26 +519,22 @@ class _SeverityAssessmentScreenState extends ConsumerState<SeverityAssessmentScr
                 SizedBox(width: 8),
                 Text(
                   'Quay lại màn hình chờ cứu hộ',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Update Symptoms Link
           RichText(
             textAlign: TextAlign.center,
             text: TextSpan(
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF6B7280),
-              ),
+              style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
               children: [
-                const TextSpan(text: 'Triệu chứng của bạn đang được theo dõi\n'),
+                const TextSpan(
+                  text: 'Triệu chứng của bạn đang được theo dõi\n',
+                ),
                 WidgetSpan(
                   child: GestureDetector(
                     onTap: () => context.pop(),
@@ -571,10 +562,7 @@ class CircularProgressPainter extends CustomPainter {
   final double progress;
   final Color color;
 
-  CircularProgressPainter({
-    required this.progress,
-    required this.color,
-  });
+  CircularProgressPainter({required this.progress, required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {

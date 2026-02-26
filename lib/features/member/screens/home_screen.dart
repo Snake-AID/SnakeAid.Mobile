@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import '../widgets/sos_button.dart';
 import '../widgets/quick_action_buttons.dart';
-import '../../emergency/screens/members/emergency_alert_screen.dart';
 import '../widgets/quick_action_cards.dart';
 import '../widgets/secondary_menu_grid.dart';
 import '../widgets/notification_bar.dart';
@@ -47,22 +46,29 @@ class MemberHomeScreen extends ConsumerWidget {
                     ),
                   ),
                   const Spacer(),
-                  
+
                   // Active SOS Indicator (if has active incident)
                   if (hasActiveIncident)
                     Container(
                       margin: const EdgeInsets.only(right: 8),
                       child: ElevatedButton.icon(
-                        onPressed: () => _navigateToActiveIncident(context, ref),
+                        onPressed: () =>
+                            _navigateToActiveIncident(context, ref),
                         icon: const Icon(Icons.emergency, size: 16),
                         label: const Text(
                           'SOS Đang Hoạt Động',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFDC3545),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           minimumSize: const Size(0, 36),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(18),
@@ -111,10 +117,15 @@ class MemberHomeScreen extends ConsumerWidget {
                 children: [
                   // Hero Emergency Area - SOS Button
                   Container(
-                    padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 24,
+                      horizontal: 16,
+                    ),
                     child: SosButton(
                       onActivate: () {
-                        final hasActiveIncident = ref.read(activeIncidentProvider).hasActiveIncident;
+                        final hasActiveIncident = ref
+                            .read(activeIncidentProvider)
+                            .hasActiveIncident;
                         if (hasActiveIncident) {
                           _navigateToActiveIncident(context, ref);
                         } else {
@@ -130,11 +141,7 @@ class MemberHomeScreen extends ConsumerWidget {
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                     child: QuickActionButtons(
                       onCameraPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Camera AI - Đang phát triển'),
-                          ),
-                        );
+                        context.push('/snake-quantity-selection');
                       },
                       onCall115Pressed: () {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -152,14 +159,17 @@ class MemberHomeScreen extends ConsumerWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: NotificationBar(
-                    message: 'Cảnh báo: Có 3 người gặp rắn độc trong khu vực của bạn trong 24h qua',
-                    onViewDetails: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Chi tiết cảnh báo - Đang phát triển'),
-                        ),
-                      );
-                    },
+                      message:
+                          'Cảnh báo: Có 3 người gặp rắn độc trong khu vực của bạn trong 24h qua',
+                      onViewDetails: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Chi tiết cảnh báo - Đang phát triển',
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
 
@@ -177,7 +187,9 @@ class MemberHomeScreen extends ConsumerWidget {
                     onHospitalPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Vui lòng dùng tab Bệnh viện ở thanh điều hướng'),
+                          content: Text(
+                            'Vui lòng dùng tab Bệnh viện ở thanh điều hướng',
+                          ),
                         ),
                       );
                     },
@@ -237,7 +249,8 @@ class MemberHomeScreen extends ConsumerWidget {
                             const SizedBox(width: 12),
                             Expanded(
                               child: ElevatedButton.icon(
-                                onPressed: () => context.go('/location-tracker'),
+                                onPressed: () =>
+                                    context.go('/location-tracker'),
                                 icon: const Icon(Icons.location_on),
                                 label: const Text('Location Tracker'),
                                 style: ElevatedButton.styleFrom(
@@ -247,6 +260,41 @@ class MemberHomeScreen extends ConsumerWidget {
                               ),
                             ),
                           ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+                  Container(
+                    color: Colors.purple.shade50,
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '🎥 Video Call Demonstration',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.purple,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () => context.push('/demo-video-call'),
+                            icon: const Icon(Icons.video_camera_front),
+                            label: const Text(
+                              'Mở màn hình Video Call Demonstration',
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.purple,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -266,9 +314,12 @@ class MemberHomeScreen extends ConsumerWidget {
 // ==================== HELPER FUNCTIONS ====================
 
 /// Navigate to active incident screen
-Future<void> _navigateToActiveIncident(BuildContext context, WidgetRef ref) async {
+Future<void> _navigateToActiveIncident(
+  BuildContext context,
+  WidgetRef ref,
+) async {
   final incident = ref.read(activeIncidentProvider).incident;
-  
+
   if (incident == null) {
     _showErrorDialog(context, 'Không tìm thấy thông tin yêu cầu SOS');
     return;
@@ -306,7 +357,9 @@ Future<void> _navigateToActiveIncident(BuildContext context, WidgetRef ref) asyn
 
     if (response.isSuccess && response.data != null) {
       // Update incident in provider with latest data
-      await ref.read(activeIncidentProvider.notifier).saveActiveIncident(response.data!);
+      await ref
+          .read(activeIncidentProvider.notifier)
+          .saveActiveIncident(response.data!);
 
       if (context.mounted) {
         context.pushNamed(
@@ -322,7 +375,10 @@ Future<void> _navigateToActiveIncident(BuildContext context, WidgetRef ref) asyn
   } catch (e) {
     if (context.mounted) {
       context.pop(); // Close loading dialog
-      _showErrorDialog(context, 'Không thể tải thông tin SOS. ${e.toString().replaceAll('Exception: ', '')}');
+      _showErrorDialog(
+        context,
+        'Không thể tải thông tin SOS. ${e.toString().replaceAll('Exception: ', '')}',
+      );
     }
   }
 }
@@ -353,11 +409,14 @@ Future<void> _handleSosActivation(BuildContext context, WidgetRef ref) async {
   try {
     // 1. Get current location
     final position = await _getCurrentLocation();
-    
+
     if (position == null) {
       if (context.mounted) {
         context.pop(); // Close loading dialog
-        _showErrorDialog(context, 'Không thể lấy vị trí hiện tại. Vui lòng kiểm tra GPS.');
+        _showErrorDialog(
+          context,
+          'Không thể lấy vị trí hiện tại. Vui lòng kiểm tra GPS.',
+        );
       }
       return;
     }
@@ -379,7 +438,9 @@ Future<void> _handleSosActivation(BuildContext context, WidgetRef ref) async {
     // 4. Check response
     if (response.isSuccess && response.data != null) {
       // Save incident to provider (auto saves to local storage)
-      await ref.read(activeIncidentProvider.notifier).saveActiveIncident(response.data!);
+      await ref
+          .read(activeIncidentProvider.notifier)
+          .saveActiveIncident(response.data!);
 
       if (context.mounted) {
         // Show success dialog and navigate
@@ -453,17 +514,18 @@ void _showErrorDialog(BuildContext context, String message) {
       ),
       content: Text(message),
       actions: [
-        TextButton(
-          onPressed: () => context.pop(),
-          child: const Text('Đóng'),
-        ),
+        TextButton(onPressed: () => context.pop(), child: const Text('Đóng')),
       ],
     ),
   );
 }
 
 /// Show SOS activated dialog
-void _showSosActivatedDialog(BuildContext context, WidgetRef ref, IncidentData incident) {
+void _showSosActivatedDialog(
+  BuildContext context,
+  WidgetRef ref,
+  IncidentData incident,
+) {
   showDialog(
     context: context,
     barrierDismissible: false,
@@ -483,11 +545,20 @@ void _showSosActivatedDialog(BuildContext context, WidgetRef ref, IncidentData i
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildStatusItem(Icons.location_on, 'Đang xác định vị trí của bạn'),
+              _buildStatusItem(
+                Icons.location_on,
+                'Đang xác định vị trí của bạn',
+              ),
               const SizedBox(height: 8),
-              _buildStatusItem(Icons.local_hospital, 'Đang tìm kiếm cứu hộ gần nhất'),
+              _buildStatusItem(
+                Icons.local_hospital,
+                'Đang tìm kiếm cứu hộ gần nhất',
+              ),
               const SizedBox(height: 8),
-              _buildStatusItem(Icons.contact_phone, 'Đang thông báo cho liên hệ khẩn cấp'),
+              _buildStatusItem(
+                Icons.contact_phone,
+                'Đang thông báo cho liên hệ khẩn cấp',
+              ),
             ],
           ),
         ),
@@ -511,10 +582,10 @@ void _showSosActivatedDialog(BuildContext context, WidgetRef ref, IncidentData i
             if (Navigator.of(dialogContext).canPop()) {
               Navigator.of(dialogContext).pop();
             }
-            
+
             // Small delay to ensure dialog is closed
             await Future.delayed(const Duration(milliseconds: 100));
-            
+
             // Navigate to emergency alert with incident data
             if (context.mounted) {
               context.pushNamed(
@@ -536,19 +607,12 @@ void _showSosActivatedDialog(BuildContext context, WidgetRef ref, IncidentData i
 Widget _buildStatusItem(IconData icon, String text) {
   return Row(
     children: [
-      Icon(
-        icon,
-        size: 16,
-        color: const Color(0xFF228B22),
-      ),
+      Icon(icon, size: 16, color: const Color(0xFF228B22)),
       const SizedBox(width: 8),
       Expanded(
         child: Text(
           text,
-          style: const TextStyle(
-            fontSize: 13,
-            color: Color(0xFF666666),
-          ),
+          style: const TextStyle(fontSize: 13, color: Color(0xFF666666)),
         ),
       ),
     ],

@@ -682,7 +682,7 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
           ),
           const SizedBox(width: 12),
           Text(
-            'Vòng ${_currentSessionNumber}',
+            'Vòng $_currentSessionNumber',
             style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,

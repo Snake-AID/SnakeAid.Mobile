@@ -609,7 +609,7 @@ class _EditMedicalRecordsDialogState extends State<_EditMedicalRecordsDialog> {
                 const SizedBox(height: 24),
                 // Blood Type
                 DropdownButtonFormField<String>(
-                  value: _selectedBloodType,
+                  initialValue: _selectedBloodType,
                   decoration: InputDecoration(
                     labelText: 'Nhóm máu',
                     prefixIcon: const Icon(Icons.bloodtype),

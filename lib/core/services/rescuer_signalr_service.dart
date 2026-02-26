@@ -350,7 +350,7 @@ class RescuerSignalRService {
 
         final data = arguments[0] as Map<String, dynamic>;
         final count = data['count'] as int;
-        final rescuerIds = (data['rescuerIds'] as List).cast<String>();
+        final rescuerIds = (data['rescuerIds'] as List?)?.cast<String>() ?? [];
 
         debugPrint('👥 Connected rescuers: $count');
         debugPrint('   IDs: ${rescuerIds.join(', ')}');

@@ -648,7 +648,7 @@ class _AddDocumentDialogState extends State<_AddDocumentDialog> {
                 const SizedBox(height: 24),
                 // Document Type Dropdown
                 DropdownButtonFormField<String>(
-                  value: _selectedType,
+                  initialValue: _selectedType,
                   decoration: InputDecoration(
                     labelText: 'Loại giấy tờ',
                     prefixIcon: const Icon(Icons.description),

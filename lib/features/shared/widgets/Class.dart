@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Connection status indicator widget
 class ConnectionStatusIndicator extends ConsumerWidget {
-  const ConnectionStatusIndicator({Key? key}) : super(key: key);
+  const ConnectionStatusIndicator({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -49,14 +49,14 @@ class UserLocationCard extends StatelessWidget {
   final bool isCurrentUser;
 
   const UserLocationCard({
-    Key? key,
+    super.key,
     required this.userId,
     required this.userName,
     required this.latitude,
     required this.longitude,
     required this.timestamp,
     this.isCurrentUser = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -135,12 +135,12 @@ class MessageBubble extends StatelessWidget {
   final bool isMe;
 
   const MessageBubble({
-    Key? key,
+    super.key,
     required this.message,
     required this.userName,
     required this.timestamp,
     required this.isMe,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -205,13 +205,13 @@ class QuickActionButton extends StatelessWidget {
   final Color? textColor;
 
   const QuickActionButton({
-    Key? key,
+    super.key,
     required this.label,
     required this.icon,
     this.onPressed,
     this.backgroundColor,
     this.textColor,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

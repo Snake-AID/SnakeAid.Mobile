@@ -8,7 +8,7 @@ import '../models/Class.dart';
 import '../providers/signalr_repository_provider.dart';
 
 class LocationTrackerScreen extends ConsumerStatefulWidget {
-  const LocationTrackerScreen({Key? key}) : super(key: key);
+  const LocationTrackerScreen({super.key});
 
   @override
   ConsumerState<LocationTrackerScreen> createState() =>
@@ -76,7 +76,7 @@ class _LocationTrackerScreenState extends ConsumerState<LocationTrackerScreen> {
                       const SizedBox(width: AppTheme.spacingSmall),
                       Expanded(
                         child: Text(
-                          '${userInfo.userName}',
+                          userInfo.userName,
                           style: Theme.of(context).textTheme.bodyLarge
                               ?.copyWith(
                                 fontWeight: FontWeight.bold,
@@ -351,7 +351,7 @@ class _LocationTrackerScreenState extends ConsumerState<LocationTrackerScreen> {
                             ],
                           ),
                         );
-                      }).toList(),
+                      }),
                     ] else
                       Padding(
                         padding: EdgeInsets.symmetric(

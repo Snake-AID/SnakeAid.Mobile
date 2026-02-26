@@ -474,16 +474,16 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
                               color: const Color(0xFF191910),
                             ),
                           ),
-                          if (location.description != null) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              location.description!,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey[600],
-                              ),
+                          ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            location.description,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[600],
                             ),
-                          ],
+                          ),
+                        ],
                         ],
                       ),
                     ),
@@ -498,7 +498,7 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
               ),
             ),
           );
-        }).toList(),
+        }),
       ],
     );
   }
@@ -625,16 +625,16 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
                               color: const Color(0xFF191910),
                             ),
                           ),
-                          if (symptom.description != null) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              symptom.description!,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey[600],
-                              ),
+                          ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            symptom.description,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[600],
                             ),
-                          ],
+                          ),
+                        ],
                         ],
                       ),
                     ),
@@ -649,7 +649,7 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
               ),
             ),
           );
-        }).toList(),
+        }),
       ],
     );
   }

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:async';
-import 'first_aid_steps_screen.dart';
-import 'rescuer_arrived_screen.dart';
 import '../../../shared/widgets/chat_screen.dart';
 
 class EmergencyTrackingScreen extends StatefulWidget {
@@ -14,8 +12,8 @@ class EmergencyTrackingScreen extends StatefulWidget {
 
 class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen> {
   int _remainingSeconds = 330; // 5:30
-  int _estimatedMinutes = 8;
-  double _distanceKm = 2.1;
+  final int _estimatedMinutes = 8;
+  final double _distanceKm = 2.1;
   Timer? _timer;
   bool _showWhileWaitingExpanded = false;
 

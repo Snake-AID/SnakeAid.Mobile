@@ -1,0 +1,2326 @@
+import 'dart:async';
+import 'package:app_links/app_links.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../snake_catching/repository/snake_catching_repository.dart';
+import '../../snake_catching/repository/snake_species_repository.dart';
+import '../../snake_catching/repository/payos_repository.dart';
+import '../../snake_catching/repository/transaction_repository.dart';
+import '../../snake_catching/models/snake_catching_request.dart';
+import '../../snake_catching/models/snake_species.dart';
+import 'package:intl/intl.dart';
+
+/// Activity Detail Screen - Shows detailed information of a snake catching request
+class ActivityDetailScreen extends ConsumerStatefulWidget {
+  final String requestId;
+
+  const ActivityDetailScreen({
+    super.key,
+    required this.requestId,
+  });
+
+  @override
+  ConsumerState<ActivityDetailScreen> createState() => _ActivityDetailScreenState();
+}
+
+class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
+  bool _isLoading = true;
+  SnakeCatchingRequestData? _request;
+  String? _errorMessage;
+  Map<int, SnakeSpecies> _speciesDetailsMap = {};
+  Set<int> _loadingSpeciesIds = {};
+  Timer? _refreshTimer;
+
+  // Deposit payment state (status == Assigned)
+  TransactionInfo? _transaction;
+  bool _isCheckingPayment = false;
+  bool _isCreatingPayment = false;
+  Timer? _paymentTimer;
+
+  // Final payment state (status == Finished)
+  TransactionInfo? _finalTransaction;
+  bool _isCreatingFinalPayment = false;
+  Timer? _finalPaymentTimer;
+  bool _hasTransferredToRescuer = false;
+
+  // Scroll
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _paymentCardKey = GlobalKey();
+
+  // Deep link
+  StreamSubscription<Uri>? _deepLinkSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRequestDetail();
+    _initDeepLinks();
+    // Auto-refresh every 10 seconds
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      _silentRefresh();
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    _paymentTimer?.cancel();
+    _finalPaymentTimer?.cancel();
+    _scrollController.dispose();
+    _deepLinkSub?.cancel();
+    super.dispose();
+  }
+
+  /// Listen for PayOS callback deep link
+  /// Handles both snakeaid://payment/return and https://snakeaid-dev.duykhiem.id.vn/payos/return
+  void _initDeepLinks() {
+    final appLinks = AppLinks();
+    _deepLinkSub = appLinks.uriLinkStream.listen((uri) {
+      if (!mounted) return;
+      final isSnakeaidScheme = uri.scheme == 'snakeaid' && uri.host == 'payment';
+      final isHttpsCallback = uri.host == 'snakeaid-dev.duykhiem.id.vn' &&
+          uri.path.startsWith('/payos/');
+
+      if (isSnakeaidScheme || isHttpsCallback) {
+        final status = uri.queryParameters['status'];
+        final cancel = uri.queryParameters['cancel'];
+        final isSuccess = status?.toUpperCase() == 'PAID' ||
+            uri.path.endsWith('/return');
+        final isCancelled = cancel == 'true' || uri.path.endsWith('/cancel');
+
+        if (isSuccess && !isCancelled) {
+          _checkPaymentStatus();
+          // If currently Finished = this was a final payment callback → transfer after short delay
+          if (_request?.status == 'Finished' && !_hasTransferredToRescuer) {
+            _hasTransferredToRescuer = true;
+            Future.delayed(const Duration(seconds: 3), () {
+              if (!mounted) return;
+              final payosRepo = ref.read(payosRepositoryProvider);
+              payosRepo.transferToRescuer(widget.requestId).then((_) {
+                if (mounted) {
+                  setState(() => _finalTransaction = _finalTransaction); // trigger rebuild
+                  _silentRefresh();
+                }
+              });
+            });
+          }
+          _checkFinalPaymentStatus();
+        } else if (isCancelled) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Bạn đã hủy thanh toán. Vui lòng thử lại khi cần.'),
+              backgroundColor: Color(0xFFFF8F00),
+            ),
+          );
+        }
+      }
+    });
+  }
+
+  /// Smoothly scrolls to the payment card after the frame is rendered.
+  void _scrollToPaymentCard() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _paymentCardKey.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeInOut,
+          alignment: 0.1, // a little from top so the card header is visible
+        );
+      }
+    });
+  }
+
+  Future<void> _loadRequestDetail() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final repository = ref.read(snakeCatchingRepositoryProvider);
+      final response = await repository.getRequestById(widget.requestId);
+
+      if (mounted && response.data != null) {
+        setState(() {
+          _request = response.data;
+          _isLoading = false;
+        });
+
+        // Load species details for each species in the request
+        _loadSpeciesDetails();
+
+        // If Assigned, check payment status and scroll to payment card
+        if (_request!.status == 'Assigned') {
+          _checkPaymentStatus(scrollIfUnpaid: true);
+        } else if (_request!.status == 'Finished') {
+          _checkFinalPaymentStatus(scrollIfUnpaid: true);
+        }
+      } else {
+        throw Exception('Không tìm thấy dữ liệu yêu cầu');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadSpeciesDetails() async {
+    if (_request == null) return;
+
+    final speciesRepository = ref.read(snakeSpeciesRepositoryProvider);
+
+    // Get unique species IDs
+    final speciesIds = _request!.details
+        .map((detail) => detail.snakeSpeciesId)
+        .toSet()
+        .toList();
+
+    for (final speciesId in speciesIds) {
+      // Skip if already loaded
+      if (_speciesDetailsMap.containsKey(speciesId)) continue;
+
+      setState(() {
+        _loadingSpeciesIds.add(speciesId);
+      });
+
+      try {
+        final speciesDetail = await speciesRepository.getSnakeSpeciesById(speciesId);
+        
+        if (mounted && speciesDetail != null) {
+          setState(() {
+            _speciesDetailsMap[speciesId] = speciesDetail;
+            _loadingSpeciesIds.remove(speciesId);
+          });
+        }
+      } catch (e) {
+        // Silently fail - just won't show the detailed info
+        if (mounted) {
+          setState(() {
+            _loadingSpeciesIds.remove(speciesId);
+          });
+        }
+      }
+    }
+  }
+
+  /// Silent refresh without showing loading indicator
+  Future<void> _silentRefresh() async {
+    try {
+      final repository = ref.read(snakeCatchingRepositoryProvider);
+      final response = await repository.getRequestById(widget.requestId);
+
+      if (mounted && response.data != null) {
+        setState(() {
+          _request = response.data;
+          _errorMessage = null;
+        });
+
+        // Load any new species details
+        _loadSpeciesDetails();
+
+        // If newly Assigned, check payment
+        if (_request!.status == 'Assigned' && !_isCheckingPayment) {
+          _checkPaymentStatus();
+        } else if (_request!.status == 'Finished' && !_isCreatingFinalPayment) {
+          _checkFinalPaymentStatus(silent: true);
+        } else if (_request!.status == 'Paid' || _request!.status == 'Completed') {
+          // Request already moved to Paid — cancel all timers and mark UI as paid
+          _finalPaymentTimer?.cancel();
+          _paymentTimer?.cancel();
+          // Transfer if somehow not done yet in this session (e.g. app was in background)
+          if (!_hasTransferredToRescuer) {
+            _hasTransferredToRescuer = true;
+            ref.read(payosRepositoryProvider).transferToRescuer(widget.requestId);
+          }
+        }
+      }
+    } catch (e) {
+      // Silently fail - don't show error on background refresh
+    }
+  }
+
+  /// Check and poll deposit payment status
+  Future<void> _checkPaymentStatus({bool silent = false, bool scrollIfUnpaid = false}) async {
+    if (!mounted) return;
+    if (!silent) setState(() => _isCheckingPayment = true);
+    try {
+      final repo = ref.read(transactionRepositoryProvider);
+      final tx = await repo.getTransactionByRequestId(widget.requestId);
+      if (!mounted) return;
+      setState(() {
+        _transaction = tx;
+        _isCheckingPayment = false;
+      });
+      // Scroll to payment card only when not yet paid
+      if (scrollIfUnpaid && (tx == null || !tx.isDeposited)) {
+        _scrollToPaymentCard();
+      }
+      // If not yet paid, poll every 5 seconds
+      if (tx == null || !tx.isDeposited) {
+        _paymentTimer?.cancel();
+        _paymentTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+          if (_request?.status == 'Assigned') {
+            _checkPaymentStatus(silent: true);
+          } else {
+            _paymentTimer?.cancel();
+          }
+        });
+      } else {
+        _paymentTimer?.cancel();
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isCheckingPayment = false);
+    }
+  }
+
+  /// Create PayOS payment link and open checkout URL
+  Future<void> _openPayment() async {
+    if (_request == null) return;
+    final amount = _request!.estimatedPrice ?? _request!.mission?.estimatedCost;
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không có thông tin giá để thanh toán')),
+      );
+      return;
+    }
+
+    setState(() => _isCreatingPayment = true);
+    try {
+      final repo = ref.read(payosRepositoryProvider);
+      final link = await repo.createPaymentLink(
+        snakeCatchingRequestId: _request!.id,
+        amount: amount,
+        description: 'Catching deposit 1',
+      );
+      if (!mounted) return;
+      setState(() => _isCreatingPayment = false);
+
+      final uri = Uri.parse(link.checkoutUrl);
+      // externalApplication + App Links (assetlinks.json on server) = auto-return to app.
+      // Falls back to manual browser close if assetlinks.json not yet deployed.
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      // If App Links didn't trigger deep link, still check on resume
+      if (mounted) _checkPaymentStatus();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isCreatingPayment = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+      );
+    }
+  }
+
+  /// Check and poll final (CatchingPayment) status
+  Future<void> _checkFinalPaymentStatus({bool silent = false, bool scrollIfUnpaid = false}) async {
+    if (!mounted) return;
+    try {
+      final repo = ref.read(transactionRepositoryProvider);
+      final tx = await repo.getTransactionByRequestId(widget.requestId);
+      if (!mounted) return;
+
+      // Consider paid if: explicit CatchingPayment tx, OR request already moved to Paid/Completed
+      final requestIsPaid = (_request?.status == 'Paid' || _request?.status == 'Completed');
+      final txIsFinalPayment = (tx?.isCatchingPayment == true);
+
+      setState(() {
+        _finalTransaction = (txIsFinalPayment || requestIsPaid) ? tx : null;
+      });
+
+      if (scrollIfUnpaid && _finalTransaction == null) _scrollToPaymentCard();
+
+      if (_finalTransaction == null) {
+        // No payment yet — poll every 5s
+        _finalPaymentTimer?.cancel();
+        _finalPaymentTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+          if (_request?.status == 'Finished') {
+            _checkFinalPaymentStatus(silent: true);
+          } else {
+            _finalPaymentTimer?.cancel();
+          }
+        });
+      } else if (requestIsPaid || (txIsFinalPayment && _finalTransaction!.isPaid)) {
+        // Payment confirmed — transfer to rescuer (once)
+        _finalPaymentTimer?.cancel();
+        if (!_hasTransferredToRescuer) {
+          _hasTransferredToRescuer = true;
+          final payosRepo = ref.read(payosRepositoryProvider);
+          payosRepo.transferToRescuer(widget.requestId).then((_) {
+            if (mounted) _silentRefresh();
+          });
+        }
+      } else {
+        // Transaction exists but not confirmed yet — poll every 3s
+        _finalPaymentTimer?.cancel();
+        _finalPaymentTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+          _checkFinalPaymentStatus(silent: true);
+        });
+      }
+    } catch (_) {}
+  }
+
+  /// Create PayOS final payment link (CatchingPayment) and open checkout
+  Future<void> _openFinalPayment() async {
+    if (_request == null) return;
+    final mission = _request!.mission;
+    const double baseFee = 500000.0;
+    final double actualCost = mission?.actualCost ?? baseFee;
+    // Final amount = price field from DB
+    final double finalAmount = (mission?.price ?? actualCost).clamp(0, double.infinity).toDouble();
+    if (finalAmount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không có thông tin giá để thanh toán')),
+      );
+      return;
+    }
+
+    setState(() => _isCreatingFinalPayment = true);
+    try {
+      final repo = ref.read(payosRepositoryProvider);
+      final link = await repo.createPaymentLink(
+        snakeCatchingRequestId: _request!.id,
+        amount: finalAmount,
+        description: 'Catching payment',
+        transactionType: 'CatchingPayment',
+      );
+      if (!mounted) return;
+      setState(() => _isCreatingFinalPayment = false);
+      await launchUrl(Uri.parse(link.checkoutUrl), mode: LaunchMode.externalApplication);
+      if (mounted) _checkFinalPaymentStatus();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isCreatingFinalPayment = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F8F6),
+      appBar: AppBar(
+        title: const Text(
+          'Chi Tiết Yêu Cầu',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => context.pop(),
+        ),
+        centerTitle: true,
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? _buildErrorView()
+              : _request != null
+                  ? _buildDetailView()
+                  : _buildNotFoundView(),
+      bottomSheet: _request != null ? _buildStickyFooter(_request!) : null,
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Color(0xFFDC3545),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadRequestDetail,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Thử Lại'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF228B22),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotFoundView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off,
+              size: 80,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Không Tìm Thấy',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Yêu cầu này không tồn tại hoặc đã bị xóa.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () => context.pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF228B22),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Quay Lại'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailView() {
+    final request = _request!;
+    final dateFormat = DateFormat('dd/MM/yyyy, HH:mm');
+    final statusColor = _getStatusColor(request.status);
+
+    return SingleChildScrollView(
+      controller: _scrollController,
+      padding: const EdgeInsets.only(bottom: 120),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 24),
+          
+          // Status Icon & Title
+          Center(
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _getStatusIcon(request.status),
+                size: 60,
+                color: statusColor,
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+          
+          Center(
+            child: Text(
+              _getStatusText(request.status),
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: statusColor,
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 32),
+
+          // Summary Card
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Green Header
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF228B22),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                    ),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.description, color: Colors.white, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Thông Tin Yêu Cầu',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Info Content
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      _buildInfoRow(
+                        Icons.access_time,
+                        'Thời gian gửi',
+                        dateFormat.format(request.requestDate.toLocal()),
+                      ),
+                      
+                      if (request.priority != 'Normal') ...[
+                        const SizedBox(height: 12),
+                        _buildInfoRow(
+                          Icons.priority_high,
+                          'Mức độ ưu tiên',
+                          _getPriorityText(request.priority),
+                          valueColor: _getPriorityColor(request.priority),
+                        ),
+                      ],
+                      
+                      const SizedBox(height: 12),
+                      _buildInfoRow(
+                        Icons.location_on,
+                        'Địa điểm',
+                        request.address,
+                        maxLines: 3,
+                      ),
+
+                      if (request.distanceKm != null) ...[
+                        const SizedBox(height: 12),
+                        _buildInfoRow(
+                          Icons.route,
+                          'Khoảng cách',
+                          '${request.distanceKm!.toStringAsFixed(1)} km',
+                          valueColor: const Color(0xFF2196F3),
+                        ),
+                      ],
+                      
+                      if (request.preferredTime != null) ...[
+                        const SizedBox(height: 12),
+                        _buildInfoRow(
+                          Icons.schedule,
+                          'Thời gian mong muốn',
+                          DateFormat('HH:mm').format(request.preferredTime!.toLocal()),
+                        ),
+                      ],
+                      
+                      if (request.assignedRescuerId != null) ...[
+                        const SizedBox(height: 12),
+                        _buildInfoRow(
+                          Icons.person,
+                          'Trạng thái',
+                          'Đã được phân công',
+                          valueColor: const Color(0xFF228B22),
+                        ),
+                        if (request.assignedAt != null) ...[
+                          const SizedBox(height: 8),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 32),
+                            child: Text(
+                              'Phân công lúc: ${dateFormat.format(request.assignedAt!.toLocal())}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Rescuer Info Card (when Assigned, Finished, Paid, or Completed) ──
+          if (request.status == 'Assigned' || request.status == 'Finished' ||
+              request.status == 'Paid' || request.status == 'Completed') ...[
+            const SizedBox(height: 16),
+            _buildRescuerInfoCard(request),
+          ],
+
+          // ── Payment Banner (only when Assigned) ──
+          if (request.status == 'Assigned') ...[            
+            const SizedBox(height: 16),
+            _buildPaymentCard(request),
+          ],
+
+          // ── Final Payment Card (when Finished, Paid, or Completed) ──
+          if (request.status == 'Finished' || request.status == 'Paid' ||
+              request.status == 'Completed') ...[
+            const SizedBox(height: 16),
+            _buildFinishedPaymentCard(request),
+          ],
+
+          // Species Section — caught snakes when Finished/Paid/Completed; reported snakes otherwise
+          if ((request.status == 'Finished' || request.status == 'Paid' ||
+               request.status == 'Completed') && request.details.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Rắn Đã Bắt Được (${request.details.length})',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF333333),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: request.details.map((detail) => _buildSpeciesChip(detail)).toList(),
+              ),
+            ),
+          ] else if (request.details.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Loài Rắn Gặp Phải (${request.details.length})',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF333333),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: request.details.map((detail) => _buildSpeciesChip(detail)).toList(),
+              ),
+            ),
+          ],
+
+          // Additional Details
+          if (request.additionalDetails != null && request.additionalDetails!.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F8FF),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF2196F3).withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.location_on, color: Color(0xFF2196F3), size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Ghi Chú Địa Chỉ',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF2196F3),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    request.additionalDetails!,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      height: 1.5,
+                      color: Color(0xFF333333),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Notes
+          if (request.notes != null && request.notes!.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3E0),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFF9800).withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Color(0xFFFF9800), size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Thông Tin Bổ Sung',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFFF9800),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    request.notes!,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      height: 1.5,
+                      color: Color(0xFF333333),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 32),
+        ],
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Sticky Footer
+  // ──────────────────────────────────────────────────────────────────
+  Widget _buildStickyFooter(SnakeCatchingRequestData request) {
+    final bool needPayment = request.status == 'Assigned' &&
+        (_transaction == null || !_transaction!.isDeposited);
+    final bool needFinalPayment = request.status == 'Finished' &&
+        _finalTransaction == null;
+    return Container(
+      padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, -3),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (needPayment) ...[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isCreatingPayment ? null : _openPayment,
+                icon: _isCreatingPayment
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.payment, size: 20),
+                label: Text(
+                  _isCreatingPayment ? 'Đang tạo link...' : 'THANH TOÁN ĐẶT CỌC',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF228B22),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 2,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+          if (needFinalPayment) ...[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isCreatingFinalPayment ? null : _openFinalPayment,
+                icon: _isCreatingFinalPayment
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.payments_outlined, size: 20),
+                label: Text(
+                  _isCreatingFinalPayment ? 'Đang tạo link...' : 'THANH TOÁN DỊCH VỤ',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF228B22),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 2,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () => context.pop(),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF228B22),
+                side: const BorderSide(color: Color(0xFF228B22)),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text(
+                'Quay Lại',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Rescuer Info Card
+  // ──────────────────────────────────────────────────────────────────
+  Widget _buildRescuerInfoCard(SnakeCatchingRequestData request) {
+    final rescuer = request.assignedRescuer;
+    final name = rescuer?.fullName ?? 'Người cứu hộ';
+    final phone = rescuer?.phoneNumber;
+    final rating = rescuer?.rating;
+    final ratingCount = rescuer?.ratingCount ?? 0;
+    final avatarUrl = rescuer?.avatarUrl;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: Color(0xFF2196F3),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.assignment_ind, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Text(
+                  'Thông Tin Người Cứu Hộ',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Avatar
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE3F2FD),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFF2196F3).withOpacity(0.3), width: 2),
+                  ),
+                  child: avatarUrl != null
+                      ? ClipOval(
+                          child: Image.network(
+                            avatarUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(
+                              Icons.person,
+                              size: 36,
+                              color: Color(0xFF2196F3),
+                            ),
+                          ),
+                        )
+                      : const Icon(Icons.person, size: 36, color: Color(0xFF2196F3)),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF333333),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      if (rating != null && rating > 0)
+                        Row(
+                          children: [
+                            ...List.generate(5, (i) {
+                              const star = Color(0xFFFFC107);
+                              return Icon(
+                                i < rating.round() ? Icons.star : Icons.star_border,
+                                color: star,
+                                size: 16,
+                              );
+                            }),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${rating.toStringAsFixed(1)}${ratingCount > 0 ? ' ($ratingCount đánh giá)' : ''}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF666666),
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        const Text(
+                          'Chưa có đánh giá',
+                          style: TextStyle(fontSize: 12, color: Color(0xFF999999)),
+                        ),
+                      if (request.assignedAt != null) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.access_time, size: 12, color: Color(0xFF999999)),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Nhận đơn: ${DateFormat('HH:mm dd/MM').format(request.assignedAt!.toLocal())}',
+                              style: const TextStyle(fontSize: 12, color: Color(0xFF999999)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Phone call button
+          if (phone != null && phone.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final uri = Uri(scheme: 'tel', path: phone);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri);
+                    }
+                  },
+                  icon: const Icon(Icons.call, size: 18, color: Color(0xFF2196F3)),
+                  label: Text(
+                    'Gọi $phone',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF2196F3),
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF2196F3)),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Payment Card
+  // ──────────────────────────────────────────────────────────────────
+  Widget _buildPaymentCard(SnakeCatchingRequestData request) {
+    final paid = _transaction != null && _transaction!.isDeposited;
+    final amount = request.estimatedPrice ?? request.mission?.estimatedCost;
+
+    return Container(
+      key: _paymentCardKey,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: paid ? const Color(0xFF28A745) : const Color(0xFFFF8F00),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  paid ? Icons.check_circle : Icons.payments_outlined,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  paid ? 'Đã Thanh Toán Phí Di Chuyển' : 'Thanh Toán Phí Di Chuyển',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                if (_isCheckingPayment) ...[
+                  const Spacer(),
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Amount
+                if (amount != null) ...[
+                  Row(
+                    children: [
+                      const Icon(Icons.monetization_on, color: Color(0xFF28A745), size: 20),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Số tiền phí di chuyển:',
+                        style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _formatCurrency(amount),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF28A745),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 28),
+                    child: Text(
+                      '(Chi phí di chuyển ${request.distanceKm != null ? request.distanceKm!.toStringAsFixed(1) : '?'}km — bắt buộc thanh toán trước)',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF999999)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                if (paid) ...[
+                  // Paid state
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F5E9),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.verified, color: Color(0xFF28A745), size: 22),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Thanh toán thành công!',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF28A745),
+                                ),
+                              ),
+                              if (_transaction?.amount != null)
+                                Text(
+                                  'Đã thanh toán: ${_formatCurrency(_transaction!.amount)}',
+                                  style: const TextStyle(fontSize: 13, color: Color(0xFF4CAF50)),
+                                ),
+                              const SizedBox(height: 2),
+                              const Text(
+                                'Người cứu hộ đang trên đường đến',
+                                style: TextStyle(fontSize: 12, color: Color(0xFF666666)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  // Not paid state
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF8E1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFFE082)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Color(0xFFFF8F00), size: 20),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Vui lòng thanh toán đặt cọc để người cứu hộ bắt đầu di chuyển đến địa điểm của bạn.',
+                            style: TextStyle(fontSize: 13, color: Color(0xFF795548), height: 1.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Row(
+                    children: [
+                      Icon(Icons.refresh, size: 12, color: Color(0xFF999999)),
+                      SizedBox(width: 4),
+                      Text(
+                        'Tự động kiểm tra mỗi 5 giây',
+                        style: TextStyle(fontSize: 11, color: Color(0xFF999999)),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Finished Payment Card (CatchingPayment)
+  // ──────────────────────────────────────────────────────────────────
+  Widget _buildFinishedPaymentCard(SnakeCatchingRequestData request) {
+    final mission = request.mission;
+    final double baseFee = 500000;
+    final double estimatedCost = mission?.estimatedCost ?? 0;
+    final double actualCost = mission?.actualCost ?? baseFee;
+    final double snakeFee = (actualCost - baseFee).clamp(0, double.infinity);
+    // Final amount = price field from DB (what customer owes for the service)
+    final double finalAmount = mission?.price ?? actualCost;
+    final bool paid = _finalTransaction != null ||
+        request.status == 'Paid' ||
+        request.status == 'Completed';
+
+    // Evidence photos uploaded by rescuer
+    final evidencePhotos = request.media
+        .where((m) => m.purpose == 'Evidence' || m.url.isNotEmpty)
+        .toList();
+
+    return Container(
+      key: _paymentCardKey,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: paid ? const Color(0xFF28A745) : const Color(0xFFFF6B35),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  paid ? Icons.check_circle : Icons.payments_outlined,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  paid ? 'Đã Thanh Toán Dịch Vụ' : 'Thanh Toán Dịch Vụ',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Fee breakdown ──
+                const Text(
+                  'Chi tiết thanh toán',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF333333),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildPayRow(
+                  'Phí dịch vụ cơ bản:',
+                  _formatCurrency(baseFee),
+                  icon: Icons.miscellaneous_services,
+                ),
+                const SizedBox(height: 8),
+                _buildPayRow(
+                  'Phí di chuyển (${request.distanceKm} km):',
+                  ' ${_formatCurrency(estimatedCost)}',
+                   icon: Icons.directions_car,
+                ),
+               
+                if (snakeFee > 0) ...[
+                  const SizedBox(height: 8),
+                  _buildPayRow(
+                    'Phí bắt rắn:',
+                    _formatCurrency(snakeFee),
+                    icon: Icons.pest_control,
+                  ),
+                ],
+                  const SizedBox(height: 8),
+                 _buildPayRow(
+                  'Chi phí đã thanh toán đợt 1:',
+                  '- ${_formatCurrency(estimatedCost)}',
+                  icon: Icons.money_off,
+                  valueColor: const Color(0xFF28A745),
+                ),
+
+                const Divider(height: 24, color: Color(0xFFE0E0E0)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Số tiền cần thanh toán:',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF333333),
+                      ),
+                    ),
+                    Text(
+                      _formatCurrency(finalAmount),
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFFF6B35),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // ── Evidence photos ──
+                if (evidencePhotos.isNotEmpty) ...[
+                  const Text(
+                    'Ảnh bằng chứng nhiệm vụ',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF333333),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 90,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: evidencePhotos.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (_, i) {
+                        final photo = evidencePhotos[i];
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            photo.url,
+                            width: 90,
+                            height: 90,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 90,
+                              height: 90,
+                              color: const Color(0xFFF0F0F0),
+                              child: const Icon(Icons.image_not_supported,
+                                  color: Color(0xFFCCCCCC)),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // ── Payment status ──
+                if (paid) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F5E9),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.verified, color: Color(0xFF28A745), size: 22),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Thanh toán thành công!',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF28A745),
+                                ),
+                              ),
+                              if (_finalTransaction?.amount != null)
+                                Text(
+                                  'Đã thanh toán: ${_formatCurrency(_finalTransaction!.amount)}',
+                                  style: const TextStyle(
+                                      fontSize: 13, color: Color(0xFF4CAF50)),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF8E1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFFE082)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Color(0xFFFF8F00), size: 20),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Người cứu hộ đã hoàn thành nhiệm vụ. Vui lòng thanh toán để xác nhận dịch vụ.',
+                            style: TextStyle(
+                                fontSize: 13, color: Color(0xFF795548), height: 1.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Row(
+                    children: [
+                      Icon(Icons.refresh, size: 12, color: Color(0xFF999999)),
+                      SizedBox(width: 4),
+                      Text(
+                        'Tự động kiểm tra mỗi 5 giây',
+                        style: TextStyle(fontSize: 11, color: Color(0xFF999999)),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPayRow(String label, String value, {
+    IconData? icon,
+    Color? valueColor,
+  }) {
+    return Row(
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 16, color: const Color(0xFF6C757D)),
+          const SizedBox(width: 8),
+        ],
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: valueColor ?? const Color(0xFF333333),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatCurrency(double value) {
+    final formatted = value.toInt().toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]},',
+    );
+    return '$formatted VNĐ';
+  }
+
+  Widget _buildInfoRow(
+    IconData icon,
+    String label,
+    String value, {
+    Color? valueColor,
+    int maxLines = 2,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: const Color(0xFF228B22)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                maxLines: maxLines,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: valueColor ?? const Color(0xFF333333),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSpeciesChip(SnakeSpeciesDetail detail) {
+    final speciesDetail = _speciesDetailsMap[detail.snakeSpeciesId];
+    final isLoading = _loadingSpeciesIds.contains(detail.snakeSpeciesId);
+
+    return InkWell(
+      onTap: speciesDetail != null ? () => _showSpeciesDetailModal(speciesDetail, detail.quantity) : null,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE0E0E0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Species Image
+            if (speciesDetail?.imageUrl != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  speciesDetail!.imageUrl!,
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => _buildImagePlaceholder(),
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return _buildImagePlaceholder();
+                  },
+                ),
+              )
+            else if (isLoading)
+              _buildImagePlaceholder()
+            else
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF9800).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Color(0xFFFF9800),
+                  size: 40,
+                ),
+              ),
+            const SizedBox(width: 12),
+            // Species Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Name and Badges
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          detail.snakeSpeciesName,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF333333),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (speciesDetail?.isVenomous == true) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'ĐỘC',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  // Scientific Name
+                  Text(
+                    detail.snakeSpeciesScientificName,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontStyle: FontStyle.italic,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  // Risk Level and Quantity
+                  Row(
+                    children: [
+                      if (speciesDetail != null) ...[
+                        _buildRiskLevelBadge(speciesDetail.riskLevel),
+                        const SizedBox(width: 8),
+                      ],
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF228B22).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'SL: ${detail.quantity}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF228B22),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (speciesDetail != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Nhấn để xem chi tiết',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[500],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImagePlaceholder() {
+    return Container(
+      width: 80,
+      height: 80,
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Center(
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF228B22)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRiskLevelBadge(double riskLevel) {
+    Color badgeColor;
+    String riskText;
+    
+    if (riskLevel >= 8.0) {
+      badgeColor = Colors.red;
+      riskText = 'CỰC KỲ NGUY HIỂM';
+    } else if (riskLevel >= 6.0) {
+      badgeColor = Colors.orange;
+      riskText = 'NGUY HIỂM';
+    } else if (riskLevel >= 4.0) {
+      badgeColor = Colors.amber;
+      riskText = 'TRUNG BÌNH';
+    } else {
+      badgeColor = Colors.green;
+      riskText = 'ÍT NGUY HIỂM';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: badgeColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: badgeColor.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.warning, color: badgeColor, size: 12),
+          const SizedBox(width: 4),
+          Text(
+            riskLevel.toStringAsFixed(1),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: badgeColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSpeciesDetailModal(SnakeSpecies species, int quantity) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: Column(
+            children: [
+              // Handle
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Content
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Species Image
+                      if (species.imageUrl != null)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(
+                            species.imageUrl!,
+                            width: double.infinity,
+                            height: 200,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              height: 200,
+                              color: Colors.grey[200],
+                              child: const Center(
+                                child: Icon(Icons.broken_image, size: 50, color: Colors.grey),
+                              ),
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+                      // Species Name
+                      Text(
+                        species.commonName,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF333333),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        species.scientificName,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey[600],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // Badges Row
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _buildRiskLevelBadge(species.riskLevel),
+                          if (species.isVenomous)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: Colors.red.withOpacity(0.3)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.dangerous, color: Colors.red, size: 14),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'RẮN ĐỘC',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF228B22).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              'Số lượng: $quantity',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF228B22),
+                              ),
+                            ),
+                          ),
+                          if (species.primaryVenomType != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.purple.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                species.primaryVenomType!,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.purple,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      // Description
+                      if (species.description != null) ...[
+                        _buildSection(
+                          icon: Icons.description,
+                          title: 'Mô Tả',
+                          content: species.description!,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      // Identification Summary
+                      if (species.identificationSummary != null) ...[
+                        _buildSection(
+                          icon: Icons.search,
+                          title: 'Nhận Diện',
+                          content: species.identificationSummary!,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      // Physical Traits
+                      if (species.identification?.physicalTraits.isNotEmpty == true) ...[
+                        _buildListSection(
+                          icon: Icons.straighten,
+                          title: 'Đặc Điểm Vật Lý',
+                          items: species.identification!.physicalTraits,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      // Behaviors
+                      if (species.identification?.behaviors.isNotEmpty == true) ...[
+                        _buildListSection(
+                          icon: Icons.pets,
+                          title: 'Hành Vi',
+                          items: species.identification!.behaviors,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      // Habitat
+                      if (species.identification?.habitat.isNotEmpty == true) ...[
+                        _buildSection(
+                          icon: Icons.terrain,
+                          title: 'Môi Trường Sống',
+                          content: species.identification!.habitat,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      // Symptoms By Time
+                      if (species.symptomsByTime?.isNotEmpty == true) ...[
+                        _buildSymptomsSection(species.symptomsByTime!),
+                        const SizedBox(height: 16),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSection({
+    required IconData icon,
+    required String title,
+    required String content,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 20, color: const Color(0xFF228B22)),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF333333),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF6F8F6),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            content,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF555555),
+              height: 1.5,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildListSection({
+    required IconData icon,
+    required String title,
+    required List<String> items,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 20, color: const Color(0xFF228B22)),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF333333),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF6F8F6),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: items
+                .map((item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('• ', style: TextStyle(fontSize: 14, color: Color(0xFF228B22))),
+                          Expanded(
+                            child: Text(
+                              item,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF555555),
+                                height: 1.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ))
+                .toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSymptomsSection(List<SymptomByTime> symptoms) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.medical_services, size: 20, color: Color(0xFF228B22)),
+            SizedBox(width: 8),
+            Text(
+              'Triệu Chứng Theo Thời Gian',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF333333),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...symptoms.map((symptom) => Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: symptom.isCritical 
+                    ? Colors.red.withOpacity(0.05)
+                    : const Color(0xFFF6F8F6),
+                borderRadius: BorderRadius.circular(8),
+                border: symptom.isCritical
+                    ? Border.all(color: Colors.red.withOpacity(0.3))
+                    : null,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      if (symptom.isCritical)
+                        const Icon(Icons.error, color: Colors.red, size: 16),
+                      if (symptom.isCritical) const SizedBox(width: 4),
+                      Text(
+                        symptom.timeRange,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: symptom.isCritical ? Colors.red : const Color(0xFF228B22),
+                        ),
+                      ),
+                      if (symptom.isCritical) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'NGUY CẤP',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ...symptom.signs.map((sign) => Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '• ',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: symptom.isCritical ? Colors.red : const Color(0xFF228B22),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                sign,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF555555),
+                                  height: 1.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )),
+                ],
+              ),
+            )),
+      ],
+    );
+  }
+
+  String _getPriorityText(String priority) {
+    switch (priority.toLowerCase()) {
+      case 'high':
+        return 'Cao';
+      case 'medium':
+        return 'Trung bình';
+      default:
+        return 'Bình thường';
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return const Color(0xFFFFA500);
+      case 'assigned':
+        return const Color(0xFF2196F3);
+      case 'finished':
+        return const Color(0xFFFF6B35);
+      case 'paid':
+        return const Color(0xFF17A2B8);
+      case 'completed':
+        return const Color(0xFF228B22);
+      case 'dispute':
+        return const Color(0xFFDC3545);
+      case 'cancelled':
+      case 'expired':
+        return Colors.grey;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Icons.schedule;
+      case 'assigned':
+        return Icons.assignment_ind;
+      case 'finished':
+        return Icons.payments_outlined;
+      case 'paid':
+        return Icons.payments;
+      case 'completed':
+        return Icons.check_circle;
+      case 'dispute':
+        return Icons.gavel;
+      case 'cancelled':
+        return Icons.cancel;
+      case 'expired':
+        return Icons.timer_off;
+      default:
+        return Icons.help_outline;
+    }
+  }
+
+  String _getStatusText(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return 'Chờ Xử Lý';
+      case 'assigned':
+        return 'Đã Phân Công';
+      case 'finished':
+        return 'Cần Thanh Toán';
+      case 'paid':
+        return 'Đã Thanh Toán';
+      case 'completed':
+        return 'Hoàn Thành';
+      case 'dispute':
+        return 'Đang Tranh Chấp';
+      case 'cancelled':
+        return 'Đã Hủy';
+      case 'expired':
+        return 'Hết Hạn';
+      default:
+        return status;
+    }
+  }
+
+  Color _getPriorityColor(String priority) {
+    switch (priority.toLowerCase()) {
+      case 'high':
+        return const Color(0xFFDC3545);
+      case 'medium':
+        return const Color(0xFFFFA500);
+      default:
+        return const Color(0xFF228B22);
+    }
+  }
+}
