@@ -1,27 +1,66 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import '../../models/snake_catching_request.dart';
+import '../../models/snake_species.dart';
+import '../../repository/snake_catching_repository.dart';
+import '../../repository/snake_species_repository.dart';
 import 'rescuer_result_confirmation_screen.dart';
 
+enum _UploadState { uploading, done, failed }
+
 /// Màn hình quá trình cứu hộ - đang bắt rắn
-class RescuerTrackingScreen extends StatefulWidget {
-  final Map<String, dynamic> requestData;
+class RescuerTrackingScreen extends ConsumerStatefulWidget {
+  final SnakeCatchingRequestData requestData;
+  final String missionId;
   
   const RescuerTrackingScreen({
     super.key,
     required this.requestData,
+    required this.missionId,
   });
 
   @override
-  State<RescuerTrackingScreen> createState() => _RescuerTrackingScreenState();
+  ConsumerState<RescuerTrackingScreen> createState() => _RescuerTrackingScreenState();
 }
 
-class _RescuerTrackingScreenState extends State<RescuerTrackingScreen> {
+class _RescuerTrackingScreenState extends ConsumerState<RescuerTrackingScreen> {
   final List<File> _capturedPhotos = [];
+  // Upload state per photo index
+  final Map<int, _UploadState> _uploadStates = {};
   final TextEditingController _notesController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
-  bool _hasUploadedPhoto = false;
+
+  // At least one photo successfully uploaded
+  bool get _hasUploadedPhoto => _uploadStates.values.any((s) => s == _UploadState.done);
+
+  SnakeSpecies? _species;
+  bool _isLoadingSpecies = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSpecies();
+  }
+
+  Future<void> _loadSpecies() async {
+    final speciesDetail = widget.requestData.details.isNotEmpty
+        ? widget.requestData.details.first
+        : null;
+    if (speciesDetail == null) {
+      if (mounted) setState(() => _isLoadingSpecies = false);
+      return;
+    }
+    try {
+      final repo = ref.read(snakeSpeciesRepositoryProvider);
+      final species = await repo.getSnakeSpeciesById(speciesDetail.snakeSpeciesId);
+      if (mounted) setState(() { _species = species; _isLoadingSpecies = false; });
+    } catch (e) {
+      debugPrint('⚠️ Failed to load species: $e');
+      if (mounted) setState(() => _isLoadingSpecies = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -35,17 +74,55 @@ class _RescuerTrackingScreenState extends State<RescuerTrackingScreen> {
         source: ImageSource.camera,
         imageQuality: 85,
       );
-      
-      if (photo != null) {
-        setState(() {
-          _capturedPhotos.add(File(photo.path));
-          _hasUploadedPhoto = true;
-        });
+      if (photo == null) return;
+
+      final file = File(photo.path);
+      final index = _capturedPhotos.length;
+      setState(() {
+        _capturedPhotos.add(file);
+        _uploadStates[index] = _UploadState.uploading;
+      });
+
+      try {
+        final repo = ref.read(snakeCatchingRepositoryProvider);
+        await repo.uploadMissionEvidence(widget.missionId, file);
+        if (mounted) setState(() => _uploadStates[index] = _UploadState.done);
+      } catch (e) {
+        debugPrint('⚠️ Upload failed for photo $index: $e');
+        if (mounted) {
+          setState(() => _uploadStates[index] = _UploadState.failed);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Tải ảnh thất bại. Nhấn ’Thử lại’ trên ảnh để upload lại.'),
+              backgroundColor: const Color(0xFFDC3545),
+              action: SnackBarAction(
+                label: 'OK',
+                textColor: Colors.white,
+                onPressed: () {},
+              ),
+            ),
+          );
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi chụp ảnh: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi chụp ảnh: $e')),
+        );
+      }
+    }
+  }
+
+  /// Retry upload for a failed photo
+  Future<void> _retryUpload(int index) async {
+    if (index >= _capturedPhotos.length) return;
+    setState(() => _uploadStates[index] = _UploadState.uploading);
+    try {
+      final repo = ref.read(snakeCatchingRepositoryProvider);
+      await repo.uploadMissionEvidence(widget.missionId, _capturedPhotos[index]);
+      if (mounted) setState(() => _uploadStates[index] = _UploadState.done);
+    } catch (e) {
+      if (mounted) setState(() => _uploadStates[index] = _UploadState.failed);
     }
   }
 
@@ -122,9 +199,7 @@ class _RescuerTrackingScreenState extends State<RescuerTrackingScreen> {
                 // Notes Section
                 _buildNotesSection(),
                 
-                // Emergency Section
-                _buildEmergencySection(),
-                
+                // Emergency Section                
                 const SizedBox(height: 100),
               ],
             ),
@@ -138,6 +213,48 @@ class _RescuerTrackingScreenState extends State<RescuerTrackingScreen> {
   }
 
   Widget _buildSnakeInfoBanner() {
+    final speciesDetail = widget.requestData.details.isNotEmpty
+        ? widget.requestData.details.first
+        : null;
+
+    // Image: prefer species imageUrl, fall back to request media
+    String? imageUrl = _species?.imageUrl;
+    if (imageUrl == null && widget.requestData.media.isNotEmpty) {
+      imageUrl = widget.requestData.media.first.url;
+    }
+
+    // Danger label from real species data
+    String dangerLabel = 'Chưa rõ';
+    Color dangerColor = const Color(0xFF999999);
+    String dangerDetail = '';
+    if (_isLoadingSpecies) {
+      dangerLabel = 'Đang tải...';
+    } else if (_species != null) {
+      if (_species!.isVenomous) {
+        if (_species!.riskLevel >= 8.0) {
+          dangerLabel = 'Cực độc';
+          dangerDetail = 'Cực kỳ nguy hiểm';
+          dangerColor = const Color(0xFFD90429);
+        } else if (_species!.riskLevel >= 6.0) {
+          dangerLabel = 'Độc mạnh';
+          dangerDetail = 'Rất nguy hiểm';
+          dangerColor = const Color(0xFFFF6B35);
+        } else if (_species!.riskLevel >= 4.0) {
+          dangerLabel = 'Có độc';
+          dangerDetail = 'Nguy hiểm';
+          dangerColor = const Color(0xFFFFA500);
+        } else {
+          dangerLabel = 'Ít độc';
+          dangerDetail = 'Ít nguy hiểm';
+          dangerColor = const Color(0xFFFFC107);
+        }
+      } else {
+        dangerLabel = 'Không độc';
+        dangerDetail = 'An toàn hơn';
+        dangerColor = const Color(0xFF28A745);
+      }
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(16),
@@ -153,13 +270,14 @@ class _RescuerTrackingScreenState extends State<RescuerTrackingScreen> {
               width: 64,
               height: 64,
               color: const Color(0xFFE0E0E0),
-              child: Image.network(
-                widget.requestData['image'] ?? 'https://picsum.photos/400/300',
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Icon(Icons.image, size: 32, color: Color(0xFFCCCCCC));
-                },
-              ),
+              child: imageUrl != null
+                  ? Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.image, size: 32, color: Color(0xFFCCCCCC)),
+                    )
+                  : const Icon(Icons.image, size: 32, color: Color(0xFFCCCCCC)),
             ),
           ),
           const SizedBox(width: 16),
@@ -168,13 +286,27 @@ class _RescuerTrackingScreenState extends State<RescuerTrackingScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.requestData['title'] ?? 'Rắn Hổ Mang',
+                  _species?.commonName ??
+                      speciesDetail?.snakeSpeciesName ??
+                      'Rắn chưa xác định',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF333333),
                   ),
                 ),
+                if (speciesDetail?.snakeSpeciesScientificName != null &&
+                    speciesDetail!.snakeSpeciesScientificName.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    speciesDetail.snakeSpeciesScientificName,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                      color: Color(0xFF999999),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -182,26 +314,27 @@ class _RescuerTrackingScreenState extends State<RescuerTrackingScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD90429),
+                        color: dangerColor,
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Text(
-                        'Có độc',
-                        style: TextStyle(
+                      child: Text(
+                        dangerLabel,
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
                         ),
                       ),
                     ),
-                    const Text(
-                      'Cực kỳ nguy hiểm',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFFD90429),
+                    if (dangerDetail.isNotEmpty)
+                      Text(
+                        dangerDetail,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: dangerColor,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ],
@@ -283,14 +416,16 @@ class _RescuerTrackingScreenState extends State<RescuerTrackingScreen> {
   }
 
   Widget _buildPhotoDocumentation() {
+    final uploadedCount = _uploadStates.values.where((s) => s == _UploadState.done).length;
+    final uploadingCount = _uploadStates.values.where((s) => s == _UploadState.uploading).length;
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            children: const [
-              Text(
+            children: [
+              const Text(
                 'Chụp Ảnh Quá Trình',
                 style: TextStyle(
                   fontSize: 18,
@@ -298,14 +433,37 @@ class _RescuerTrackingScreenState extends State<RescuerTrackingScreen> {
                   color: Color(0xFF333333),
                 ),
               ),
-              SizedBox(width: 4),
-              Text(
+              const SizedBox(width: 4),
+              const Text(
                 '*Bắt buộc',
                 style: TextStyle(
                   fontSize: 14,
                   color: Color(0xFFDC3545),
                 ),
               ),
+              const Spacer(),
+              if (_capturedPhotos.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: uploadedCount > 0
+                        ? const Color(0xFF28A745).withOpacity(0.12)
+                        : const Color(0xFFFF6B35).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    uploadingCount > 0
+                        ? 'Đang tải $uploadingCount...'
+                        : 'Đã tải $uploadedCount/${_capturedPhotos.length}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: uploadedCount > 0
+                          ? const Color(0xFF28A745)
+                          : const Color(0xFFFF6B35),
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 12),
@@ -324,8 +482,8 @@ class _RescuerTrackingScreenState extends State<RescuerTrackingScreen> {
                   style: BorderStyle.solid,
                 ),
               ),
-              child: Column(
-                children: const [
+              child: const Column(
+                children: [
                   Icon(
                     Icons.photo_camera,
                     size: 36,
@@ -365,6 +523,7 @@ class _RescuerTrackingScreenState extends State<RescuerTrackingScreen> {
   }
 
   Widget _buildPhotoThumbnail(File imageFile, int index) {
+    final uploadState = _uploadStates[index] ?? _UploadState.uploading;
     return Stack(
       children: [
         ClipRRect(
@@ -373,36 +532,103 @@ class _RescuerTrackingScreenState extends State<RescuerTrackingScreen> {
             width: 96,
             height: 96,
             color: const Color(0xFFE0E0E0),
-            child: Image.file(
-              imageFile,
-              fit: BoxFit.cover,
+            child: Image.file(imageFile, fit: BoxFit.cover),
+          ),
+        ),
+
+        // Upload state overlay
+        Positioned.fill(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: uploadState == _UploadState.uploading
+                  ? Container(
+                      key: const ValueKey('uploading'),
+                      color: Colors.black45,
+                      child: const Center(
+                        child: SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    )
+                  : uploadState == _UploadState.failed
+                      ? GestureDetector(
+                          key: const ValueKey('failed'),
+                          onTap: () => _retryUpload(index),
+                          child: Container(
+                            color: Colors.black54,
+                            child: const Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.refresh, color: Colors.white, size: 22),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Thử lại',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        )
+                      : // done — small green tick in corner
+                      Align(
+                          key: const ValueKey('done'),
+                          alignment: Alignment.bottomRight,
+                          child: Container(
+                            margin: const EdgeInsets.all(4),
+                            width: 20,
+                            height: 20,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF28A745),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.check, color: Colors.white, size: 13),
+                          ),
+                        ),
             ),
           ),
         ),
+
+        // Delete button (top-right)
         Positioned(
           top: -4,
           right: -4,
-          child: Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF333333),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.close, size: 14, color: Colors.white),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(
-                minWidth: 20,
-                minHeight: 20,
-              ),
-              onPressed: () {
-                setState(() {
-                  _capturedPhotos.removeAt(index);
-                  if (_capturedPhotos.isEmpty) {
-                    _hasUploadedPhoto = false;
-                  }
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                _capturedPhotos.removeAt(index);
+                // Rebuild uploadStates with shifted indices
+                final newStates = <int, _UploadState>{};
+                _uploadStates.forEach((k, v) {
+                  if (k < index) newStates[k] = v;
+                  else if (k > index) newStates[k - 1] = v;
                 });
-              },
+                _uploadStates
+                  ..clear()
+                  ..addAll(newStates);
+              });
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF333333),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              width: 22,
+              height: 22,
+              child: const Icon(Icons.close, size: 13, color: Colors.white),
             ),
           ),
         ),
@@ -474,54 +700,6 @@ class _RescuerTrackingScreenState extends State<RescuerTrackingScreen> {
     );
   }
 
-  Widget _buildEmergencySection() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(
-        children: [
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                // TODO: Call emergency
-              },
-              icon: const Icon(Icons.call, size: 20),
-              label: const Text(
-                'Gọi Hỗ Trợ Khẩn Cấp',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFFDC3545),
-                side: const BorderSide(color: Color(0xFFDC3545), width: 2),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: () {
-              // TODO: Contact expert
-            },
-            child: const Text(
-              'Liên hệ Expert',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF2196F3),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildBottomButton() {
     return Positioned(
       bottom: 0,
@@ -549,6 +727,7 @@ class _RescuerTrackingScreenState extends State<RescuerTrackingScreen> {
                       MaterialPageRoute(
                         builder: (context) => RescuerResultConfirmationScreen(
                           requestData: widget.requestData,
+                          missionId: widget.missionId,
                           capturedPhotos: _capturedPhotos,
                           notes: _notesController.text,
                         ),
@@ -574,9 +753,9 @@ class _RescuerTrackingScreenState extends State<RescuerTrackingScreen> {
                     padding: EdgeInsets.only(right: 8),
                     child: Icon(Icons.lock, size: 20),
                   ),
-                const Text(
-                  'HOÀN THÀNH BẮT RẮN',
-                  style: TextStyle(
+                Text(
+                  _hasUploadedPhoto ? 'HOÀN THÀNH BẮT RẮN' : 'CẦN ÍT NHẤT 1 ẢNH',
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),

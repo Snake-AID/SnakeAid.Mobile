@@ -1,37 +1,127 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io';
+import '../../models/snake_catching_request.dart';
+import '../../models/snake_species.dart';
+import '../../repository/snake_catching_repository.dart';
+import '../../repository/snake_species_repository.dart';
 import 'rescuer_mission_success_screen.dart';
 
+/// A confirmed snake entry (species + quantity) — submitted to backend
+class _SnakeEntry {
+  final SnakeSpecies species;
+  final int quantity;
+  const _SnakeEntry({required this.species, required this.quantity});
+}
+
 /// Màn hình xác nhận kết quả sau khi bắt rắn thành công
-class RescuerResultConfirmationScreen extends StatefulWidget {
-  final Map<String, dynamic> requestData;
+class RescuerResultConfirmationScreen extends ConsumerStatefulWidget {
+  final SnakeCatchingRequestData requestData;
+  final String missionId;
   final List<File> capturedPhotos;
   final String notes;
   
   const RescuerResultConfirmationScreen({
     super.key,
     required this.requestData,
+    required this.missionId,
     required this.capturedPhotos,
     required this.notes,
   });
 
   @override
-  State<RescuerResultConfirmationScreen> createState() => _RescuerResultConfirmationScreenState();
+  ConsumerState<RescuerResultConfirmationScreen> createState() => _RescuerResultConfirmationScreenState();
 }
 
-class _RescuerResultConfirmationScreenState extends State<RescuerResultConfirmationScreen> {
-  String? _selectedSnake;
-  final TextEditingController _scientificNameController = TextEditingController();
+class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultConfirmationScreen> {
+  // Snake species loaded from API
+  List<SnakeSpecies> _allSpecies = [];
+  bool _isLoadingSpecies = true;
+
+  // Pending entry (not yet confirmed / submitted)
+  SnakeSpecies? _pendingSpecies;
+  int _pendingQuantity = 1;
+
+  // Confirmed snakes (already submitted to backend)
+  final List<_SnakeEntry> _confirmedSnakes = [];
+  bool _isConfirmingSnake = false;
+  bool _isSubmitting = false;
+
+  // Optional detail fields
   double _snakeSize = 120;
   String _snakeStatus = 'healthy';
   final TextEditingController _releaseLocationController = TextEditingController();
   final TextEditingController _additionalNotesController = TextEditingController();
-  
-  bool get _isValid => _selectedSnake != null;
+
+  bool get _isValid => _confirmedSnakes.isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAllSpecies();
+  }
+
+  Future<void> _loadAllSpecies() async {
+    try {
+      final repo = ref.read(snakeSpeciesRepositoryProvider);
+      final list = await repo.getSnakeSpecies();
+      if (mounted) setState(() { _allSpecies = list; _isLoadingSpecies = false; });
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingSpecies = false);
+    }
+  }
+
+  Future<void> _confirmSnake() async {
+    if (_pendingSpecies == null || _isConfirmingSnake) return;
+    setState(() => _isConfirmingSnake = true);
+    try {
+      final repo = ref.read(snakeCatchingRepositoryProvider);
+      await repo.addMissionDetail(widget.missionId, _pendingSpecies!.id, _pendingQuantity);
+      setState(() {
+        _confirmedSnakes.add(_SnakeEntry(species: _pendingSpecies!, quantity: _pendingQuantity));
+        _pendingSpecies = null;
+        _pendingQuantity = 1;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Lỗi: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isConfirmingSnake = false);
+    }
+  }
+
+  Future<void> _submitResult() async {
+    if (!_isValid || _isSubmitting) return;
+    setState(() => _isSubmitting = true);
+    try {
+      final repo = ref.read(snakeCatchingRepositoryProvider);
+      await repo.completeMission(widget.missionId);
+      if (!mounted) return;
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (context) => RescuerMissionSuccessScreen(
+          requestData: widget.requestData,
+          missionId: widget.missionId,
+          photoCount: widget.capturedPhotos.length,
+        ),
+      ));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Lỗi: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
 
   @override
   void dispose() {
-    _scientificNameController.dispose();
     _releaseLocationController.dispose();
     _additionalNotesController.dispose();
     super.dispose();
@@ -146,7 +236,7 @@ class _RescuerResultConfirmationScreenState extends State<RescuerResultConfirmat
       ),
       child: Column(
         children: [
-          _buildSummaryRow(Icons.location_on, widget.requestData['address'] ?? '123 Nguyễn Văn Linh'),
+          _buildSummaryRow(Icons.location_on, widget.requestData.address),
           const SizedBox(height: 12),
           _buildSummaryRow(Icons.calendar_today, '8/12/2025, 14:30'),
         ],
@@ -180,9 +270,6 @@ class _RescuerResultConfirmationScreenState extends State<RescuerResultConfirmat
   }
 
   Widget _buildSnakeConfirmationCard() {
-    final aiSnakeName = widget.requestData['title'] ?? 'Rắn Hổ Mang';
-    final bool isDifferentFromAI = _selectedSnake != null && _selectedSnake != aiSnakeName;
-    
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(16),
@@ -190,150 +277,161 @@ class _RescuerResultConfirmationScreenState extends State<RescuerResultConfirmat
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2)),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header
           Row(
             children: const [
-              Text(
-                'Xác Nhận Loài Rắn',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF333333),
-                ),
-              ),
-              Text(
-                ' *',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Color(0xFFFF6B35),
-                ),
-              ),
+              Text('Xác Nhận Loài Rắn',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF333333))),
+              Text(' *', style: TextStyle(fontSize: 18, color: Color(0xFFFF6B35))),
             ],
           ),
+          const SizedBox(height: 4),
+          const Text('Thêm từng loài rắn đã bắt được',
+              style: TextStyle(fontSize: 13, color: Color(0xFF888888))),
           const SizedBox(height: 16),
-          
-          // Photo Grid
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: widget.capturedPhotos.map((photo) {
-                return Container(
-                  margin: const EdgeInsets.only(right: 12),
-                  width: 112,
-                  height: 112,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    color: const Color(0xFFE0E0E0),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.file(
-                      photo,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Dropdown
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFFF6B35), width: 1.5),
-              borderRadius: BorderRadius.circular(8),
-              color: Colors.white,
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                isExpanded: true,
-                value: _selectedSnake,
-                hint: const Text(
-                  'Chọn loài rắn',
-                  style: TextStyle(color: Color(0xFF999999)),
-                ),
-                items: [
-                  'Rắn Hổ Mang',
-                  'Rắn Lục',
-                  'Rắn Cạp Nong',
-                  'Rắn Hổ Lục',
-                  'Rắn Ri Cá',
-                ].map((snake) {
-                  return DropdownMenuItem(
-                    value: snake,
-                    child: Text(snake),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedSnake = value;
-                  });
-                },
-              ),
-            ),
-          ),
-          
-          if (isDifferentFromAI) ...[
-            const SizedBox(height: 12),
+
+          // List of confirmed snakes
+          if (_confirmedSnakes.isEmpty)
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: const Text('Chưa có loài rắn nào được xác nhận',
+                  style: TextStyle(fontSize: 14, color: Color(0xFF999999), fontStyle: FontStyle.italic)),
+            )
+          else
+            ...List.generate(_confirmedSnakes.length, (i) {
+              final entry = _confirmedSnakes[i];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FFF4),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF28A745).withOpacity(0.4)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: Color(0xFF28A745), size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text('${entry.species.commonName} × ${entry.quantity}',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600,
+                              color: Color(0xFF333333))),
+                    ),
+                    InkWell(
+                      onTap: () => setState(() => _confirmedSnakes.removeAt(i)),
+                      child: const Icon(Icons.close, size: 18, color: Color(0xFF999999)),
+                    ),
+                  ],
+                ),
+              );
+            }),
+
+          const Divider(height: 24),
+
+          // Add snake row
+          const Text('Thêm rắn', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF666666))),
+          const SizedBox(height: 10),
+
+          // Species dropdown
+          if (_isLoadingSpecies)
+            const Center(child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFF6B35))))
+          else if (_allSpecies.isEmpty)
+            const Text('Không thể tải danh sách loài rắn',
+                style: TextStyle(color: Color(0xFF999999), fontStyle: FontStyle.italic))
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF3CD),
+                border: Border.all(color: const Color(0xFFFF6B35), width: 1.5),
                 borderRadius: BorderRadius.circular(8),
+                color: Colors.white,
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.warning, color: Color(0xFF856404), size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Khác với kết quả AI ($aiSnakeName)',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF856404),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<SnakeSpecies>(
+                  isExpanded: true,
+                  value: _pendingSpecies,
+                  hint: const Text('Chọn loài rắn', style: TextStyle(color: Color(0xFF999999))),
+                  items: _allSpecies.map((s) {
+                    return DropdownMenuItem<SnakeSpecies>(
+                      value: s,
+                      child: Text(s.commonName, overflow: TextOverflow.ellipsis),
+                    );
+                  }).toList(),
+                  onChanged: (s) => setState(() => _pendingSpecies = s),
+                ),
+              ),
+            ),
+
+          if (!_isLoadingSpecies && _allSpecies.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            // Quantity row + confirm button
+            Row(
+              children: [
+                // Quantity selector
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: const Color(0xFFDDDDDD)),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.remove, size: 16),
+                        padding: const EdgeInsets.all(6),
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        onPressed: _pendingQuantity > 1
+                            ? () => setState(() => _pendingQuantity--)
+                            : null,
                       ),
+                      Text('$_pendingQuantity',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
+                              color: Color(0xFF333333))),
+                      IconButton(
+                        icon: const Icon(Icons.add, size: 16),
+                        padding: const EdgeInsets.all(6),
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        onPressed: () => setState(() => _pendingQuantity++),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Confirm button
+                Expanded(
+                  child: SizedBox(
+                    height: 44,
+                    child: ElevatedButton(
+                      onPressed: (_pendingSpecies != null && !_isConfirmingSnake)
+                          ? _confirmSnake
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF6B35),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: const Color(0xFFDDDDDD),
+                        disabledForegroundColor: const Color(0xFF999999),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: _isConfirmingSnake
+                          ? const SizedBox(width: 18, height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Text('XÁC NHẬN',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ],
-          
-          const SizedBox(height: 12),
-          
-          TextField(
-            controller: _scientificNameController,
-            decoration: InputDecoration(
-              hintText: 'Tên khoa học (tùy chọn)',
-              hintStyle: const TextStyle(color: Color(0xFF999999)),
-              filled: true,
-              fillColor: const Color(0xFFF4F4F4),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFDDDDDD)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFDDDDDD)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFF28A745)),
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -535,14 +633,15 @@ class _RescuerResultConfirmationScreenState extends State<RescuerResultConfirmat
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              'Bạn sẽ nhận: ${widget.requestData['price'] ?? '170,000'} VNĐ',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF28A745),
-              ),
+            if (widget.requestData.estimatedPrice != null)
+              Text(
+                'Bạn sẽ nhận: ${widget.requestData.estimatedPrice!.toStringAsFixed(0)} VNĐ',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF28A745),
+                ),
             ),
             const SizedBox(height: 4),
             const Text(
@@ -576,41 +675,24 @@ class _RescuerResultConfirmationScreenState extends State<RescuerResultConfirmat
           width: double.infinity,
           height: 55,
           child: ElevatedButton.icon(
-            onPressed: _isValid
-                ? () {
-                    _showSuccessDialog();
-                  }
-                : null,
-            icon: const Icon(Icons.send, size: 20),
-            label: const Text(
-              'GỬI KẾT QUẢ CHO KHÁCH HÀNG',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+            onPressed: (_isValid && !_isSubmitting) ? _submitResult : null,
+            icon: _isSubmitting
+                ? const SizedBox(width: 20, height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.send, size: 20),
+            label: Text(
+              _isValid ? 'GỬI KẾT QUẢ CHO KHÁCH HÀNG' : 'CẦN XÁC NHẬN ÍT NHẤT 1 LOÀI RẮN',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: _isValid ? const Color(0xFF28A745) : const Color(0xFFDDDDDD),
-              foregroundColor: _isValid ? Colors.white : const Color(0xFF999999),
+              backgroundColor: (_isValid && !_isSubmitting) ? const Color(0xFF28A745) : const Color(0xFFDDDDDD),
+              foregroundColor: (_isValid && !_isSubmitting) ? Colors.white : const Color(0xFF999999),
               elevation: 0,
               disabledBackgroundColor: const Color(0xFFDDDDDD),
               disabledForegroundColor: const Color(0xFF999999),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  void _showSuccessDialog() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => RescuerMissionSuccessScreen(
-          requestData: widget.requestData,
-          photoCount: widget.capturedPhotos.length,
         ),
       ),
     );
