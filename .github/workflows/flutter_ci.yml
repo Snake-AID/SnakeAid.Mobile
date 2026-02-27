@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: ["main", "dev"]
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   analyze-test:
     name: Analyze and Test
@@ -93,3 +97,31 @@ jobs:
         with:
           name: debug-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
+
+  auto-format:
+    name: Auto-format Code
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.1"
+          channel: "stable"
+
+      - name: Format code
+        run: dart format .
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "style: auto-format dart code"
+          title: "style: auto-format dart code"
+          body: "This PR was automatically generated to format Dart code using `dart format`."
+          branch: auto-format-dart
+          base: ${{ github.ref_name }}
+          delete-branch: true
