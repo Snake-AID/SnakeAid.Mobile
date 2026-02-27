@@ -1,17 +1,29 @@
 import 'package:dio/dio.dart';
-import '../services/health_check_service.dart';
+import 'package:flutter/foundation.dart';
 import '../interceptors/token_refresh_interceptor.dart';
 import '../interceptors/logging_interceptor.dart';
+import '../services/health_check_service.dart';
 
-/// HTTP Service - Simplified
-/// Chỉ làm HTTP client wrapper, không quản lý auth logic
-/// Token refresh được xử lý bởi TokenRefreshInterceptor
+/// Thin Dio wrapper.
+///
+/// Responsibilities:
+/// - Configure Dio with timeouts and base headers.
+/// - Run [HealthCheckService] before each request (cached, low-overhead).
+/// - Translate [DioException] into user-readable messages while preserving
+///   the original exception type for callers that need to inspect status codes.
+///
+/// Auth / token refresh is handled entirely by [TokenRefreshInterceptor].
 class HttpService {
   late final Dio _dio;
   final String baseUrl;
   final HealthCheckService? healthCheckService;
+  final Future<void> Function() onForceLogout;
 
-  HttpService({required this.baseUrl, this.healthCheckService}) {
+  HttpService({
+    required this.baseUrl,
+    required this.onForceLogout,
+    this.healthCheckService,
+  }) {
     _dio = Dio(
       BaseOptions(
         baseUrl: baseUrl,
@@ -24,190 +36,193 @@ class HttpService {
       ),
     );
 
-    // Add interceptors (in order)
     _dio.interceptors.addAll([
-      LoggingInterceptor(), // Logging trước
-      TokenRefreshInterceptor(_dio), // Token refresh sau
+      LoggingInterceptor(),
+      TokenRefreshInterceptor(_dio, onForceLogout: onForceLogout),
     ]);
   }
 
   Dio get dio => _dio;
 
-  // GET request
+  // ==================== HTTP METHODS ====================
+
   Future<Response> get(
     String path, {
     Map<String, dynamic>? queryParameters,
     Options? options,
   }) async {
-    await _performHealthCheck();
+    await _healthCheck();
     try {
-      final response = await _dio.get(
+      return await _dio.get(
         path,
         queryParameters: queryParameters,
         options: options,
       );
-      return response;
     } on DioException catch (e) {
-      throw _handleError(e);
+      throw _enrichError(e);
     }
   }
 
-  // POST request
   Future<Response> post(
     String path, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
     Options? options,
   }) async {
-    await _performHealthCheck();
+    await _healthCheck();
     try {
-      final response = await _dio.post(
+      return await _dio.post(
         path,
         data: data,
         queryParameters: queryParameters,
         options: options,
       );
-      return response;
     } on DioException catch (e) {
-      throw _handleError(e);
+      throw _enrichError(e);
     }
   }
 
-  // PUT request
   Future<Response> put(
     String path, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
     Options? options,
   }) async {
-    await _performHealthCheck();
+    await _healthCheck();
     try {
-      final response = await _dio.put(
+      return await _dio.put(
         path,
         data: data,
         queryParameters: queryParameters,
         options: options,
       );
-      return response;
     } on DioException catch (e) {
-      throw _handleError(e);
+      throw _enrichError(e);
     }
   }
 
-  // PATCH request
   Future<Response> patch(
     String path, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
     Options? options,
   }) async {
+    await _healthCheck(); // ← was missing in original
     try {
-      final response = await _dio.patch(
+      return await _dio.patch(
         path,
         data: data,
         queryParameters: queryParameters,
         options: options,
       );
-      return response;
     } on DioException catch (e) {
-      throw _handleError(e);
+      throw _enrichError(e);
     }
   }
 
-  // DELETE request
   Future<Response> delete(
     String path, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
     Options? options,
   }) async {
-    await _performHealthCheck();
+    await _healthCheck();
     try {
-      final response = await _dio.delete(
+      return await _dio.delete(
         path,
         data: data,
         queryParameters: queryParameters,
         options: options,
       );
-      return response;
     } on DioException catch (e) {
-      throw _handleError(e);
+      throw _enrichError(e);
     }
   }
 
-  /// Perform health check before request
-  Future<void> _performHealthCheck() async {
-    if (healthCheckService != null) {
-      final isAlive = await healthCheckService!.isServerAlive();
-      if (!isAlive) {
-        throw DioException(
-          requestOptions: RequestOptions(path: ''),
-          type: DioExceptionType.connectionError,
-          error: 'HEALTH_CHECK_FAILED',
-        );
-      }
+  // ==================== PRIVATE HELPERS ====================
+
+  /// Fast-fail health check using cached result (15 s TTL by default).
+  /// No-op when [healthCheckService] is null.
+  Future<void> _healthCheck() async {
+    if (healthCheckService == null) return;
+    final alive = await healthCheckService!.isServerAlive();
+    if (!alive) {
+      throw DioException(
+        requestOptions: RequestOptions(path: ''),
+        type: DioExceptionType.connectionError,
+        error: 'HEALTH_CHECK_FAILED',
+        message:
+            'Máy chủ đang bảo trì hoặc không thể kết nối. Vui lòng thử lại sau.',
+      );
     }
   }
 
-  /// Handle Dio errors và extract user-friendly messages
-  String _handleError(DioException error) {
-    switch (error.type) {
+  /// Re-throws [original] with a user-readable [message] attached.
+  ///
+  /// Preserves the original [DioException] type and response so callers
+  /// (repositories, interceptors) can still inspect status codes.
+  DioException _enrichError(DioException original) {
+    final message = _buildMessage(original);
+    debugPrint('🌐 HTTP error: $message (${original.response?.statusCode})');
+    return DioException(
+      requestOptions: original.requestOptions,
+      response: original.response,
+      type: original.type,
+      error: original.error,
+      message: message, // ← user-readable, accessible via e.message
+    );
+  }
+
+  String _buildMessage(DioException e) {
+    // Health check shortcut
+    if (e.error == 'HEALTH_CHECK_FAILED') {
+      return 'Máy chủ đang bảo trì hoặc không thể kết nối. Vui lòng thử lại sau.';
+    }
+
+    switch (e.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
         return 'Kết nối timeout. Vui lòng thử lại.';
 
-      case DioExceptionType.badResponse:
-        return _extractErrorMessage(error.response);
-
       case DioExceptionType.cancel:
         return 'Request đã bị hủy.';
 
       case DioExceptionType.connectionError:
-        if (error.error == 'HEALTH_CHECK_FAILED') {
-          return 'Máy chủ đang bảo trì hoặc không thể kết nối. Vui lòng thử lại sau.';
-        }
         return 'Không thể kết nối tới server. Kiểm tra kết nối mạng.';
 
       case DioExceptionType.unknown:
-        return error.message?.contains('SocketException') ?? false
-            ? 'Không thể kết nối tới server'
+        return (e.message?.contains('SocketException') ?? false)
+            ? 'Không thể kết nối tới server.'
             : 'Lỗi mạng. Vui lòng kiểm tra kết nối.';
+
+      case DioExceptionType.badResponse:
+        return _messageFromResponse(e.response);
 
       default:
         return 'Đã có lỗi xảy ra. Vui lòng thử lại.';
     }
   }
 
-  /// Extract error message từ response data (ApiResponse structure)
-  String _extractErrorMessage(Response? response) {
-    if (response?.data == null) {
-      return _getHttpErrorMessage(response?.statusCode);
-    }
+  /// Extract message from backend ApiResponse envelope, then fall back to
+  /// HTTP status code description.
+  String _messageFromResponse(Response? response) {
+    if (response?.data is Map) {
+      final data = response!.data as Map;
 
-    // Try to extract from backend ApiResponse format
-    if (response!.data is Map) {
-      final data = response.data as Map;
+      if (data['message'] != null) return data['message'].toString();
 
-      // Priority: message > error.message > HTTP status message
-      if (data.containsKey('message')) {
-        return data['message'].toString();
-      }
-
-      if (data.containsKey('error') && data['error'] is Map) {
-        final errorData = data['error'] as Map;
-        if (errorData.containsKey('message')) {
-          return errorData['message'].toString();
-        }
+      if (data['error'] is Map) {
+        final err = data['error'] as Map;
+        if (err['message'] != null) return err['message'].toString();
       }
     }
 
-    return _getHttpErrorMessage(response.statusCode);
+    return _messageFromStatusCode(response?.statusCode);
   }
 
-  /// Get generic error message based on HTTP status code
-  String _getHttpErrorMessage(int? statusCode) {
-    switch (statusCode) {
+  String _messageFromStatusCode(int? code) {
+    switch (code) {
       case 400:
         return 'Yêu cầu không hợp lệ.';
       case 401:
@@ -221,7 +236,7 @@ class HttpService {
       case 503:
         return 'Dịch vụ không khả dụng.';
       default:
-        return 'Đã có lỗi xảy ra (${statusCode ?? 'unknown'}).';
+        return 'Đã có lỗi xảy ra (${code ?? 'unknown'}).';
     }
   }
 }

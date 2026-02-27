@@ -20,8 +20,8 @@ class HealthCheckService {
     _pingDio = Dio(
       BaseOptions(
         baseUrl: baseUrl,
-        connectTimeout: const Duration(seconds: 2), // Fail-fast: đóng sau 2s
-        receiveTimeout: const Duration(seconds: 2),
+        connectTimeout: const Duration(seconds: 10), // Fail-fast: đóng sau 2s
+        receiveTimeout: const Duration(seconds: 10),
       ),
     );
   }
