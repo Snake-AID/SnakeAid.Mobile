@@ -37,8 +37,8 @@ class HttpService {
     );
 
     _dio.interceptors.addAll([
-      LoggingInterceptor(),
       TokenRefreshInterceptor(_dio, onForceLogout: onForceLogout),
+      LoggingInterceptor(),
     ]);
   }
 

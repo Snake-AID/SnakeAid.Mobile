@@ -8,9 +8,11 @@ final String baseUrl =
     dotenv.env['BASE_URL'] ?? 'https://snakeaid-dev.duykhiem.id.vn';
 // const String baseUrl = 'http://10.0.2.2:8080';
 final httpServiceProvider = Provider<HttpService>((ref) {
+  final healthCheckService = ref.read(healthCheckServiceProvider);
   return HttpService(
     baseUrl: baseUrl,
     onForceLogout: () => ref.read(authProvider.notifier).forceLogout(),
+    healthCheckService: healthCheckService,
   );
 });
 
