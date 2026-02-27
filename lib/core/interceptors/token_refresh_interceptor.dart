@@ -1,58 +1,56 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 
-/// Result từ refresh token operation
-enum RefreshResult {
-  success, // Refresh thành công
-  invalidToken, // Refresh token không hợp lệ (401)
-  networkError, // Lỗi network/server (giữ session)
-}
-
-/// Interceptor xử lý token refresh tự động
-/// - Proactive refresh: Refresh token TRƯỚC khi hết hạn (5-10 phút trước)
-/// - Fallback refresh: Retry khi gặp 401 Unauthorized
-/// - Session preservation: KHÔNG force logout khi network error (offline-first)
+/// Handles automatic token refresh when a mid-session API call returns 401.
+///
+/// Responsibilities (ONLY these):
+/// - Attach Bearer token to every non-public request.
+/// - On 401: call /auth/refresh → retry original request.
+/// - On refresh 401/403: call [onForceLogout] so the UI redirects to login.
+/// - FormData requests: cannot re-send body, update header only, let caller retry.
+///
+/// NOT responsible for:
+/// - Proactive / startup token refresh  →  AuthNotifier._loadSavedSession
+/// - Offline detection                  →  AuthNotifier._loadSavedSession
 class TokenRefreshInterceptor extends Interceptor {
   final Dio dio;
 
-  // Public endpoints không cần token hoặc refresh
+  /// Called when server rejects the refresh token (401/403).
+  /// Wire to AuthNotifier.forceLogout() via http_provider.
+  final Future<void> Function() onForceLogout;
+
   static const _publicEndpoints = [
     '/api/auth/login',
     '/api/auth/register',
     '/api/auth/refresh',
+    '/api/auth/logout',
+    '/api/auth/verify-account',
     '/api/email/send-otp',
     '/api/email/verify',
   ];
 
-  TokenRefreshInterceptor(this.dio);
+  // Prevent concurrent refresh calls
+  bool _isRefreshing = false;
+  final _waitingCompleters = <Completer<bool>>[];
+
+  TokenRefreshInterceptor(this.dio, {required this.onForceLogout});
+
+  // ==================== INTERCEPTOR HOOKS ====================
 
   @override
   Future<void> onRequest(
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    // Skip cho public endpoints
-    if (_isPublicEndpoint(options.path)) {
-      return handler.next(options);
+    if (_isPublicEndpoint(options.path)) return handler.next(options);
+
+    final token = await _getAccessToken();
+    if (token != null) {
+      options.headers['Authorization'] = 'Bearer $token';
     }
-
-    try {
-      // Proactive token refresh: Check nếu token sắp hết hạn
-      await _proactiveRefreshIfNeeded();
-
-      // Add auth header
-      final token = await _getAccessToken();
-      if (token != null) {
-        options.headers['Authorization'] = 'Bearer $token';
-      }
-
-      return handler.next(options);
-    } catch (e) {
-      debugPrint('⚠️ Error in request interceptor: $e');
-      return handler.next(options);
-    }
+    return handler.next(options);
   }
 
   @override
@@ -60,278 +58,147 @@ class TokenRefreshInterceptor extends Interceptor {
     DioException err,
     ErrorInterceptorHandler handler,
   ) async {
-    // Skip cho public endpoints
     if (_isPublicEndpoint(err.requestOptions.path)) {
       return handler.next(err);
     }
-
-    // Fallback refresh: Nếu gặp 401, thử refresh token và retry
-    if (err.response?.statusCode == 401) {
-      final refreshResult = await _fallbackRefresh();
-
-      if (refreshResult == RefreshResult.success) {
-        final isFormData =
-            err.requestOptions.data is FormData ||
-            err.requestOptions.headers['Content-Type']?.toString().contains(
-                  'multipart/form-data',
-                ) ==
-                true;
-
-        if (isFormData) {
-          // Return error với updated token, để caller tự retry
-          final token = await _getAccessToken();
-          err.requestOptions.headers['Authorization'] = 'Bearer $token';
-          return handler.next(err);
-        }
-
-        // Retry request với token mới (non-FormData only)
-        try {
-          final token = await _getAccessToken();
-          err.requestOptions.headers['Authorization'] = 'Bearer $token';
-
-          final response = await dio.fetch(err.requestOptions);
-          return handler.resolve(response);
-        } catch (e) {
-          debugPrint('❌ Retry after refresh failed: $e');
-          return handler.next(err);
-        }
-      } else if (refreshResult == RefreshResult.invalidToken) {
-        // 🔴 Refresh token không hợp lệ → Force logout
-        debugPrint('🚨 Refresh token invalid, forcing logout...');
-        await _forceLogout();
-        return handler.next(err);
-      } else {
-        // RefreshResult.networkError → GIỮ session, convert to network error
-        debugPrint(
-          '⚠️ Refresh failed due to network, keeping session for offline mode',
-        );
-        debugPrint('   → Converting 401 to network error for better UX');
-
-        // Convert authentication error to network error for better user experience
-        final networkError = DioException(
-          requestOptions: err.requestOptions,
-          type: DioExceptionType.connectionTimeout,
-          message:
-              'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.',
-          error: 'Token refresh timeout - keeping session for offline mode',
-        );
-        return handler.next(networkError);
-      }
+    if (err.response?.statusCode != 401) {
+      return handler.next(err);
     }
 
-    return handler.next(err);
+    debugPrint('🔄 401 on ${err.requestOptions.path} — refreshing token...');
+
+    // If a refresh is already in flight, wait for its result
+    if (_isRefreshing) {
+      debugPrint('⏳ Waiting for in-flight refresh...');
+      final completer = Completer<bool>();
+      _waitingCompleters.add(completer);
+      final success = await completer.future;
+      if (!success) return handler.next(err);
+      return _retryRequest(err, handler);
+    }
+
+    // First caller — do the refresh
+    _isRefreshing = true;
+    final refreshed = await _performRefresh();
+    _isRefreshing = false;
+
+    // Wake up waiting requests
+    for (final c in _waitingCompleters) {
+      c.complete(refreshed);
+    }
+    _waitingCompleters.clear();
+
+    if (!refreshed) {
+      debugPrint('🚨 Refresh token rejected — forcing logout');
+      await onForceLogout();
+      return handler.next(err);
+    }
+
+    return _retryRequest(err, handler);
   }
 
-  /// Proactive refresh: Refresh token nếu sắp hết hạn
-  /// 🔥 CHỈ refresh khi SẮP hết hạn, KHÔNG refresh khi ĐÃ hết hạn
-  /// (để tránh clear session khi offline/network error)
-  Future<void> _proactiveRefreshIfNeeded() async {
+  // ==================== PRIVATE METHODS ====================
+
+  Future<void> _retryRequest(
+    DioException err,
+    ErrorInterceptorHandler handler,
+  ) async {
+    final newToken = await _getAccessToken();
+
+    // FormData body cannot be re-sent — update the token header and return
+    // the error so the caller (e.g. an upload screen) can show a retry button.
+    if (_isFormData(err.requestOptions)) {
+      debugPrint('📎 FormData request — token updated, caller must retry');
+      err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+      return handler.next(err);
+    }
+
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final tokenExpiryStr = prefs.getString('token_expiry');
-
-      if (tokenExpiryStr == null) return;
-
-      final tokenExpiry = DateTime.parse(tokenExpiryStr);
-      final now = DateTime.now();
-
-      // 🔴 CHỈ refresh khi token SẮP hết hạn (5-10 phút trước)
-      // KHÔNG refresh nếu đã hết hạn (để giữ session cho offline mode)
-      final isExpired = now.isAfter(tokenExpiry);
-      final isExpiringSoon =
-          now.isAfter(tokenExpiry.subtract(const Duration(minutes: 10))) &&
-          !isExpired;
-
-      if (isExpiringSoon) {
-        debugPrint('⏰ Token expiring soon, checking connectivity...');
-
-        // Check connectivity TRƯỚC khi refresh
-        try {
-          final connectivityResults = await Connectivity().checkConnectivity();
-          final isOffline =
-              connectivityResults.isEmpty ||
-              connectivityResults.every(
-                (result) => result == ConnectivityResult.none,
-              );
-
-          if (isOffline) {
-            debugPrint('📵 Offline mode - skipping proactive refresh');
-            debugPrint('   → Will attempt refresh when network is available');
-            return; // ← Skip refresh khi offline
-          }
-
-          debugPrint(
-            '📶 Network available (${connectivityResults.first.name}), proceeding with proactive refresh...',
-          );
-        } catch (e) {
-          // If connectivity check fails, proceed anyway
-          debugPrint('⚠️ Connectivity check failed: $e, attempting refresh...');
-        }
-
-        final result = await _refreshToken();
-
-        if (result != RefreshResult.success) {
-          debugPrint(
-            '⚠️ Proactive refresh failed: $result, will retry on next request',
-          );
-          // KHÔNG force logout - giữ session cho offline mode
-        }
-      } else if (isExpired) {
-        debugPrint(
-          '⏰ Token expired, waiting for 401 to trigger fallback refresh',
-        );
-        // KHÔNG force logout - chờ request thất bại rồi fallback refresh
-      }
+      err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+      final response = await dio.fetch(err.requestOptions);
+      debugPrint('✅ Retried successfully after token refresh');
+      return handler.resolve(response);
     } catch (e) {
-      debugPrint('⚠️ Proactive refresh check failed: $e');
-      // KHÔNG force logout - giữ session
+      debugPrint('❌ Retry failed: $e');
+      return handler.next(err);
     }
   }
 
-  /// Fallback refresh: Gọi khi gặp 401
-  Future<RefreshResult> _fallbackRefresh() async {
-    try {
-      debugPrint('🔄 Fallback token refresh...');
-      return await _refreshToken();
-    } catch (e) {
-      debugPrint('❌ Fallback refresh failed: $e');
-      return RefreshResult.networkError;
-    }
-  }
-
-  /// Thực hiện refresh token với connectivity awareness
-  /// Checks network state before making API call to avoid unnecessary timeouts
-  Future<RefreshResult> _refreshToken() async {
+  /// Returns true  → tokens saved, caller may retry request.
+  /// Returns false → server rejected refresh (401/403), caller must logout.
+  /// Network errors return true to avoid false logouts in poor connectivity.
+  Future<bool> _performRefresh() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final refreshToken = prefs.getString('refresh_token');
       final userId = prefs.getString('user_id');
 
       if (refreshToken == null || userId == null) {
-        debugPrint('⚠️ No refresh token or userId available');
-        return RefreshResult.invalidToken;
+        debugPrint('⚠️ No refresh token/userId in storage');
+        return false;
       }
 
-      // 🔥 Check connectivity BEFORE calling API (fast fail if offline)
-      try {
-        final connectivityResults = await Connectivity().checkConnectivity();
-        final isOffline =
-            connectivityResults.isEmpty ||
-            connectivityResults.every(
-              (result) => result == ConnectivityResult.none,
-            );
-
-        if (isOffline) {
-          debugPrint(
-            '📵 No network connection, skipping refresh (offline mode)',
-          );
-          debugPrint('   → Keeping session for offline access to cached data');
-          return RefreshResult
-              .networkError; // ← Fast fail, don't wait for timeout
-        }
-
-        debugPrint(
-          '📶 Network available (${connectivityResults.first.name}), proceeding with refresh...',
-        );
-      } catch (e) {
-        // If connectivity check fails, proceed with API call anyway
-        debugPrint(
-          '⚠️ Connectivity check failed: $e, proceeding with refresh...',
-        );
-      }
-
-      // Call refresh API (only when network is available)
       final response = await dio.post(
         '/api/auth/refresh',
         data: {'userId': userId, 'refreshToken': refreshToken},
         options: Options(
+          sendTimeout: const Duration(seconds: 10),
           receiveTimeout: const Duration(seconds: 10),
-          sendTimeout: const Duration(seconds: 5),
         ),
       );
 
-      // Parse response
-      if (response.data != null &&
-          response.data['is_success'] == true &&
-          response.data['data'] != null) {
-        final newAccessToken = response.data['data']['accessToken'] as String;
-        final newRefreshToken = response.data['data']['refreshToken'] as String;
+      final respData = response.data;
+      if (respData?['is_success'] == true && respData?['data'] != null) {
+        final tokenData = respData['data'] as Map<String, dynamic>;
+        final newAccess = tokenData['accessToken'] as String;
+        final newRefresh = tokenData['refreshToken'] as String;
+        final newUserId =
+            (tokenData['user'] as Map<String, dynamic>?)?['id'] as String? ??
+            userId;
 
-        // Save new tokens
-        await prefs.setString('access_token', newAccessToken);
-        await prefs.setString('refresh_token', newRefreshToken);
-        await prefs.setString('auth_token', newAccessToken);
+        await Future.wait([
+          prefs.setString('access_token', newAccess),
+          prefs.setString('refresh_token', newRefresh),
+          prefs.setString('auth_token', newAccess),
+          prefs.setString('user_id', newUserId),
+          prefs.setString(
+            'token_expiry',
+            DateTime.now().add(const Duration(minutes: 55)).toIso8601String(),
+          ),
+        ]);
 
-        // Update expiry time (55 minutes from now)
-        final newExpiry = DateTime.now().add(const Duration(minutes: 55));
-        await prefs.setString('token_expiry', newExpiry.toIso8601String());
-
-        // Clear needs_reauth flag nếu có
-        await prefs.remove('token_needs_reauth');
-
-        debugPrint('✅ Token refreshed successfully');
-        debugPrint('⏰ New expiry: $newExpiry');
-
-        return RefreshResult.success;
+        debugPrint('✅ Mid-session token refreshed');
+        return true;
       }
 
-      debugPrint('⚠️ Refresh response invalid');
-      return RefreshResult.invalidToken;
+      debugPrint('⚠️ Refresh response not successful');
+      return false;
     } on DioException catch (e) {
-      // Phân biệt giữa network error và invalid token
       if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
-        // Server rejected token → Token thật sự invalid
-        debugPrint('🚨 Refresh token invalid (${e.response?.statusCode})');
-        debugPrint('   → Token expired or revoked, will force logout');
-        return RefreshResult.invalidToken;
+        debugPrint(
+          '🚨 Server rejected refresh token (${e.response?.statusCode})',
+        );
+        return false; // Trigger logout
       }
-
-      // Network/server errors → Keep session for offline mode
-      debugPrint('⚠️ Token refresh network error: ${e.type}');
-      debugPrint('   → Keeping session, user can access cached data');
-      return RefreshResult.networkError;
+      // Network/timeout → keep session alive, don't logout
+      debugPrint('⚠️ Refresh network error (${e.type}) — keeping session');
+      return true;
     } catch (e) {
-      debugPrint('❌ Token refresh unexpected error: $e');
-      return RefreshResult.networkError;
+      debugPrint('⚠️ Refresh unexpected error: $e — keeping session');
+      return true;
     }
   }
 
-  /// Get access token từ storage
   Future<String?> _getAccessToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('access_token') ?? prefs.getString('auth_token');
   }
 
-  /// 🔴 Force logout: Clear all session data khi token hết hạn
-  /// Called when refresh token fails or is invalid
-  Future<void> _forceLogout() async {
-    try {
-      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      debugPrint('🚨 FORCE LOGOUT: Clearing session due to token expiration');
+  bool _isFormData(RequestOptions options) =>
+      options.data is FormData ||
+      (options.headers['Content-Type']?.toString().contains('multipart') ??
+          false);
 
-      final prefs = await SharedPreferences.getInstance();
-
-      // Clear ALL auth-related data
-      await prefs.remove('access_token');
-      await prefs.remove('refresh_token');
-      await prefs.remove('auth_token');
-      await prefs.remove('user_id');
-      await prefs.remove('token_expiry');
-      await prefs.remove('cached_user');
-      await prefs.remove('token_needs_reauth');
-
-      // Set flag to trigger UI logout
-      await prefs.setBool('force_logout_required', true);
-
-      debugPrint('✅ Session cleared, logout flag set');
-      debugPrint('📱 App should redirect to login screen');
-    } catch (e) {
-      debugPrint('❌ Force logout error: $e');
-    }
-  }
-
-  /// Check if endpoint is public (không cần auth)
-  bool _isPublicEndpoint(String path) {
-    return _publicEndpoints.any((endpoint) => path.contains(endpoint));
-  }
+  bool _isPublicEndpoint(String path) =>
+      _publicEndpoints.any((ep) => path.contains(ep));
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'dart:convert';
 import '../models/user.dart';
 import '../models/user_role.dart';
@@ -8,22 +9,14 @@ import '../repository/auth_repository.dart'
     show AuthRepository, authRepositoryProvider;
 import '../models/login_request.dart';
 import '../models/register_request.dart';
+import '../models/refresh_token_request.dart';
 
 // ==================== AUTH STATE ====================
 
-/// Authentication state
-/// Manages user session, tokens, and loading states
 class AuthState {
-  /// Currently logged in user (null if not logged in)
   final User? user;
-
-  /// Whether user is authenticated
   final bool isAuthenticated;
-
-  /// Whether an auth operation is in progress
   final bool isLoading;
-
-  /// Error message if operation failed
   final String? error;
 
   const AuthState({
@@ -33,7 +26,6 @@ class AuthState {
     this.error,
   });
 
-  /// Creates a copy with modified fields
   AuthState copyWith({
     User? user,
     bool? isAuthenticated,
@@ -50,209 +42,186 @@ class AuthState {
     );
   }
 
-  /// Reset to initial state (for logout)
   factory AuthState.initial() => const AuthState();
-
-  @override
-  String toString() =>
-      'AuthState(user: ${user?.email}, isAuth: $isAuthenticated, loading: $isLoading)';
 }
 
 // ==================== AUTH NOTIFIER ====================
 
-/// Manages authentication state and operations
-/// Handles login, logout, session restoration, and user state
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _authRepository;
 
   AuthNotifier({required AuthRepository authRepository})
     : _authRepository = authRepository,
       super(const AuthState(isLoading: true)) {
-    // Load saved session on initialization
-    _loadSavedSession().then((_) {
-      // Set isLoading to false after session check completes
-      // (if still in loading state and not authenticated)
-      if (state.isLoading && !state.isAuthenticated) {
-        state = state.copyWith(isLoading: false);
-      }
-    });
+    _loadSavedSession();
   }
 
-  /// 🔴 Check if force logout is required (called on-demand, NO polling)
+  /// Startup session validation.
   ///
-  /// Flow when token expires:
-  /// 1. User makes API call → Token expired → 401
-  /// 2. TokenRefreshInterceptor tries refresh → Refresh fails
-  /// 3. Interceptor calls _forceLogout() → Clears session + Sets 'force_logout_required' flag
-  /// 4. This method detects flag and logs out user
-  ///
-  /// Trigger points (on-demand, not continuous polling):
-  /// - ✅ App init (_loadSavedSession) - Catches flag from previous session
-  /// - ✅ After any API 401 error - Can be called from error handlers
-  /// - ✅ App resume from background - Optional, can be added to lifecycle
-  ///
-  /// Returns true if force logout was triggered (skip session load)
-  Future<bool> checkAndHandleForceLogout() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final forceLogout = prefs.getBool('force_logout_required') ?? false;
-
-      if (forceLogout) {
-        debugPrint('🚨 Force logout flag detected, clearing session...');
-        await prefs.remove('force_logout_required');
-
-        // Clear all session data
-        await _clearUserCache();
-        await prefs.remove('access_token');
-        await prefs.remove('refresh_token');
-        await prefs.remove('user_id');
-        await prefs.remove('token_expiry');
-
-        // Clear state
-        state = AuthState.initial();
-
-        debugPrint('✅ Forced logout completed');
-        return true; // Flag was set, skip session load
-      }
-
-      return false; // No flag, continue with session load
-    } catch (e) {
-      debugPrint('⚠️ Force logout check error: $e');
-      return false; // On error, continue with session load
-    }
-  }
-
-  /// Load saved user session from storage
-  /// Called automatically on provider initialization
-  /// 🔥 OFFLINE SUPPORT: Load cached user first, then verify with API
+  /// Flow:
+  /// 1. Load tokens from storage. No tokens → unauthenticated.
+  /// 2. Load cached user → set authenticated immediately (enables offline browse).
+  /// 3. No network → done (use cached user).
+  /// 4. Network available → call GET /auth/me
+  ///    - 200 → update user + cache. Done.
+  ///    - 401 → call POST /auth/refresh
+  ///      - 200 → retry GET /auth/me. Done.
+  ///      - 401 → refresh token expired → full logout.
+  ///    - Other network error → keep cached user (offline-first).
   Future<void> _loadSavedSession() async {
     try {
-      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      debugPrint('📱 Loading saved session...');
+      final prefs = await SharedPreferences.getInstance();
+      final accessToken = prefs.getString('access_token');
+      final refreshToken = prefs.getString('refresh_token');
+      final userId = prefs.getString('user_id');
 
-      // 🔴 Check if interceptor flagged force logout (e.g., token refresh failed)
-      final wasForceLoggedOut = await checkAndHandleForceLogout();
-      if (wasForceLoggedOut) {
-        debugPrint('⚠️ Force logout was triggered, skipping session load');
+      // No session stored → go to login
+      if (accessToken == null || refreshToken == null || userId == null) {
+        debugPrint('ℹ️ No saved session found');
+        state = AuthState.initial();
         return;
       }
 
-      final prefs = await SharedPreferences.getInstance();
-      final accessToken = prefs.getString('access_token');
-      final userId = prefs.getString('user_id');
-      final refreshToken = prefs.getString('refresh_token');
-
-      // 🔍 DEBUG: Log all stored keys
-      debugPrint('🔍 DEBUG: Checking SharedPreferences...');
-      debugPrint(
-        '  - access_token: ${accessToken != null ? "EXISTS (${accessToken.length} chars)" : "NULL"}',
-      );
-      debugPrint('  - user_id: ${userId ?? "NULL"}');
-      debugPrint(
-        '  - refresh_token: ${refreshToken != null ? "EXISTS" : "NULL"}',
-      );
-      debugPrint(
-        '  - cached_user: ${prefs.getString('cached_user') != null ? "EXISTS" : "NULL"}',
-      );
-      debugPrint(
-        '  - token_expiry: ${prefs.getString('token_expiry') ?? "NULL"}',
-      );
-
-      // 🔴 CRITICAL: Must have all required tokens to restore session
-      // If refresh_token is missing, session cannot be refreshed → force login
-      if (accessToken != null && userId != null && refreshToken != null) {
-        debugPrint('✅ Found saved session for user: $userId');
-
-        // 🔥 STEP 1: Load cached user data first (works offline)
-        final cachedUser = await _loadUserFromCache();
-
-        if (cachedUser != null) {
-          // Restore session from cache immediately
-          state = state.copyWith(
-            user: cachedUser,
-            isAuthenticated: true,
-            isLoading: false, // Done loading from cache
-          );
-          debugPrint('✅ Session restored from cache (OFFLINE CAPABLE)');
-          debugPrint('📱 User: ${cachedUser.email} (${cachedUser.role.name})');
-
-          // Trigger role-based services (will fail gracefully if offline)
-          _initializeRoleBasedServices(cachedUser);
-        } else {
-          debugPrint('⚠️ No cached user found, but tokens exist');
-          debugPrint('⚠️ This may indicate User.fromJson() failed');
-        }
-
-        // 🔥 STEP 2: Verify token with API in background (only if token not expired)
-        // This prevents unnecessary 401 errors on app startup with expired tokens
-        final tokenExpiryStr = prefs.getString('token_expiry');
-        final shouldVerify =
-            tokenExpiryStr != null &&
-            DateTime.now().isBefore(DateTime.parse(tokenExpiryStr));
-
-        if (shouldVerify) {
-          try {
-            debugPrint('🔍 Verifying session with API...');
-            final user = await _authRepository.getCurrentUser();
-
-            if (user != null) {
-              // Update with fresh data from API
-              state = state.copyWith(user: user);
-
-              // Update cache with fresh data
-              await _saveUserToCache(user);
-
-              debugPrint('✅ User data refreshed from API');
-
-              // Re-trigger services in case role changed
-              _initializeRoleBasedServices(user);
-            }
-          } catch (e) {
-            debugPrint('⚠️ Failed to verify token with API: $e');
-            debugPrint('📱 Continuing with cached user data (offline mode)');
-            // Don't throw - keep using cached data
-          }
-        } else {
-          debugPrint('⏰ Token expired or not set');
-          debugPrint(
-            '📱 Using cached user data (will refresh on next API call)',
-          );
-          // Token expired, but we keep cached user for offline mode
-          // Next API call will trigger 401 → interceptor will try refresh
-        }
-      } else {
-        debugPrint('ℹ️ No saved session found (missing tokens)');
-        debugPrint('  - Missing access_token: ${accessToken == null}');
-        debugPrint('  - Missing refresh_token: ${refreshToken == null}');
-        debugPrint('  - Missing user_id: ${userId == null}');
+      // Step 1: Restore from cache immediately so user can browse offline
+      final cachedUser = await _loadUserFromCache();
+      if (cachedUser == null) {
+        // Tokens exist but no cached user → treat as no session
+        debugPrint('⚠️ Tokens exist but no cached user, clearing session');
+        await _clearSession();
+        state = AuthState.initial();
+        return;
       }
-    } catch (e, stackTrace) {
-      debugPrint('❌ Failed to load session: $e');
-      debugPrint('❌ Stack trace: $stackTrace');
-      // Don't throw, just start with empty state
+
+      state = state.copyWith(
+        user: cachedUser,
+        isAuthenticated: true,
+        isLoading: true, // Keep true until server validation finishes
+      );
+      debugPrint(
+        '✅ Session restored from cache: ${cachedUser.email} (${cachedUser.role.name})',
+      );
+      _initializeRoleBasedServices(cachedUser);
+
+      // Step 2: If offline, unlock navigation with cached data
+      if (!await _isNetworkAvailable()) {
+        debugPrint('📵 Offline — using cached session');
+        state = state.copyWith(isLoading: false);
+        return;
+      }
+
+      // Step 3: Online — validate. isLoading=false is set inside
+      // _validateAndRefreshSession once the flow fully resolves.
+      debugPrint('📶 Online — validating session with server...');
+      await _validateAndRefreshSession(
+        userId: userId,
+        refreshToken: refreshToken,
+      );
+    } catch (e) {
+      debugPrint('❌ _loadSavedSession error: $e');
+      // Don't clear state — cached user (if any) is still usable offline
+      state = state.copyWith(isLoading: false);
     }
   }
 
-  /// Login with email and password
-  ///
-  /// Returns true if login successful, false otherwise
-  /// Sets user state and triggers role-based initializations (e.g., SignalR for rescuer)
-  Future<bool> login({required String email, required String password}) async {
-    // Set loading state and clear previous errors
-    state = state.copyWith(isLoading: true, clearError: true);
+  /// Call GET /auth/me. On 401, try refresh then retry.
+  /// On refresh 401 → full logout.
+  Future<void> _validateAndRefreshSession({
+    required String userId,
+    required String refreshToken,
+  }) async {
+    // Try to get fresh user data
+    final freshUser = await _authRepository.getCurrentUser();
 
+    if (freshUser != null) {
+      // /auth/me succeeded — validation complete, allow navigation
+      state = state.copyWith(user: freshUser, isLoading: false);
+      await _saveUserToCache(freshUser);
+      debugPrint('✅ User data refreshed from server');
+      _initializeRoleBasedServices(freshUser);
+      return;
+    }
+
+    // Guard: interceptor may have already called forceLogout() while
+    // getCurrentUser() was in-flight. If state is no longer authenticated,
+    // don't attempt refresh — that would cause a second refresh cycle.
+    if (!state.isAuthenticated) {
+      debugPrint('ℹ️ Already logged out by interceptor — skipping refresh');
+      return;
+    }
+
+    // freshUser == null means 401 from /auth/me → try refresh
+    debugPrint('⚠️ /auth/me returned 401, attempting token refresh...');
+
+    final refreshSuccess = await _tryRefreshToken(
+      userId: userId,
+      refreshToken: refreshToken,
+    );
+
+    if (!refreshSuccess) {
+      // Refresh token also expired → must re-login
+      debugPrint('🚨 Refresh token expired — forcing logout');
+      await logout();
+      return;
+    }
+
+    // Refresh succeeded → retry /auth/me with new token
+    final retryUser = await _authRepository.getCurrentUser();
+    if (retryUser != null) {
+      state = state.copyWith(user: retryUser, isLoading: false);
+      await _saveUserToCache(retryUser);
+      debugPrint('✅ User data refreshed after token renewal');
+      _initializeRoleBasedServices(retryUser);
+    } else {
+      // /auth/me still failing after refresh — keep cached user, allow navigation
+      debugPrint('⚠️ /auth/me failed after refresh — keeping cached user');
+      state = state.copyWith(isLoading: false);
+    }
+  }
+
+  /// Returns true if refresh succeeded, false if refresh token is invalid (401/403).
+  /// Throws on network errors so caller can distinguish.
+  Future<bool> _tryRefreshToken({
+    required String userId,
+    required String refreshToken,
+  }) async {
     try {
-      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      debugPrint('🔐 Logging in: $email');
+      final response = await _authRepository.refreshToken(
+        RefreshTokenRequest(userId: userId, refreshToken: refreshToken),
+      );
+      return response.isSuccess && response.data != null;
+    } catch (e) {
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('401') ||
+          msg.contains('unauthorized') ||
+          msg.contains('403') ||
+          msg.contains('phiên đăng nhập hết hạn')) {
+        return false; // Refresh token truly expired
+      }
+      // Network/server error — don't logout, let cached session stand
+      debugPrint(
+        '⚠️ Refresh call failed (network?): $e — keeping cached session',
+      );
+      return true; // Optimistic: keep user logged in
+    }
+  }
 
-      final loginRequest = LoginRequest(email: email, password: password);
+  // ==================== PUBLIC METHODS ====================
 
-      final response = await _authRepository.login(loginRequest);
+  /// Called by TokenRefreshInterceptor when mid-session refresh token is rejected.
+  Future<void> forceLogout() async {
+    debugPrint('🚨 forceLogout called by interceptor');
+    await logout();
+  }
+
+  Future<bool> login({required String email, required String password}) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final response = await _authRepository.login(
+        LoginRequest(email: email, password: password),
+      );
 
       if (response.isSuccess && response.data != null) {
         final userData = response.data!.user;
-
-        // Convert UserData to User model
         final user = User(
           id: userData.id,
           email: userData.email,
@@ -262,44 +231,28 @@ class AuthNotifier extends StateNotifier<AuthState> {
           createdAt: DateTime.now(),
         );
 
-        // Update state with user data
         state = state.copyWith(
           user: user,
           isAuthenticated: true,
           isLoading: false,
         );
-
-        // 💾 Cache user for offline access
         await _saveUserToCache(user);
-
-        debugPrint('✅ Login successful: ${user.email}');
-        debugPrint('👤 User role: ${userData.role}');
-        debugPrint('📱 User ID: ${user.id}');
-
-        // Trigger role-based initialization
         _initializeRoleBasedServices(user);
-
+        debugPrint('✅ Login successful: ${user.email}');
         return true;
-      } else {
-        // Login failed
-        state = state.copyWith(isLoading: false, error: response.message);
-        debugPrint('❌ Login failed: ${response.message}');
-        return false;
       }
+
+      state = state.copyWith(isLoading: false, error: response.message);
+      return false;
     } catch (e) {
-      // Set error state
       state = state.copyWith(
         isLoading: false,
         error: e.toString().replaceAll('Exception: ', ''),
       );
-      debugPrint('❌ Login error: $e');
       return false;
     }
   }
 
-  /// Register new user
-  ///
-  /// Returns true if registration successful, false otherwise
   Future<bool> register({
     required String email,
     required String password,
@@ -310,108 +263,107 @@ class AuthNotifier extends StateNotifier<AuthState> {
     String? biography,
   }) async {
     state = state.copyWith(isLoading: true, clearError: true);
-
     try {
-      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      debugPrint('📝 Registering new user: $email');
-
-      final registerRequest = RegisterRequest(
-        email: email,
-        password: password,
-        fullName: fullName,
-        phoneNumber: phoneNumber,
-        role: role,
-        type: type,
-        biography: biography,
+      final response = await _authRepository.register(
+        RegisterRequest(
+          email: email,
+          password: password,
+          fullName: fullName,
+          phoneNumber: phoneNumber,
+          role: role,
+          type: type,
+          biography: biography,
+        ),
       );
+      final success =
+          (response.message ?? '').toLowerCase().contains('success') ||
+          (response.message ?? '').toLowerCase().contains('thành công');
 
-      final response = await _authRepository.register(registerRequest);
-
-      // Check if registration successful (assumes 2xx status code or specific flag)
-      final message = response.message ?? '';
-      final isSuccess =
-          message.toLowerCase().contains('success') ||
-          message.toLowerCase().contains('thành công');
-
-      if (isSuccess) {
-        state = state.copyWith(isLoading: false);
-        debugPrint('✅ Registration successful: ${response.message}');
-        return true;
-      } else {
-        state = state.copyWith(
-          isLoading: false,
-          error: response.message ?? 'Đăng ký thất bại',
-        );
-        debugPrint('❌ Registration failed: ${response.message}');
-        return false;
-      }
+      state = state.copyWith(
+        isLoading: false,
+        error: success ? null : (response.message ?? 'Đăng ký thất bại'),
+      );
+      return success;
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
         error: e.toString().replaceAll('Exception: ', ''),
       );
-      debugPrint('❌ Registration error: $e');
       return false;
     }
   }
 
-  /// Logout current user
-  /// Clears session and disconnects all services (SignalR, etc.)
   Future<void> logout() async {
     try {
-      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      debugPrint('🚪 Logging out...');
-
-      // Cleanup role-based services before logout
       _cleanupRoleBasedServices();
-
-      // Call logout API
-      await _authRepository.logout();
-
-      // Clear user cache
-      await _clearUserCache();
-
-      // Clear local state
-      state = AuthState.initial();
-
-      debugPrint('✅ Logged out successfully');
-    } catch (e) {
-      debugPrint('⚠️ Logout error (clearing local state anyway): $e');
-      // Clear state even if API fails
-      await _clearUserCache();
-      state = AuthState.initial();
-    }
+      await _authRepository.logout(); // Best-effort API call
+    } catch (_) {}
+    await _clearSession();
+    state = AuthState.initial();
+    debugPrint('✅ Logged out');
   }
 
-  /// Refresh current user data from API
-  /// Updates cache after successful refresh
   Future<void> refreshUserData() async {
     if (!state.isAuthenticated) return;
-
     try {
-      debugPrint('🔄 Refreshing user data...');
-
       final user = await _authRepository.getCurrentUser();
-
       if (user != null) {
         state = state.copyWith(user: user);
-
-        // Update cache
         await _saveUserToCache(user);
-
-        debugPrint('✅ User data refreshed');
       }
     } catch (e) {
-      debugPrint('❌ Failed to refresh user data: $e');
+      debugPrint('⚠️ refreshUserData failed: $e');
     }
   }
 
-  /// Clear error message
-  void clearError() {
-    state = state.copyWith(clearError: true);
+  void clearError() => state = state.copyWith(clearError: true);
+
+  // ==================== PRIVATE HELPERS ====================
+
+  Future<bool> _isNetworkAvailable() async {
+    try {
+      final results = await Connectivity().checkConnectivity();
+      return results.isNotEmpty &&
+          results.any((r) => r != ConnectivityResult.none);
+    } catch (_) {
+      return false;
+    }
   }
 
-  /// Parse user role string to UserRole enum
+  Future<User?> _loadUserFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final json = prefs.getString('cached_user');
+      if (json == null) return null;
+      return User.fromJson(jsonDecode(json) as Map<String, dynamic>);
+    } catch (e) {
+      debugPrint('⚠️ _loadUserFromCache error: $e');
+      return null;
+    }
+  }
+
+  Future<void> _saveUserToCache(User user) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cached_user', jsonEncode(user.toJson()));
+    } catch (e) {
+      debugPrint('⚠️ _saveUserToCache error: $e');
+    }
+  }
+
+  Future<void> _clearSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await Future.wait([
+      prefs.remove('access_token'),
+      prefs.remove('refresh_token'),
+      prefs.remove('auth_token'),
+      prefs.remove('user_id'),
+      prefs.remove('token_expiry'),
+      prefs.remove('cached_user'),
+    ]);
+    debugPrint('🗑️ Session cleared');
+  }
+
   UserRole _parseUserRole(String roleString) {
     switch (roleString.toUpperCase()) {
       case 'MEMBER':
@@ -425,189 +377,44 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Initialize role-based services after login
-  /// - Rescuer: Auto-connect to SignalR hub
-  /// - Expert: Initialize availability tracking
-  /// - Member: No special initialization needed
   void _initializeRoleBasedServices(User user) {
-    debugPrint('🔧 Initializing role-based services for: ${user.role.name}');
-
-    switch (user.role) {
-      case UserRole.rescuer:
-        debugPrint('🚑 User is RESCUER - will initialize SignalR connection');
-        // SignalR connection will be managed by rescuer_signalr_provider
-        // which listens to authProvider changes
-        break;
-
-      case UserRole.expert:
-        debugPrint('👨‍⚕️ User is EXPERT - no special initialization needed');
-        // Could initialize expert-specific services here
-        break;
-
-      case UserRole.member:
-        debugPrint('👤 User is MEMBER - no special initialization needed');
-        break;
-    }
+    debugPrint('🔧 Initializing services for: ${user.role.name}');
+    // SignalR and other role-specific providers react to authProvider changes automatically
   }
 
-  // ==================== CACHE HELPERS ====================
-
-  /// Save user to SharedPreferences cache for offline access
-  /// Called after successful login and API refresh
-  Future<void> _saveUserToCache(User user) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final userJson = jsonEncode(user.toJson());
-
-      debugPrint('💾 Caching user...');
-      debugPrint('💾 User ID: ${user.id}');
-      debugPrint('💾 User email: ${user.email}');
-      debugPrint('💾 User role: ${user.role.name}');
-      debugPrint('💾 JSON length: ${userJson.length} chars');
-
-      final saved = await prefs.setString('cached_user', userJson);
-
-      if (saved) {
-        debugPrint('✅ User cached successfully for offline use');
-
-        // Verify immediately
-        final verified = prefs.getString('cached_user');
-        debugPrint('✅ Verified cache exists: ${verified != null}');
-      } else {
-        debugPrint('❌ Failed to cache user (setString returned false)');
-      }
-    } catch (e, stackTrace) {
-      debugPrint('⚠️ Failed to cache user: $e');
-      debugPrint('⚠️ Stack trace: $stackTrace');
-      // Don't throw - caching is optional feature
-    }
-  }
-
-  /// Load user from SharedPreferences cache
-  /// Returns null if no cache found or cache is invalid
-  Future<User?> _loadUserFromCache() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final userJson = prefs.getString('cached_user');
-
-      if (userJson == null) {
-        debugPrint('ℹ️ No cached user found in SharedPreferences');
-        return null;
-      }
-
-      debugPrint('📦 Found cached user JSON (${userJson.length} chars)');
-      debugPrint(
-        '📦 JSON preview: ${userJson.substring(0, userJson.length > 100 ? 100 : userJson.length)}...',
-      );
-
-      final userMap = jsonDecode(userJson) as Map<String, dynamic>;
-      debugPrint('📦 Decoded JSON to Map: $userMap');
-
-      final user = User.fromJson(userMap);
-
-      debugPrint('📦 Loaded user from cache: ${user.email}');
-      debugPrint('📦 User role: ${user.role.name}');
-      debugPrint('📦 User ID: ${user.id}');
-      return user;
-    } catch (e, stackTrace) {
-      debugPrint('⚠️ Failed to load cached user: $e');
-      debugPrint('⚠️ Stack trace: $stackTrace');
-      return null;
-    }
-  }
-
-  /// Clear cached user data from SharedPreferences
-  /// Called on logout
-  Future<void> _clearUserCache() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('cached_user');
-      debugPrint('🗑️ User cache cleared');
-    } catch (e) {
-      debugPrint('⚠️ Failed to clear user cache: $e');
-    }
-  }
-
-  /// Cleanup role-based services before logout
   void _cleanupRoleBasedServices() {
-    if (state.user == null) return;
-
-    debugPrint(
-      '🧹 Cleaning up role-based services for: ${state.user!.role.name}',
-    );
-
-    switch (state.user!.role) {
-      case UserRole.rescuer:
-        debugPrint('🚑 Disconnecting SignalR for RESCUER');
-        // Will be handled by rescuer_signalr_provider listener
-        break;
-
-      default:
-        break;
-    }
+    debugPrint('🧹 Cleaning up role-based services');
   }
 }
 
 // ==================== PROVIDERS ====================
 
-/// Main authentication provider
-/// Manages user session and auth operations
-final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  final authRepository = ref.watch(authRepositoryProvider);
-  return AuthNotifier(authRepository: authRepository);
-});
+final StateNotifierProvider<AuthNotifier, AuthState> authProvider =
+    StateNotifierProvider<AuthNotifier, AuthState>((ref) {
+      final authRepository = ref.watch(authRepositoryProvider);
+      return AuthNotifier(authRepository: authRepository);
+    });
 
-/// Computed: Is user authenticated?
-final isAuthenticatedProvider = Provider<bool>((ref) {
-  final authState = ref.watch(authProvider);
-  return authState.isAuthenticated;
-});
+final isAuthenticatedProvider = Provider<bool>(
+  (ref) => ref.watch(authProvider).isAuthenticated,
+);
 
-/// Computed: Current logged-in user
-final currentUserProvider = Provider<User?>((ref) {
-  final authState = ref.watch(authProvider);
-  return authState.user;
-});
+final currentUserProvider = Provider<User?>(
+  (ref) => ref.watch(authProvider).user,
+);
 
-/// Computed: Current user role
-final currentUserRoleProvider = Provider<UserRole?>((ref) {
-  final user = ref.watch(currentUserProvider);
-  return user?.role;
-});
+final currentUserRoleProvider = Provider<UserRole?>(
+  (ref) => ref.watch(currentUserProvider)?.role,
+);
 
-/// Computed: Is user a rescuer?
-final isRescuerProvider = Provider<bool>((ref) {
-  final role = ref.watch(currentUserRoleProvider);
-  return role == UserRole.rescuer;
-});
+final isRescuerProvider = Provider<bool>(
+  (ref) => ref.watch(currentUserRoleProvider) == UserRole.rescuer,
+);
 
-/// Computed: Is user an expert?
-final isExpertProvider = Provider<bool>((ref) {
-  final role = ref.watch(currentUserRoleProvider);
-  return role == UserRole.expert;
-});
+final isExpertProvider = Provider<bool>(
+  (ref) => ref.watch(currentUserRoleProvider) == UserRole.expert,
+);
 
-/// Computed: Is user a member?
-final isMemberProvider = Provider<bool>((ref) {
-  final role = ref.watch(currentUserRoleProvider);
-  return role == UserRole.member;
-});
-
-// ==================== USAGE NOTES ====================
-// 
-// To manually trigger force logout check (optional, usually not needed):
-// 
-// In a widget or error handler:
-//   final authNotifier = ref.read(authProvider.notifier);
-//   await authNotifier.checkAndHandleForceLogout();
-// 
-// This is useful for:
-//   - Global error boundaries catching 401 errors
-//   - App lifecycle events (app resume)
-//   - Manual retry after network errors
-// 
-// However, in most cases this is automatic:
-//   - Checked on app init
-//   - Token cleared → next navigation redirects to login
-// 
-// =====================================================
+final isMemberProvider = Provider<bool>(
+  (ref) => ref.watch(currentUserRoleProvider) == UserRole.member,
+);

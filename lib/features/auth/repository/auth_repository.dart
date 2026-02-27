@@ -203,6 +203,7 @@ class AuthRepository {
     try {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       debugPrint('🔄 Refreshing token for user: ${request.userId}');
+      debugPrint('🔄 Request data: ${request.toJson()}');
 
       final response = await httpService.post(
         '/api/auth/refresh',
