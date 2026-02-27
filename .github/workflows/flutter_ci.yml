@@ -23,7 +23,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.9.2" # From pubspec.yaml sdk constraint
+          flutter-version: "3.41.1" # From pubspec.yaml sdk constraint
           channel: "stable"
           cache: true
 
@@ -67,7 +67,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.9.2"
+          flutter-version: "3.41.1"
           channel: "stable"
           cache: true
 
