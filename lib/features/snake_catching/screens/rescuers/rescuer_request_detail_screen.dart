@@ -1572,7 +1572,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
                 navigator.pop(); // Close loading dialog
 
                 if (response.isSuccess && response.data != null) {
-                  navigator.push(
+                  navigator.pushReplacement(
                     MaterialPageRoute(
                       builder: (context) => RescuerAcceptRequestScreen(
                         requestData: response.data!,

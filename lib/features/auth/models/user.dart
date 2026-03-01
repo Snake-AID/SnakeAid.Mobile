@@ -7,6 +7,8 @@ class User {
   final String email;
   final String fullName;
   final String? phoneNumber;
+  final String? avatarUrl;
+  final bool isActive;
   final UserRole role;
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -16,6 +18,8 @@ class User {
     required this.email,
     required this.fullName,
     this.phoneNumber,
+    this.avatarUrl,
+    this.isActive = true,
     required this.role,
     required this.createdAt,
     this.updatedAt,
@@ -28,6 +32,10 @@ class User {
       email: json['email'] ?? '',
       fullName: json['fullName'] ?? '',
       phoneNumber: json['phoneNumber'],
+      avatarUrl: (json['avatarUrl'] as String?)?.isNotEmpty == true
+          ? json['avatarUrl'] as String
+          : null,
+      isActive: json['isActive'] ?? true,
       role: _getRoleFromInt(json['role']),
       createdAt: json['createdAt'] != null 
           ? DateTime.parse(json['createdAt']) 
@@ -78,6 +86,8 @@ class User {
       'email': email,
       'fullName': fullName,
       'phoneNumber': phoneNumber,
+      'avatarUrl': avatarUrl,
+      'isActive': isActive,
       'role': _roleToInt(role),
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),

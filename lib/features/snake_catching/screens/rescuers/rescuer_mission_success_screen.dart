@@ -46,39 +46,50 @@ class _RescuerMissionSuccessScreenState
 
   // ─── Computed values ───────────────────────────────────────────────────────
 
-  /// Fixed base service fee (platform default)
-  static const double _baseFee = 500000.0;
-
   SnakeCatchingRequestData get _data => _freshData ?? widget.requestData;
   MissionData? get _mission => _data.mission;
 
-  /// Actual total service cost from server (includes snake fee on top of base)
-  double get _actualCost => _mission?.actualCost ?? _baseFee;
+  /// Base service fee = mission.price (set by platform per service type)
+  double get _baseFee => _mission?.price ?? 0.0;
 
-  /// Km deposit already paid by customer at booking
-  double get _estimatedCost => _mission?.estimatedCost ?? 0.0;
+  /// Travel/deposit fee already paid by customer in round 1
+  double get _travelFee => _mission?.estimatedCost ?? 0.0;
 
-  /// Extra amount customer still owes = actualCost − estimatedCost
-  /// (server already stores this as mission.price)
-  double get _missionPrice => _mission?.price ?? (_actualCost - _estimatedCost);
+  /// Snake catching fee = sum of all missionDetails prices
+  double get _snakeFee =>
+      (_mission?.missionDetails ?? []).fold(0.0, (sum, d) => sum + d.price);
 
-  /// Customer's total cost = km deposit + remaining balance (= actualCost total)
-  double get _customerTotal => _estimatedCost + _missionPrice;
+  /// Environment fee from catchingEnvironment (e.g. "Tại nhà")
+  double get _envFee => _mission?.catchingEnvironment?.price ?? 0.0;
 
-  /// Platform fee = 40% of base fee only (not applied to snake/travel fees)
+  /// Environment name for display
+  String? get _envName => _mission?.catchingEnvironment?.name;
+
+  /// Platform fee = 40% of base fee only
   double get _platformFee => _baseFee * 0.4;
 
   /// Rescuer base share = 60% of base fee
   double get _rescuerBaseShare => _baseFee * 0.6;
 
-  /// Snake catching fee = anything above base fee (goes 100% to rescuer)
-  double get _snakeFee => (_actualCost - _baseFee).clamp(0.0, double.infinity);
+  /// Rescuer total = base share (60%) + snake fee + travel fee + env fee
+  double get _rescuerTotal => _rescuerBaseShare + _snakeFee + _travelFee + _envFee;
 
-  /// Travel fee = km deposit (goes 100% to rescuer)
-  double get _travelFee => _estimatedCost;
+  /// Customer round-2 payment = actualCost from server (= base + snake + env, travel already paid)
+  double get _customerRound2 => _mission?.actualCost ?? (_baseFee + _snakeFee + _envFee);
 
-  /// Rescuer total = base share + snake fee + travel fee
-  double get _rescuerTotal => _rescuerBaseShare + _snakeFee + _travelFee;
+  /// Evidence photo count — from mission.media (referenceType=SnakeCatchingMission)
+  /// Falls back to request-level media if mission media is empty
+  int get _evidencePhotoCount {
+    final missionMedia = _mission?.media ?? [];
+    if (missionMedia.isNotEmpty) {
+      return missionMedia.where((m) => m.purpose == 'Evidence').length;
+    }
+    // fallback: request-level media
+    return _data.media.where((m) => m.purpose == 'Evidence').length;
+  }
+
+  /// Customer grand total = travel (round 1) + round-2
+  double get _customerTotal => _travelFee + _customerRound2;
 
   // ─── Duration ──────────────────────────────────────────────────────────────
 
@@ -106,7 +117,7 @@ class _RescuerMissionSuccessScreenState
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Chờ Thanh Toán',
+          'Đơn đã hoàn thành',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF343A40)),
         ),
         centerTitle: true,
@@ -244,22 +255,38 @@ class _RescuerMissionSuccessScreenState
           const Divider(height: 28, color: Color(0xFFE2E8F0)),
           _buildFeeRow('Phí dịch vụ cơ bản:', '${_formatCurrency(_baseFee.toInt())} VNĐ'),
           const SizedBox(height: 8),
-          _buildFeeRow('Phí nền tảng (40%):', '− ${_formatCurrency(_platformFee.toInt())} VNĐ',
+          _buildFeeRow('  Nền tảng giữ lại (40%):', '− ${_formatCurrency(_platformFee.toInt())} VNĐ',
               valueColor: const Color(0xFFDC3545)),
           const SizedBox(height: 8),
           _buildFeeRow(
-            'Phần của bạn (60%):',
-            '${_formatCurrency(_rescuerBaseShare.toInt())} VNĐ',
+            '  Phần của bạn (60%):',
+            '+ ${_formatCurrency(_rescuerBaseShare.toInt())} VNĐ',
             valueColor: const Color(0xFF28A745),
           ),
           if (_snakeFee > 0) ...[
             const SizedBox(height: 8),
-            _buildFeeRow('Phí bắt rắn:', '${_formatCurrency(_snakeFee.toInt())} VNĐ',
+            _buildFeeRow('Phí bắt rắn:', '+ ${_formatCurrency(_snakeFee.toInt())} VNĐ',
                 valueColor: const Color(0xFF28A745)),
+            // per-species breakdown
+            ...(_mission?.missionDetails ?? []).map((d) => Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: _buildFeeRow(
+                    '  ${d.snakeSpeciesName} × ${d.quantity}:',
+                    '${_formatCurrency(d.price.toInt())} VNĐ',
+                  ),
+                )),
+          ],
+          if (_envFee > 0) ...[
+            const SizedBox(height: 8),
+            _buildFeeRow(
+              'Phí môi trường${_envName != null ? ' ($_envName)' : ''}:',
+              '+ ${_formatCurrency(_envFee.toInt())} VNĐ',
+              valueColor: const Color(0xFF28A745),
+            ),
           ],
           if (_travelFee > 0) ...[
             const SizedBox(height: 8),
-            _buildFeeRow('Phí di chuyển:', '${_formatCurrency(_travelFee.toInt())} VNĐ',
+            _buildFeeRow('Phí di chuyển:', '+ ${_formatCurrency(_travelFee.toInt())} VNĐ',
                 valueColor: const Color(0xFF28A745)),
           ],
         ],
@@ -276,15 +303,53 @@ class _RescuerMissionSuccessScreenState
           const Text('Chi phí khách hàng',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF343A40))),
           const Divider(height: 24, color: Color(0xFFE2E8F0)),
+          // Round 1 — already paid
           _buildFeeRow(
-            'Phí di chuyển (đã cọc):',
-            '${_formatCurrency(_estimatedCost.toInt())} VNĐ${distanceKm != null ? ' · ${distanceKm.toStringAsFixed(1)} km' : ''}',
+            'Phí di chuyển (đã thanh toán đợt 1):',
+            '${_formatCurrency(_travelFee.toInt())} VNĐ',
+            valueColor: const Color(0xFF28A745),
           ),
-          const SizedBox(height: 8),
-          _buildFeeRow('Phí phi vụ còn lại:', '${_formatCurrency(_missionPrice.toInt())} VNĐ'),
+          if (distanceKm != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                'Khoảng cách: ${distanceKm.toStringAsFixed(1)} km',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF999999)),
+              ),
+            ),
+          const Divider(height: 20, color: Color(0xFFE2E8F0)),
+          // Round 2 breakdown
+          _buildFeeRow('Phí dịch vụ cơ bản:', '${_formatCurrency(_baseFee.toInt())} VNĐ'),
+          if (_snakeFee > 0) ...[
+            const SizedBox(height: 8),
+            _buildFeeRow('Phí bắt rắn:', '${_formatCurrency(_snakeFee.toInt())} VNĐ'),
+            // per-species price detail
+            ...(_mission?.missionDetails ?? []).map((d) => Padding(
+                  padding: const EdgeInsets.only(top: 4, left: 12),
+                  child: _buildFeeRow(
+                    '· ${d.snakeSpeciesName} × ${d.quantity}:',
+                    '${_formatCurrency(d.price.toInt())} VNĐ',
+                  ),
+                )),
+          ],
+          if (_envFee > 0) ...[
+            const SizedBox(height: 8),
+            _buildFeeRow(
+              'Phí môi trường${_envName != null ? ' ($_envName)' : ''}:',
+              '${_formatCurrency(_envFee.toInt())} VNĐ',
+            ),
+          ],
           const Divider(height: 20, color: Color(0xFFE2E8F0)),
           _buildFeeRow(
-            'Tổng cộng:',
+            'Cần thanh toán đợt 2:',
+            '${_formatCurrency(_customerRound2.toInt())} VNĐ',
+            labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold,
+                color: Color(0xFFFF6B35)),
+            valueColor: const Color(0xFFFF6B35),
+          ),
+          const Divider(height: 20, color: Color(0xFFE2E8F0)),
+          _buildFeeRow(
+            'Tổng chi phí:',
             '${_formatCurrency(_customerTotal.toInt())} VNĐ',
             labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold,
                 color: Color(0xFF343A40)),
@@ -309,7 +374,7 @@ class _RescuerMissionSuccessScreenState
           const SizedBox(height: 16),
           _buildSummaryRow(Icons.location_on, _data.address),
           const SizedBox(height: 16),
-          _buildSummaryRow(Icons.photo_camera, '${widget.photoCount} ảnh đã ghi nhận'),
+          _buildSummaryRow(Icons.photo_camera, '$_evidencePhotoCount ảnh đã ghi nhận'),
         ],
       ),
     );
@@ -386,11 +451,16 @@ class _RescuerMissionSuccessScreenState
     TextStyle? labelStyle,
   }) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: labelStyle ??
-            const TextStyle(fontSize: 14, color: Color(0xFF6C757D))),
+        Expanded(
+          child: Text(label,
+              style: labelStyle ??
+                  const TextStyle(fontSize: 14, color: Color(0xFF6C757D))),
+        ),
+        const SizedBox(width: 8),
         Text(value,
+            textAlign: TextAlign.end,
             style: TextStyle(
                 fontSize: 14,
                 fontWeight: labelStyle != null ? FontWeight.bold : FontWeight.normal,

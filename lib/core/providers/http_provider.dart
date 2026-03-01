@@ -5,7 +5,7 @@ import '../../features/auth/providers/auth_provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 final String baseUrl =
-    dotenv.env['BASE_URL'] ?? 'https://snakeaid-dev.duykhiem.id.vn';
+    dotenv.env['BASE_URL'] ?? 'https://dev.snakeaid.tech';
 // const String baseUrl = 'http://10.0.2.2:8080';
 final httpServiceProvider = Provider<HttpService>((ref) {
   final healthCheckService = ref.read(healthCheckServiceProvider);

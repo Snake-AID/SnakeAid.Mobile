@@ -250,15 +250,16 @@ class SnakeCatchingRepository {
 
   /// Complete a mission — rescuer sends result to customer
   /// PATCH /api/snakecatching/missions/{missionId}/complete
-  Future<void> completeMission(String missionId) async {
+  Future<void> completeMission(String missionId, {required String catchingEnvironmentId}) async {
     try {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       debugPrint('✅ Completing Mission');
       debugPrint('📍 Endpoint: /api/snakecatching/missions/$missionId/complete');
+      debugPrint('🌿 catchingEnvironmentId: $catchingEnvironmentId');
 
       final response = await _httpService.patch(
         '/api/snakecatching/missions/$missionId/complete',
-        data: {},
+        data: {'catchingEnvironmentId': catchingEnvironmentId},
       );
       debugPrint('✅ Mission Completed: ${response.statusCode}');
     } on DioException catch (e) {
@@ -271,6 +272,80 @@ class SnakeCatchingRepository {
         throw Exception(message);
       }
       throw Exception('Không thể hoàn thành nhiệm vụ. Vui lòng thử lại.');
+    } catch (e) {
+      debugPrint('❌ Exception: $e');
+      throw Exception('Lỗi không xác định: $e');
+    }
+  }
+
+  /// Abort (cancel) a mission after accepting
+  /// PATCH /api/snakecatching/missions/{missionId}/abort
+  Future<void> abortMission(String missionId, String reason) async {
+    try {
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint('❌ Aborting Mission');
+      debugPrint('📍 Endpoint: /api/snakecatching/missions/$missionId/abort');
+      debugPrint('📝 Reason: $reason');
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      final response = await _httpService.patch(
+        '/api/snakecatching/missions/$missionId/abort',
+        data: {'reason': reason},
+      );
+      debugPrint('✅ Abort Response Status: ${response.statusCode}');
+    } on DioException catch (e) {
+      debugPrint('❌ DioException: ${e.message}');
+      debugPrint('📥 Response: ${e.response?.data}');
+      if (e.response?.statusCode == 404) {
+        throw Exception('Không tìm thấy nhiệm vụ này.');
+      } else if (e.response?.statusCode == 400) {
+        final errorCode = e.response?.data['error']?['errorCode'] as String?;
+        if (errorCode == 'INTERNAL_SERVER_ERROR') {
+          throw Exception('Máy chủ gặp lỗi nội bộ khi hủy đơn. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.');
+        }
+        final message = e.response?.data['message'] ?? 'Không thể hủy nhiệm vụ';
+        throw Exception(message);
+      } else if (e.response?.statusCode == 403) {
+        throw Exception('Bạn không có quyền hủy nhiệm vụ này.');
+      }
+      throw Exception('Không thể hủy nhiệm vụ. Vui lòng thử lại sau.');
+    } catch (e) {
+      debugPrint('❌ Exception: $e');
+      throw Exception('Lỗi không xác định: $e');
+    }
+  }
+
+  /// Cancel a snake catching request
+  /// PATCH /api/snakecatching/requests/cancel/{requestId}
+  Future<void> cancelRequest(String requestId, String reason) async {
+    try {
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint('❌ Cancelling Snake Catching Request');
+      debugPrint('📍 Endpoint: /api/snakecatching/requests/cancel/$requestId');
+      debugPrint('📝 Reason: $reason');
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      final response = await _httpService.patch(
+        '/api/snakecatching/requests/cancel/$requestId',
+        data: {'reason': reason},
+      );
+      debugPrint('✅ Cancel Response Status: ${response.statusCode}');
+    } on DioException catch (e) {
+      debugPrint('❌ DioException: ${e.message}');
+      debugPrint('📥 Response: ${e.response?.data}');
+      if (e.response?.statusCode == 404) {
+        throw Exception('Không tìm thấy yêu cầu này.');
+      } else if (e.response?.statusCode == 400) {
+        final errorCode = e.response?.data['error']?['errorCode'] as String?;
+        if (errorCode == 'INTERNAL_SERVER_ERROR') {
+          throw Exception('Máy chủ gặp lỗi nội bộ khi hủy đơn. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.');
+        }
+        final message = e.response?.data['message'] ?? 'Không thể hủy yêu cầu';
+        throw Exception(message);
+      } else if (e.response?.statusCode == 403) {
+        throw Exception('Bạn không có quyền hủy yêu cầu này.');
+      }
+      throw Exception('Không thể hủy yêu cầu. Vui lòng thử lại sau.');
     } catch (e) {
       debugPrint('❌ Exception: $e');
       throw Exception('Lỗi không xác định: $e');
