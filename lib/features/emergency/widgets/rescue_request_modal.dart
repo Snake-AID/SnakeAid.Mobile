@@ -13,6 +13,8 @@ import '../models/rescue_request.dart';
 import '../models/detailed_incident_response.dart';
 import '../repository/incident_repository.dart';
 import '../providers/rescuer_emergency_provider.dart';
+import '../providers/mission_hub_provider.dart';
+import '../../rescuer/providers/tracking_provider.dart';
 import '../../../core/services/nominatim_service.dart';
 import '../../../core/utils/distance_utils.dart';
 
@@ -278,6 +280,51 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
     });
   }
 
+  /// Connect rescuer to MissionHub and start broadcasting GPS to the member.
+  Future<void> _connectRescuerToMissionHub(
+    String incidentId,
+    String rescuerId,
+  ) async {
+    try {
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint(
+        '🔌 [RescueRequestModal] _connectRescuerToMissionHub() called',
+      );
+      debugPrint('   Incident ID: $incidentId');
+      debugPrint('   Rescuer ID: $rescuerId');
+
+      debugPrint(
+        '🔌 [RescueRequestModal] Connecting rescuer to MissionHub for incident: $incidentId',
+      );
+      await ref
+          .read(missionHubConnectionProvider.notifier)
+          .connectForIncident(incidentId);
+      debugPrint(
+        '✅ [RescueRequestModal] Rescuer joined MissionHub group: $incidentId',
+      );
+
+      // Start streaming GPS → MissionHub.UpdateLocation → member map
+      debugPrint('📍 [RescueRequestModal] Starting mission tracking...');
+      final missionHubService = ref.read(missionHubServiceProvider);
+      debugPrint(
+        '📍 [RescueRequestModal] MissionHub service connected: ${missionHubService.isConnected}',
+      );
+
+      await ref
+          .read(locationManagerProvider)
+          .startMissionTracking(rescuerId, incidentId, missionHubService);
+      debugPrint(
+        '✅✅✅ [RescueRequestModal] Rescuer GPS tracking started for incident $incidentId ✅✅✅',
+      );
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    } catch (e, stack) {
+      debugPrint(
+        '❌ [RescueRequestModal] Failed to connect rescuer to MissionHub: $e',
+      );
+      debugPrint('Stack trace: $stack');
+    }
+  }
+
   Future<void> _onAccept() async {
     if (_isAccepting || _incident == null) return;
 
@@ -309,13 +356,37 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
             backgroundColor: Colors.green,
           ),
         );
-        widget.onDismiss();
 
-        // Navigate to mission detail screen
+        // Navigate FIRST for instant UI response
         if (response.missionId != null) {
-          debugPrint('🚀 Navigating to mission detail: ${response.missionId}');
+          debugPrint(
+            '🚀 [RescueRequestModal] Navigating to mission detail: ${response.missionId}',
+          );
           context.push('/rescuer/mission-detail/${response.missionId}');
+
+          // Dismiss modal AFTER navigation started
+          widget.onDismiss();
+
+          // Connect rescuer to MissionHub and start GPS broadcast to member
+          // Run in background (no await) to not block UI
+          if (response.incidentId != null) {
+            debugPrint(
+              '🔌 [RescueRequestModal] Starting MissionHub connection in background...',
+            );
+            _connectRescuerToMissionHub(response.incidentId!, rescuerId)
+                .then((_) {
+                  debugPrint(
+                    '✅ [RescueRequestModal] Background MissionHub connection completed',
+                  );
+                })
+                .catchError((error) {
+                  debugPrint(
+                    '❌ [RescueRequestModal] Background connection failed: $error',
+                  );
+                });
+          }
         } else {
+          widget.onDismiss();
           debugPrint('⚠️ WARNING: Mission accepted but no missionId returned!');
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(

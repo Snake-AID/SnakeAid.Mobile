@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/rescue_mission_response.dart';
 import '../../models/detailed_incident_response.dart';
 import '../../models/route_navigation_data.dart';
@@ -13,6 +14,8 @@ import '../../providers/mission_detail_provider.dart';
 import '../../../../core/utils/distance_utils.dart';
 import '../../../../core/providers/openroute_provider.dart';
 import '../../../../core/services/openroute_service.dart';
+import '../../providers/mission_hub_provider.dart' hide MissionStatus;
+import '../../../rescuer/providers/tracking_provider.dart';
 
 /// Rescuer Mission Detail Screen
 /// Main screen for rescuer to view mission details and manage status
@@ -33,6 +36,7 @@ class _RescuerMissionDetailScreenState
   StreamSubscription<Position>? _locationSubscription;
   RouteNavigationData? _routeData; // Route data from OpenRouteService
   String? _routeError;
+  final List<StreamSubscription> _missionHubSubscriptions = [];
 
   @override
   void initState() {
@@ -44,6 +48,16 @@ class _RescuerMissionDetailScreenState
   void dispose() {
     _elapsedTimer?.cancel();
     _locationSubscription?.cancel();
+    for (final s in _missionHubSubscriptions) {
+      s.cancel();
+    }
+
+    // NOTE: We do NOT stop LocationManager or disconnect MissionHub here because:
+    // 1. User may navigate to Navigation screen → still need GPS broadcast
+    // 2. LocationManager and MissionHub must persist across screen transitions
+    // 3. They will be stopped only when mission truly ends (completed/cancelled)
+    // 4. This matches member-side architecture where connections persist globally
+
     super.dispose();
   }
 
@@ -59,6 +73,46 @@ class _RescuerMissionDetailScreenState
             missionId: widget.missionId,
             rescuerLocation: position,
           );
+
+      // Connect to MissionHub for real-time bidirectional GPS
+      final mission = ref.read(missionDetailProvider).mission;
+      if (mission != null) {
+        try {
+          await ref
+              .read(missionHubConnectionProvider.notifier)
+              .connectForIncident(mission.incident.id);
+          debugPrint(
+            '✅ Rescuer connected to MissionHub for incident: ${mission.incident.id}',
+          );
+
+          // Setup listener for member location updates
+          _setupMissionHubListeners();
+
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            final rescuerId = prefs.getString('user_id');
+            if (rescuerId != null) {
+              final missionHubService = ref.read(missionHubServiceProvider);
+              await ref
+                  .read(locationManagerProvider)
+                  .startMissionTracking(
+                    rescuerId,
+                    mission.incident.id,
+                    missionHubService,
+                  );
+              debugPrint(
+                '✅ [MissionDetail] Started GPS broadcast to MissionHub',
+              );
+            } else {
+              debugPrint('⚠️ [MissionDetail] No rescuer ID found');
+            }
+          } catch (e) {
+            debugPrint('❌ [MissionDetail] Failed to start GPS broadcast: $e');
+          }
+        } catch (e) {
+          debugPrint('⚠️ Failed to connect to MissionHub: $e');
+        }
+      }
 
       // Start location tracking
       _startLocationTracking();
@@ -76,17 +130,33 @@ class _RescuerMissionDetailScreenState
   }
 
   void _startLocationTracking() {
+    // This stream is ONLY for local provider updates (distance/ETA display)
     _locationSubscription =
         Geolocator.getPositionStream(
           locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.high,
-            distanceFilter: 10, // Update every 10 meters
+            distanceFilter: 15, // Match LocationManager for consistency
           ),
         ).listen((position) {
+          // Update local provider for distance/ETA calculations
           ref
               .read(missionDetailProvider.notifier)
               .updateRescuerLocation(position);
         });
+  }
+
+  void _setupMissionHubListeners() {
+    final svc = ref.read(missionHubServiceProvider);
+
+    // Listen for member live location updates
+    _missionHubSubscriptions.add(
+      svc.memberLocationUpdatedStream.listen((data) {
+        debugPrint(
+          '📍 [RescuerDetail] Member location updated: ${data.latitude}, ${data.longitude}',
+        );
+        // Could update a state variable here if you want to show member location on preview map
+      }),
+    );
   }
 
   void _startElapsedTimer() {
@@ -1741,6 +1811,31 @@ class _RescuerMissionDetailScreenState
                 if (!mounted) return;
 
                 if (success) {
+                  // Clean up: stop mission GPS and disconnect MissionHub
+                  // so the rescuer can receive new SOS requests immediately.
+                  ref.read(locationManagerProvider).stopMissionTracking();
+                  await ref
+                      .read(missionHubConnectionProvider.notifier)
+                      .disconnect();
+
+                  // Restart idle tracking so this rescuer is discoverable for new missions
+                  try {
+                    final prefs = await SharedPreferences.getInstance();
+                    final rescuerId = prefs.getString('user_id');
+                    if (rescuerId != null) {
+                      await ref
+                          .read(locationManagerProvider)
+                          .startTracking(rescuerId);
+                      debugPrint(
+                        '✅ Restarted idle tracking after mission abort',
+                      );
+                    }
+                  } catch (e) {
+                    debugPrint('⚠️ Failed to restart idle tracking: $e');
+                  }
+
+                  if (!mounted) return;
+
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('✅ Đã hủy nhiệm vụ'),

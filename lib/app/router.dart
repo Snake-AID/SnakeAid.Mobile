@@ -563,7 +563,14 @@ final router = GoRouter(
     GoRoute(
       path: '/emergency-tracking',
       name: 'emergency_tracking',
-      builder: (context, state) => const EmergencyTrackingScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return EmergencyTrackingScreen(
+          incidentId: extra?['incidentId'] as String?,
+          missionId: extra?['missionId'] as String?,
+          rescuerId: extra?['rescuerId'] as String?,
+        );
+      },
     ),
     GoRoute(
       path: '/member-rescuer-arrived',

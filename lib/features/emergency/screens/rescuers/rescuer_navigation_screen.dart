@@ -9,6 +9,9 @@ import '../../../shared/widgets/custom_dialog.dart';
 import '../../models/rescue_mission_response.dart';
 import '../../models/route_navigation_data.dart';
 import '../../providers/mission_detail_provider.dart';
+import '../../providers/mission_hub_provider.dart';
+import '../../../../core/services/mission_hub_service.dart'
+    show MemberLocationData;
 
 class RescuerNavigationScreen extends ConsumerStatefulWidget {
   final String missionId;
@@ -43,11 +46,19 @@ class _RescuerNavigationScreenState
   bool _isFollowingUser = true; // Auto-follow mode like Google Maps
   bool _hasInitialPosition = false; // Track if we got first position
 
+  // Live member GPS from MissionHub
+  LatLng? _memberLivePosition;
+  final List<StreamSubscription> _missionHubSubscriptions = [];
+
   // Position tracking & turn-by-turn navigation
   int _currentStepIndex = 0; // Current instruction step
   double? _distanceToNextManeuver; // Distance to next turn (meters)
   bool _isOffRoute = false; // Off-route detection flag
   bool _hasShownOffRouteAlert = false; // Prevent spam alerts
+
+  // 🔋 Thermal optimization: throttle off-route checks
+  DateTime _lastOffRouteCheck = DateTime.now();
+  static const Duration _offRouteCheckInterval = Duration(seconds: 15);
 
   RouteNavigationData? _getRouteData() {
     // Try widget parameter first, then fallback to provider
@@ -84,33 +95,52 @@ class _RescuerNavigationScreenState
 
     _mapController = MapController();
 
+    // 🔋 Thermal optimization: slower animations = less CPU/GPU work
     // Red pin pulse animation
     _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 2000), // Increased from 1500ms
       vsync: this,
     )..repeat(reverse: true);
 
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+      // Reduced from 1.2
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
     // Blue dot pulse animation
     _bluePulseController = AnimationController(
-      duration: const Duration(seconds: 2),
+      duration: const Duration(seconds: 3), // Increased from 2s
       vsync: this,
     )..repeat();
 
-    _bluePulseAnimation = Tween<double>(begin: 1.0, end: 3.0).animate(
+    _bluePulseAnimation = Tween<double>(begin: 1.0, end: 2.5).animate(
+      // Reduced from 3.0
       CurvedAnimation(parent: _bluePulseController, curve: Curves.easeOut),
     );
 
     // Start real-time location tracking
     _startLocationTracking();
 
-    // Fit bounds to show entire route initially
+    // Listen for member's live GPS from MissionHub
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupMissionHubListeners();
       _fitBoundsToRoute();
     });
+  }
+
+  void _setupMissionHubListeners() {
+    final svc = ref.read(missionHubServiceProvider);
+    _missionHubSubscriptions.add(
+      svc.memberLocationUpdatedStream.listen((MemberLocationData data) {
+        if (!mounted) return;
+        setState(() {
+          _memberLivePosition = LatLng(data.latitude, data.longitude);
+        });
+        debugPrint(
+          '📍 [NavScreen] Member live position: ${data.latitude}, ${data.longitude}',
+        );
+      }),
+    );
   }
 
   void _fitBoundsToRoute() {
@@ -205,7 +235,8 @@ class _RescuerNavigationScreenState
         Geolocator.getPositionStream(
           locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.high,
-            distanceFilter: 10, // Update every 10 meters
+            distanceFilter:
+                15, // Increased from 10m for battery/thermal savings
           ),
         ).listen((Position position) {
           if (mounted) {
@@ -218,14 +249,13 @@ class _RescuerNavigationScreenState
             });
 
             // Auto-follow user like Google Maps
-            if (_isFollowingUser) {
+            if (_isFollowingUser && mounted) {
               _mapController.move(
                 LatLng(position.latitude, position.longitude),
                 _mapController.camera.zoom, // Keep current zoom
               );
             }
 
-            // Update provider with current location
             ref
                 .read(missionDetailProvider.notifier)
                 .updateRescuerLocation(position);
@@ -356,7 +386,15 @@ class _RescuerNavigationScreenState
   }
 
   /// Check if rescuer is off-route (too far from polyline)
+  /// 🔋 Thermal optimization: throttled to run every 15s max
   void _checkOffRoute(Position position) {
+    // Throttle: only check every 15 seconds
+    final now = DateTime.now();
+    if (now.difference(_lastOffRouteCheck) < _offRouteCheckInterval) {
+      return; // Skip this check
+    }
+    _lastOffRouteCheck = now;
+
     final routeData = _getRouteData();
     if (routeData == null) return;
     final routePoints = routeData.points;
@@ -455,6 +493,9 @@ class _RescuerNavigationScreenState
   @override
   void dispose() {
     _positionSubscription?.cancel();
+    for (final s in _missionHubSubscriptions) {
+      s.cancel();
+    }
     _pulseController.dispose();
     _bluePulseController.dispose();
     _mapController.dispose();
@@ -524,7 +565,7 @@ class _RescuerNavigationScreenState
               // Markers for rescuer and victim
               MarkerLayer(
                 markers: [
-                  // Victim location marker (red pin)
+                  // Victim SOS origin marker (red pin – static location where SOS was created)
                   Marker(
                     point: LatLng(
                       widget.mission.incident.locationCoordinates.latitude,
@@ -532,42 +573,17 @@ class _RescuerNavigationScreenState
                     ),
                     width: 48,
                     height: 48,
-                    child: AnimatedBuilder(
-                      animation: _pulseAnimation,
-                      builder: (context, child) {
-                        return Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            // Pulse effect
-                            Transform.scale(
-                              scale: _pulseAnimation.value,
-                              child: Container(
-                                width: 64,
-                                height: 64,
-                                decoration: BoxDecoration(
-                                  color: const Color(
-                                    0xFFDC3545,
-                                  ).withOpacity(0.3),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                            // Pin icon
-                            const Icon(
-                              Icons.location_on,
-                              color: Color(0xFFDC3545),
-                              size: 48,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black26,
-                                  blurRadius: 10,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                          ],
-                        );
-                      },
+                    child: const Icon(
+                      Icons.location_on,
+                      color: Color(0xFFDC3545),
+                      size: 48,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black26,
+                          blurRadius: 10,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
                     ),
                   ),
 
@@ -636,6 +652,71 @@ class _RescuerNavigationScreenState
                     ),
                 ],
               ),
+
+              // Live member position (orange pulsing dot – updates every 15 s)
+              if (_memberLivePosition != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _memberLivePosition!,
+                      width: 64,
+                      height: 64,
+                      child: AnimatedBuilder(
+                        animation: _pulseAnimation,
+                        builder: (_, __) => Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Outer pulse ring – opacity fades out as scale grows
+                            Transform.scale(
+                              scale: _pulseAnimation.value,
+                              child: Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: const Color(0xFFFF8800).withOpacity(
+                                    (0.4 *
+                                            (1.0 -
+                                                (_pulseAnimation.value - 1.0) /
+                                                    0.2))
+                                        .clamp(0.0, 1.0),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // White halo
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white,
+                              ),
+                            ),
+                            // Core orange dot
+                            Container(
+                              width: 17,
+                              height: 17,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFFFF8800),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFFFF8800,
+                                    ).withOpacity(0.4),
+                                    blurRadius: 6,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
 

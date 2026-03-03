@@ -19,14 +19,16 @@ class RescuerAvailableJobsScreen extends ConsumerStatefulWidget {
   const RescuerAvailableJobsScreen({super.key});
 
   @override
-  ConsumerState<RescuerAvailableJobsScreen> createState() => _RescuerAvailableJobsScreenState();
+  ConsumerState<RescuerAvailableJobsScreen> createState() =>
+      _RescuerAvailableJobsScreenState();
 }
 
-class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJobsScreen> {
+class _RescuerAvailableJobsScreenState
+    extends ConsumerState<RescuerAvailableJobsScreen> {
   bool _isOnline = true;
   String _selectedFilter = 'Gần nhất'; // Gần nhất, Mới nhất
   String _selectedDistance = '10km'; // 10km, 20km, 30km
-  
+
   bool _isLoading = true;
   String? _errorMessage;
   String? _locationErrorMessage;
@@ -34,7 +36,7 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
   Position? _currentPosition;
   Timer? _refreshTimer;
   String? _currentRescuerId;
-  
+
   // Cache for snake species details
   final Map<int, SnakeSpecies> _speciesCache = {};
 
@@ -49,9 +51,9 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
     super.initState();
     _initialize();
     // Auto-refresh every 10 seconds
-    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      _silentRefresh();
-    });
+    // _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    //   _silentRefresh();
+    // });
   }
 
   @override
@@ -83,30 +85,32 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
   Future<void> _getCurrentLocation() async {
     try {
       debugPrint('🌍 Starting location acquisition...');
-      
+
       // Check if location service is enabled
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         debugPrint('❌ Location service is disabled');
         if (mounted) {
           setState(() {
-            _locationErrorMessage = 'Vui lòng bật dịch vụ định vị để tính khoảng cách';
+            _locationErrorMessage =
+                'Vui lòng bật dịch vụ định vị để tính khoảng cách';
           });
         }
         return;
       }
-      
+
       // Check permission
       LocationPermission permission = await Geolocator.checkPermission();
       debugPrint('📍 Location permission status: $permission');
-      
+
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
           debugPrint('❌ Location permission denied');
           if (mounted) {
             setState(() {
-              _locationErrorMessage = 'Cần quyền truy cập vị trí để tính khoảng cách';
+              _locationErrorMessage =
+                  'Cần quyền truy cập vị trí để tính khoảng cách';
             });
           }
           return;
@@ -117,7 +121,8 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
         debugPrint('❌ Location permission denied forever');
         if (mounted) {
           setState(() {
-            _locationErrorMessage = 'Vui lòng cấp quyền vị trí trong cài đặt để tính khoảng cách';
+            _locationErrorMessage =
+                'Vui lòng cấp quyền vị trí trong cài đặt để tính khoảng cách';
           });
         }
         return;
@@ -129,9 +134,11 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 10),
       );
-      
-      debugPrint('✓ Got current location: ${_currentPosition?.latitude}, ${_currentPosition?.longitude}');
-      
+
+      debugPrint(
+        '✓ Got current location: ${_currentPosition?.latitude}, ${_currentPosition?.longitude}',
+      );
+
       // Trigger UI update with new location
       if (mounted) {
         setState(() {
@@ -143,7 +150,8 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
       debugPrint('❌ Error getting location: $e');
       if (mounted) {
         setState(() {
-          _locationErrorMessage = 'Không thể lấy vị trí hiện tại. Khoảng cách sẽ không chính xác.';
+          _locationErrorMessage =
+              'Không thể lấy vị trí hiện tại. Khoảng cách sẽ không chính xác.';
         });
       }
     }
@@ -203,7 +211,13 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
   /// Fetch mission status for all active requests (re-fetches each refresh so status stays fresh)
   Future<void> _loadMissionStatusForAssigned() async {
     final repo = ref.read(snakeCatchingRepositoryProvider);
-    const activeStatuses = {'Assigned', 'Finished', 'Paid', 'Completed', 'Dispute'};
+    const activeStatuses = {
+      'Assigned',
+      'Finished',
+      'Paid',
+      'Completed',
+      'Dispute',
+    };
     final assignedRequests = _allRequests
         .where((r) => activeStatuses.contains(r.status))
         .toList();
@@ -229,7 +243,9 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
   Future<void> _loadTransactionsForAssigned() async {
     final repo = ref.read(transactionRepositoryProvider);
     final assignedRequests = _allRequests
-        .where((r) => r.status == 'Assigned' && !_transactionCache.containsKey(r.id))
+        .where(
+          (r) => r.status == 'Assigned' && !_transactionCache.containsKey(r.id),
+        )
         .toList();
     if (assignedRequests.isEmpty) return;
 
@@ -249,7 +265,7 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
   Future<void> _loadSnakeSpeciesDetails() async {
     try {
       final repository = ref.read(snakeSpeciesRepositoryProvider);
-      
+
       // Get all unique species IDs from all requests
       final Set<int> speciesIds = {};
       for (final request in _allRequests) {
@@ -257,12 +273,12 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
           speciesIds.add(detail.snakeSpeciesId);
         }
       }
-      
+
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       debugPrint('🐍 Loading Snake Species Details');
       debugPrint('📊 Total unique species: ${speciesIds.length}');
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      
+
       // Load details for each species that's not in cache
       for (final speciesId in speciesIds) {
         if (!_speciesCache.containsKey(speciesId)) {
@@ -277,7 +293,7 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
           }
         }
       }
-      
+
       if (mounted) {
         setState(() {}); // Trigger rebuild with loaded species data
       }
@@ -291,13 +307,13 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
     // Check if coordinates are within valid range
     if (location.latitude < -90 || location.latitude > 90) return false;
     if (location.longitude < -180 || location.longitude > 180) return false;
-    
+
     // Filter out obvious placeholder/invalid values
     // Vietnam + nearby region: lat ~8-24, lng ~102-110
     // Allow broader range for neighboring countries
     if (location.latitude < 5 || location.latitude > 30) return false;
     if (location.longitude < 95 || location.longitude > 115) return false;
-    
+
     return true;
   }
 
@@ -306,27 +322,31 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
       debugPrint('⚠️ Cannot calculate distance: Current position is null');
       return 0.0;
     }
-    
+
     // Validate coordinates before calculating
     if (!_isValidCoordinate(requestLocation)) {
-      debugPrint('⚠️ Invalid coordinates: (${requestLocation.latitude}, ${requestLocation.longitude})');
+      debugPrint(
+        '⚠️ Invalid coordinates: (${requestLocation.latitude}, ${requestLocation.longitude})',
+      );
       return double.infinity; // Return infinity for invalid coordinates
     }
-    
-    final distance = Geolocator.distanceBetween(
-      _currentPosition!.latitude,
-      _currentPosition!.longitude,
-      requestLocation.latitude,
-      requestLocation.longitude,
-    ) / 1000; // Convert to km
-    
+
+    final distance =
+        Geolocator.distanceBetween(
+          _currentPosition!.latitude,
+          _currentPosition!.longitude,
+          requestLocation.latitude,
+          requestLocation.longitude,
+        ) /
+        1000; // Convert to km
+
     return distance;
   }
 
   String _getTimeAgo(DateTime dateTime) {
     final now = DateTime.now();
     final difference = now.difference(dateTime);
-    
+
     if (difference.inMinutes < 60) {
       return '${difference.inMinutes} phút trước';
     } else if (difference.inHours < 24) {
@@ -338,20 +358,24 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
 
   List<SnakeCatchingRequestData> _getFilteredRequests({String? statusFilter}) {
     List<SnakeCatchingRequestData> filtered = List.from(_allRequests);
-    
+
     // Filter by status (tab)
     if (statusFilter == 'Pending') {
       // "Đơn có thể nhận": only Pending orders (not yet assigned)
-      filtered = filtered.where((request) => request.status == 'Pending').toList();
+      filtered = filtered
+          .where((request) => request.status == 'Pending')
+          .toList();
 
       // Filter out requests with invalid coordinates
-      filtered = filtered.where((request) =>
-        _isValidCoordinate(request.locationCoordinates)
-      ).toList();
+      filtered = filtered
+          .where((request) => _isValidCoordinate(request.locationCoordinates))
+          .toList();
 
       // Filter by distance for Pending tab
-      double maxDistance = _selectedDistance == '10km' ? 10.0
-          : _selectedDistance == '20km' ? 20.0
+      double maxDistance = _selectedDistance == '10km'
+          ? 10.0
+          : _selectedDistance == '20km'
+          ? 20.0
           : 30.0;
 
       if (_currentPosition != null) {
@@ -379,15 +403,24 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
     } else if (statusFilter == 'Accepted') {
       // "Đơn đã nhận": filter from _allRequests by assignedRescuerId
       // (works once BE adds assignedRescuerId to the list endpoint)
-      const activeStatuses = {'Assigned', 'Finished', 'Paid', 'Dispute', 'Completed'};
-      filtered = filtered.where((request) =>
-        activeStatuses.contains(request.status) &&
-        request.assignedRescuerId != null &&
-        request.assignedRescuerId == _currentRescuerId
-      ).toList();
+      const activeStatuses = {
+        'Assigned',
+        'Finished',
+        'Paid',
+        'Dispute',
+        'Completed',
+      };
+      filtered = filtered
+          .where(
+            (request) =>
+                activeStatuses.contains(request.status) &&
+                request.assignedRescuerId != null &&
+                request.assignedRescuerId == _currentRescuerId,
+          )
+          .toList();
       filtered.sort((a, b) => b.requestDate.compareTo(a.requestDate));
     }
-    
+
     return filtered;
   }
 
@@ -402,13 +435,13 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
             children: [
               // Header
               _buildHeader(),
-              
+
               // Tabs
               _buildTabBar(),
-              
+
               // Filter Sort Options
               _buildFilterSortRow(),
-              
+
               // Job List with TabBarView
               Expanded(
                 child: TabBarView(
@@ -434,10 +467,7 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
         indicatorColor: const Color(0xFFFF6B35),
         indicatorWeight: 3,
         labelPadding: const EdgeInsets.symmetric(vertical: 12),
-        labelStyle: const TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.bold,
-        ),
+        labelStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
         unselectedLabelStyle: const TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w600,
@@ -453,9 +483,7 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
   Widget _buildAvailableJobsContent({required String statusFilter}) {
     if (_isLoading) {
       return const Center(
-        child: CircularProgressIndicator(
-          color: Color(0xFFFF6B35),
-        ),
+        child: CircularProgressIndicator(color: Color(0xFFFF6B35)),
       );
     }
 
@@ -464,11 +492,7 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.error_outline,
-              size: 60,
-              color: Color(0xFFDC3545),
-            ),
+            const Icon(Icons.error_outline, size: 60, color: Color(0xFFDC3545)),
             const SizedBox(height: 16),
             Text(
               'Lỗi tải dữ liệu',
@@ -484,10 +508,7 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
               child: Text(
                 _errorMessage!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF666666),
-                ),
+                style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
               ),
             ),
             const SizedBox(height: 16),
@@ -505,26 +526,19 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
     }
 
     final filteredRequests = _getFilteredRequests(statusFilter: statusFilter);
-    
+
     if (filteredRequests.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.search_off,
-              size: 80,
-              color: Colors.grey[300],
-            ),
+            Icon(Icons.search_off, size: 80, color: Colors.grey[300]),
             const SizedBox(height: 16),
             Text(
-              statusFilter == 'Pending' 
-                ? 'Không có đơn nào trong khu vực $_selectedDistance'
-                : 'Bạn chưa nhận đơn nào',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
+              statusFilter == 'Pending'
+                  ? 'Không có đơn nào trong khu vực $_selectedDistance'
+                  : 'Bạn chưa nhận đơn nào',
+              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
               textAlign: TextAlign.center,
             ),
           ],
@@ -550,13 +564,15 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
             ),
           ),
           const Spacer(),
-          
+
           // Online Status Toggle - Compact
           Container(
             height: 32,
             padding: const EdgeInsets.symmetric(horizontal: 8),
             decoration: BoxDecoration(
-              color: _isOnline ? const Color(0xFFFF6B35).withOpacity(0.1) : const Color(0xFFF5F5F5),
+              color: _isOnline
+                  ? const Color(0xFFFF6B35).withOpacity(0.1)
+                  : const Color(0xFFF5F5F5),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
@@ -566,7 +582,9 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                   width: 6,
                   height: 6,
                   decoration: BoxDecoration(
-                    color: _isOnline ? const Color(0xFFFF6B35) : const Color(0xFF999999),
+                    color: _isOnline
+                        ? const Color(0xFFFF6B35)
+                        : const Color(0xFF999999),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -576,7 +594,9 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: _isOnline ? const Color(0xFFFF6B35) : const Color(0xFF999999),
+                    color: _isOnline
+                        ? const Color(0xFFFF6B35)
+                        : const Color(0xFF999999),
                   ),
                 ),
                 Transform.scale(
@@ -595,10 +615,14 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
               ],
             ),
           ),
-          
+
           // Menu Icon
           IconButton(
-            icon: const Icon(Icons.more_vert, color: Color(0xFF666666), size: 20),
+            icon: const Icon(
+              Icons.more_vert,
+              color: Color(0xFF666666),
+              size: 20,
+            ),
             onPressed: () {
               // TODO: Show menu
             },
@@ -648,12 +672,19 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                       });
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 7,
+                      ),
                       decoration: BoxDecoration(
-                        color: isSelected ? const Color(0xFF28A745) : Colors.transparent,
+                        color: isSelected
+                            ? const Color(0xFF28A745)
+                            : Colors.transparent,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isSelected ? const Color(0xFF28A745) : const Color(0xFFE0E0E0),
+                          color: isSelected
+                              ? const Color(0xFF28A745)
+                              : const Color(0xFFE0E0E0),
                           width: 1,
                         ),
                       ),
@@ -662,7 +693,9 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: isSelected ? Colors.white : const Color(0xFF666666),
+                          color: isSelected
+                              ? Colors.white
+                              : const Color(0xFF666666),
                         ),
                       ),
                     ),
@@ -695,12 +728,19 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                       });
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 7,
+                      ),
                       decoration: BoxDecoration(
-                        color: isSelected ? const Color(0xFFFF6B35) : Colors.transparent,
+                        color: isSelected
+                            ? const Color(0xFFFF6B35)
+                            : Colors.transparent,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isSelected ? const Color(0xFFFF6B35) : const Color(0xFFE0E0E0),
+                          color: isSelected
+                              ? const Color(0xFFFF6B35)
+                              : const Color(0xFFE0E0E0),
                           width: 1,
                         ),
                       ),
@@ -709,7 +749,9 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: isSelected ? Colors.white : const Color(0xFF666666),
+                          color: isSelected
+                              ? Colors.white
+                              : const Color(0xFF666666),
                         ),
                       ),
                     ),
@@ -723,7 +765,6 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
     );
   }
 
-  
   Widget _buildJobListByDistance(List<SnakeCatchingRequestData> requests) {
     // Group by distance ranges
     Map<String, List<SnakeCatchingRequestData>> groupedRequests = {
@@ -778,7 +819,7 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
               ],
             ),
           ),
-        
+
         // Job list
         Expanded(
           child: ListView.builder(
@@ -788,7 +829,7 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
               final areaName = groupedRequests.keys.elementAt(index);
               final areaRequests = groupedRequests[areaName]!;
               final count = areaRequests.length;
-              
+
               // Xác định màu cho từng khu vực
               Color areaColor;
               if (areaName.contains('GẦN BẠN')) {
@@ -798,74 +839,82 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
               } else {
                 areaColor = const Color(0xFFFF6B35); // Cam
               }
-        
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Area Header
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              color: const Color(0xFFFFFBF5),
-              child: Row(
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Area Header
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: areaColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: areaColor, width: 1.5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
                     ),
-                    child: Text(
-                      '$count',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: areaColor,
-                      ),
+                    color: const Color(0xFFFFFBF5),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: areaColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: areaColor, width: 1.5),
+                          ),
+                          child: Text(
+                            '$count',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: areaColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          areaName.split('(')[0].trim(),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF666666),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '(${areaName.split('(')[1]}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF666666),
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '$count yêu cầu',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: areaColor,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    areaName.split('(')[0].trim(),
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF666666),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '(${areaName.split('(')[1]}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF666666),
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '$count yêu cầu',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: areaColor,
-                    ),
-                  ),
+
+                  // Job Cards
+                  ...areaRequests
+                      .map((request) => _buildJobCard(request))
+                      .toList(),
                 ],
-              ),
-            ),
-            
-            // Job Cards
-            ...areaRequests.map((request) => _buildJobCard(request)).toList(),
-          ],
-        );
-      },
+              );
+            },
           ),
         ),
       ],
     );
   }
-  
+
   // Helper function không cần nữa vì dùng DateTime từ API
   // int _parseTimeAgo(String timeAgo) {...}
 
@@ -951,27 +1000,36 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
   Widget _buildJobCard(SnakeCatchingRequestData request) {
     final distance = _calculateDistance(request.locationCoordinates);
     final timeAgo = _getTimeAgo(request.requestDate);
-    final speciesDetail = request.details.isNotEmpty ? request.details.first : null;
-    final totalQuantity = request.details.fold<int>(0, (sum, detail) => sum + detail.quantity);
-    
+    final speciesDetail = request.details.isNotEmpty
+        ? request.details.first
+        : null;
+    final totalQuantity = request.details.fold<int>(
+      0,
+      (sum, detail) => sum + detail.quantity,
+    );
+
     // Get snake species details from cache
     SnakeSpecies? species;
-    if (speciesDetail != null && _speciesCache.containsKey(speciesDetail.snakeSpeciesId)) {
+    if (speciesDetail != null &&
+        _speciesCache.containsKey(speciesDetail.snakeSpeciesId)) {
       species = _speciesCache[speciesDetail.snakeSpeciesId];
     }
-    
-    final snakeTitle = species?.commonName ?? speciesDetail?.snakeSpeciesName ?? 'Rắn chưa xác định';
-    
+
+    final snakeTitle =
+        species?.commonName ??
+        speciesDetail?.snakeSpeciesName ??
+        'Rắn chưa xác định';
+
     // Get image from species (preferred) or user media
     String? imageUrl = species?.imageUrl;
     if (imageUrl == null && request.media.isNotEmpty) {
       imageUrl = request.media.first.url;
     }
-    
+
     // Get danger level from species info
     String dangerBadge = 'CHƯA RÕ';
     Color dangerColor = const Color(0xFF999999);
-    
+
     if (species != null) {
       if (species.isVenomous) {
         if (species.riskLevel >= 8.0) {
@@ -992,7 +1050,7 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
         dangerColor = const Color(0xFF28A745); // Green
       }
     }
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -1016,7 +1074,10 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
               children: [
                 // Distance Badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF28A745),
                     borderRadius: BorderRadius.circular(12),
@@ -1037,11 +1098,15 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                   ),
                 ),
                 const SizedBox(width: 8),
-                
+
                 // Time Badge
                 Row(
                   children: [
-                    const Icon(Icons.access_time, size: 14, color: Color(0xFF999999)),
+                    const Icon(
+                      Icons.access_time,
+                      size: 14,
+                      color: Color(0xFF999999),
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       timeAgo,
@@ -1053,42 +1118,59 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                   ],
                 ),
                 const Spacer(),
-                
+
                 // Status Badge (for accepted orders)
                 if (request.status != 'Pending') ...[
-                  Builder(builder: (_) {
-                    final displayStatus = _resolveDisplayStatus(request);
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(displayStatus).withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: _getStatusColor(displayStatus), width: 1),
-                      ),
-                      child: Text(
-                        _getStatusText(displayStatus),
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: _getStatusColor(displayStatus),
+                  Builder(
+                    builder: (_) {
+                      final displayStatus = _resolveDisplayStatus(request);
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
                         ),
-                      ),
-                    );
-                  }),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(
+                            displayStatus,
+                          ).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _getStatusColor(displayStatus),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          _getStatusText(displayStatus),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: _getStatusColor(displayStatus),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                   const SizedBox(width: 4),
                 ],
 
                 // Priority Badge
                 if (request.priority == 'High')
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFDC3545).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.priority_high, size: 12, color: Color(0xFFDC3545)),
+                        Icon(
+                          Icons.priority_high,
+                          size: 12,
+                          color: Color(0xFFDC3545),
+                        ),
                         SizedBox(width: 2),
                         Text(
                           'KHẨN',
@@ -1104,7 +1186,7 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
               ],
             ),
           ),
-          
+
           // Snake Image
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1122,7 +1204,11 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) {
                               return const Center(
-                                child: Icon(Icons.image, size: 60, color: Color(0xFFCCCCCC)),
+                                child: Icon(
+                                  Icons.image,
+                                  size: 60,
+                                  color: Color(0xFFCCCCCC),
+                                ),
                               );
                             },
                           )
@@ -1130,7 +1216,11 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.image_not_supported, size: 60, color: Color(0xFFCCCCCC)),
+                                Icon(
+                                  Icons.image_not_supported,
+                                  size: 60,
+                                  color: Color(0xFFCCCCCC),
+                                ),
                                 SizedBox(height: 8),
                                 Text(
                                   'Chưa có ảnh',
@@ -1144,13 +1234,16 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                           ),
                   ),
                 ),
-                
+
                 // Danger Badge (show when we have species info)
                 Positioned(
                   top: 8,
                   right: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: dangerColor,
                       borderRadius: BorderRadius.circular(6),
@@ -1164,7 +1257,11 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.warning, size: 14, color: Colors.white),
+                        const Icon(
+                          Icons.warning,
+                          size: 14,
+                          color: Colors.white,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           dangerBadge,
@@ -1181,9 +1278,9 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
               ],
             ),
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           // Title & Quantity
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1204,7 +1301,10 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF0F0F0),
                         borderRadius: BorderRadius.circular(6),
@@ -1221,7 +1321,7 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                   ],
                 ),
                 const SizedBox(height: 8),
-                
+
                 // Scientific name if available
                 if (speciesDetail != null)
                   Text(
@@ -1235,9 +1335,9 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
               ],
             ),
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           // Address
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1251,7 +1351,11 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                     color: const Color(0xFFF0F0F0),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Icon(Icons.location_on, size: 18, color: Color(0xFFFF6B35)),
+                  child: const Icon(
+                    Icons.location_on,
+                    size: 18,
+                    color: Color(0xFFFF6B35),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -1269,11 +1373,12 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
               ],
             ),
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           // Additional Details (if any)
-          if (request.additionalDetails != null && request.additionalDetails!.isNotEmpty)
+          if (request.additionalDetails != null &&
+              request.additionalDetails!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Container(
@@ -1284,7 +1389,11 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline, size: 16, color: Color(0xFFFF6B35)),
+                    const Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: Color(0xFFFF6B35),
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -1301,91 +1410,99 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                 ),
               ),
             ),
-          
+
           const SizedBox(height: 12),
-          
+
           // ── Deposit-paid banner (Assigned + CatchingDeposit) ──
           if (request.status == 'Assigned') ...[
-            Builder(builder: (_) {
-              final tx = _transactionCache[request.id];
-              final depositPaid = tx != null && tx.isDeposited;
-              if (!depositPaid) return const SizedBox.shrink();
-              return Container(
-                margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF1B8F3A), Color(0xFF28A745)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
+            Builder(
+              builder: (_) {
+                final tx = _transactionCache[request.id];
+                final depositPaid = tx != null && tx.isDeposited;
+                if (!depositPaid) return const SizedBox.shrink();
+                return Container(
+                  margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
                   ),
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF28A745).withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF1B8F3A), Color(0xFF28A745)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
                     ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF28A745).withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
                       ),
-                      child: const Icon(
-                        Icons.verified,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Đã thanh toán phí di chuyển',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Sẵn sàng xuất phát · ${_formatCurrency(tx!.amount)}',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Colors.white70,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        'SẴN SÀNG',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.verified,
                           color: Colors.white,
+                          size: 20,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              );
-            }),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Đã thanh toán phí di chuyển',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Sẵn sàng xuất phát · ${_formatCurrency(tx!.amount)}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'SẴN SÀNG',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ],
 
           // View Detail Button
@@ -1415,8 +1532,11 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                         ),
                       ),
                     );
-                  } else if ((missionStatus == 'Finished' || missionStatus == 'MissionCompleted' ||
-                      missionStatus == 'Paid' || missionStatus == 'Completed') && mission != null) {
+                  } else if ((missionStatus == 'Finished' ||
+                          missionStatus == 'MissionCompleted' ||
+                          missionStatus == 'Paid' ||
+                          missionStatus == 'Completed') &&
+                      mission != null) {
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (context) => RescuerMissionSuccessScreen(
@@ -1428,9 +1548,8 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                   } else if (request.status == 'Assigned') {
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (context) => RescuerAcceptRequestScreen(
-                          requestData: request,
-                        ),
+                        builder: (context) =>
+                            RescuerAcceptRequestScreen(requestData: request),
                       ),
                     );
                   } else {
