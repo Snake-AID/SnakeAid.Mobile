@@ -1,4 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../auth/repository/auth_repository.dart';
+import '../../auth/models/user.dart';
 import 'edit_profile_screen.dart';
 import 'health_history_screen.dart';
 import 'payment_history_screen.dart';
@@ -8,10 +12,68 @@ import 'id_documents_screen.dart';
 import 'deposit_money_screen.dart';
 import 'withdraw_money_screen.dart';
 import 'settings_screen.dart';
+import '../../snake_catching/repository/wallet_repository.dart';
 
 /// Member Profile Screen
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  WalletInfo? _walletInfo;
+  bool _isLoadingWallet = true;
+  Timer? _walletRefreshTimer;
+  User? _userInfo;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserInfo();
+    _loadWallet();
+    _walletRefreshTimer = Timer.periodic(const Duration(minutes: 3), (_) {
+      _silentRefreshWallet();
+    });
+  }
+
+  @override
+  void dispose() {
+    _walletRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadUserInfo() async {
+    try {
+      final user = await ref.read(authRepositoryProvider).getCurrentUser();
+      if (mounted && user != null) setState(() => _userInfo = user);
+    } catch (_) {}
+  }
+
+  Future<void> _loadWallet() async {
+    try {
+      final wallet = await ref.read(walletRepositoryProvider).getWalletInfo();
+      if (mounted) setState(() { _walletInfo = wallet; _isLoadingWallet = false; });
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingWallet = false);
+    }
+  }
+
+  Future<void> _silentRefreshWallet() async {
+    try {
+      final wallet = await ref.read(walletRepositoryProvider).getWalletInfo();
+      if (mounted) setState(() => _walletInfo = wallet);
+    } catch (_) {}
+  }
+
+  String _formatBalance(double amount) {
+    final formatted = amount.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+    return '$formatted đ';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -93,9 +155,11 @@ class ProfileScreen extends StatelessWidget {
                               color: Colors.grey[300]!,
                               width: 2,
                             ),
-                            image: const DecorationImage(
+                            image: DecorationImage(
                               image: NetworkImage(
-                                'https://ui-avatars.com/api/?name=Nguyen+Van+A&background=228B22&color=fff&size=200',
+                                _userInfo?.avatarUrl?.isNotEmpty == true
+                                    ? _userInfo!.avatarUrl!
+                                    : 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_userInfo?.fullName ?? 'User')}&background=228B22&color=fff&size=200',
                               ),
                               fit: BoxFit.cover,
                             ),
@@ -103,49 +167,59 @@ class ProfileScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                         // Name
-                        const Text(
-                          'Nguyễn Văn A',
-                          style: TextStyle(
+                        Text(
+                          _userInfo?.fullName ?? '---',
+                          style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF1F1F1F),
                           ),
                         ),
                         const SizedBox(height: 4),
-                        // Phone
+                        // Email
                         Text(
-                          '+84 912 345 678',
+                          _userInfo?.email ?? '',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 14,
                             color: Colors.grey[600],
                           ),
                         ),
                         const SizedBox(height: 8),
-                        // Verified Badge
+                        // Active Badge
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF228B22).withOpacity(0.1),
+                            color: (_userInfo?.isActive ?? true)
+                                ? const Color(0xFF228B22).withOpacity(0.1)
+                                : Colors.grey.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(
-                                Icons.verified,
+                              Icon(
+                                (_userInfo?.isActive ?? true)
+                                    ? Icons.verified
+                                    : Icons.cancel_outlined,
                                 size: 16,
-                                color: Color(0xFF228B22),
+                                color: (_userInfo?.isActive ?? true)
+                                    ? const Color(0xFF228B22)
+                                    : Colors.grey,
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                'Tài khoản đã xác minh',
+                                (_userInfo?.isActive ?? true)
+                                    ? 'Tài khoản đã xác minh'
+                                    : 'Tài khoản chưa xác minh',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF228B22),
+                                  color: (_userInfo?.isActive ?? true)
+                                      ? const Color(0xFF228B22)
+                                      : Colors.grey,
                                 ),
                               ),
                             ],
@@ -280,14 +354,28 @@ class ProfileScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        const Text(
-                          '1.250.000 đ',
-                          style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
+                        _isLoadingWallet
+                            ? const SizedBox(
+                                height: 40,
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white54,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                _formatBalance(_walletInfo?.balance ?? 0),
+                                style: const TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
                         const SizedBox(height: 20),
                         Row(
                           children: [

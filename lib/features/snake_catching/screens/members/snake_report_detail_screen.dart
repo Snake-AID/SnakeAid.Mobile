@@ -62,6 +62,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
       _loadSnakeSpecies();
     });
     _searchController.addListener(_onSearchChanged);
+    _addressDetailController.addListener(() => setState(() {}));
   }
 
   @override
@@ -142,6 +143,11 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
   bool get _canSubmit {
     // Must have location
     if (_selectedAddress == null || _selectedLatitude == null || _selectedLongitude == null) {
+      return false;
+    }
+
+    // Must have address detail (BE does not allow null)
+    if (_addressDetailController.text.trim().isEmpty) {
       return false;
     }
     
@@ -727,29 +733,68 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
   }
 
   Widget _buildAddressDetailField() {
+    final isFilled = _addressDetailController.text.trim().isNotEmpty;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(
+          color: isFilled
+              ? const Color(0xFF228B22)
+              : const Color(0xFFE53935),
+          width: isFilled ? 2 : 1.5,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.location_on, size: 18, color: Colors.grey[600]),
+              Icon(
+                Icons.location_on,
+                size: 18,
+                color: isFilled ? const Color(0xFF228B22) : const Color(0xFFE53935),
+              ),
               const SizedBox(width: 8),
               Text(
                 'GHI CHÚ ĐỊA CHỈ CHI TIẾT',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey[500],
+                  color: Colors.grey[600],
                   letterSpacing: 1,
                 ),
               ),
+              const SizedBox(width: 4),
+              const Text(
+                '*',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFE53935),
+                ),
+              ),
+              const Spacer(),
+              if (isFilled)
+                const Icon(Icons.check_circle, size: 16, color: Color(0xFF228B22))
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFEBEE),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'Bắt buộc',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFE53935),
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 12),
@@ -759,18 +804,29 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
               hintText: 'Ví dụ: gần chùa, gần hẻm 123, gần công viên...',
               hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
               filled: true,
-              fillColor: const Color(0xFFF8FAFC),
+              fillColor: isFilled
+                  ? const Color(0xFFF0FDF4)
+                  : const Color(0xFFFFF8F8),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(color: Colors.grey[300]!),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: Colors.grey[300]!),
+                borderSide: BorderSide(
+                  color: isFilled
+                      ? const Color(0xFF228B22)
+                      : Colors.grey[300]!,
+                ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFF228B22)),
+                borderSide: BorderSide(
+                  color: isFilled
+                      ? const Color(0xFF228B22)
+                      : const Color(0xFFE53935),
+                  width: 1.5,
+                ),
               ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 12,
@@ -781,12 +837,24 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
             maxLines: 2,
           ),
           const SizedBox(height: 8),
-          Text(
-            'Ghi chú thêm để đội cứu hộ dễ tìm',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[500],
-            ),
+          Row(
+            children: [
+              Icon(
+                isFilled ? Icons.check_circle_outline : Icons.info_outline,
+                size: 13,
+                color: isFilled ? const Color(0xFF228B22) : const Color(0xFFE53935),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                isFilled
+                    ? 'Đội cứu hộ sẽ dễ tìm hơn với thông tin này'
+                    : 'Vui lòng điền để đội cứu hộ xác định đúng vị trí',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isFilled ? const Color(0xFF228B22) : const Color(0xFFE53935),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1996,10 +2064,8 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
           .toList();
     }
 
-    // additionalDetails = Ghi chú địa chỉ chi tiết (gần chùa, gần hẻm, etc.)
-    final additionalDetails = _addressDetailController.text.isNotEmpty
-        ? _addressDetailController.text
-        : null;
+    // additionalDetails = Ghi chú địa chỉ chi tiết (gần chùa, gần hẻm, etc.) — required by BE
+    final additionalDetails = _addressDetailController.text.trim();
 
     // notes = Các thông tin bổ sung khác (vị trí cụ thể, kích thước, hành vi)
     final notesParts = <String>[];

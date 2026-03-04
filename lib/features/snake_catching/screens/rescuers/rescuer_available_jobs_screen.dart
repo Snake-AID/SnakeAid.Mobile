@@ -13,6 +13,7 @@ import '../../models/snake_species.dart';
 import '../../repository/snake_catching_repository.dart';
 import '../../repository/snake_species_repository.dart';
 import '../../repository/transaction_repository.dart';
+import '../../../emergency/providers/rescuer_emergency_provider.dart';
 
 /// Màn hình hiển thị danh sách các đơn cứu hộ có thể nhận
 class RescuerAvailableJobsScreen extends ConsumerStatefulWidget {
@@ -25,7 +26,8 @@ class RescuerAvailableJobsScreen extends ConsumerStatefulWidget {
 
 class _RescuerAvailableJobsScreenState
     extends ConsumerState<RescuerAvailableJobsScreen> {
-  bool _isOnline = true;
+  // _isOnline is derived from rescueModeProvider in build() — not stored locally
+  bool _isOnline = false;
   String _selectedFilter = 'Gần nhất'; // Gần nhất, Mới nhất
   String _selectedDistance = '10km'; // 10km, 20km, 30km
 
@@ -66,6 +68,57 @@ class _RescuerAvailableJobsScreenState
     await _loadRescuerId();
     await _getCurrentLocation();
     await _loadRequests();
+  }
+
+  Future<void> _toggleRescueMode() async {
+    if (_currentRescuerId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không tìm thấy thông tin cứu hộ viên'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    final rescueModeState = ref.read(rescueModeProvider);
+    if (rescueModeState.isActive) {
+      await ref.read(rescueModeProvider.notifier).stopRescueMode();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Đã tắt chế độ cứu hộ — bạn sẽ không nhận được đơn mới',
+            ),
+            backgroundColor: Colors.grey,
+          ),
+        );
+      }
+    } else {
+      try {
+        await ref
+            .read(rescueModeProvider.notifier)
+            .startRescueMode(_currentRescuerId!);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('🟢 Đã bật chế độ cứu hộ — sẵn sàng nhận đơn'),
+              backgroundColor: Color(0xFF28A745),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Không thể bật chế độ cứu hộ: ${e.toString().replaceAll('Exception: ', '')}',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 
   Future<void> _loadRescuerId() async {
@@ -426,6 +479,10 @@ class _RescuerAvailableJobsScreenState
 
   @override
   Widget build(BuildContext context) {
+    // Sync _isOnline with real rescue mode state so _buildHeader() can read it
+    final rescueModeState = ref.watch(rescueModeProvider);
+    _isOnline = rescueModeState.isActive && rescueModeState.isConnected;
+
     return DefaultTabController(
       length: 2,
       child: Container(
@@ -446,8 +503,14 @@ class _RescuerAvailableJobsScreenState
               Expanded(
                 child: TabBarView(
                   children: [
-                    _buildAvailableJobsContent(statusFilter: 'Pending'),
-                    _buildAvailableJobsContent(statusFilter: 'Accepted'),
+                    _buildAvailableJobsContent(
+                      statusFilter: 'Pending',
+                      isOnline: _isOnline,
+                    ),
+                    _buildAvailableJobsContent(
+                      statusFilter: 'Accepted',
+                      isOnline: true,
+                    ),
                   ],
                 ),
               ),
@@ -480,7 +543,15 @@ class _RescuerAvailableJobsScreenState
     );
   }
 
-  Widget _buildAvailableJobsContent({required String statusFilter}) {
+  Widget _buildAvailableJobsContent({
+    required String statusFilter,
+    required bool isOnline,
+  }) {
+    // Gate "Đơn có thể nhận" behind online status
+    if (statusFilter == 'Pending' && !isOnline) {
+      return _buildOfflineWall();
+    }
+
     if (_isLoading) {
       return const Center(
         child: CircularProgressIndicator(color: Color(0xFFFF6B35)),
@@ -549,6 +620,86 @@ class _RescuerAvailableJobsScreenState
     return _buildJobListByDistance(filteredRequests);
   }
 
+  Widget _buildOfflineWall() {
+    final rescueModeState = ref.read(rescueModeProvider);
+    final isConnecting = rescueModeState.isConnecting;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF6B35).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.wifi_off_rounded,
+                size: 44,
+                color: Color(0xFFFF6B35),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Bạn đang ngoại tuyến',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF333333),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Bật chế độ cứu hộ để xem và nhận các đơn trong khu vực của bạn.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Color(0xFF666666),
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 28),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: isConnecting ? null : _toggleRescueMode,
+                icon: isConnecting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.power_settings_new, size: 20),
+                label: Text(
+                  isConnecting ? 'Đang kết nối...' : 'Bật chế độ cứu hộ',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF6B35),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
@@ -603,11 +754,7 @@ class _RescuerAvailableJobsScreenState
                   scale: 0.7,
                   child: Switch(
                     value: _isOnline,
-                    onChanged: (value) {
-                      setState(() {
-                        _isOnline = value;
-                      });
-                    },
+                    onChanged: (_) => _toggleRescueMode(),
                     activeColor: const Color(0xFFFF6B35),
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
@@ -932,6 +1079,8 @@ class _RescuerAvailableJobsScreenState
         return const Color(0xFFFFC107);
       case 'assigned':
         return const Color(0xFF2196F3);
+      case 'preparing':
+        return const Color(0xFFFFC107);
       case 'enroute':
         return const Color(0xFF9C27B0);
       case 'arrived':
@@ -960,6 +1109,8 @@ class _RescuerAvailableJobsScreenState
         return 'Chờ xử lý';
       case 'assigned':
         return 'Đã nhận';
+      case 'preparing':
+        return 'Đang chuẩn bị';
       case 'enroute':
         return 'Đang di chuyển';
       case 'arrived':

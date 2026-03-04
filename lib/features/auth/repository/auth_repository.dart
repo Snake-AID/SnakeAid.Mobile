@@ -297,6 +297,8 @@ class AuthRepository {
         email: userData['email'] ?? '',
         fullName: userData['fullName'] ?? '',
         phoneNumber: null,
+        avatarUrl: userData['avatarUrl'],
+        isActive: userData['isActive'] ?? true,
         role: _parseUserRole(userData['role'] ?? 'Member'),
         createdAt: DateTime.now(),
       );

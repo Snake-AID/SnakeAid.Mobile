@@ -364,20 +364,84 @@ class RequestAccount {
   }
 }
 
+/// Catching environment embedded in mission (e.g. "Tại nhà")
+class CatchingEnvironmentInfo {
+  final int id;
+  final String name;
+  final String? description;
+  final double price;
+  final String? currency;
+
+  const CatchingEnvironmentInfo({
+    required this.id,
+    required this.name,
+    this.description,
+    required this.price,
+    this.currency,
+  });
+
+  factory CatchingEnvironmentInfo.fromJson(Map<String, dynamic> json) {
+    return CatchingEnvironmentInfo(
+      id: json['id'] as int? ?? 0,
+      name: json['name'] as String? ?? '',
+      description: json['description'] as String?,
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      currency: json['currency'] as String?,
+    );
+  }
+}
+
+/// A single snake detail line inside a mission (after rescuer confirms)
+class MissionDetailItem {
+  final String id;
+  final String snakeCatchingMissionId;
+  final int snakeSpeciesId;
+  final String snakeSpeciesName;
+  final int quantity;
+  final double price;
+
+  const MissionDetailItem({
+    required this.id,
+    required this.snakeCatchingMissionId,
+    required this.snakeSpeciesId,
+    required this.snakeSpeciesName,
+    required this.quantity,
+    required this.price,
+  });
+
+  factory MissionDetailItem.fromJson(Map<String, dynamic> json) {
+    return MissionDetailItem(
+      id: json['id'] as String? ?? '',
+      snakeCatchingMissionId: json['snakeCatchingMissionId'] as String? ?? '',
+      snakeSpeciesId: json['snakeSpeciesId'] as int? ?? 0,
+      snakeSpeciesName: json['snakeSpeciesName'] as String? ?? '',
+      quantity: json['quantity'] as int? ?? 1,
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
 /// Mission data from accepted request
 class MissionData {
   final String id;
   final String rescuerId;
   final String snakeCatchingRequestId;
   final String status;
+  /// Base service fee (e.g. 500 000 VNĐ) — platform's fixed charge
   final double? price;
+  /// Travel/deposit fee already paid by customer in round 1
   final double? estimatedCost;
+  /// Total round-2 payment = price + snakeFee + envFee
   final double? actualCost;
   final DateTime? startedAt;
   final DateTime? arrivedAt;
   final DateTime? completedAt;
   final String? notes;
   final String? cancellationReason;
+  final CatchingEnvironmentInfo? catchingEnvironment;
+  final List<MissionDetailItem> missionDetails;
+  /// Evidence photos uploaded during this mission
+  final List<RequestMedia> media;
 
   MissionData({
     required this.id,
@@ -392,6 +456,9 @@ class MissionData {
     this.completedAt,
     this.notes,
     this.cancellationReason,
+    this.catchingEnvironment,
+    this.missionDetails = const [],
+    this.media = const [],
   });
 
   factory MissionData.fromJson(Map<String, dynamic> json) {
@@ -408,6 +475,17 @@ class MissionData {
       completedAt: json['completedAt'] != null ? DateTime.parse(json['completedAt'] as String) : null,
       notes: json['notes'] as String?,
       cancellationReason: json['cancellationReason'] as String?,
+      catchingEnvironment: json['catchingEnvironment'] != null
+          ? CatchingEnvironmentInfo.fromJson(json['catchingEnvironment'] as Map<String, dynamic>)
+          : null,
+      missionDetails: (json['missionDetails'] as List<dynamic>?)
+              ?.map((e) => MissionDetailItem.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      media: (json['media'] as List<dynamic>?)
+              ?.map((e) => RequestMedia.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
     );
   }
 }

@@ -9,6 +9,7 @@ import '../../snake_catching/repository/snake_catching_repository.dart';
 import '../../snake_catching/repository/snake_species_repository.dart';
 import '../../snake_catching/repository/payos_repository.dart';
 import '../../snake_catching/repository/transaction_repository.dart';
+import '../../snake_catching/repository/wallet_repository.dart';
 import '../../snake_catching/models/snake_catching_request.dart';
 import '../../snake_catching/models/snake_species.dart';
 import 'package:intl/intl.dart';
@@ -45,6 +46,11 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   bool _isCreatingFinalPayment = false;
   Timer? _finalPaymentTimer;
   bool _hasTransferredToRescuer = false;
+
+  // Wallet
+  WalletInfo? _walletInfo;
+  bool _isPayingWithWallet = false;
+  bool _isPayingFinalWithWallet = false;
 
   // Scroll
   final ScrollController _scrollController = ScrollController();
@@ -160,6 +166,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         } else if (_request!.status == 'Finished') {
           _checkFinalPaymentStatus(scrollIfUnpaid: true);
         }
+
+        // Load wallet balance for payment options
+        _loadWallet();
       } else {
         throw Exception('Không tìm thấy dữ liệu yêu cầu');
       }
@@ -282,6 +291,98 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     }
   }
 
+  Future<void> _loadWallet() async {
+    try {
+      final wallet = await ref.read(walletRepositoryProvider).getWalletInfo();
+      if (mounted) setState(() => _walletInfo = wallet);
+    } catch (_) {}
+  }
+
+  String _formatCurrencyVnd(double amount) {
+    return '${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ';
+  }
+
+  /// Pay round-1 deposit using SnakeAidPay wallet
+  Future<void> _payWithWallet() async {
+    if (_request == null) return;
+    final amount = _request!.estimatedPrice ?? _request!.mission?.estimatedCost;
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không có thông tin giá để thanh toán')),
+      );
+      return;
+    }
+    setState(() => _isPayingWithWallet = true);
+    try {
+      await ref.read(walletRepositoryProvider).payWithWallet(
+        snakeCatchingRequestId: _request!.id,
+        amount: amount,
+        transactionType: 'CatchingDeposit',
+        description: 'Catching deposit 1',
+      );
+      if (!mounted) return;
+      setState(() => _isPayingWithWallet = false);
+      final depositAmount = _request!.estimatedPrice ?? _request!.mission?.estimatedCost ?? 0;
+      await _showPaymentSuccessDialog(
+        title: 'Thanh Toán Thành Công!',
+        subtitle: 'Đặt cọc phí di chuyển đã được xác nhận.',
+        amount: depositAmount,
+        method: 'Ví SnakeAidPay',
+      );
+      _loadWallet();
+      _checkPaymentStatus();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isPayingWithWallet = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+      );
+    }
+  }
+
+  /// Pay round-2 service fee using SnakeAidPay wallet
+  Future<void> _payFinalWithWallet() async {
+    if (_request == null) return;
+    final double finalAmount = (_request!.mission?.actualCost ?? 0).toDouble();
+    if (finalAmount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không có thông tin giá để thanh toán')),
+      );
+      return;
+    }
+    setState(() => _isPayingFinalWithWallet = true);
+    try {
+      await ref.read(walletRepositoryProvider).payWithWallet(
+        snakeCatchingRequestId: _request!.id,
+        amount: finalAmount,
+        transactionType: 'CatchingPayment',
+        description: 'Catching payment',
+      );
+      if (!mounted) return;
+      setState(() => _isPayingFinalWithWallet = false);
+      await _showPaymentSuccessDialog(
+        title: 'Thanh Toán Thành Công!',
+        subtitle: 'Thanh toán dịch vụ bắt rắn đã được xác nhận.',
+        amount: finalAmount,
+        method: 'Ví SnakeAidPay',
+      );
+      _loadWallet();
+      if (!_hasTransferredToRescuer) {
+        _hasTransferredToRescuer = true;
+        ref.read(payosRepositoryProvider).transferToRescuer(widget.requestId).then((_) {
+          if (mounted) _silentRefresh();
+        });
+      }
+      _checkFinalPaymentStatus();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isPayingFinalWithWallet = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+      );
+    }
+  }
+
   /// Create PayOS payment link and open checkout URL
   Future<void> _openPayment() async {
     if (_request == null) return;
@@ -371,10 +472,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   Future<void> _openFinalPayment() async {
     if (_request == null) return;
     final mission = _request!.mission;
-    const double baseFee = 500000.0;
-    final double actualCost = mission?.actualCost ?? baseFee;
-    // Final amount = price field from DB
-    final double finalAmount = (mission?.price ?? actualCost).clamp(0, double.infinity).toDouble();
+    // Round-2 payment = actualCost (base + snake + env fees; travel already paid in round 1)
+    final double finalAmount = (mission?.actualCost ?? 0).toDouble();
     if (finalAmount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Không có thông tin giá để thanh toán')),
@@ -846,6 +945,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         (_transaction == null || !_transaction!.isDeposited);
     final bool needFinalPayment = request.status == 'Finished' &&
         _finalTransaction == null;
+    final bool isAnyLoading = _isCreatingPayment || _isCreatingFinalPayment ||
+        _isPayingWithWallet || _isPayingFinalWithWallet;
+
     return Container(
       padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
       decoration: BoxDecoration(
@@ -861,47 +963,23 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (needPayment) ...[
+          if (needPayment || needFinalPayment) ...[
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: _isCreatingPayment ? null : _openPayment,
-                icon: _isCreatingPayment
+                onPressed: isAnyLoading
+                    ? null
+                    : () => _showPaymentSheet(isFinalPayment: needFinalPayment),
+                icon: isAnyLoading
                     ? const SizedBox(
-                        width: 18,
-                        height: 18,
+                        width: 18, height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
-                    : const Icon(Icons.payment, size: 20),
+                    : const Icon(Icons.payment_rounded, size: 20),
                 label: Text(
-                  _isCreatingPayment ? 'Đang tạo link...' : 'THANH TOÁN ĐẶT CỌC',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF228B22),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 2,
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
-          if (needFinalPayment) ...[
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _isCreatingFinalPayment ? null : _openFinalPayment,
-                icon: _isCreatingFinalPayment
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.payments_outlined, size: 20),
-                label: Text(
-                  _isCreatingFinalPayment ? 'Đang tạo link...' : 'THANH TOÁN DỊCH VỤ',
+                  isAnyLoading
+                      ? 'Đang xử lý...'
+                      : (needFinalPayment ? 'THANH TOÁN DỊCH VỤ' : 'THANH TOÁN ĐẶT CỌC'),
                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -932,6 +1010,248 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Payment Method Bottom Sheet
+  // ──────────────────────────────────────────────────────────────────
+  void _showPaymentSheet({required bool isFinalPayment}) {
+    // Refresh wallet before opening
+    _loadWallet();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _PaymentMethodSheet(
+        isFinalPayment: isFinalPayment,
+        walletInfo: _walletInfo,
+        amount: isFinalPayment
+            ? (_request!.mission?.actualCost ?? 0).toDouble()
+            : (_request!.estimatedPrice ?? _request!.mission?.estimatedCost ?? 0).toDouble(),
+        onPayOS: () {
+          Navigator.pop(ctx);
+          if (isFinalPayment) {
+            _openFinalPayment();
+          } else {
+            _openPayment();
+          }
+        },
+        onWallet: () {
+          Navigator.pop(ctx);
+          if (isFinalPayment) {
+            _payFinalWithWallet();
+          } else {
+            _payWithWallet();
+          }
+        },
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Payment Success Dialog
+  // ──────────────────────────────────────────────────────────────────
+  Future<void> _showPaymentSuccessDialog({
+    required String title,
+    required String subtitle,
+    required double amount,
+    required String method,
+  }) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ── Green top banner ──────────────────────────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF228B22), Color(0xFF2ecc71)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.check_rounded,
+                        color: Colors.white,
+                        size: 44,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.white70,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── Details ───────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    // Amount row
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0F9F0),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Số tiền',
+                            style: TextStyle(
+                                fontSize: 14, color: Color(0xFF666666)),
+                          ),
+                          Text(
+                            _formatCurrency(amount),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF228B22),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // Method row
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8F8F8),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.account_balance_wallet,
+                              size: 18, color: Color(0xFF228B22)),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Phương thức',
+                            style: TextStyle(
+                                fontSize: 13, color: Color(0xFF666666)),
+                          ),
+                          const Spacer(),
+                          Text(
+                            method,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF333333),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // Time row
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8F8F8),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.access_time,
+                              size: 18, color: Color(0xFF888888)),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Thời gian',
+                            style: TextStyle(
+                                fontSize: 13, color: Color(0xFF666666)),
+                          ),
+                          const Spacer(),
+                          Text(
+                            DateFormat('HH:mm — dd/MM/yyyy')
+                                .format(DateTime.now()),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF333333),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    // Done button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF228B22),
+                          foregroundColor: Colors.white,
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'Hoàn Tất',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1178,37 +1498,104 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Amount
+                // ── Deposit amount (round 1) ──
                 if (amount != null) ...[
-                  Row(
+                  _buildPayRow(
+                    'Phí di chuyển (đang thanh toán):',
+                    _formatCurrency(amount),
+                    icon: Icons.directions_car,
+                    valueColor: const Color(0xFF28A745),
+                  ),
+                  if (request.distanceKm != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 28, top: 2),
+                      child: Text(
+                        'Khoảng cách: ${request.distanceKm!.toStringAsFixed(1)} km',
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF999999)),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                ],
+
+                // ── Round-2 cost preview ──
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE0E0E0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.monetization_on, color: Color(0xFF28A745), size: 20),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Số tiền phí di chuyển:',
-                        style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
+                      const Row(
+                        children: [
+                          Icon(Icons.receipt_long, size: 15, color: Color(0xFF888888)),
+                          SizedBox(width: 6),
+                          Text(
+                            'Chi phí sẽ thanh toán sau khi hoàn thành',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+                                color: Color(0xFF666666)),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _formatCurrency(amount),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF28A745),
+                      const SizedBox(height: 10),
+                      // Base fee
+                      if (request.mission?.price != null)
+                        _buildPayRow(
+                          'Phí dịch vụ cơ bản:',
+                          _formatCurrency(request.mission!.price!),
+                          icon: Icons.miscellaneous_services,
                         ),
-                      ),
+                      // Snake catching fee from missionDetails (if available)
+                      if ((request.mission?.missionDetails ?? []).isNotEmpty) ...[  
+                        const SizedBox(height: 6),
+                        _buildPayRow(
+                          'Phí bắt rắn:',
+                          _formatCurrency((request.mission!.missionDetails
+                              .fold(0.0, (s, d) => s + d.price))),
+                          icon: Icons.pest_control,
+                        ),
+                        ...request.mission!.missionDetails.map((d) => Padding(
+                              padding: const EdgeInsets.only(top: 4, left: 28),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('· ${d.snakeSpeciesName} × ${d.quantity}',
+                                      style: const TextStyle(fontSize: 12,
+                                          color: Color(0xFF888888))),
+                                  Text(_formatCurrency(d.price),
+                                      style: const TextStyle(fontSize: 12,
+                                          color: Color(0xFF888888))),
+                                ],
+                              ),
+                            )),
+                      ] else ...[  
+                        const SizedBox(height: 6),
+                        const Row(
+                          children: [
+                            Icon(Icons.pest_control, size: 14, color: Color(0xFFAAAAAA)),
+                            SizedBox(width: 6),
+                            Text('Phí bắt rắn: xác nhận sau khi hoàn thành',
+                                style: TextStyle(fontSize: 12, color: Color(0xFFAAAAAA),
+                                    fontStyle: FontStyle.italic)),
+                          ],
+                        ),
+                      ],
+                      // Environment fee
+                      if (request.mission?.catchingEnvironment != null) ...[  
+                        const SizedBox(height: 6),
+                        _buildPayRow(
+                          'Phí môi trường (${request.mission!.catchingEnvironment!.name}):',
+                          _formatCurrency(request.mission!.catchingEnvironment!.price),
+                          icon: Icons.home_work_outlined,
+                        ),
+                      ],
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 28),
-                    child: Text(
-                      '(Chi phí di chuyển ${request.distanceKm != null ? request.distanceKm!.toStringAsFixed(1) : '?'}km — bắt buộc thanh toán trước)',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF999999)),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
+                ),
+                const SizedBox(height: 12),
+
 
                 if (paid) ...[
                   // Paid state
@@ -1294,145 +1681,215 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
 
   // ──────────────────────────────────────────────────────────────────
   // Finished Payment Card (CatchingPayment)
+  // Two separate cards: Round 1 (done) + Round 2 (pending/done)
   // ──────────────────────────────────────────────────────────────────
   Widget _buildFinishedPaymentCard(SnakeCatchingRequestData request) {
     final mission = request.mission;
-    final double baseFee = 500000;
-    final double estimatedCost = mission?.estimatedCost ?? 0;
-    final double actualCost = mission?.actualCost ?? baseFee;
-    final double snakeFee = (actualCost - baseFee).clamp(0, double.infinity);
-    // Final amount = price field from DB (what customer owes for the service)
-    final double finalAmount = mission?.price ?? actualCost;
-    final bool paid = _finalTransaction != null ||
+
+    final double baseFee   = mission?.price ?? 0;
+    final double travelFee = mission?.estimatedCost ?? 0;
+    final double snakeFee  = (mission?.missionDetails ?? [])
+        .fold(0.0, (sum, d) => sum + d.price);
+    final double envFee    = mission?.catchingEnvironment?.price ?? 0;
+    final String? envName  = mission?.catchingEnvironment?.name;
+    final double round2Amount = mission?.actualCost ?? (baseFee + snakeFee + envFee);
+    final double totalPaid = travelFee + round2Amount;
+
+    final bool round2Paid = _finalTransaction != null ||
         request.status == 'Paid' ||
         request.status == 'Completed';
 
-    // Evidence photos uploaded by rescuer
-    final evidencePhotos = request.media
-        .where((m) => m.purpose == 'Evidence' || m.url.isNotEmpty)
-        .toList();
+    // Evidence photos
+    final missionMedia = request.mission?.media ?? [];
+    final evidencePhotos = missionMedia.isNotEmpty
+        ? missionMedia.where((m) => m.purpose == 'Evidence').toList()
+        : request.media.where((m) => m.purpose == 'Evidence' || m.url.isNotEmpty).toList();
 
-    return Container(
-      key: _paymentCardKey,
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2)),
-        ],
-      ),
+    Widget _card({required Widget child}) => Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2)),
+            ],
+          ),
+          child: child,
+        );
+
+    Widget _cardHeader(String title, Color color, IconData icon) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(16),
+              topRight: Radius.circular(16),
+            ),
+          ),
+          child: Row(children: [
+            Icon(icon, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Text(title,
+                style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white)),
+          ]),
+        );
+
+    // ── Card 1: Round 1 — travel fee (always done by this point) ────
+    final round1Card = _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
-          Container(
+          _cardHeader(
+            'Đợt 1 — Phí Di Chuyển (Đã Thanh Toán)',
+            const Color(0xFF28A745),
+            Icons.check_circle,
+          ),
+          Padding(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: paid ? const Color(0xFF28A745) : const Color(0xFFFF6B35),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-              ),
-            ),
-            child: Row(
+            child: Column(
               children: [
-                Icon(
-                  paid ? Icons.check_circle : Icons.payments_outlined,
-                  color: Colors.white,
-                  size: 20,
+                _buildPayRow(
+                  'Phí di chuyển:',
+                  _formatCurrency(travelFee),
+                  icon: Icons.directions_car,
+                  valueColor: const Color(0xFF28A745),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  paid ? 'Đã Thanh Toán Dịch Vụ' : 'Thanh Toán Dịch Vụ',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                if (request.distanceKm != null) ...[
+                  const SizedBox(height: 4),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 24),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Khoảng cách: ${request.distanceKm!.toStringAsFixed(1)} km',
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF999999)),
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.verified, color: Color(0xFF28A745), size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Đã thanh toán ${_formatCurrency(travelFee)}',
+                        style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF28A745)),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
+        ],
+      ),
+    );
 
+    // ── Card 2: Round 2 — service payment ───────────────────────────
+    final round2Card = _card(
+      child: Column(
+        key: _paymentCardKey,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _cardHeader(
+            round2Paid ? 'Đợt 2 — Thanh Toán Dịch Vụ (Đã Thanh Toán)' : 'Đợt 2 — Thanh Toán Dịch Vụ',
+            round2Paid ? const Color(0xFF28A745) : const Color(0xFFFF6B35),
+            round2Paid ? Icons.check_circle : Icons.payments_outlined,
+          ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Fee breakdown ──
-                const Text(
-                  'Chi tiết thanh toán',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF333333),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _buildPayRow(
-                  'Phí dịch vụ cơ bản:',
-                  _formatCurrency(baseFee),
-                  icon: Icons.miscellaneous_services,
-                ),
-                const SizedBox(height: 8),
-                _buildPayRow(
-                  'Phí di chuyển (${request.distanceKm} km):',
-                  ' ${_formatCurrency(estimatedCost)}',
-                   icon: Icons.directions_car,
-                ),
-               
+                const Text('Chi tiết đợt 2:',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF555555))),
+                const SizedBox(height: 10),
+
+                // Base fee
+                _buildPayRow('Phí dịch vụ cơ bản:', _formatCurrency(baseFee),
+                    icon: Icons.miscellaneous_services),
+
+                // Snake fee
                 if (snakeFee > 0) ...[
                   const SizedBox(height: 8),
+                  _buildPayRow('Phí bắt rắn:', _formatCurrency(snakeFee),
+                      icon: Icons.pest_control),
+                  ...(mission?.missionDetails ?? []).map((d) => Padding(
+                        padding: const EdgeInsets.only(top: 4, left: 28),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('${d.snakeSpeciesName} × ${d.quantity}',
+                                style: const TextStyle(
+                                    fontSize: 13, color: Color(0xFF888888))),
+                            Text(_formatCurrency(d.price),
+                                style: const TextStyle(
+                                    fontSize: 13, color: Color(0xFF888888))),
+                          ],
+                        ),
+                      )),
+                ],
+
+                // Environment fee
+                if (envFee > 0) ...[
+                  const SizedBox(height: 8),
                   _buildPayRow(
-                    'Phí bắt rắn:',
-                    _formatCurrency(snakeFee),
-                    icon: Icons.pest_control,
+                    'Phí môi trường${envName != null ? ' ($envName)' : ''}:',
+                    _formatCurrency(envFee),
+                    icon: Icons.home_work_outlined,
                   ),
                 ],
-                  const SizedBox(height: 8),
-                 _buildPayRow(
-                  'Chi phí đã thanh toán đợt 1:',
-                  '- ${_formatCurrency(estimatedCost)}',
-                  icon: Icons.money_off,
-                  valueColor: const Color(0xFF28A745),
-                ),
 
                 const Divider(height: 24, color: Color(0xFFE0E0E0)),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Số tiền cần thanh toán:',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF333333),
-                      ),
+                    Text(
+                      round2Paid ? 'Đã thanh toán:' : 'Số tiền cần thanh toán:',
+                      style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF333333)),
                     ),
                     Text(
-                      _formatCurrency(finalAmount),
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFFFF6B35),
-                      ),
+                      _formatCurrency(round2Amount),
+                      style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: round2Paid
+                              ? const Color(0xFF28A745)
+                              : const Color(0xFFFF6B35)),
                     ),
                   ],
                 ),
 
-                const SizedBox(height: 16),
-
-                // ── Evidence photos ──
+                // ── Evidence photos (shown in round-2 card) ──
                 if (evidencePhotos.isNotEmpty) ...[
-                  const Text(
-                    'Ảnh bằng chứng nhiệm vụ',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF333333),
-                    ),
-                  ),
+                  const SizedBox(height: 16),
+                  const Text('Ảnh bằng chứng nhiệm vụ',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF333333))),
                   const SizedBox(height: 8),
                   SizedBox(
                     height: 90,
@@ -1461,11 +1918,12 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       },
                     ),
                   ),
-                  const SizedBox(height: 16),
                 ],
 
+                const SizedBox(height: 12),
+
                 // ── Payment status ──
-                if (paid) ...[
+                if (round2Paid) ...[
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -1476,25 +1934,13 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       children: [
                         const Icon(Icons.verified, color: Color(0xFF28A745), size: 22),
                         const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Thanh toán thành công!',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF28A745),
-                                ),
-                              ),
-                              if (_finalTransaction?.amount != null)
-                                Text(
-                                  'Đã thanh toán: ${_formatCurrency(_finalTransaction!.amount)}',
-                                  style: const TextStyle(
-                                      fontSize: 13, color: Color(0xFF4CAF50)),
-                                ),
-                            ],
+                        const Expanded(
+                          child: Text(
+                            'Thanh toán đợt 2 thành công!',
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF28A745)),
                           ),
                         ),
                       ],
@@ -1527,10 +1973,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     children: [
                       Icon(Icons.refresh, size: 12, color: Color(0xFF999999)),
                       SizedBox(width: 4),
-                      Text(
-                        'Tự động kiểm tra mỗi 5 giây',
-                        style: TextStyle(fontSize: 11, color: Color(0xFF999999)),
-                      ),
+                      Text('Tự động kiểm tra mỗi 5 giây',
+                          style: TextStyle(fontSize: 11, color: Color(0xFF999999))),
                     ],
                   ),
                 ],
@@ -1540,7 +1984,79 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         ],
       ),
     );
+
+    // ── Card 3: Total summary (only when fully paid) ─────────────────
+    final totalCard = round2Paid
+        ? Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF28A745), Color(0xFF20C85A)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                    color: const Color(0xFF28A745).withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4)),
+              ],
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.receipt_long, color: Colors.white, size: 28),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Tổng đã thanh toán',
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatCurrency(totalPaid),
+                        style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: -0.5),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('Đợt 1: ${_formatCurrency(travelFee)}',
+                        style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                    const SizedBox(height: 2),
+                    Text('Đợt 2: ${_formatCurrency(round2Amount)}',
+                        style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                  ],
+                ),
+              ],
+            ),
+          )
+        : const SizedBox.shrink();
+
+    return Column(
+      children: [
+        round1Card,
+        const SizedBox(height: 12),
+        round2Card,
+        if (round2Paid) ...[
+          const SizedBox(height: 12),
+          totalCard,
+        ],
+      ],
+    );
   }
+
 
   Widget _buildPayRow(String label, String value, {
     IconData? icon,
@@ -2322,5 +2838,430 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       default:
         return const Color(0xFF228B22);
     }
+  }
+}
+// ──────────────────────────────────────────────────────────────────────────────
+// Payment Method Bottom Sheet
+// ──────────────────────────────────────────────────────────────────────────────
+class _PaymentMethodSheet extends StatelessWidget {
+  final bool isFinalPayment;
+  final WalletInfo? walletInfo;
+  final double amount;
+  final VoidCallback onPayOS;
+  final VoidCallback onWallet;
+
+  const _PaymentMethodSheet({
+    required this.isFinalPayment,
+    required this.walletInfo,
+    required this.amount,
+    required this.onPayOS,
+    required this.onWallet,
+  });
+
+  String _fmt(double v) {
+    final s = v.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+    return '$s đ';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool hasSufficientBalance =
+        walletInfo != null && walletInfo!.balance >= amount;
+    final double balance = walletInfo?.balance ?? 0;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFF6F8F6),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      padding: EdgeInsets.fromLTRB(
+          20, 12, 20, MediaQuery.of(context).padding.bottom + 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ── Handle ────────────────────────────────────────────────
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // ── Header ────────────────────────────────────────────────
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF228B22).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.payment_rounded,
+                    color: Color(0xFF228B22), size: 22),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isFinalPayment
+                        ? 'Thanh toán dịch vụ'
+                        : 'Thanh toán đặt cọc',
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1F1F1F),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Chọn phương thức thanh toán',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // ── Amount pill ───────────────────────────────────────────
+          Container(
+            width: double.infinity,
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF228B22).withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  isFinalPayment ? 'Đợt 2 — Dịch vụ' : 'Đợt 1 — Đặt cọc',
+                  style: const TextStyle(
+                      fontSize: 13, color: Color(0xFF555555)),
+                ),
+                Text(
+                  _fmt(amount),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF228B22),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── Card 1: SnakeAidPay ───────────────────────────────────
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 12,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Card header
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 14),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                            Icons.account_balance_wallet,
+                            color: Colors.white,
+                            size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Ví SnakeAidPay',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              'Thanh toán tức thì, không phí giao dịch',
+                              style: TextStyle(
+                                  fontSize: 11, color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Card body
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Số dư hiện tại',
+                              style: TextStyle(
+                                  fontSize: 13, color: Colors.grey[600])),
+                          walletInfo == null
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Color(0xFF228B22)),
+                                )
+                              : Text(
+                                  _fmt(balance),
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: hasSufficientBalance
+                                        ? const Color(0xFF228B22)
+                                        : const Color(0xFFDC3545),
+                                  ),
+                                ),
+                        ],
+                      ),
+                      if (!hasSufficientBalance && walletInfo != null) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDC3545).withOpacity(0.06),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline,
+                                  size: 14, color: Color(0xFFDC3545)),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Số dư không đủ. Cần nạp thêm ${_fmt(amount - balance)}.',
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFFDC3545)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: hasSufficientBalance ? onWallet : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF228B22),
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: Colors.grey[200],
+                            disabledForegroundColor: Colors.grey[400],
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            hasSufficientBalance
+                                ? 'Thanh toán bằng ví'
+                                : 'Số dư không đủ',
+                            style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // ── Card 2: PayOS ─────────────────────────────────────────
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 12,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Card header
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 14),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF1565C0), Color(0xFF0D47A1)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.credit_card_rounded,
+                            color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'PayOS',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              'Thẻ ngân hàng, QR code, Internet Banking',
+                              style: TextStyle(
+                                  fontSize: 11, color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Card body
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          _featureChip(Icons.qr_code_2, 'QR Code'),
+                          const SizedBox(width: 8),
+                          _featureChip(Icons.credit_card, 'ATM / Visa'),
+                          const SizedBox(width: 8),
+                          _featureChip(Icons.account_balance,
+                              'Internet Banking'),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: onPayOS,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1565C0),
+                            foregroundColor: Colors.white,
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Thanh toán qua PayOS',
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _featureChip(IconData icon, String label) {
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1565C0).withOpacity(0.07),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: const Color(0xFF1565C0)),
+          const SizedBox(width: 4),
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF1565C0),
+                  fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
   }
 }
