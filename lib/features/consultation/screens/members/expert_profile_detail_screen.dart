@@ -572,7 +572,7 @@ class ExpertProfileDetailScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         SizedBox(
-          height: 100,
+          height: 110,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: expert.availability.length,
@@ -604,15 +604,13 @@ class ExpertProfileDetailScreen extends ConsumerWidget {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: day.isAvailable
-                            ? _primaryColor
-                            : Colors.grey[400],
-                        shape: BoxShape.circle,
+                    const SizedBox(height: 4),
+                    Text(
+                      'tháng ${day.date.month}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: _primaryColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],

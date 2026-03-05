@@ -10,10 +10,8 @@ const Color _backgroundColor = Color(0xFFF6F8F6);
 
 /// Payment method enum
 enum PaymentMethod {
-  momo,
-  vnpay,
-  zalopay,
-  creditCard,
+  payos,
+  snakeaidPay,
 }
 
 /// Payment Confirmation Screen
@@ -51,24 +49,17 @@ class PaymentConfirmationScreen extends ConsumerStatefulWidget {
 
 class _PaymentConfirmationScreenState
     extends ConsumerState<PaymentConfirmationScreen> {
-  PaymentMethod _selectedPaymentMethod = PaymentMethod.momo;
+  PaymentMethod _selectedPaymentMethod = PaymentMethod.payos;
   bool _agreedToTerms = false;
 
   void _handlePayment() {
-    if (!_agreedToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng đồng ý với điều khoản dịch vụ'),
-        ),
-      );
-      return;
-    }
+    // Tạo ID tạm cho buổi tư vấn vừa đặt (sẽ thay bằng ID từ API)
+    final newConsultationId =
+        'new_${DateTime.now().millisecondsSinceEpoch}';
 
-    // TODO: Implement payment processing
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Đang xử lý thanh toán...'),
-      ),
+    context.go(
+      '/consultation-home',
+      extra: {'newConsultationId': newConsultationId},
     );
   }
 
@@ -175,10 +166,6 @@ class _PaymentConfirmationScreenState
 
                             // Security Info Box
                             _buildSecurityInfo(theme),
-                            const SizedBox(height: 16),
-
-                            // Terms and Conditions
-                            _buildTermsCheckbox(theme),
                             const SizedBox(height: 24),
                           ],
                         ),
@@ -503,39 +490,23 @@ class _PaymentConfirmationScreenState
         ),
         const SizedBox(height: 8),
 
-        // MoMo
+        // PayOS
         _buildPaymentMethodOption(
-          PaymentMethod.momo,
-          'Momo',
-          'assets/images/logo/momoicon.png',
+          PaymentMethod.payos,
+          'PayOS',
+          'assets/images/logo/payosicon.png',
           theme,
+          subtitle: 'Thanh toán qua QR / Internet Banking',
         ),
         const SizedBox(height: 12),
 
-        // VNPay
+        // SnakeAid Pay
         _buildPaymentMethodOption(
-          PaymentMethod.vnpay,
-          'VNPay',
-          'https://vnpay.vn/s1/statics.vnpay.vn/2023/9/06ncktiwd6dc1694418196384.png',
-          theme,
-        ),
-        const SizedBox(height: 12),
-
-        // ZaloPay
-        _buildPaymentMethodOption(
-          PaymentMethod.zalopay,
-          'ZaloPay',
-          'https://cdn.haitrieu.com/wp-content/uploads/2022/10/Logo-ZaloPay.png',
-          theme,
-        ),
-        const SizedBox(height: 12),
-
-        // Credit Card
-        _buildPaymentMethodOption(
-          PaymentMethod.creditCard,
-          'Thẻ tín dụng/ghi nợ',
+          PaymentMethod.snakeaidPay,
+          'SnakeAid Pay',
           null,
           theme,
+          subtitle: 'Thanh toán từ ví SnakeAid của bạn',
         ),
       ],
     );
@@ -544,66 +515,42 @@ class _PaymentConfirmationScreenState
   /// Build fallback icon for payment method
   Widget _buildFallbackIcon(PaymentMethod method) {
     switch (method) {
-      case PaymentMethod.momo:
+      case PaymentMethod.payos:
         return Container(
-          width: 60,
-          height: 24,
+          width: 72,
+          height: 36,
           decoration: BoxDecoration(
-            color: const Color(0xFFAE2070),
-            borderRadius: BorderRadius.circular(4),
+            color: const Color(0xFF0C6EF2),
+            borderRadius: BorderRadius.circular(6),
           ),
           alignment: Alignment.center,
           child: const Text(
-            'MoMo',
+            'PayOS',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
             ),
           ),
         );
-      case PaymentMethod.vnpay:
+      case PaymentMethod.snakeaidPay:
         return Container(
-          width: 60,
-          height: 24,
+          width: 72,
+          height: 36,
           decoration: BoxDecoration(
-            color: const Color(0xFF0066B3),
-            borderRadius: BorderRadius.circular(4),
+            color: const Color(0xFF228B22),
+            borderRadius: BorderRadius.circular(6),
           ),
           alignment: Alignment.center,
           child: const Text(
-            'VNPAY',
+            'S·Pay',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 10,
+              fontSize: 13,
               fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
             ),
-          ),
-        );
-      case PaymentMethod.zalopay:
-        return Container(
-          width: 60,
-          height: 24,
-          decoration: BoxDecoration(
-            color: const Color(0xFF008FE5),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          alignment: Alignment.center,
-          child: const Text(
-            'ZaloPay',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        );
-      case PaymentMethod.creditCard:
-        return Center(
-          child: Icon(
-            Icons.credit_card,
-            color: Colors.grey.shade600,
-            size: 24,
           ),
         );
     }
@@ -614,8 +561,9 @@ class _PaymentConfirmationScreenState
     PaymentMethod method,
     String label,
     String? logoUrl,
-    ThemeData theme,
-  ) {
+    ThemeData theme, {
+    String? subtitle,
+  }) {
     final isSelected = _selectedPaymentMethod == method;
 
     return InkWell(
@@ -671,8 +619,8 @@ class _PaymentConfirmationScreenState
 
             // Logo or icon (fixed width container for alignment)
             SizedBox(
-              width: 60,
-              height: 24,
+              width: 72,
+              height: 36,
               child: logoUrl != null
                   ? (logoUrl.startsWith('assets/')
                       ? Image.asset(
@@ -703,13 +651,27 @@ class _PaymentConfirmationScreenState
             ),
             const SizedBox(width: 16),
 
-            // Label
+            // Label + subtitle
             Expanded(
-              child: Text(
-                label,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],

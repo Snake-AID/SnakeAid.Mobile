@@ -113,13 +113,6 @@ class _ConsultationDocumentsScreenState
 
   void _handleContinue() {
     // Validate required fields
-    if (_uploadedImages.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng upload ít nhất 1 ảnh')),
-      );
-      return;
-    }
-
     if (_problemController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Vui lòng mô tả vấn đề của bạn')),
@@ -219,16 +212,6 @@ class _ConsultationDocumentsScreenState
                             _buildConsultationSummary(
                                 context, state.expert!, theme),
                             const SizedBox(height: 24),
-
-                            // Image Upload Section
-                            _buildImageUploadSection(theme),
-                            const SizedBox(height: 16),
-
-                            // Uploaded Thumbnails
-                            if (_uploadedImages.isNotEmpty)
-                              _buildUploadedThumbnails(),
-                            if (_uploadedImages.isNotEmpty)
-                              const SizedBox(height: 24),
 
                             // Problem Description Section
                             _buildProblemDescriptionSection(theme),
@@ -526,42 +509,41 @@ class _ConsultationDocumentsScreenState
           ),
         ),
         const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: Colors.grey.shade300,
-              width: 1,
+        TextField(
+          controller: _problemController,
+          maxLength: _maxProblemChars,
+          maxLines: 4,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade300),
             ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: _primaryColor, width: 1.5),
+            ),
+            hintText: 'Ví dụ: Con rắn xuất hiện trong vườn nhà tôi, dài khoảng 1m...',
+            counterText: '',
+            contentPadding: const EdgeInsets.all(14),
           ),
-          child: Column(
-            children: [
-              TextField(
-                controller: _problemController,
-                maxLength: _maxProblemChars,
-                maxLines: 4,
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  hintText:
-                      'Ví dụ: Con rắn xuất hiện trong vườn nhà tôi, dài khoảng 1m...',
-                  counterText: '',
-                ),
-                onChanged: (value) {
-                  setState(() {}); // Update character count
-                },
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  '${_problemController.text.length}/$_maxProblemChars',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ],
+          onChanged: (value) {
+            setState(() {});
+          },
+        ),
+        const SizedBox(height: 4),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            '${_problemController.text.length}/$_maxProblemChars',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       ],
@@ -580,41 +562,41 @@ class _ConsultationDocumentsScreenState
           ),
         ),
         const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: Colors.grey.shade300,
-              width: 1,
+        TextField(
+          controller: _questionsController,
+          maxLength: _maxQuestionsChars,
+          maxLines: 3,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade300),
             ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: _primaryColor, width: 1.5),
+            ),
+            hintText: 'Bạn muốn hỏi gì chuyên gia?',
+            counterText: '',
+            contentPadding: const EdgeInsets.all(14),
           ),
-          child: Column(
-            children: [
-              TextField(
-                controller: _questionsController,
-                maxLength: _maxQuestionsChars,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  hintText: 'Bạn muốn hỏi gì chuyên gia?',
-                  counterText: '',
-                ),
-                onChanged: (value) {
-                  setState(() {}); // Update character count
-                },
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  '${_questionsController.text.length}/$_maxQuestionsChars',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ],
+          onChanged: (value) {
+            setState(() {});
+          },
+        ),
+        const SizedBox(height: 4),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            '${_questionsController.text.length}/$_maxQuestionsChars',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       ],

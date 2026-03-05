@@ -12,27 +12,6 @@ class ExpertSettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
-  // Schedule toggles
-  final Map<String, bool> _scheduleEnabled = {
-    'Thứ 2': true,
-    'Thứ 3': true,
-    'Thứ 4': true,
-    'Thứ 5': false,
-    'Thứ 6': true,
-    'Thứ 7': false,
-    'Chủ Nhật': false,
-  };
-
-  final Map<String, String> _scheduleTimes = {
-    'Thứ 2': '8:00 - 17:00',
-    'Thứ 3': '8:00 - 17:00',
-    'Thứ 4': '9:00 - 18:00',
-    'Thứ 5': '',
-    'Thứ 6': '8:00 - 12:00',
-    'Thứ 7': '',
-    'Chủ Nhật': '',
-  };
-
   // Notification toggles
   bool _notifyNewConsultation = true;
   bool _notifySOS = true;
@@ -109,36 +88,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
               ],
             ),
 
-            // SECTION 2: Work Schedule
-            _buildSectionHeader(
-              'Lịch Làm Việc',
-              subtitle: 'Đặt thời gian sẵn sàng nhận tư vấn đặt lịch',
-            ),
-            _buildCard(
-              children: [
-                ..._scheduleEnabled.keys.map((day) {
-                  final isLast = day == 'Chủ Nhật';
-                  return Column(
-                    children: [
-                      _buildScheduleRow(day),
-                      if (!isLast) const Divider(height: 1),
-                    ],
-                  );
-                }).toList(),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-              child: Text(
-                'Thời gian theo múi giờ ICT (GMT+7)',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ),
-
-            // SECTION 3: Consultation Fees
+            // SECTION 2: Consultation Fees
             _buildSectionHeader('Phí Tư Vấn'),
             _buildCard(
               children: [
@@ -628,49 +578,6 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
             Icon(Icons.chevron_right, color: Colors.grey[400]),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildScheduleRow(String day) {
-    final enabled = _scheduleEnabled[day] ?? false;
-    final time = _scheduleTimes[day] ?? '';
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              day,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF2D2D2D),
-              ),
-            ),
-          ),
-          if (enabled && time.isNotEmpty) ...[
-            Text(
-              time,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF6C47C2),
-              ),
-            ),
-            const SizedBox(width: 12),
-          ],
-          Switch(
-            value: enabled,
-            onChanged: (value) {
-              setState(() {
-                _scheduleEnabled[day] = value;
-              });
-            },
-            activeColor: const Color(0xFF6C47C2),
-          ),
-        ],
       ),
     );
   }

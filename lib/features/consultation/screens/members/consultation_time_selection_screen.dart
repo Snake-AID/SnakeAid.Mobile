@@ -308,8 +308,8 @@ class _ConsultationTimeSelectionScreenState
   /// Build horizontal date scroller
   Widget _buildDateScroller(ThemeData theme) {
     return Container(
-      height: 100,
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      height: 110,
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -353,12 +353,13 @@ class _ConsultationTimeSelectionScreenState
                     dateItem.dayLabel,
                     style: theme.textTheme.bodySmall?.copyWith(
                       fontWeight: FontWeight.w500,
+                      fontSize: 11,
                       color: isSelected
                           ? theme.colorScheme.onSurface
                           : theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     '${dateItem.date.day}',
                     style: theme.textTheme.headlineSmall?.copyWith(
@@ -368,15 +369,15 @@ class _ConsultationTimeSelectionScreenState
                           : theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: dateItem.hasAvailability
-                          ? _primaryColor
-                          : Colors.transparent,
-                      shape: BoxShape.circle,
+                  const SizedBox(height: 2),
+                  Text(
+                    'tháng ${dateItem.date.month}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: isSelected
+                          ? theme.colorScheme.onSurface
+                          : theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
