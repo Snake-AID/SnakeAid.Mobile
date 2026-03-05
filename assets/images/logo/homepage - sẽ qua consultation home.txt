@@ -1,4 +1,0 @@
-homepage -> sẽ qua consultation homepage bao gồm buổi đặt lịch, các thông tin liên quan và có thêm nút đặt lịch mới vào trang lựa expert
-
-
-cần thêm 1 màn hình sảnh chờ giống google meet, có thể tắt mở cam, mic, có thêm nút join phòng và kết thúc dvu
