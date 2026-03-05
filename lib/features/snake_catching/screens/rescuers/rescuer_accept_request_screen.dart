@@ -31,6 +31,7 @@ class _RescuerAcceptRequestScreenState
   bool _paymentConfirmed = false;
   Timer? _pollingTimer;
   int _pollCount = 0;
+  bool _cancelledByCustomerHandled = false;
 
   final Map<int, SnakeSpecies?> _speciesCache = {};
   bool _isStartingMission = false;
@@ -46,6 +47,7 @@ class _RescuerAcceptRequestScreenState
     _fetchFullRequest();
     _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!_paymentConfirmed) _checkPayment(silent: true);
+      _pollRequestStatus();
     });
   }
 
@@ -65,6 +67,118 @@ class _RescuerAcceptRequestScreenState
     } catch (e) {
       debugPrint('⚠️ Could not fetch full request details: $e');
     }
+  }
+
+  Future<void> _pollRequestStatus() async {
+    if (_cancelledByCustomerHandled) return;
+    try {
+      final repo = ref.read(snakeCatchingRepositoryProvider);
+      final response = await repo.getRequestById(widget.requestData.id);
+      if (!mounted) return;
+      final data = response.data;
+      if (data != null) {
+        setState(() => _fullRequest = data);
+        if (data.status == 'Cancelled' && !_cancelledByCustomerHandled) {
+          _cancelledByCustomerHandled = true;
+          _pollingTimer?.cancel();
+          _showCancelledByCustomerDialog(data.cancellationReason);
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _showCancelledByCustomerDialog(String? reason) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 68,
+              height: 68,
+              decoration: BoxDecoration(
+                color: const Color(0xFFDC3545).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.cancel, color: Color(0xFFDC3545), size: 38),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Đơn bị hủy bởi khách hàng',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1F1F1F),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Khách hàng đã hủy yêu cầu này. Bạn sẽ được đưa về danh sách công việc.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Color(0xFF666666), height: 1.4),
+            ),
+            if (reason != null && reason.isNotEmpty) ...[  
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F8F8),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFEEEEEE)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Lý do hủy:',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF999999)),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      reason,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF444444),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                // Pop back to rescuer home / available jobs list
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF6B35),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+              ),
+              child: const Text(
+                'Về Danh Sách Công Việc',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _startMission() async {

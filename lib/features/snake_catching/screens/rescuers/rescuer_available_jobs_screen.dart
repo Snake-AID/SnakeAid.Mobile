@@ -1034,9 +1034,9 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
       case 'arrived':
         return 'Đã đến nơi';
       case 'finished':
-        return 'Chờ khách thanh toán';
+        return 'Đã hoàn thành';
       case 'missioncompleted':
-        return 'Chờ khách thanh toán';
+        return 'Đã hoàn thành';
       case 'paid':
         return 'Đã thanh toán';
       case 'completed':
@@ -1533,13 +1533,15 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                         ),
                       ),
                     );
-                  } else if ((missionStatus == 'Finished' || missionStatus == 'MissionCompleted' ||
-                      missionStatus == 'Paid' || missionStatus == 'Completed') && mission != null) {
+                  } else if (missionStatus == 'Finished' || missionStatus == 'MissionCompleted' ||
+                      missionStatus == 'Paid' || missionStatus == 'Completed' ||
+                      request.status == 'Paid' || request.status == 'Completed' ||
+                      request.status == 'Finished') {
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (context) => RescuerMissionSuccessScreen(
                           requestData: request,
-                          missionId: mission.id,
+                          missionId: mission?.id ?? request.id,
                         ),
                       ),
                     );

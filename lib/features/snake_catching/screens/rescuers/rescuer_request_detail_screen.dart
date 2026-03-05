@@ -1492,34 +1492,6 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
               ),
             ),
           ),
-          
-          const SizedBox(height: 12),
-          
-          // Reject Button
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () {
-                // TODO: Reject request
-                _showRejectDialog();
-              },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF666666),
-                side: const BorderSide(color: Color(0xFFDDDDDD), width: 2),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'TỪ CHỐI',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -1603,35 +1575,6 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
               backgroundColor: const Color(0xFFFF6B35),
             ),
             child: const Text('Xác nhận'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showRejectDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Từ chối yêu cầu'),
-        content: const Text('Bạn có chắc chắn muốn từ chối yêu cầu này?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Đã từ chối yêu cầu.')),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC3545),
-            ),
-            child: const Text('Từ chối'),
           ),
         ],
       ),

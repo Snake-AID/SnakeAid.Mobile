@@ -39,6 +39,7 @@ import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_ser
 import 'package:snakeaid_mobile/features/member/screens/messages_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/message_detail_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/activity_detail_screen.dart';
+import 'package:snakeaid_mobile/features/member/screens/member_history_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_home_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_settings_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_edit_profile_screen.dart';
@@ -335,6 +336,13 @@ final router = GoRouter(
         final requestId = state.pathParameters['requestId']!;
         return ActivityDetailScreen(requestId: requestId);
       },
+    ),
+
+    // Member History
+    GoRoute(
+      path: '/member-history',
+      name: 'member_history',
+      builder: (context, state) => const MemberHistoryScreen(),
     ),
 
     // Rescuer Settings

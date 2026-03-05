@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../snake_catching/repository/snake_catching_repository.dart';
+import 'member_history_screen.dart';
 import '../../snake_catching/models/snake_catching_request.dart';
 import '../../auth/providers/auth_provider.dart';
 import 'package:intl/intl.dart';
@@ -20,6 +21,9 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
   List<SnakeCatchingRequestData> _requests = [];
   String? _errorMessage;
   Timer? _refreshTimer;
+
+  // Statuses considered "history" — excluded from the active list
+  static const _historyStatuses = {'completed', 'paid', 'dispute', 'cancelled', 'expired'};
 
   @override
   void initState() {
@@ -50,10 +54,12 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
 
       if (mounted) {
         setState(() {
-          // Filter requests to show only current user's requests
+          // Active requests only (history has its own screen)
           if (currentUser != null) {
             _requests = response.data
-                .where((request) => request.userId == currentUser.id)
+                .where((r) =>
+                    r.userId == currentUser.id &&
+                    !_historyStatuses.contains(r.status.toLowerCase()))
                 .toList();
           } else {
             _requests = [];
@@ -80,10 +86,12 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
 
       if (mounted) {
         setState(() {
-          // Filter requests to show only current user's requests
+          // Active requests only (history has its own screen)
           if (currentUser != null) {
             _requests = response.data
-                .where((request) => request.userId == currentUser.id)
+                .where((r) =>
+                    r.userId == currentUser.id &&
+                    !_historyStatuses.contains(r.status.toLowerCase()))
                 .toList();
           } else {
             _requests = [];
@@ -123,6 +131,23 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                     icon: const Icon(Icons.refresh),
                     onPressed: _loadRequests,
                     tooltip: 'Làm mới',
+                  ),
+                  TextButton.icon(
+                    onPressed: () => context.push('/member-history'),
+                    icon: const Icon(Icons.history_rounded,
+                        size: 18, color: Color(0xFF228B22)),
+                    label: const Text(
+                      'Lịch sử',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF228B22),
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                    ),
                   ),
                 ],
               ),

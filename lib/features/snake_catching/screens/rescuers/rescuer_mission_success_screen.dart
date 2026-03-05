@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/snake_catching_request.dart';
 import '../../repository/snake_catching_repository.dart';
+import '../../repository/feedback_repository.dart';
+import '../../../../features/auth/providers/auth_provider.dart';
 
 /// Màn hình hiển thị trạng thái nhiệm vụ đã hoàn thành và đang chờ khách hàng thanh toán
 class RescuerMissionSuccessScreen extends ConsumerStatefulWidget {
@@ -26,6 +28,7 @@ class _RescuerMissionSuccessScreenState
   SnakeCatchingRequestData? _freshData;
   bool _isLoading = true;
   String? _error;
+  bool _isSubmittingFeedback = false;
 
   @override
   void initState() {
@@ -146,6 +149,10 @@ class _RescuerMissionSuccessScreenState
                             _buildCustomerPaymentCard(),
                             const SizedBox(height: 16),
                             _buildMissionSummaryCard(),
+                            const SizedBox(height: 16),
+                            _buildCustomerFeedbackCard(),
+                            const SizedBox(height: 16),
+                            _buildFeedbackCard(),
                             const SizedBox(height: 16),
                             _buildInfoCard(),
                             const SizedBox(height: 24),
@@ -427,6 +434,481 @@ class _RescuerMissionSuccessScreenState
         ),
       ),
     );
+  }
+
+  // ─── Feedback ─────────────────────────────────────────────────────────────
+
+  /// Card hiển thị đánh giá của khách hàng dành cho cứu hộ viên
+  Widget _buildCustomerFeedbackCard() {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null) return const SizedBox.shrink();
+
+    // Tìm feedback mà member đã gửi cho rescuer (currentUser)
+    final memberFeedback = _data.feedbacks
+        .where((f) =>
+            f.targetUserId == currentUser.id &&
+            f.raterId == _data.userId &&
+            f.referenceId == _data.id)
+        .firstOrNull;
+
+    if (memberFeedback == null) return const SizedBox.shrink();
+
+    final memberName = _data.user?.userName ??
+        _data.user?.account?.fullName ??
+        'Khách hàng';
+    final memberAvatar = _data.user?.account?.avatarUrl;
+
+    return _buildCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundImage:
+                    memberAvatar != null ? NetworkImage(memberAvatar) : null,
+                backgroundColor: const Color(0xFF0D6EFD).withOpacity(0.12),
+                child: memberAvatar == null
+                    ? const Icon(Icons.person, color: Color(0xFF0D6EFD), size: 20)
+                    : null,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Khách hàng đánh giá bạn',
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF343A40)),
+                    ),
+                    Text(memberName,
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF6C757D))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: List.generate(
+              5,
+              (i) => Padding(
+                padding: const EdgeInsets.only(right: 3),
+                child: Icon(
+                  i < memberFeedback.rating
+                      ? Icons.star_rounded
+                      : Icons.star_border_rounded,
+                  size: 24,
+                  color: i < memberFeedback.rating
+                      ? const Color(0xFFFFB300)
+                      : Colors.grey[300],
+                ),
+              ),
+            ),
+          ),
+          if (memberFeedback.comments != null &&
+              memberFeedback.comments!.isNotEmpty) ...[  
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF6F8F6),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '"${memberFeedback.comments!}"',
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                    color: Color(0xFF6C757D)),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeedbackCard() {
+    final currentUser = ref.read(currentUserProvider);
+    final memberUserId = _data.userId;
+    final memberName = _data.user?.userName ??
+        _data.user?.account?.fullName ??
+        'Khách hàng';
+    final memberAvatar = _data.user?.account?.avatarUrl;
+
+    debugPrint('━━━━ [FeedbackCard] ━━━━━━━━━━━━━━━━━━━━━━━━');
+    debugPrint('[FeedbackCard] currentUser.id  = ${currentUser?.id}');
+    debugPrint('[FeedbackCard] memberUserId    = $memberUserId');
+    debugPrint('[FeedbackCard] feedbacks.count = ${_data.feedbacks.length}');
+    for (final f in _data.feedbacks) {
+      debugPrint('[FeedbackCard] feedback → raterId=${f.raterId} targetUserId=${f.targetUserId} rating=${f.rating}');
+    }
+
+    final existing = currentUser != null
+        ? _data.feedbacks
+            .where((f) =>
+                f.raterId == currentUser.id &&
+                f.targetUserId == memberUserId &&
+                f.referenceId == _data.id)
+            .firstOrNull
+        : null;
+    debugPrint('[FeedbackCard] existing = $existing');
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+    return _buildCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFB300).withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.star_rounded,
+                    color: Color(0xFFFFB300), size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Đánh giá khách hàng',
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF343A40))),
+                    Text(memberName,
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF6C757D))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          if (existing != null) ...[
+            Row(
+              children: List.generate(
+                5,
+                (i) => Icon(
+                  i < existing.rating
+                      ? Icons.star_rounded
+                      : Icons.star_border_rounded,
+                  size: 22,
+                  color: i < existing.rating
+                      ? const Color(0xFFFFB300)
+                      : Colors.grey[300],
+                ),
+              ),
+            ),
+            if (existing.comments != null && existing.comments!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                '"${existing.comments!}"',
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                    color: Color(0xFF6C757D)),
+              ),
+            ],
+            const SizedBox(height: 8),
+            const Row(
+              children: [
+                Icon(Icons.check_circle_outline,
+                    size: 14, color: Color(0xFF28A745)),
+                SizedBox(width: 5),
+                Text('Đã gửi đánh giá',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF28A745),
+                        fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ] else ...[
+            const Text(
+              'Chia sẻ nhận xét của bạn với khách hàng này.',
+              style: TextStyle(fontSize: 13, color: Color(0xFF6C757D)),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _showFeedbackSheet(
+                  memberUserId: memberUserId,
+                  memberName: memberName,
+                  memberAvatar: memberAvatar,
+                ),
+                icon: const Icon(Icons.rate_review_outlined, size: 18),
+                label: const Text('Đánh giá ngay'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF28A745),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showFeedbackSheet({
+    required String memberUserId,
+    required String memberName,
+    String? memberAvatar,
+  }) {
+    debugPrint('━━━━ [FeedbackSheet] open memberUserId=$memberUserId isSubmitting=$_isSubmittingFeedback');
+    int selectedRating = 0;
+    final commentController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2)),
+                ),
+                const SizedBox(height: 20),
+
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 26,
+                      backgroundImage: memberAvatar != null
+                          ? NetworkImage(memberAvatar)
+                          : null,
+                      backgroundColor:
+                          const Color(0xFF28A745).withOpacity(0.15),
+                      child: memberAvatar == null
+                          ? const Icon(Icons.person, color: Color(0xFF28A745))
+                          : null,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Đánh giá khách hàng',
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF343A40))),
+                          const SizedBox(height: 2),
+                          Text(memberName,
+                              style: const TextStyle(
+                                  fontSize: 13, color: Color(0xFF6C757D))),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (i) {
+                    return GestureDetector(
+                      onTap: () {
+                        debugPrint('[FeedbackSheet] star tapped: ${i + 1}');
+                        setSheet(() => selectedRating = i + 1);
+                      },
+                      child: Padding(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 6),
+                        child: Icon(
+                          i < selectedRating
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          size: 40,
+                          color: i < selectedRating
+                              ? const Color(0xFFFFB300)
+                              : Colors.grey[300],
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+
+                if (selectedRating > 0) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    ['', 'Rất tệ', 'Tệ', 'Bình thường', 'Tốt', 'Tuyệt vời!']
+                        [selectedRating],
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: selectedRating >= 4
+                            ? const Color(0xFF228B22)
+                            : selectedRating == 3
+                                ? Colors.orange
+                                : const Color(0xFFDC3545)),
+                  ),
+                ],
+
+                const SizedBox(height: 16),
+
+                TextField(
+                  controller: commentController,
+                  maxLines: 3,
+                  maxLength: 300,
+                  decoration: InputDecoration(
+                    hintText: 'Nhận xét về khách hàng (không bắt buộc)...',
+                    hintStyle:
+                        TextStyle(fontSize: 13, color: Colors.grey[400]),
+                    filled: true,
+                    fillColor: const Color(0xFFF6F8F6),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.all(14),
+                    counterStyle:
+                        TextStyle(fontSize: 11, color: Colors.grey[400]),
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: Text('Bỏ qua',
+                            style: TextStyle(color: Colors.grey[600])),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: selectedRating == 0 || _isSubmittingFeedback
+                            ? null
+                            : () async {
+                                debugPrint('[FeedbackSheet] submit pressed rating=$selectedRating memberUserId=$memberUserId');
+                                Navigator.pop(ctx);
+                                await _submitFeedback(
+                                  targetUserId: memberUserId,
+                                  rating: selectedRating,
+                                  comments: commentController.text.trim(),
+                                );
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF28A745),
+                          foregroundColor: Colors.white,
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          disabledBackgroundColor: Colors.grey[200],
+                        ),
+                        child: _isSubmittingFeedback
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white))
+                            : const Text('Gửi đánh giá',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submitFeedback({
+    required String targetUserId,
+    required int rating,
+    required String comments,
+  }) async {
+    debugPrint('━━━━ [SubmitFeedback] ━━━━━━━━━━━━━━━━━━━━━━');
+    debugPrint('[SubmitFeedback] targetUserId  = $targetUserId');
+    debugPrint('[SubmitFeedback] referenceId   = ${_data.id}');
+    debugPrint('[SubmitFeedback] rating        = $rating');
+    debugPrint('[SubmitFeedback] comments      = $comments');
+    debugPrint('[SubmitFeedback] targetRole    = Member');
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    setState(() => _isSubmittingFeedback = true);
+    try {
+      await ref.read(feedbackRepositoryProvider).submitFeedback(
+            FeedbackRequest(
+              targetUserId: targetUserId,
+              referenceId: _data.id,
+              type: 'Catching',
+              rating: rating,
+              comments: comments.isEmpty ? null : comments,
+              targetUserRole: 'Member',
+            ),
+          );
+      if (!mounted) return;
+      setState(() => _isSubmittingFeedback = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(children: [
+            Icon(Icons.check_circle, color: Colors.white, size: 18),
+            SizedBox(width: 8),
+            Text('Cảm ơn bạn đã đánh giá!'),
+          ]),
+          backgroundColor: const Color(0xFF28A745),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      _fetchFreshData();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmittingFeedback = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: const Color(0xFFDC3545),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    }
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
