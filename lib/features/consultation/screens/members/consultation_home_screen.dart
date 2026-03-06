@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../models/consultation_booking_response.dart';
+import '../../providers/consultation_bookings_provider.dart';
 
-/// Trạng thái của một buổi tư vấn
+/// Trạng thái hiển thị của một buổi tư vấn (derived from ConsultationBookingStatus)
 enum ConsultationStatus {
-  active,    // Đang diễn ra (đến giờ rồi)
-  upcoming,  // Đã đặt lịch, chưa đến giờ
-  completed, // Đã hoàn thành
-  cancelled, // Đã hủy
+  active,         // Đang diễn ra (confirmed + đến giờ)
+  upcoming,       // Đã xác nhận, chưa đến giờ
+  pendingPayment, // Chờ thanh toán
+  completed,      // Đã hoàn thành
+  cancelled,      // Đã hủy
 }
 
-/// Model mock cho buổi tư vấn
+/// Internal UI model for a consultation card
 class _ConsultationItem {
   final String id;
   final String expertName;
@@ -32,21 +36,51 @@ class _ConsultationItem {
     required this.feeCost,
     this.rating,
   });
+
+  /// Map from API booking response to UI model
+  factory _ConsultationItem.fromBooking(ConsultationBookingResponse b) {
+    final ConsultationStatus uiStatus;
+    if (b.status == ConsultationBookingStatus.confirmed) {
+      final diff = b.scheduledTime.difference(DateTime.now());
+      uiStatus = diff.inMinutes <= 10
+          ? ConsultationStatus.active
+          : ConsultationStatus.upcoming;
+    } else if (b.status == ConsultationBookingStatus.pendingPayment) {
+      uiStatus = ConsultationStatus.pendingPayment;
+    } else if (b.status == ConsultationBookingStatus.completed) {
+      uiStatus = ConsultationStatus.completed;
+    } else {
+      uiStatus = ConsultationStatus.cancelled;
+    }
+
+    return _ConsultationItem(
+      id: b.id,
+      expertName: b.expertName,
+      expertSpecialty: b.expertSpecialty ?? '',
+      expertAvatarUrl: b.expertAvatarUrl,
+      scheduledTime: b.scheduledTime,
+      status: uiStatus,
+      serviceType: b.consultationType == 'Instant' ? 'Tư vấn khẩn cấp' : 'Tư vấn đặt lịch',
+      feeCost: b.feeCost,
+      rating: b.rating,
+    );
+  }
 }
 
 /// Màn hình trang chủ tư vấn chuyên gia
 /// Hiển thị lịch sử các buổi tư vấn và cho phép đặt lịch mới
-class ConsultationHomeScreen extends StatefulWidget {
+class ConsultationHomeScreen extends ConsumerStatefulWidget {
   /// ID buổi tư vấn vừa được đặt (từ màn hình thanh toán) — sẽ được highlight vàng
   final String? highlightedId;
 
   const ConsultationHomeScreen({super.key, this.highlightedId});
 
   @override
-  State<ConsultationHomeScreen> createState() => _ConsultationHomeScreenState();
+  ConsumerState<ConsultationHomeScreen> createState() =>
+      _ConsultationHomeScreenState();
 }
 
-class _ConsultationHomeScreenState extends State<ConsultationHomeScreen>
+class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
 
@@ -55,79 +89,26 @@ class _ConsultationHomeScreenState extends State<ConsultationHomeScreen>
   late AnimationController _flashController;
   late Animation<Color?> _flashColorAnimation;
 
-  // Dữ liệu mock - sẽ được thay bằng API thực
-  final List<_ConsultationItem> _mockConsultations = [
-    _ConsultationItem(
-      id: '1',
-      expertName: 'TS. Nguyễn Văn A',
-      expertSpecialty: 'Rắn Độc & Huyết Thanh',
-      scheduledTime: DateTime.now().add(const Duration(minutes: 5)),
-      status: ConsultationStatus.active,
-      serviceType: 'Tư vấn khẩn cấp',
-      feeCost: 150000,
-    ),
-    _ConsultationItem(
-      id: '2',
-      expertName: 'PGS. Trần Thị B',
-      expertSpecialty: 'Herpetology',
-      scheduledTime: DateTime.now().add(const Duration(hours: 3)),
-      status: ConsultationStatus.upcoming,
-      serviceType: 'Tư vấn trực tuyến',
-      feeCost: 200000,
-    ),
-    _ConsultationItem(
-      id: '3',
-      expertName: 'BS. Lê Minh C',
-      expertSpecialty: 'Y khoa cấp cứu',
-      scheduledTime: DateTime.now().add(const Duration(days: 1, hours: 10)),
-      status: ConsultationStatus.upcoming,
-      serviceType: 'Tư vấn trực tuyến',
-      feeCost: 180000,
-    ),
-    _ConsultationItem(
-      id: '4',
-      expertName: 'TS. Nguyễn Văn A',
-      expertSpecialty: 'Rắn Độc & Huyết Thanh',
-      scheduledTime: DateTime.now().subtract(const Duration(days: 2)),
-      status: ConsultationStatus.completed,
-      serviceType: 'Tư vấn trực tuyến',
-      feeCost: 150000,
-      rating: 5.0,
-    ),
-    _ConsultationItem(
-      id: '5',
-      expertName: 'PGS. Trần Thị B',
-      expertSpecialty: 'Herpetology',
-      scheduledTime: DateTime.now().subtract(const Duration(days: 7)),
-      status: ConsultationStatus.completed,
-      serviceType: 'Tư vấn khẩn cấp',
-      feeCost: 200000,
-      rating: 4.5,
-    ),
-    _ConsultationItem(
-      id: '6',
-      expertName: 'BS. Phạm Đức D',
-      expertSpecialty: 'Độc chất học',
-      scheduledTime: DateTime.now().subtract(const Duration(days: 14)),
-      status: ConsultationStatus.cancelled,
-      serviceType: 'Tư vấn trực tuyến',
-      feeCost: 120000,
-    ),
-  ];
+  /// Derive UI item list from provider bookings
+  List<_ConsultationItem> _toItems(
+      List<ConsultationBookingResponse> bookings) {
+    return bookings.map(_ConsultationItem.fromBooking).toList();
+  }
 
-  List<_ConsultationItem> get _upcomingList {
-    final list = _mockConsultations
+  List<_ConsultationItem> _upcomingList(
+      List<ConsultationBookingResponse> bookings) {
+    final list = _toItems(bookings)
         .where((c) =>
             c.status == ConsultationStatus.active ||
-            c.status == ConsultationStatus.upcoming)
+            c.status == ConsultationStatus.upcoming ||
+            c.status == ConsultationStatus.pendingPayment)
         .toList()
       ..sort((a, b) {
-        // Active items always first
-        final aActive = a.status == ConsultationStatus.active;
-        final bActive = b.status == ConsultationStatus.active;
-        if (aActive && !bActive) return -1;
-        if (bActive && !aActive) return 1;
-        // Highlighted item second (right after active)
+        // Active first, then pendingPayment, then by time
+        if (a.status == ConsultationStatus.active &&
+            b.status != ConsultationStatus.active) return -1;
+        if (b.status == ConsultationStatus.active &&
+            a.status != ConsultationStatus.active) return 1;
         if (_highlightedId != null) {
           if (a.id == _highlightedId) return -1;
           if (b.id == _highlightedId) return 1;
@@ -137,12 +118,14 @@ class _ConsultationHomeScreenState extends State<ConsultationHomeScreen>
     return list;
   }
 
-  List<_ConsultationItem> get _historyList => _mockConsultations
-      .where((c) =>
-          c.status == ConsultationStatus.completed ||
-          c.status == ConsultationStatus.cancelled)
-      .toList()
-    ..sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
+  List<_ConsultationItem> _historyList(
+      List<ConsultationBookingResponse> bookings) =>
+      _toItems(bookings)
+          .where((c) =>
+              c.status == ConsultationStatus.completed ||
+              c.status == ConsultationStatus.cancelled)
+          .toList()
+        ..sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
 
   @override
   void initState() {
@@ -155,31 +138,16 @@ class _ConsultationHomeScreenState extends State<ConsultationHomeScreen>
       duration: const Duration(milliseconds: 700),
     );
     _flashColorAnimation = ColorTween(
-      begin: const Color(0xFFFFE082), // Amber 200 – clearly visible gold
+      begin: const Color(0xFFFFE082), // Amber 200
       end: Colors.white,
     ).animate(CurvedAnimation(
       parent: _flashController,
       curve: Curves.easeInOut,
     ));
 
-    // Nếu có buổi tư vấn vừa đặt, thêm vào danh sách mock và highlight
+    // Nếu có buổi tư vấn vừa được tạo, highlight nó khi danh sách load xong
     if (widget.highlightedId != null) {
       _highlightedId = widget.highlightedId;
-      // Thêm buổi tư vấn mới vào đầu danh sách
-      _mockConsultations.insert(
-        0,
-        _ConsultationItem(
-          id: _highlightedId!,
-          expertName: 'TS. Nguyễn Văn A',
-          expertSpecialty: 'Rắn Độc & Huyết Thanh',
-          scheduledTime: DateTime.now().add(const Duration(hours: 2)),
-          status: ConsultationStatus.upcoming,
-          serviceType: 'Tư vấn trực tuyến',
-          feeCost: 150000,
-        ),
-      );
-
-      // Bắt đầu flash sau khi frame đầu render xong
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _startFlashAnimation();
       });
@@ -205,6 +173,10 @@ class _ConsultationHomeScreenState extends State<ConsultationHomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final bookingsState = ref.watch(consultationBookingsProvider);
+    final upcoming = _upcomingList(bookingsState.bookings);
+    final history = _historyList(bookingsState.bookings);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8F6),
       body: SafeArea(
@@ -214,17 +186,19 @@ class _ConsultationHomeScreenState extends State<ConsultationHomeScreen>
             _buildAppBar(context),
 
             // Tab Bar
-            _buildTabBar(),
+            _buildTabBar(upcoming),
 
             // Tab Content
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildUpcomingTab(context),
-                  _buildHistoryTab(context),
-                ],
-              ),
+              child: bookingsState.isLoading
+                  ? const Center(child: CircularProgressIndicator(color: Color(0xFF228B22)))
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildUpcomingTab(context, upcoming),
+                        _buildHistoryTab(context, history),
+                      ],
+                    ),
             ),
           ],
         ),
@@ -307,7 +281,7 @@ class _ConsultationHomeScreenState extends State<ConsultationHomeScreen>
     );
   }
 
-  Widget _buildTabBar() {
+  Widget _buildTabBar(List<_ConsultationItem> upcomingList) {
     return Container(
       color: Colors.white,
       child: TabBar(
@@ -330,7 +304,7 @@ class _ConsultationHomeScreenState extends State<ConsultationHomeScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Text('Sắp Tới'),
-                if (_upcomingList.isNotEmpty) ...[
+                if (upcomingList.isNotEmpty) ...[
                   const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -340,7 +314,7 @@ class _ConsultationHomeScreenState extends State<ConsultationHomeScreen>
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
-                      '${_upcomingList.length}',
+                      '${upcomingList.length}',
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
@@ -360,8 +334,9 @@ class _ConsultationHomeScreenState extends State<ConsultationHomeScreen>
 
   // ─── Tab "Sắp Tới" ────────────────────────────────────────────────────────
 
-  Widget _buildUpcomingTab(BuildContext context) {
-    if (_upcomingList.isEmpty) {
+  Widget _buildUpcomingTab(BuildContext context,
+      List<_ConsultationItem> upcomingList) {
+    if (upcomingList.isEmpty) {
       return _buildEmptyState(
         icon: Icons.calendar_today_outlined,
         message: 'Bạn chưa có buổi tư vấn nào sắp tới',
@@ -372,9 +347,7 @@ class _ConsultationHomeScreenState extends State<ConsultationHomeScreen>
 
     return RefreshIndicator(
       color: const Color(0xFF228B22),
-      onRefresh: () async {
-        await Future.delayed(const Duration(seconds: 1));
-      },
+      onRefresh: () => ref.read(consultationBookingsProvider.notifier).loadBookings(),
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         children: [
@@ -382,7 +355,7 @@ class _ConsultationHomeScreenState extends State<ConsultationHomeScreen>
           _buildInfoBanner(),
           const SizedBox(height: 16),
 
-          ..._upcomingList.map((item) => Padding(
+          ...upcomingList.map((item) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: _buildUpcomingCard(context, item),
               )),
@@ -573,7 +546,7 @@ class _ConsultationHomeScreenState extends State<ConsultationHomeScreen>
                     ),
                     const SizedBox(width: 10),
 
-                    // Nút chính (vào hoặc chờ)
+                    // Nút chính (vào / thanh toán / chờ)
                     Expanded(
                       flex: 2,
                       child: isActive
@@ -598,31 +571,58 @@ class _ConsultationHomeScreenState extends State<ConsultationHomeScreen>
                                 elevation: 0,
                               ),
                             )
-                          : ElevatedButton.icon(
-                              onPressed: null, // disabled
-                              icon: const Icon(Icons.hourglass_empty, size: 18),
-                              label: const Text(
-                                'Chưa Đến Giờ',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
+                          : item.status == ConsultationStatus.pendingPayment
+                              ? ElevatedButton.icon(
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Thanh toán - Đang phát triển'),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.payment, size: 18),
+                                  label: const Text(
+                                    'Thanh Toán Ngay',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFF59E0B),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                )
+                              : ElevatedButton.icon(
+                                  onPressed: null, // disabled
+                                  icon: const Icon(Icons.hourglass_empty, size: 18),
+                                  label: const Text(
+                                    'Chưa Đến Giờ',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFE5E7EB),
+                                    foregroundColor: const Color(0xFF9CA3AF),
+                                    disabledBackgroundColor:
+                                        const Color(0xFFE5E7EB),
+                                    disabledForegroundColor:
+                                        const Color(0xFF9CA3AF),
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    elevation: 0,
+                                  ),
                                 ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFE5E7EB),
-                                foregroundColor: const Color(0xFF9CA3AF),
-                                disabledBackgroundColor:
-                                    const Color(0xFFE5E7EB),
-                                disabledForegroundColor:
-                                    const Color(0xFF9CA3AF),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                elevation: 0,
-                              ),
-                            ),
                     ),
                   ],
                 ),
@@ -638,8 +638,9 @@ class _ConsultationHomeScreenState extends State<ConsultationHomeScreen>
 
   // ─── Tab "Lịch Sử" ────────────────────────────────────────────────────────
 
-  Widget _buildHistoryTab(BuildContext context) {
-    if (_historyList.isEmpty) {
+  Widget _buildHistoryTab(BuildContext context,
+      List<_ConsultationItem> historyList) {
+    if (historyList.isEmpty) {
       return _buildEmptyState(
         icon: Icons.history,
         message: 'Chưa có lịch sử tư vấn',
@@ -650,12 +651,10 @@ class _ConsultationHomeScreenState extends State<ConsultationHomeScreen>
 
     return RefreshIndicator(
       color: const Color(0xFF228B22),
-      onRefresh: () async {
-        await Future.delayed(const Duration(seconds: 1));
-      },
+      onRefresh: () => ref.read(consultationBookingsProvider.notifier).loadBookings(),
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-        children: _historyList
+        children: historyList
             .map((item) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _buildHistoryCard(context, item),
@@ -887,6 +886,11 @@ class _ConsultationHomeScreenState extends State<ConsultationHomeScreen>
         bgColor = const Color(0xFF3B82F6).withOpacity(0.12);
         textColor = const Color(0xFF3B82F6);
         label = 'Sắp tới';
+        break;
+      case ConsultationStatus.pendingPayment:
+        bgColor = const Color(0xFFF59E0B).withOpacity(0.12);
+        textColor = const Color(0xFFF59E0B);
+        label = 'Chờ thanh toán';
         break;
       case ConsultationStatus.completed:
         bgColor = const Color(0xFF6B7280).withOpacity(0.12);

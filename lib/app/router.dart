@@ -331,6 +331,8 @@ final router = GoRouter(
           initialMicOn: initialMicOn,
           initialCameraOn: initialCameraOn,
           afterCallRoute: afterCallRoute,
+          livekitToken: extra?['livekitToken'] as String? ?? '',
+          wsUrl: extra?['wsUrl'] as String? ?? '',
         );
       },
     ),
@@ -456,6 +458,7 @@ final router = GoRouter(
           selectedTime: extraData?['selectedTime'],
           duration: extraData?['duration'],
           price: extraData?['price'],
+          timeSlotId: extraData?['timeSlotId'],
         );
       },
     ),
@@ -479,6 +482,8 @@ final router = GoRouter(
           uploadedImagesCount: extraData?['uploadedImagesCount'] ?? 0,
           problemDescription: extraData?['problemDescription'],
           questions: extraData?['questions'],
+          consultationId: extraData?['consultationId'] as String?,
+          expertName: extraData?['expertName'] as String?,
         );
       },
     ),

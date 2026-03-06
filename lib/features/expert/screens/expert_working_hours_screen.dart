@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../consultation/repository/consultation_repository.dart';
 
 /// Working hours configuration screen for experts.
 /// Allows selecting active days and setting time slot availability per day.
-class ExpertWorkingHoursScreen extends StatefulWidget {
+class ExpertWorkingHoursScreen extends ConsumerStatefulWidget {
   const ExpertWorkingHoursScreen({super.key});
 
   @override
-  State<ExpertWorkingHoursScreen> createState() =>
+  ConsumerState<ExpertWorkingHoursScreen> createState() =>
       _ExpertWorkingHoursScreenState();
 }
 
@@ -19,7 +22,7 @@ class _TimeSlot {
   _TimeSlot copy() => _TimeSlot(start: start, end: end);
 }
 
-class _ExpertWorkingHoursScreenState extends State<ExpertWorkingHoursScreen> {
+class _ExpertWorkingHoursScreenState extends ConsumerState<ExpertWorkingHoursScreen> {
   static const Color _purple = Color(0xFF6C47C2);
 
   // Selected days: 1=Mon, 2=Tue, ..., 7=Sun
@@ -27,6 +30,8 @@ class _ExpertWorkingHoursScreenState extends State<ExpertWorkingHoursScreen> {
 
   // Time slots per weekday
   late final Map<int, List<_TimeSlot>> _slots;
+
+  bool _isSaving = false;
 
   static const List<String> _dayLabels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
   static const List<String> _dayFullNames = [
@@ -126,18 +131,166 @@ class _ExpertWorkingHoursScreenState extends State<ExpertWorkingHoursScreen> {
     );
   }
 
-  void _save() {
-    // TODO: persist working hours
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Đã lưu lịch làm việc'),
-        backgroundColor: _purple,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-    Navigator.of(context).pop();
+  /// Expand a time range [start, end) into a list of 30-minute slot maps.
+  /// e.g. 08:00–16:00 → [{dayOfWeek, startTime: "08:00", endTime: "08:30"}, ...]
+  List<Map<String, dynamic>> _expand30Min(
+      int dayOfWeek, TimeOfDay start, TimeOfDay end) {
+    final slots = <Map<String, dynamic>>[];
+    int cur = start.hour * 60 + start.minute;
+    final endMin = end.hour * 60 + end.minute;
+    while (cur + 30 <= endMin) {
+      final s =
+          '${(cur ~/ 60).toString().padLeft(2, '0')}:${(cur % 60).toString().padLeft(2, '0')}';
+      final e =
+          '${((cur + 30) ~/ 60).toString().padLeft(2, '0')}:${((cur + 30) % 60).toString().padLeft(2, '0')}';
+      slots.add({'dayOfWeek': dayOfWeek, 'startTime': s, 'endTime': e});
+      cur += 30;
+    }
+    return slots;
+  }
+
+  /// Returns the actual local calendar date for a given weekday (1=Mon..7=Sun).
+  /// If weekday >= today's weekday → this week. Otherwise → next week.
+  DateTime _dateForWeekday(int weekday) {
+    final today = DateTime.now();
+    final diff = weekday >= today.weekday
+        ? weekday - today.weekday
+        : 7 - today.weekday + weekday;
+    final d = today.add(Duration(days: diff));
+    return DateTime(d.year, d.month, d.day);
+  }
+
+  /// Returns the ISO weekStart string (Monday 00:00:00Z) for a given local date.
+  String _weekStartForDate(DateTime date) {
+    final monday = date.subtract(Duration(days: date.weekday - 1));
+    final start = DateTime.utc(monday.year, monday.month, monday.day);
+    return start.toIso8601String().replaceFirst(RegExp(r'\.\d+'), '');
+  }
+
+  static const Map<int, String> _dayNames = {
+    1: 'Monday',
+    2: 'Tuesday',
+    3: 'Wednesday',
+    4: 'Thursday',
+    5: 'Friday',
+    6: 'Saturday',
+    7: 'Sunday',
+  };
+
+  Future<void> _save() async {
+    if (_isSaving) return;
+
+    // Group selected days by their actual calendar week.
+    // Days from today onwards → this week; days before today → next week.
+    // Each week gets a separate bulkTimeSlots call.
+    final Map<String, List<Map<String, dynamic>>> weekGroups = {};
+    int totalDays = 0;
+    for (final day in (_selectedDays.toList()..sort())) {
+      final date = _dateForWeekday(day);
+      final weekStart = _weekStartForDate(date);
+      final timeBlocks = _slots[day]!
+          .map((slot) => {
+                'startTime': _formatTime(slot.start),
+                'endTime': _formatTime(slot.end),
+              })
+          .toList();
+      weekGroups.putIfAbsent(weekStart, () => []).add({
+        'dayOfWeek': _dayNames[day]!,
+        'timeBlocks': timeBlocks,
+      });
+      totalDays++;
+    }
+
+    if (weekGroups.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng thiết lập ít nhất một khung giờ'),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    // Check if any of the target weeks already have slots (backend APPENDs)
+    final user = ref.read(currentUserProvider);
+    if (user != null) {
+      try {
+        final repo = ref.read(consultationRepositoryProvider);
+        final existingSlots = await repo.getExpertTimeSlots(user.id);
+        int conflictCount = 0;
+        for (final weekStartStr in weekGroups.keys) {
+          final weekStartDt = DateTime.parse(weekStartStr);
+          conflictCount += existingSlots.where((d) {
+            final ds = DateTime(d.date.year, d.date.month, d.date.day);
+            final ws = DateTime(weekStartDt.year, weekStartDt.month, weekStartDt.day);
+            return !ds.isBefore(ws) && ds.isBefore(ws.add(const Duration(days: 7)));
+          }).length;
+        }
+        if (conflictCount > 0 && mounted) {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Đã có lịch trùng'),
+              content: Text(
+                'Một số tuần đã có lịch làm việc ($conflictCount ngày). '
+                'Lưu lịch mới sẽ THÊM vào lịch hiện tại, không ghi đè.\n\n'
+                'Bạn có muốn tiếp tục không?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Hủy'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: ElevatedButton.styleFrom(backgroundColor: _purple),
+                  child: const Text('Tiếp tục', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+          );
+          if (confirmed != true) return;
+        }
+      } catch (_) {
+        // Pre-check failed — proceed with save anyway
+      }
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      // Make one API call per week group
+      for (final entry in weekGroups.entries) {
+        await repo.bulkTimeSlots(
+          weekStartDate: entry.key,
+          days: entry.value,
+        );
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đã lưu lịch cho $totalDays ngày'),
+          backgroundColor: _purple,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Không thể lưu lịch: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
   }
 
   @override
@@ -200,6 +353,9 @@ class _ExpertWorkingHoursScreenState extends State<ExpertWorkingHoursScreen> {
                           children: List.generate(7, (i) {
                             final day = i + 1;
                             final selected = _selectedDays.contains(day);
+                            final date = _dateForWeekday(day);
+                            final dateLabel =
+                                '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}';
                             return GestureDetector(
                               onTap: () {
                                 setState(() {
@@ -212,36 +368,53 @@ class _ExpertWorkingHoursScreenState extends State<ExpertWorkingHoursScreen> {
                                   }
                                 });
                               },
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: selected
-                                      ? _purple
-                                      : const Color(0xFFF0EBF9),
-                                  boxShadow: selected
-                                      ? [
-                                          BoxShadow(
-                                            color: _purple.withOpacity(0.35),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 3),
-                                          )
-                                        ]
-                                      : null,
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  _dayLabels[i],
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: selected
-                                        ? Colors.white
-                                        : const Color(0xFF6C47C2),
+                              child: Column(
+                                children: [
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: selected
+                                          ? _purple
+                                          : const Color(0xFFF0EBF9),
+                                      boxShadow: selected
+                                          ? [
+                                              BoxShadow(
+                                                color: _purple.withOpacity(0.35),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 3),
+                                              )
+                                            ]
+                                          : null,
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      _dayLabels[i],
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: selected
+                                            ? Colors.white
+                                            : const Color(0xFF6C47C2),
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    dateLabel,
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: selected
+                                          ? _purple
+                                          : const Color(0xFF999999),
+                                      fontWeight: selected
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                                ],
                               ),
                             );
                           }),
@@ -257,6 +430,9 @@ class _ExpertWorkingHoursScreenState extends State<ExpertWorkingHoursScreen> {
                     final day = i + 1;
                     if (!_selectedDays.contains(day)) return const SizedBox.shrink();
                     final slots = _slots[day]!;
+                    final date = _dateForWeekday(day);
+                    final dateLabel =
+                        '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}';
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: Container(
@@ -293,6 +469,15 @@ class _ExpertWorkingHoursScreenState extends State<ExpertWorkingHoursScreen> {
                                     fontSize: 15,
                                     fontWeight: FontWeight.bold,
                                     color: Color(0xFF2D2D2D),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  dateLabel,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF6C47C2),
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ],
@@ -451,7 +636,7 @@ class _ExpertWorkingHoursScreenState extends State<ExpertWorkingHoursScreen> {
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: _save,
+                onPressed: _isSaving ? null : _save,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _purple,
                   foregroundColor: Colors.white,
@@ -460,13 +645,20 @@ class _ExpertWorkingHoursScreenState extends State<ExpertWorkingHoursScreen> {
                   ),
                   elevation: 0,
                 ),
-                child: const Text(
-                  'Lưu Lịch Làm Việc',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                child: _isSaving
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2.5, color: Colors.white),
+                      )
+                    : const Text(
+                        'Lưu Lịch Làm Việc',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ),
           ),

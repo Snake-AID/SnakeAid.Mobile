@@ -43,8 +43,8 @@ class ExpertDetailModel extends ExpertModel {
   /// Create from JSON
   factory ExpertDetailModel.fromJson(Map<String, dynamic> json) {
     return ExpertDetailModel(
-      id: json['id'] ?? '',
-      userId: json['userId'] ?? '',
+      id: (json['id'] ?? json['expertId'] ?? '').toString(),
+      userId: (json['userId'] ?? json['id'] ?? '').toString(),
       fullName: json['fullName'] ?? '',
       avatarUrl: json['avatarUrl'],
       academicRank: json['academicRank'],

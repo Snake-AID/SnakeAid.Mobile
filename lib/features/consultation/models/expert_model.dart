@@ -41,29 +41,52 @@ class ExpertModel {
 
   /// Create from JSON
   factory ExpertModel.fromJson(Map<String, dynamic> json) {
+    // Map tất cả field names có thể có từ backend
+    // accountId (production) | id (legacy/test)
+    final id = (json['accountId'] ?? json['id'] ?? json['expertId'] ?? '').toString();
+
+    // specializations (production) | specialties (legacy)
+    final List<dynamic> rawSpecializations =
+        json['specializations'] as List<dynamic>? ??
+        json['specialties'] as List<dynamic>? ??
+        [];
+    final specialties = rawSpecializations
+        .map((e) => e is Map ? (e['name'] ?? e.toString()) : e.toString())
+        .cast<String>()
+        .toList();
+
     return ExpertModel(
-      id: json['id'] ?? '',
-      userId: json['userId'] ?? '',
-      fullName: json['fullName'] ?? '',
-      avatarUrl: json['avatarUrl'],
-      academicRank: json['academicRank'],
-      specialty: json['specialty'],
-      specialties: json['specialties'] != null
-          ? List<String>.from(json['specialties'])
-          : [],
-      isVerified: json['isVerified'] ?? false,
-      isOnline: json['isOnline'] ?? false,
-      rating: (json['rating'] ?? 0).toDouble(),
-      reviewCount: json['reviewCount'] ?? 0,
-      consultationFee: (json['consultationFee'] ?? 0).toDouble(),
-      consultationDuration: json['consultationDuration'] ?? 30,
-      bio: json['bio'],
-      yearsOfExperience: json['yearsOfExperience'] ?? 0,
+      id: id,
+      userId: (json['userId'] ?? json['accountId'] ?? json['id'] ?? '').toString(),
+      fullName: (json['fullName'] ?? json['name'] ?? '') as String,
+      avatarUrl: (json['avatarUrl'] ?? json['profileImage'] ?? json['avatar'])
+          as String?,
+      academicRank: json['academicRank'] as String?,
+      specialty: (json['specialty'] ?? json['specialization'] ??
+          (specialties.isNotEmpty ? specialties.first : null)) as String?,
+      specialties: specialties,
+      isVerified: json['isVerified'] as bool? ?? false,
+      isOnline: json['isOnline'] as bool? ?? false,
+      rating: ((json['rating'] ?? 0) as num).toDouble(),
+      // ratingCount (production) | reviewCount/totalFeedbacks (legacy)
+      reviewCount: (json['ratingCount'] ??
+              json['reviewCount'] ??
+              json['totalFeedbacks'] ??
+              json['feedbackCount'] ??
+              0) as int,
+      consultationFee:
+          ((json['consultationFee'] ?? json['fee'] ?? 0) as num).toDouble(),
+      consultationDuration: (json['consultationDuration'] ?? 30) as int,
+      // biography (production) | bio/introduction/description (legacy)
+      bio: (json['biography'] ?? json['bio'] ?? json['introduction'] ?? json['description'])
+          as String?,
+      yearsOfExperience:
+          (json['yearsOfExperience'] ?? json['experience'] ?? 0) as int,
       createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
+          ? DateTime.parse(json['createdAt'] as String)
           : DateTime.now(),
       updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'])
+          ? DateTime.parse(json['updatedAt'] as String)
           : null,
     );
   }

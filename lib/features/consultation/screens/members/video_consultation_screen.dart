@@ -2,15 +2,16 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:livekit_client/livekit_client.dart';
+import '../../repository/consultation_repository.dart';
 
-/// Mock video consultation screen (UI only — LiveKit integration pending)
-/// [initialMicOn] / [initialCameraOn] are synced from the waiting room so
-/// the device state on entry matches what the user configured before joining.
-/// [afterCallRoute] overrides the route to navigate to after ending the call
-/// (default: `/video-waiting/:id` for members; expert side passes its own route).
-class VideoConsultationScreen extends StatefulWidget {
+/// Video consultation screen powered by LiveKit.
+/// Receives [livekitToken] and [wsUrl] from WaitingRoom (fetched via API) and connects
+/// to the LiveKit server URL provided by the token API response.
+class VideoConsultationScreen extends ConsumerStatefulWidget {
   final String consultationId;
   final String expertName;
   final String expertSpecialty;
@@ -20,6 +21,10 @@ class VideoConsultationScreen extends StatefulWidget {
   final bool initialCameraOn;
   /// Route to go to after ending the call (null = use default member waiting room)
   final String? afterCallRoute;
+  /// LiveKit JWT token received from backend
+  final String livekitToken;
+  /// LiveKit server WebSocket URL received from backend (e.g. wss://livekit.example.com)
+  final String wsUrl;
 
   const VideoConsultationScreen({
     super.key,
@@ -29,46 +34,81 @@ class VideoConsultationScreen extends StatefulWidget {
     this.initialMicOn = true,
     this.initialCameraOn = true,
     this.afterCallRoute,
+    this.livekitToken = '',
+    this.wsUrl = '',
   });
 
   @override
-  State<VideoConsultationScreen> createState() =>
+  ConsumerState<VideoConsultationScreen> createState() =>
       _VideoConsultationScreenState();
 }
 
-class _VideoConsultationScreenState extends State<VideoConsultationScreen>
+class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScreen>
     with TickerProviderStateMixin {
-  // Timer đếm thời gian
+  // ── LiveKit ────────────────────────────────────────────────────────────────
+  late Room _room;
+  bool _isConnecting = true;
+  String? _connectionError;
+
+  // ── Timer ──────────────────────────────────────────────────────────────────
   late Timer _timer;
   int _secondsElapsed = 0;
 
-  // Trạng thái controls — khởi đầu từ sảnh chờ
+  // ── Controls ───────────────────────────────────────────────────────────────
   late bool _isMicOn;
   late bool _isCameraOn;
+  bool _isFrontCamera = true;
 
-  // Vị trí PiP (picture-in-picture)
+  // ── PiP position ───────────────────────────────────────────────────────────
   double _pipTop = 96;
   double _pipRight = 16;
 
-  // Animation cho blink "Trực tuyến"
+  // ── Animations ─────────────────────────────────────────────────────────────
   late AnimationController _liveBadgeController;
 
-  // Controller cho notes
+  // ── Notes ──────────────────────────────────────────────────────────────────
   final TextEditingController _notesController = TextEditingController();
+
+  // ── Computed helpers ───────────────────────────────────────────────────────
+
+  /// Local video track (null when camera off or not yet published)
+  VideoTrack? get _localVideoTrack {
+    if (!_isCameraOn) return null;
+    return _room.localParticipant?.videoTrackPublications
+        .where((p) => p.track != null)
+        .map((p) => p.track!)
+        .whereType<VideoTrack>()
+        .firstOrNull;
+  }
+
+  /// Remote participant's video track (first remote participant)
+  VideoTrack? get _remoteVideoTrack {
+    final remote = _room.remoteParticipants.values.firstOrNull;
+    return remote?.videoTrackPublications
+        .where((p) => p.track != null)
+        .map((p) => p.track!)
+        .whereType<VideoTrack>()
+        .firstOrNull;
+  }
+
+  bool get _isAnyoneConnected => _room.remoteParticipants.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
-
-    // Đồng bộ trạng thái mic/camera từ sảnh chờ
     _isMicOn = widget.initialMicOn;
     _isCameraOn = widget.initialCameraOn;
 
-    // Ẩn status bar, full screen
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    // TODO (LiveKit): sau khi room.connect() xong, gọi:
-    //   room.localParticipant.setMicrophoneEnabled(_isMicOn);
-    //   room.localParticipant.setCameraEnabled(_isCameraOn);
+
+    _room = Room(
+      roomOptions: const RoomOptions(
+        adaptiveStream: true,
+        dynacast: true,
+      ),
+    );
+    _room.addListener(_onRoomChanged);
+    _connectToRoom();
 
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _secondsElapsed++);
@@ -80,11 +120,45 @@ class _VideoConsultationScreenState extends State<VideoConsultationScreen>
     )..repeat(reverse: true);
   }
 
+  Future<void> _connectToRoom() async {
+    final wsUrl = widget.wsUrl.isNotEmpty ? widget.wsUrl : '';
+    if (wsUrl.isEmpty || widget.livekitToken.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _isConnecting = false;
+          _connectionError = 'Thiếu wsUrl hoặc token — không thể kết nối phòng';
+        });
+      }
+      return;
+    }
+    try {
+      await _room.connect(wsUrl, widget.livekitToken);
+      if (!mounted) return;
+      await _room.localParticipant?.setMicrophoneEnabled(_isMicOn);
+      await _room.localParticipant?.setCameraEnabled(_isCameraOn);
+      if (mounted) setState(() => _isConnecting = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isConnecting = false;
+          _connectionError = 'Không thể kết nối phòng: $e';
+        });
+      }
+    }
+  }
+
+  void _onRoomChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     _timer.cancel();
     _liveBadgeController.dispose();
     _notesController.dispose();
+    _room.removeListener(_onRoomChanged);
+    _room.disconnect();
+    _room.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
@@ -112,8 +186,13 @@ class _VideoConsultationScreenState extends State<VideoConsultationScreen>
                 style: TextStyle(color: Color(0xFF228B22))),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
+              // Best-effort: call end API, then navigate regardless of result
+              final repo = ref.read(consultationRepositoryProvider);
+              await repo.endConsultation(widget.consultationId);
+
+              if (!mounted) return;
               final targetRoute = widget.afterCallRoute ??
                   '/video-waiting/${widget.consultationId}';
               context.go(
@@ -143,6 +222,31 @@ class _VideoConsultationScreenState extends State<VideoConsultationScreen>
     );
   }
 
+  Future<void> _toggleMic() async {
+    _isMicOn = !_isMicOn;
+    await _room.localParticipant?.setMicrophoneEnabled(_isMicOn);
+    setState(() {});
+  }
+
+  Future<void> _toggleCamera() async {
+    _isCameraOn = !_isCameraOn;
+    await _room.localParticipant?.setCameraEnabled(_isCameraOn);
+    setState(() {});
+  }
+
+  Future<void> _flipCamera() async {
+    if (!_isCameraOn) return;
+    _isFrontCamera = !_isFrontCamera;
+    await _room.localParticipant?.setCameraEnabled(
+      true,
+      cameraCaptureOptions: CameraCaptureOptions(
+        cameraPosition:
+            _isFrontCamera ? CameraPosition.front : CameraPosition.back,
+      ),
+    );
+    setState(() {});
+  }
+
   void _showChat() {
     showModalBottomSheet(
       context: context,
@@ -167,28 +271,38 @@ class _VideoConsultationScreenState extends State<VideoConsultationScreen>
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // ── Nền giả camera bệnh nhân ──────────────────────────────────
-          _buildPatientBackground(),
+          // ── Remote participant's camera (full-screen background) ───────
+          _buildRemoteVideo(),
 
-          // ── Overlay gradient (trên + dưới) ────────────────────────────
+          // ── Gradient overlay (top + bottom) ───────────────────────────
           _buildGradientOverlay(),
 
-          // ── PiP: camera chuyên gia (kéo được) ─────────────────────────
+          // ── PiP: local camera (draggable) ─────────────────────────────
           _buildDraggablePip(),
 
           // ── Top bar ───────────────────────────────────────────────────
           _buildTopBar(),
 
-          // ── Bottom controls ────────────────────────────────────
+          // ── Connecting / error overlay ────────────────────────────────
+          if (_isConnecting) _buildConnectingOverlay(),
+          if (_connectionError != null) _buildErrorOverlay(),
+
+          // ── Bottom controls ───────────────────────────────────────────
           _buildBottomControls(),
         ],
       ),
     );
   }
 
-  // ─── Nền camera bệnh nhân ────────────────────────────────────────────────
+  // ─── Remote video (full-screen background) ────────────────────────────────
 
-  Widget _buildPatientBackground() {
+  Widget _buildRemoteVideo() {
+    final remoteTrack = _remoteVideoTrack;
+    if (remoteTrack != null) {
+      return Positioned.fill(
+        child: VideoTrackRenderer(remoteTrack),
+      );
+    }
     return Container(
       width: double.infinity,
       height: double.infinity,
@@ -196,11 +310,7 @@ class _VideoConsultationScreenState extends State<VideoConsultationScreen>
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF0d1117),
-            Color(0xFF1a1a2e),
-            Color(0xFF0d1117),
-          ],
+          colors: [Color(0xFF0d1117), Color(0xFF1a1a2e), Color(0xFF0d1117)],
         ),
       ),
       child: Center(
@@ -213,21 +323,102 @@ class _VideoConsultationScreenState extends State<VideoConsultationScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.white.withOpacity(0.08),
-                border: Border.all(
-                    color: Colors.white.withOpacity(0.15), width: 2),
+                border:
+                    Border.all(color: Colors.white.withOpacity(0.15), width: 2),
               ),
-              child: const Icon(Icons.person,
-                  size: 56, color: Colors.white38),
+              child: const Icon(Icons.person, size: 56, color: Colors.white38),
             ),
             const SizedBox(height: 16),
             Text(
-              'Camera của bạn',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.4),
-                fontSize: 14,
-              ),
+              _isAnyoneConnected
+                  ? '${widget.expertName} đang tắt camera'
+                  : 'Đang chờ đối phương kết nối...',
+              style:
+                  TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Connecting overlay ───────────────────────────────────────────────────
+
+  Widget _buildConnectingOverlay() {
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black.withOpacity(0.7),
+        child: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: Colors.white),
+              SizedBox(height: 20),
+              Text(
+                'Đang kết nối phòng...',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─── Error overlay ────────────────────────────────────────────────────────
+
+  Widget _buildErrorOverlay() {
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black.withOpacity(0.85),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.signal_wifi_off, color: Colors.red, size: 56),
+                const SizedBox(height: 16),
+                const Text(
+                  'Không thể kết nối',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _connectionError ?? '',
+                  style:
+                      const TextStyle(color: Colors.white60, fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _connectionError = null;
+                      _isConnecting = true;
+                    });
+                    _connectToRoom();
+                  },
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF228B22)),
+                  child: const Text('Thử lại',
+                      style: TextStyle(color: Colors.white)),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () => context.go('/consultation-home'),
+                  child: const Text('Quay về',
+                      style: TextStyle(color: Colors.white60)),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -355,7 +546,7 @@ class _VideoConsultationScreenState extends State<VideoConsultationScreen>
     );
   }
 
-  // ─── Draggable PiP ───────────────────────────────────────────────────────
+  // ─── Draggable PiP (local camera) ─────────────────────────────────────
 
   Widget _buildDraggablePip() {
     return Positioned(
@@ -366,8 +557,6 @@ class _VideoConsultationScreenState extends State<VideoConsultationScreen>
           setState(() {
             _pipTop += details.delta.dy;
             _pipRight -= details.delta.dx;
-
-            // Clamp inside screen
             _pipTop = _pipTop.clamp(
                 MediaQuery.of(context).padding.top + 8.0,
                 MediaQuery.of(context).size.height - 200.0);
@@ -384,60 +573,66 @@ class _VideoConsultationScreenState extends State<VideoConsultationScreen>
             color: Colors.black,
             boxShadow: const [
               BoxShadow(
-                  color: Colors.black54,
-                  blurRadius: 16,
-                  offset: Offset(0, 4))
+                  color: Colors.black54, blurRadius: 16, offset: Offset(0, 4))
             ],
           ),
           clipBehavior: Clip.antiAlias,
           child: Stack(
             children: [
-              // Mock expert video - placeholder
-              Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF1e3a1e), Color(0xFF0d1f0d)],
-                  ),
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.1),
+              // Local video or placeholder
+              _localVideoTrack != null
+                  ? VideoTrackRenderer(_localVideoTrack!)
+                  : Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF1e3a1e), Color(0xFF0d1f0d)],
                         ),
-                        child: const Icon(Icons.person,
-                            size: 28, color: Colors.white54),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        widget.expertName.split(' ').last,
-                        style: const TextStyle(
-                            color: Colors.white70, fontSize: 11),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white.withOpacity(0.1),
+                              ),
+                              child: Icon(
+                                _isCameraOn
+                                    ? Icons.person
+                                    : Icons.videocam_off,
+                                size: 28,
+                                color: Colors.white54,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text('Bạn',
+                                style: TextStyle(
+                                    color: Colors.white70, fontSize: 11)),
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
+                    ),
 
-              // Switch camera button on hover
+              // Flip camera button
               Positioned(
                 bottom: 6,
                 right: 6,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
-                    shape: BoxShape.circle,
+                child: GestureDetector(
+                  onTap: _flipCamera,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.cameraswitch,
+                        color: Colors.white, size: 14),
                   ),
-                  child: const Icon(Icons.cameraswitch,
-                      color: Colors.white, size: 14),
                 ),
               ),
             ],
@@ -469,13 +664,13 @@ class _VideoConsultationScreenState extends State<VideoConsultationScreen>
               icon: _isMicOn ? Icons.mic : Icons.mic_off,
               label: _isMicOn ? 'Tắt Mic' : 'Bật Mic',
               active: !_isMicOn,
-              onTap: () => setState(() => _isMicOn = !_isMicOn),
+              onTap: _toggleMic,
             ),
             _buildControlButton(
               icon: _isCameraOn ? Icons.videocam : Icons.videocam_off,
               label: 'Camera',
               highlighted: _isCameraOn,
-              onTap: () => setState(() => _isCameraOn = !_isCameraOn),
+              onTap: _toggleCamera,
             ),
 
             // Nút Kết Thúc — tâm màn hình, lớn hơn
@@ -523,14 +718,7 @@ class _VideoConsultationScreenState extends State<VideoConsultationScreen>
             _buildControlButton(
               icon: Icons.flip_camera_ios_outlined,
               label: 'Lật Cam',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Đã lật camera'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-              },
+              onTap: _flipCamera,
             ),
           ],
         ),

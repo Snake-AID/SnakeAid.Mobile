@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../models/availability_model.dart';
 import '../../providers/expert_detail_provider.dart';
 
 // Primary color constant
 const Color _primaryColor = Color(0xFF228B22);
 const Color _backgroundColor = Color(0xFFF6F8F6);
 
-/// Time Slot model
+/// Time Slot model for UI rendering
 class TimeSlot {
   final String startTime;
   final String endTime;
@@ -56,11 +57,14 @@ class _ConsultationTimeSelectionScreenState
   int? _selectedDateIndex;
   int? _selectedTimeSlotIndex;
 
-  // Mock available dates (next 7 days)
-  late List<AvailableDate> _availableDates;
+  /// Real slot ID from backend (used as timeSlotId in booking request)
+  String? _selectedSlotId;
 
-  // Mock time slots
-  final List<TimeSlot> _timeSlots = const [
+  // Fallback mock dates when provider has no availability yet
+  late List<AvailableDate> _mockDates;
+
+  // Fallback mock time slots per day (used only during initial load)
+  static const List<TimeSlot> _mockTimeSlots = [
     TimeSlot(startTime: '09:00', endTime: '09:30', isAvailable: true),
     TimeSlot(startTime: '09:30', endTime: '10:00', isAvailable: true),
     TimeSlot(startTime: '10:00', endTime: '10:30', isAvailable: true),
@@ -71,18 +75,21 @@ class _ConsultationTimeSelectionScreenState
     TimeSlot(startTime: '14:30', endTime: '15:00', isAvailable: false),
   ];
 
+  // Whether backend data has been received (not just loading)
+  bool _dataLoaded = false;
+
   @override
   void initState() {
     super.initState();
-    _initializeDates();
+    _initializeMockDates();
   }
 
-  void _initializeDates() {
+  void _initializeMockDates() {
     final now = DateTime.now();
-    _availableDates = List.generate(7, (index) {
+    _mockDates = List.generate(7, (index) {
       final date = now.add(Duration(days: index));
       final dayLabel = _getDayLabel(date);
-      final hasAvailability = index != 2 && index != 5; // Mock: some days unavailable
+      final hasAvailability = index != 2 && index != 5;
 
       return AvailableDate(
         date: date,
@@ -157,10 +164,32 @@ class _ConsultationTimeSelectionScreenState
       return;
     }
 
-    final selectedDate = _availableDates[_selectedDateIndex!];
-    final selectedTimeSlot = _timeSlots[_selectedTimeSlotIndex!];
+    final availability = ref.read(expertDetailProvider(widget.expertId))
+        .expert
+        ?.availability ?? const <AvailabilityDay>[];
+    final displayDates = availability.isNotEmpty
+        ? availability.map((d) => AvailableDate(
+              date: d.date,
+              dayLabel: d.dayOfWeek,
+              hasAvailability: d.isAvailable,
+            )).toList()
+        : _mockDates;
+    final displaySlots = (availability.isNotEmpty &&
+            _selectedDateIndex != null &&
+            _selectedDateIndex! < availability.length)
+        ? (availability[_selectedDateIndex!].timeSlots ?? const <TimeSlotEntry>[])
+            .map((e) => TimeSlot(
+                  startTime: e.startTime,
+                  endTime: e.endTime,
+                  isAvailable: true,
+                ))
+            .toList()
+        : _mockTimeSlots;
 
-    // Navigate to documents screen with consultation details
+    final selectedDate = displayDates[_selectedDateIndex!];
+    final selectedTimeSlot = displaySlots[_selectedTimeSlotIndex!];
+
+    // Navigate to documents screen with consultation details + real timeSlotId
     context.push(
       '/consultation-documents/${widget.expertId}',
       extra: {
@@ -169,6 +198,7 @@ class _ConsultationTimeSelectionScreenState
         'selectedTime': '${selectedTimeSlot.startTime} (30 phút)',
         'duration': '30 phút',
         'price': '150,000 VNĐ',
+        if (_selectedSlotId != null) 'timeSlotId': _selectedSlotId!,
       },
     );
   }
@@ -177,6 +207,38 @@ class _ConsultationTimeSelectionScreenState
   Widget build(BuildContext context) {
     final state = ref.watch(expertDetailProvider(widget.expertId));
     final theme = Theme.of(context);
+
+    // Track whether real data has been received
+    if (!state.isLoading && state.expert != null && !_dataLoaded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _dataLoaded = true);
+      });
+    }
+
+    // Derive display dates and slots from provider when available
+    final availability = state.expert?.availability ?? const <AvailabilityDay>[];
+    // Use mock dates only while data hasn't loaded yet
+    final displayDates = availability.isNotEmpty
+        ? availability.map((d) => AvailableDate(
+              date: d.date,
+              dayLabel: d.dayOfWeek,
+              hasAvailability: d.isAvailable,
+            )).toList()
+        : (_dataLoaded ? const <AvailableDate>[] : _mockDates);
+    final List<TimeSlot> displaySlots;
+    if (availability.isNotEmpty &&
+        _selectedDateIndex != null &&
+        _selectedDateIndex! < availability.length) {
+      displaySlots = (availability[_selectedDateIndex!].timeSlots ?? const <TimeSlotEntry>[])
+          .map((e) => TimeSlot(startTime: e.startTime, endTime: e.endTime, isAvailable: true))
+          .toList();
+    } else if (!_dataLoaded) {
+      // Still loading — show mock slots so UI isn't empty
+      displaySlots = _selectedDateIndex != null ? _mockTimeSlots : const [];
+    } else {
+      // Data loaded but no availability
+      displaySlots = const [];
+    }
 
     return Scaffold(
       backgroundColor: _backgroundColor,
@@ -201,7 +263,9 @@ class _ConsultationTimeSelectionScreenState
           ? const Center(child: CircularProgressIndicator())
           : state.expert == null
               ? const Center(child: Text('Không tìm thấy chuyên gia'))
-              : Column(
+              : (_dataLoaded && availability.isEmpty)
+                  ? _buildNoAvailability(theme)
+                  : Column(
                   children: [
                     // Main scrollable content
                     Expanded(
@@ -221,12 +285,13 @@ class _ConsultationTimeSelectionScreenState
                             ),
 
                             // Horizontal Date Scroller
-                            _buildDateScroller(theme),
+                            _buildDateScroller(displayDates, theme),
 
                             // Available Times Section
                             Padding(
                               padding: const EdgeInsets.all(16),
-                              child: _buildAvailableTimesSection(theme),
+                              child: _buildAvailableTimesSection(
+                                  displayDates, displaySlots, availability, theme),
                             ),
                           ],
                         ),
@@ -236,7 +301,7 @@ class _ConsultationTimeSelectionScreenState
                     // Bottom Summary & Actions
                     if (_selectedDateIndex != null &&
                         _selectedTimeSlotIndex != null)
-                      _buildBottomSummary(theme),
+                      _buildBottomSummary(displayDates, displaySlots, theme),
                   ],
                 ),
     );
@@ -292,7 +357,7 @@ class _ConsultationTimeSelectionScreenState
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  expert.specialties.first,
+                  expert.specialty ?? (expert.specialties.isEmpty ? null : expert.specialties.first) ?? 'Chuyên gia tư vấn',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -306,17 +371,17 @@ class _ConsultationTimeSelectionScreenState
   }
 
   /// Build horizontal date scroller
-  Widget _buildDateScroller(ThemeData theme) {
+  Widget _buildDateScroller(List<AvailableDate> displayDates, ThemeData theme) {
     return Container(
       height: 110,
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _availableDates.length,
+        itemCount: displayDates.length,
         separatorBuilder: (context, index) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
-          final dateItem = _availableDates[index];
+          final dateItem = displayDates[index];
           final isSelected = _selectedDateIndex == index;
 
           return InkWell(
@@ -324,6 +389,7 @@ class _ConsultationTimeSelectionScreenState
               setState(() {
                 _selectedDateIndex = index;
                 _selectedTimeSlotIndex = null; // Reset time selection
+                _selectedSlotId = null;
               });
             },
             child: Container(
@@ -389,8 +455,70 @@ class _ConsultationTimeSelectionScreenState
     );
   }
 
+  /// Build empty state when expert has no available time slots
+  Widget _buildNoAvailability(ThemeData theme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.calendar_today_outlined,
+              size: 64,
+              color: Colors.grey[350],
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Chưa có lịch trống',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF333333),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Chuyên gia hiện chưa có khung giờ nào khả dụng.\nVui lòng thử lại sau hoặc chọn chuyên gia khác.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton(
+                onPressed: () => context.pop(),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: _primaryColor, width: 2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Quay lại',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _primaryColor,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Build available times section
-  Widget _buildAvailableTimesSection(ThemeData theme) {
+  Widget _buildAvailableTimesSection(
+    List<AvailableDate> displayDates,
+    List<TimeSlot> displaySlots,
+    List<AvailabilityDay> availability,
+    ThemeData theme,
+  ) {
     if (_selectedDateIndex == null) {
       return Container(
         padding: const EdgeInsets.all(32),
@@ -406,7 +534,22 @@ class _ConsultationTimeSelectionScreenState
       );
     }
 
-    final selectedDate = _availableDates[_selectedDateIndex!];
+    if (displaySlots.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(32),
+        child: Center(
+          child: Text(
+            'Không có khung giờ nào cho ngày này',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    final selectedDate = displayDates[_selectedDateIndex!];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -427,9 +570,9 @@ class _ConsultationTimeSelectionScreenState
             crossAxisSpacing: 12,
             childAspectRatio: 2.5,
           ),
-          itemCount: _timeSlots.length,
+          itemCount: displaySlots.length,
           itemBuilder: (context, index) {
-            final timeSlot = _timeSlots[index];
+            final timeSlot = displaySlots[index];
             final isSelected = _selectedTimeSlotIndex == index;
 
             return InkWell(
@@ -437,6 +580,17 @@ class _ConsultationTimeSelectionScreenState
                   ? () {
                       setState(() {
                         _selectedTimeSlotIndex = index;
+                        // Store real slot ID if available
+                        if (availability.isNotEmpty &&
+                            _selectedDateIndex != null &&
+                            _selectedDateIndex! < availability.length) {
+                          final slots = availability[_selectedDateIndex!].timeSlots;
+                          _selectedSlotId = slots != null && index < slots.length
+                              ? slots[index].id
+                              : null;
+                        } else {
+                          _selectedSlotId = null;
+                        }
                       });
                     }
                   : null,
@@ -480,9 +634,13 @@ class _ConsultationTimeSelectionScreenState
   }
 
   /// Build bottom summary and action buttons
-  Widget _buildBottomSummary(ThemeData theme) {
-    final selectedDate = _availableDates[_selectedDateIndex!];
-    final selectedTimeSlot = _timeSlots[_selectedTimeSlotIndex!];
+  Widget _buildBottomSummary(
+    List<AvailableDate> displayDates,
+    List<TimeSlot> displaySlots,
+    ThemeData theme,
+  ) {
+    final selectedDate = displayDates[_selectedDateIndex!];
+    final selectedTimeSlot = displaySlots[_selectedTimeSlotIndex!];
 
     return Container(
       decoration: BoxDecoration(

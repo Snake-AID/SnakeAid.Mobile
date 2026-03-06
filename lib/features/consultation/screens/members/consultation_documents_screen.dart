@@ -4,7 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../models/consultation_booking_response.dart';
+import '../../providers/consultation_bookings_provider.dart';
 import '../../providers/expert_detail_provider.dart';
+import '../../repository/consultation_repository.dart';
 
 // Primary color constant
 const Color _primaryColor = Color(0xFF228B22);
@@ -20,6 +23,7 @@ class ConsultationDocumentsScreen extends ConsumerStatefulWidget {
   final String? selectedTime; // For scheduled consultations
   final String? duration; // For scheduled consultations
   final String? price; // Consultation price
+  final String? timeSlotId; // Real slot ID from backend
 
   const ConsultationDocumentsScreen({
     super.key,
@@ -29,6 +33,7 @@ class ConsultationDocumentsScreen extends ConsumerStatefulWidget {
     this.selectedTime,
     this.duration,
     this.price,
+    this.timeSlotId,
   });
 
   @override
@@ -45,6 +50,7 @@ class _ConsultationDocumentsScreenState
   final int _maxImages = 5;
   final int _maxProblemChars = 500;
   final int _maxQuestionsChars = 300;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -111,7 +117,7 @@ class _ConsultationDocumentsScreenState
     });
   }
 
-  void _handleContinue() {
+  Future<void> _handleContinue() async {
     // Validate required fields
     if (_problemController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -120,7 +126,57 @@ class _ConsultationDocumentsScreenState
       return;
     }
 
-    // Navigate to payment confirmation screen with documents
+    // If we have a real timeSlotId, call the createBooking API
+    if (widget.timeSlotId != null && widget.timeSlotId!.isNotEmpty) {
+      setState(() => _isSubmitting = true);
+      try {
+        final repository = ref.read(consultationRepositoryProvider);
+        final booking = await repository.createBooking(
+          CreateConsultationBookingRequest(
+            timeSlotId: widget.timeSlotId!,
+            problemDescription: _problemController.text.trim(),
+          ),
+        );
+        // Invalidate bookings list so home screen refreshes later
+        ref.invalidate(consultationBookingsProvider);
+
+        if (!mounted) return;
+        setState(() => _isSubmitting = false);
+
+        // Format price from booking response
+        final priceStr = booking.feeCost > 0
+            ? '${booking.feeCost.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} VNĐ'
+            : widget.price ?? '150,000 VNĐ';
+
+        // Navigate to payment screen with real consultationId
+        context.push(
+          '/payment-confirmation/${widget.expertId}',
+          extra: {
+            'consultationId': booking.consultationId ?? '',
+            'expertName': booking.expertName,
+            'consultationType': 'scheduled',
+            'selectedDate': widget.selectedDate ?? '',
+            'selectedTime': widget.selectedTime ?? '',
+            'duration': '30 phút',
+            'price': priceStr,
+            'hasDocuments': true,
+            'uploadedImagesCount': _uploadedImages.length,
+          },
+        );
+        return;
+      } catch (e) {
+        if (!mounted) return;
+        final msg = e.toString().contains('409')
+            ? 'Khung giờ này vừa được đặt bởi người khác. Vui lòng chọn giờ khác.'
+            : 'Không thể tạo lịch tư vấn. Vui lòng thử lại.';
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+        setState(() => _isSubmitting = false);
+        return;
+      }
+    }
+
+    // Fallback: no real timeSlotId — navigate to payment screen (placeholder flow)
     context.push(
       '/payment-confirmation/${widget.expertId}',
       extra: {
@@ -635,6 +691,7 @@ class _ConsultationDocumentsScreenState
 
   /// Build footer with action buttons
   Widget _buildFooter(ThemeData theme) {
+    final hasRealSlot = widget.timeSlotId != null && widget.timeSlotId!.isNotEmpty;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -651,35 +708,43 @@ class _ConsultationDocumentsScreenState
             width: double.infinity,
             height: 48,
             child: FilledButton(
-              onPressed: _handleContinue,
+              onPressed: _isSubmitting ? null : _handleContinue,
               style: FilledButton.styleFrom(
                 backgroundColor: _primaryColor,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: const Text(
-                'Tiếp Tục Thanh Toán',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2.5, color: Colors.white),
+                    )
+                  : Text(
+                      hasRealSlot ? 'Xác Nhận Đặt Lịch' : 'Tiếp Tục Thanh Toán',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
             ),
           ),
           const SizedBox(height: 12),
 
-          // Skip button
-          TextButton(
-            onPressed: _handleSkip,
-            child: Text(
-              'Bỏ qua (không upload)',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w500,
+          // Skip button (only for placeholder flow without real slot)
+          if (!hasRealSlot)
+            TextButton(
+              onPressed: _handleSkip,
+              child: Text(
+                'Bỏ qua (không upload)',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

@@ -1,11 +1,15 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/http_provider.dart';
 import '../../../core/services/http_service.dart';
 import '../models/expert_model.dart';
 import '../models/expert_list_response.dart';
 import '../models/expert_detail_model.dart';
+import '../models/review_model.dart';
+import '../models/availability_model.dart';
+import '../models/consultation_booking_response.dart';
 
 /// Provider for ConsultationRepository
 final consultationRepositoryProvider = Provider<ConsultationRepository>((ref) {
@@ -45,7 +49,7 @@ class ConsultationRepository {
 
       // Build query parameters
       final queryParams = <String, dynamic>{
-        'page': page,
+        'pageNumber': page,
         'pageSize': pageSize,
       };
 
@@ -62,7 +66,7 @@ class ConsultationRepository {
       }
 
       final response = await httpService.get(
-        '/api/experts',
+        '/api/v1/experts',
         queryParameters: queryParams,
       );
 
@@ -93,56 +97,36 @@ class ConsultationRepository {
     }
   }
 
-  /// Get expert detail by ID
-  /// 
+  /// Get expert by ID (basic profile)
+  ///
   /// Returns [ExpertModel] or null if not found
   Future<ExpertModel?> getExpertById(String expertId) async {
     try {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      debugPrint('📋 Fetching expert detail: $expertId');
+      debugPrint('📋 Fetching expert by id: $expertId');
 
-      final response = await httpService.get('/api/experts/$expertId');
+      final response = await httpService.get('/api/v1/experts/$expertId');
 
-      debugPrint('✅ Expert detail fetched successfully');
+      debugPrint('✅ Expert fetched successfully');
 
-      // Handle response structure
-      if (response.data['is_success'] == true && response.data['data'] != null) {
-        return ExpertModel.fromJson(response.data['data']);
-      }
-
-      return null;
+      final body = response.data as Map<String, dynamic>;
+      final data = body['is_success'] == true
+          ? body['data'] as Map<String, dynamic>?
+          : body;
+      if (data == null) return null;
+      return ExpertModel.fromJson(data);
     } on DioException catch (e) {
-      debugPrint('❌ Failed to fetch expert detail: ${e.message}');
+      debugPrint('❌ Failed to fetch expert: ${e.message}');
       return null;
     } catch (e) {
-      debugPrint('❌ Unexpected error fetching expert detail: $e');
+      debugPrint('❌ Unexpected error fetching expert: $e');
       return null;
     }
   }
 
-  /// Get list of available specialties
-  /// 
-  /// Returns list of specialty names
+  /// Get list of available specialties (local fallback — no dedicated endpoint)
   Future<List<String>> getSpecialties() async {
-    try {
-      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      debugPrint('📋 Fetching specialties list');
-
-      final response = await httpService.get('/api/experts/specialties');
-
-      debugPrint('✅ Specialties fetched successfully');
-
-      if (response.data['is_success'] == true && response.data['data'] != null) {
-        return List<String>.from(response.data['data']);
-      }
-
-      // Return default specialties if API fails
-      return _getDefaultSpecialties();
-    } catch (e) {
-      debugPrint('❌ Failed to fetch specialties: $e');
-      // Return default specialties
-      return _getDefaultSpecialties();
-    }
+    return _getDefaultSpecialties();
   }
 
   /// Get default specialties (fallback)
@@ -159,33 +143,420 @@ class ConsultationRepository {
     ];
   }
 
-  /// Get expert detail by ID
-  /// 
-  /// Parameters:
-  /// - expertId: The ID of the expert
-  /// 
-  /// Returns [ExpertDetailModel] with detailed information
+  /// Get full expert detail: profile + reviews + time slots (3 parallel calls)
+  ///
+  /// Returns [ExpertDetailModel] assembled from:
+  /// - `GET /api/v1/experts/{id}`
+  /// - `GET /api/v1/experts/{id}/reviews`
+  /// - `GET /api/v1/experts/{id}/time-slots`
   Future<ExpertDetailModel> getExpertDetail(String expertId) async {
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    debugPrint('📋 Fetching expert detail (3 parallel): $expertId');
+
+    // Start all 3 requests in parallel
+    final profileFuture = httpService.get('/api/v1/experts/$expertId');
+    final reviewsFuture = httpService.get(
+      '/api/v1/experts/$expertId/reviews',
+      queryParameters: {'pageNumber': 1, 'pageSize': 10},
+    );
+    final slotsFuture =
+        httpService.get('/api/v1/experts/$expertId/time-slots');
+
+    // Await results (all running in parallel)
+    final profileResponse = await profileFuture;
+    final reviewsResponse = await reviewsFuture;
+    final slotsResponse = await slotsFuture;
+
+    debugPrint('✅ All 3 expert detail requests completed');
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+    // --- Parse profile ---
+    final profileBody = profileResponse.data as Map<String, dynamic>;
+    final profileData = profileBody['is_success'] == true
+        ? (profileBody['data'] as Map<String, dynamic>? ?? profileBody)
+        : profileBody;
+    final expert = ExpertModel.fromJson(profileData);
+
+    // --- Parse reviews (non-fatal) ---
+    List<ReviewModel> reviews = [];
     try {
-      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      debugPrint('📋 Fetching expert detail: $expertId');
-
-      final response = await httpService.get('/api/experts/$expertId');
-
-      debugPrint('✅ Expert detail fetched successfully');
-      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-      return ExpertDetailModel.fromJson(response.data);
-    } on DioException catch (e) {
-      debugPrint('❌ DioException fetching expert detail: ${e.message}');
-      debugPrint('   Status Code: ${e.response?.statusCode}');
-      debugPrint('   Response: ${e.response?.data}');
-      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      rethrow;
+      final body = reviewsResponse.data as Map<String, dynamic>;
+      if (body['is_success'] == true && body['data'] != null) {
+        final data = body['data'];
+        final items = (data['items'] ?? data['data'] ?? []) as List<dynamic>;
+        reviews = items
+            .map((e) => ReviewModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
     } catch (e) {
-      debugPrint('❌ Unexpected error fetching expert detail: $e');
-      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      rethrow;
+      debugPrint('⚠️ Failed to parse reviews: $e');
+    }
+
+    // --- Parse time slots (non-fatal) ---
+    List<AvailabilityDay> availability = [];
+    try {
+      final body = slotsResponse.data as Map<String, dynamic>;
+      if (body['is_success'] == true && body['data'] != null) {
+        final slots = body['data'] as List<dynamic>;
+        availability = _groupSlotsToAvailabilityDays(slots);
+      }
+    } catch (e) {
+      debugPrint('⚠️ Failed to parse time slots: $e');
+    }
+
+    return ExpertDetailModel.fromExpertModel(
+      expert,
+      experienceList: const [],
+      totalConsultations: 0,
+      averageResponseTime: '< 5 phút',
+      successRate: 0.0,
+      consultationFees: {30: expert.consultationFee},
+      availability: availability,
+      reviews: reviews,
+    );
+  }
+
+  /// Get reviews for an expert
+  ///
+  /// API: `GET /api/v1/experts/{expertId}/reviews`
+  Future<List<ReviewModel>> getExpertReviews(
+    String expertId, {
+    int pageNumber = 1,
+    int pageSize = 10,
+  }) async {
+    try {
+      debugPrint('📋 Fetching reviews for expert: $expertId');
+
+      final response = await httpService.get(
+        '/api/v1/experts/$expertId/reviews',
+        queryParameters: {'pageNumber': pageNumber, 'pageSize': pageSize},
+      );
+
+      final body = response.data as Map<String, dynamic>;
+      if (body['is_success'] == true && body['data'] != null) {
+        final data = body['data'];
+        final items = (data['items'] ?? data['data'] ?? []) as List<dynamic>;
+        return items
+            .map((e) => ReviewModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+      return [];
+    } on DioException catch (e) {
+      debugPrint('❌ Failed to fetch reviews: ${e.message}');
+      return [];
+    } catch (e) {
+      debugPrint('❌ Unexpected error fetching reviews: $e');
+      return [];
+    }
+  }
+
+  /// Get available time slots for an expert
+  ///
+  /// API: `GET /api/v1/experts/{expertId}/time-slots`
+  Future<List<AvailabilityDay>> getExpertTimeSlots(String expertId) async {
+    try {
+      debugPrint('📋 Fetching time slots for expert: $expertId');
+
+      final response =
+          await httpService.get('/api/v1/experts/$expertId/time-slots');
+
+      final body = response.data as Map<String, dynamic>;
+      if (body['is_success'] == true && body['data'] != null) {
+        final slots = body['data'] as List<dynamic>;
+        return _groupSlotsToAvailabilityDays(slots);
+      }
+      return [];
+    } on DioException catch (e) {
+      debugPrint('❌ Failed to fetch time slots: ${e.message}');
+      return [];
+    } catch (e) {
+      debugPrint('❌ Unexpected error fetching time slots: $e');
+      return [];
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------------------
+
+  /// Group flat time-slot list into [AvailabilityDay] objects grouped by date.
+  ///
+  /// Each slot from backend: `{ id, expertId, startTime (ISO UTC), endTime (ISO UTC) }`
+  List<AvailabilityDay> _groupSlotsToAvailabilityDays(
+      List<dynamic> slotsJson) {
+    const weekDayLabels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+    final Map<String, DateTime> dayToDate = {};
+    final Map<String, List<TimeSlotEntry>> dayToEntries = {};
+
+    for (final slot in slotsJson) {
+      final startTimeStr = slot['startTime'] as String?;
+      if (startTimeStr == null) continue;
+
+      // Only show slots that are still available
+      final status = slot['status'] as String?;
+      if (status != null && status != 'Available') continue;
+
+      final slotId = (slot['id'] as String?) ?? '';
+      // Use .toUtc() — backend stores Vietnam local time labelled as UTC (no tz conversion),
+      // so we must NOT call .toLocal() or times will be shifted by +7h on device.
+      final startTime = DateTime.parse(startTimeStr).toUtc();
+      final endTimeStr = slot['endTime'] as String?;
+      final endTime = endTimeStr != null
+          ? DateTime.parse(endTimeStr).toUtc()
+          : startTime.add(const Duration(minutes: 30));
+
+      final dateKey =
+          '${startTime.year.toString().padLeft(4, '0')}-'
+          '${startTime.month.toString().padLeft(2, '0')}-'
+          '${startTime.day.toString().padLeft(2, '0')}';
+
+      final startStr =
+          '${startTime.hour.toString().padLeft(2, '0')}:'
+          '${startTime.minute.toString().padLeft(2, '0')}';
+      final endStr =
+          '${endTime.hour.toString().padLeft(2, '0')}:'
+          '${endTime.minute.toString().padLeft(2, '0')}';
+
+      dayToDate[dateKey] =
+          DateTime(startTime.year, startTime.month, startTime.day);
+      dayToEntries.putIfAbsent(dateKey, () => []).add(
+            TimeSlotEntry(id: slotId, startTime: startStr, endTime: endStr),
+          );
+    }
+
+    final days = dayToDate.entries.map((entry) {
+      final date = entry.value;
+      final slots = dayToEntries[entry.key]!
+        ..sort((a, b) => a.startTime.compareTo(b.startTime));
+      return AvailabilityDay(
+        date: date,
+        dayOfWeek: weekDayLabels[date.weekday - 1],
+        isAvailable: true,
+        timeSlots: slots,
+      );
+    }).toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+
+    return days;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Booking methods
+  // ---------------------------------------------------------------------------
+
+  /// Get all bookings for the current logged-in member
+  ///
+  /// API: `GET /api/v1/consultation-bookings/my-bookings`
+  Future<List<ConsultationBookingResponse>> getMyBookings() async {
+    try {
+      debugPrint('📋 Fetching my bookings');
+      final response =
+          await httpService.get('/api/v1/consultation-bookings/my-bookings');
+
+      final body = response.data as Map<String, dynamic>;
+      if (body['is_success'] == true && body['data'] != null) {
+        final list = body['data'] as List<dynamic>;
+        return list
+            .map((e) => ConsultationBookingResponse.fromJson(
+                  e as Map<String, dynamic>,
+                ))
+            .toList();
+      }
+      return [];
+    } on DioException catch (e) {
+      debugPrint('❌ Failed to fetch bookings: ${e.message}');
+      return [];
+    } catch (e) {
+      debugPrint('❌ Unexpected error fetching bookings: $e');
+      return [];
+    }
+  }
+
+  /// Create a new consultation booking
+  ///
+  /// API: `POST /api/v1/consultation-bookings`
+  ///
+  /// Throws:
+  /// - `409` when the slot has already been booked (race condition)
+  /// - `404` when expert or slot not found
+  /// - `400/422` for invalid payload
+  Future<ConsultationBookingResponse> createBooking(
+      CreateConsultationBookingRequest request) async {
+    debugPrint('📋 Creating booking for slot: ${request.timeSlotId}');
+
+    final response = await httpService.post(
+      '/api/v1/consultation-bookings',
+      data: request.toJson(),
+    );
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] == true && body['data'] != null) {
+      return ConsultationBookingResponse.fromJson(
+        body['data'] as Map<String, dynamic>,
+      );
+    }
+
+    throw Exception(body['message'] ?? 'Không thể tạo lịch tư vấn');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Video call methods
+  // ---------------------------------------------------------------------------
+
+  /// Get a LiveKit access token for a consultation room.
+  ///
+  /// API: `POST /api/videocall/livekit-token/{consultationId}`
+  ///
+  /// Returns `({String token, String wsUrl})` from `data.token` + `data.wsUrl`.
+  /// Falls back to `LIVEKIT_URL` env var if `wsUrl` is absent in response.
+  /// Throws on 401 (unauthenticated), 403 (not a participant), 404 (not found).
+  Future<({String token, String wsUrl})> getLivekitToken(String consultationId) async {
+    debugPrint('🎥 Getting LiveKit token for consultation: $consultationId');
+
+    final response = await httpService.post(
+      '/api/videocall/livekit-token/$consultationId',
+    );
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] == true && body['data'] != null) {
+      final data = body['data'] as Map<String, dynamic>;
+      final token = data['token'] as String?;
+      final wsUrlFromApi = data['wsUrl'] as String?;
+      final wsUrl = (wsUrlFromApi != null && wsUrlFromApi.isNotEmpty)
+          ? wsUrlFromApi
+          : (dotenv.env['LIVEKIT_URL'] ?? '');
+      if (token != null && token.isNotEmpty) return (token: token, wsUrl: wsUrl);
+    }
+
+    final statusCode = body['status_code'] as int? ?? 0;
+    if (statusCode == 403) throw Exception('403');
+    if (statusCode == 404) throw Exception('404');
+    throw Exception(body['message'] ?? 'Không thể lấy token phòng tư vấn');
+  }
+
+  /// End a consultation session.
+  ///
+  /// API: `POST /api/v1/consultations/{consultationId}/end`
+  ///
+  /// Returns true on success; does not throw — failures are logged only
+  /// so the UI can always navigate away.
+  Future<bool> endConsultation(String consultationId) async {
+    try {
+      debugPrint('🏁 Ending consultation: $consultationId');
+      final response = await httpService.post(
+        '/api/v1/consultations/$consultationId/end',
+      );
+      final body = response.data as Map<String, dynamic>;
+      return body['is_success'] == true;
+    } catch (e) {
+      debugPrint('⚠️ endConsultation failed (non-critical): $e');
+      return false;
+    }
+  }
+
+  /// Submit a review for a completed consultation.
+  ///
+  /// API: `POST /api/v1/consultations/{consultationId}/reviews`
+  ///
+  /// Throws on validation errors or permission errors.
+  Future<void> submitReview({
+    required String consultationId,
+    required int rating,
+    String comment = '',
+  }) async {
+    debugPrint('⭐ Submitting review for consultation: $consultationId, rating: $rating');
+
+    final response = await httpService.post(
+      '/api/v1/consultations/$consultationId/reviews',
+      data: {
+        'rating': rating,
+        'comment': comment,
+      },
+    );
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] != true) {
+      throw Exception(body['message'] ?? 'Không thể gửi đánh giá');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Expert profile settings
+  // ---------------------------------------------------------------------------
+
+  /// Update the current expert's profile settings.
+  ///
+  /// API: `PUT /api/v1/experts/me/settings`
+  ///
+  /// Provide at least one of [consultationFee], [biography], [specializations].
+  /// Null values are omitted from the request body.
+  ///
+  /// Throws on 400/422 (invalid payload), 401/403 (unauthenticated / wrong role).
+  Future<void> updateExpertSettings({
+    double? consultationFee,
+    String? biography,
+    List<String>? specializations,
+  }) async {
+    final body = <String, dynamic>{
+      if (consultationFee != null) 'consultationFee': consultationFee,
+      if (biography != null) 'biography': biography,
+      if (specializations != null) 'specializations': specializations,
+    };
+
+    debugPrint('⚙️  Updating expert settings: $body');
+
+    final response = await httpService.put(
+      '/api/v1/experts/me/settings',
+      data: body,
+    );
+
+    final resBody = response.data as Map<String, dynamic>;
+    if (resBody['is_success'] != true) {
+      throw Exception(resBody['message'] ?? 'Không thể cập nhật cài đặt');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Expert time-slot management
+  // ---------------------------------------------------------------------------
+
+  /// Submit bulk working-hour time slots for the current expert.
+  ///
+  /// API: `POST /api/v1/experts/me/time-slots/bulk`
+  ///
+  /// Request body:
+  /// ```json
+  /// {
+  ///   "weekStartDate": "2026-03-09T00:00:00Z",
+  ///   "days": [
+  ///     { "dayOfWeek": "Monday", "timeBlocks": [{"startTime": "08:00", "endTime": "12:00"}] }
+  ///   ]
+  /// }
+  /// ```
+  Future<void> bulkTimeSlots({
+    required String weekStartDate,
+    required List<Map<String, dynamic>> days,
+  }) async {
+    debugPrint('📅 Submitting bulk time slots for week $weekStartDate (${days.length} days)');
+
+    final response = await httpService.post(
+      '/api/v1/experts/me/time-slots/bulk',
+      data: {
+        'weekStartDate': weekStartDate,
+        'days': days,
+      },
+    );
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] != true) {
+      final statusCode = body['status_code'] as int? ?? 0;
+      if (statusCode == 422) {
+        throw Exception('weekStartDate phải là ngày Thứ Hai theo múi giờ UTC');
+      }
+      if (statusCode == 409) {
+        throw Exception('Một số khung giờ đã bị trùng, vui lòng thử lại');
+      }
+      throw Exception(body['message'] ?? 'Không thể lưu lịch làm việc');
     }
   }
 }

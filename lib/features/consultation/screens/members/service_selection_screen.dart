@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../models/expert_detail_model.dart';
 import '../../providers/expert_detail_provider.dart';
 
 // Primary color constant
@@ -59,7 +60,12 @@ class ServiceSelectionScreen extends ConsumerWidget {
                       const SizedBox(height: 16),
 
                       // Scheduled Consultation Card
-                      _buildScheduledConsultationCard(context, state.expert!, theme),
+                      _buildScheduledConsultationCard(
+                        context,
+                        state.expert!,
+                        state.expert!.availability.isNotEmpty,
+                        theme,
+                      ),
                       const SizedBox(height: 16),
 
                       // Info Box
@@ -135,7 +141,8 @@ class ServiceSelectionScreen extends ConsumerWidget {
   }
 
   /// Build instant consultation card
-  Widget _buildInstantConsultationCard(BuildContext context, expert, ThemeData theme) {
+  Widget _buildInstantConsultationCard(BuildContext context, ExpertDetailModel expert, ThemeData theme) {
+    final isOnline = expert.isOnline;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -172,19 +179,20 @@ class ServiceSelectionScreen extends ConsumerWidget {
                   size: 20,
                 ),
               ),
-              if (expert.isOnline)
-                Container(
+              Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _primaryColor.withOpacity(0.1),
+                    color: isOnline
+                        ? _primaryColor.withOpacity(0.1)
+                        : Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    'Đang Online',
+                    isOnline ? 'Đang Online' : 'Ngoại Tuyến',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: _primaryColor,
+                      color: isOnline ? _primaryColor : Colors.grey,
                     ),
                   ),
                 ),
@@ -231,22 +239,37 @@ class ServiceSelectionScreen extends ConsumerWidget {
           const SizedBox(height: 20),
 
           // Action Button
+          if (!isOnline)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Chuyên gia hiện không trực tuyến',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
           SizedBox(
             width: double.infinity,
             height: 48,
             child: FilledButton(
-              onPressed: () {
-                // Navigate to documents screen for instant consultation
-                context.push(
-                  '/consultation-documents/${expert.userId}',
-                  extra: {
-                    'consultationType': 'instant',
-                    'price': '200,000 VNĐ',
-                  },
-                );
-              },
+              onPressed: isOnline
+                  ? () {
+                      context.push(
+                        '/consultation-documents/${expert.userId}',
+                        extra: {
+                          'consultationType': 'instant',
+                          'price': '200,000 VNĐ',
+                        },
+                      );
+                    }
+                  : null,
               style: FilledButton.styleFrom(
-                backgroundColor: _primaryColor,
+                backgroundColor: isOnline ? _primaryColor : Colors.grey.shade400,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -266,7 +289,7 @@ class ServiceSelectionScreen extends ConsumerWidget {
   }
 
   /// Build scheduled consultation card
-  Widget _buildScheduledConsultationCard(BuildContext context, expert, ThemeData theme) {
+  Widget _buildScheduledConsultationCard(BuildContext context, ExpertDetailModel expert, bool hasAvailability, ThemeData theme) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -341,16 +364,34 @@ class ServiceSelectionScreen extends ConsumerWidget {
           const SizedBox(height: 20),
 
           // Action Button
+          if (!hasAvailability)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Chuyên gia chưa có lịch trống',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
           SizedBox(
             width: double.infinity,
             height: 48,
             child: OutlinedButton(
-              onPressed: () {
-                // Navigate to time selection screen
-                context.push('/consultation-time-selection/${expert.userId}');
-              },
+              onPressed: hasAvailability
+                  ? () {
+                      context.push('/consultation-time-selection/${expert.userId}');
+                    }
+                  : null,
               style: OutlinedButton.styleFrom(
-                side: BorderSide(color: _primaryColor, width: 2),
+                side: BorderSide(
+                  color: hasAvailability ? _primaryColor : Colors.grey.shade400,
+                  width: 2,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -360,7 +401,7 @@ class ServiceSelectionScreen extends ConsumerWidget {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: _primaryColor,
+                  color: hasAvailability ? _primaryColor : Colors.grey.shade400,
                 ),
               ),
             ),

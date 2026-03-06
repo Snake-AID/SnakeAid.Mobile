@@ -48,16 +48,12 @@ class ExpertListData {
   });
 
   factory ExpertListData.fromJson(Map<String, dynamic> json) {
-    // Handle experts array
-    List<dynamic> expertsJson = [];
-    
-    if (json['experts'] != null) {
-      // Object with experts field
-      expertsJson = json['experts'] as List<dynamic>;
-    } else if (json is Map && json.isNotEmpty) {
-      // If json is a map but no 'experts' key, assume the map itself contains expert data
-      expertsJson = [];
-    }
+    // Handle PagingResponse<ExpertProfileResponse>:
+    // backend wraps experts under 'items' (pagination) or 'experts' (legacy).
+    final List<dynamic> expertsJson =
+        json['items'] as List<dynamic>? ??
+        json['experts'] as List<dynamic>? ??
+        [];
 
     final experts = expertsJson
         .map((e) => ExpertModel.fromJson(e as Map<String, dynamic>))
@@ -67,9 +63,17 @@ class ExpertListData {
     final onlineCount = json['onlineCount'] as int? ??
         experts.where((e) => e.isOnline).length;
 
+    // meta.total_items (production pagination) | totalCount/totalItems (legacy)
+    final meta = json['meta'] as Map<String, dynamic>?;
+    final totalCount = meta?['total_items'] as int? ??
+        meta?['totalItems'] as int? ??
+        json['totalCount'] as int? ??
+        json['totalItems'] as int? ??
+        experts.length;
+
     return ExpertListData(
       experts: experts,
-      totalCount: json['totalCount'] as int? ?? experts.length,
+      totalCount: totalCount,
       onlineCount: onlineCount,
     );
   }

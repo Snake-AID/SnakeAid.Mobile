@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../repository/consultation_repository.dart';
 
 /// Màn hình hoàn thành & đánh giá tư vấn
-class ConsultationCompletionScreen extends StatefulWidget {
+class ConsultationCompletionScreen extends ConsumerStatefulWidget {
   final String expertName;
   final String expertSpecialty;
   final int durationSeconds;
@@ -17,18 +19,19 @@ class ConsultationCompletionScreen extends StatefulWidget {
   });
 
   @override
-  State<ConsultationCompletionScreen> createState() =>
+  ConsumerState<ConsultationCompletionScreen> createState() =>
       _ConsultationCompletionScreenState();
 }
 
 class _ConsultationCompletionScreenState
-    extends State<ConsultationCompletionScreen> {
+    extends ConsumerState<ConsultationCompletionScreen> {
   static const Color _primary = Color(0xFF228B22);
   static const Color _bg = Color(0xFFF6F8F6);
 
   int _selectedStars = 0;
   final TextEditingController _feedbackController = TextEditingController();
   final Set<String> _selectedTags = {};
+  bool _isSubmitting = false;
   int get _charCount => _feedbackController.text.length;
 
   final List<String> _quickTags = [
@@ -51,16 +54,52 @@ class _ConsultationCompletionScreenState
     super.dispose();
   }
 
-  void _submitRating() {
-    // TODO: send rating to API
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Cảm ơn bạn đã đánh giá!'),
-        backgroundColor: _primary,
-        duration: Duration(seconds: 2),
-      ),
-    );
-    context.go('/member-home');
+  Future<void> _submitRating() async {
+    if (_selectedStars == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng chọn số sao đánh giá'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      final comment = [
+        _feedbackController.text.trim(),
+        ..._selectedTags,
+      ].where((s) => s.isNotEmpty).join(' | ');
+
+      await repo.submitReview(
+        consultationId: widget.consultationId,
+        rating: _selectedStars,
+        comment: comment,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cảm ơn bạn đã đánh giá!'),
+          backgroundColor: _primary,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      context.go('/member-home');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Không thể gửii đánh giá: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   @override
@@ -544,7 +583,7 @@ class _ConsultationCompletionScreenState
       width: double.infinity,
       height: 56,
       child: ElevatedButton(
-        onPressed: _submitRating,
+        onPressed: _isSubmitting ? null : _submitRating,
         style: ElevatedButton.styleFrom(
           backgroundColor: _primary,
           foregroundColor: Colors.white,
@@ -552,10 +591,17 @@ class _ConsultationCompletionScreenState
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
-        child: const Text(
-          'Gửi Đánh Giá',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
+        child: _isSubmitting
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.5, color: Colors.white),
+              )
+            : const Text(
+                'Gửii Đánh Giá',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
       ),
     );
   }

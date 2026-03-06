@@ -21,18 +21,31 @@ class ReviewModel {
     required this.createdAt,
   });
 
-  /// Create from JSON
+  /// Create from JSON (handles both local fields and backend UserFeedbackResponse)
   factory ReviewModel.fromJson(Map<String, dynamic> json) {
     return ReviewModel(
-      id: json['id'] ?? '',
-      expertId: json['expertId'] ?? '',
-      patientId: json['patientId'] ?? '',
-      patientName: json['patientName'] ?? '',
-      patientAvatarUrl: json['patientAvatarUrl'],
-      rating: (json['rating'] ?? 0).toDouble(),
-      comment: json['comment'] ?? '',
+      id: json['id'] as String? ?? '',
+      expertId: json['expertId'] as String? ?? '',
+      // backend uses userId for the reviewer
+      patientId:
+          (json['patientId'] ?? json['userId'] ?? '') as String,
+      // backend uses userName or fullName
+      patientName: (json['patientName'] ??
+              json['userName'] ??
+              json['fullName'] ??
+              'Người dùng') as String,
+      // backend uses userAvatarUrl or avatarUrl
+      patientAvatarUrl: (json['patientAvatarUrl'] ??
+          json['userAvatarUrl'] ??
+          json['avatarUrl']) as String?,
+      rating: ((json['rating'] ?? 0) as num).toDouble(),
+      // backend may use feedback, content, or comment
+      comment: (json['comment'] ??
+              json['feedback'] ??
+              json['content'] ??
+              '') as String,
       createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
+          ? DateTime.parse(json['createdAt'] as String)
           : DateTime.now(),
     );
   }

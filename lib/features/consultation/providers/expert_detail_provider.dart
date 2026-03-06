@@ -85,7 +85,12 @@ class ExpertDetailNotifier extends StateNotifier<ExpertDetailState> {
         dayOfWeek: dayOfWeek,
         isAvailable: isAvailable,
         timeSlots: isAvailable
-            ? ['08:00-09:00', '10:00-11:00', '14:00-15:00', '16:00-17:00']
+            ? [
+                TimeSlotEntry(id: 'mock-${index}-1', startTime: '08:00', endTime: '09:00'),
+                TimeSlotEntry(id: 'mock-${index}-2', startTime: '10:00', endTime: '11:00'),
+                TimeSlotEntry(id: 'mock-${index}-3', startTime: '14:00', endTime: '15:00'),
+                TimeSlotEntry(id: 'mock-${index}-4', startTime: '16:00', endTime: '17:00'),
+              ]
             : null,
       );
     });

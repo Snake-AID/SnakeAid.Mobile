@@ -27,6 +27,10 @@ class PaymentConfirmationScreen extends ConsumerStatefulWidget {
   final int uploadedImagesCount;
   final String? problemDescription;
   final String? questions;
+  /// Real consultation ID from createBooking response
+  final String? consultationId;
+  /// Expert name from createBooking response
+  final String? expertName;
 
   const PaymentConfirmationScreen({
     super.key,
@@ -40,6 +44,8 @@ class PaymentConfirmationScreen extends ConsumerStatefulWidget {
     this.uploadedImagesCount = 0,
     this.problemDescription,
     this.questions,
+    this.consultationId,
+    this.expertName,
   });
 
   @override
@@ -53,10 +59,25 @@ class _PaymentConfirmationScreenState
   bool _agreedToTerms = false;
 
   void _handlePayment() {
-    // Tạo ID tạm cho buổi tư vấn vừa đặt (sẽ thay bằng ID từ API)
+    if (widget.consultationId != null && widget.consultationId!.isNotEmpty) {
+      // Real booking — navigate to waiting room
+      final state = ref.read(expertDetailProvider(widget.expertId));
+      final expertDisplayName = widget.expertName ??
+          state.expert?.displayName ??
+          'Chuyên Gia';
+      final expertSpecialty = state.expert?.primarySpecialty ?? '';
+      context.push(
+        '/video-waiting/${widget.consultationId}',
+        extra: {
+          'expertName': expertDisplayName,
+          'expertSpecialty': expertSpecialty,
+        },
+      );
+      return;
+    }
+    // Fallback mock (no real consultationId)
     final newConsultationId =
         'new_${DateTime.now().millisecondsSinceEpoch}';
-
     context.go(
       '/consultation-home',
       extra: {'newConsultationId': newConsultationId},

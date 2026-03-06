@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../repository/consultation_repository.dart';
 
 /// Phòng chờ trước/sau buổi tư vấn video
-class ConsultationWaitingRoomScreen extends StatefulWidget {
+class ConsultationWaitingRoomScreen extends ConsumerStatefulWidget {
   final String consultationId;
   final String expertName;
   final String expertSpecialty;
@@ -27,12 +29,12 @@ class ConsultationWaitingRoomScreen extends StatefulWidget {
   });
 
   @override
-  State<ConsultationWaitingRoomScreen> createState() =>
+  ConsumerState<ConsultationWaitingRoomScreen> createState() =>
       _ConsultationWaitingRoomScreenState();
 }
 
 class _ConsultationWaitingRoomScreenState
-    extends State<ConsultationWaitingRoomScreen>
+    extends ConsumerState<ConsultationWaitingRoomScreen>
     with TickerProviderStateMixin {
   static const Color _green = Color(0xFF228B22);
   static const Color _joinButtonColor = Color(0xFF22628C);
@@ -40,6 +42,7 @@ class _ConsultationWaitingRoomScreenState
 
   bool _isMicOn = true;
   bool _isCameraOn = true;
+  bool _isJoining = false;
 
   late Timer _clockTimer;
   DateTime _now = DateTime.now();
@@ -95,15 +98,43 @@ class _ConsultationWaitingRoomScreenState
     return '$h:$m';
   }
 
-  void _enterRoom() {
+  Future<void> _enterRoom() async {
+    if (_isJoining) return;
+    setState(() => _isJoining = true);
+
+    ({String token, String wsUrl})? livekitResult;
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      livekitResult = await repo.getLivekitToken(widget.consultationId);
+    } on Exception catch (e) {
+      if (!mounted) return;
+      setState(() => _isJoining = false);
+      final msg = e.toString().contains('403')
+          ? 'Bạn không phải thành viên của phòng tư vấn này'
+          : e.toString().contains('404')
+              ? 'Không tìm thấy buổi tư vấn'
+              : 'Không thể kết nối phòng, vui lòng thử lại';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _isJoining = false);
     context.push(
       '/video-consultation/${widget.consultationId}',
       extra: {
         'expertName': widget.expertName,
         'expertSpecialty': widget.expertSpecialty,
-        // Đồng bộ trạng thái mic/camera sang màn hình video call
         'initialMicOn': _isMicOn,
         'initialCameraOn': _isCameraOn,
+        'livekitToken': livekitResult.token,
+        'wsUrl': livekitResult.wsUrl,
       },
     );
   }
@@ -490,7 +521,7 @@ class _ConsultationWaitingRoomScreenState
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
-              onPressed: _enterRoom,
+              onPressed: _isJoining ? null : _enterRoom,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _joinButtonColor,
                 foregroundColor: Colors.white,
@@ -498,11 +529,18 @@ class _ConsultationWaitingRoomScreenState
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
-              child: const Text(
-                'Vào phòng',
-                style:
-                    TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
+              child: _isJoining
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2.5, color: Colors.white),
+                    )
+                  : const Text(
+                      'Vào phòng',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
             ),
           ),
 

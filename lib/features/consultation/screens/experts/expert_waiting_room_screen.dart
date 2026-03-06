@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../repository/consultation_repository.dart';
 
 /// Phòng chờ tư vấn video dành cho chuyên gia
 /// Hiển thị trước/sau buổi tư vấn, chờ bệnh nhân tham gia
-class ExpertWaitingRoomScreen extends StatefulWidget {
+class ExpertWaitingRoomScreen extends ConsumerStatefulWidget {
   final String consultationId;
   final String patientName;
   final String consultationType;
@@ -31,11 +33,11 @@ class ExpertWaitingRoomScreen extends StatefulWidget {
   });
 
   @override
-  State<ExpertWaitingRoomScreen> createState() =>
+  ConsumerState<ExpertWaitingRoomScreen> createState() =>
       _ExpertWaitingRoomScreenState();
 }
 
-class _ExpertWaitingRoomScreenState extends State<ExpertWaitingRoomScreen>
+class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScreen>
     with TickerProviderStateMixin {
   static const Color _purple = Color(0xFF6C47C2);
   static const Color _enterColor = Color(0xFF22628C);
@@ -44,6 +46,7 @@ class _ExpertWaitingRoomScreenState extends State<ExpertWaitingRoomScreen>
   bool _isMicOn = true;
   bool _isCameraOn = true;
   bool _isFrontCamera = true;
+  bool _isJoining = false;
 
   late Timer _clockTimer;
   DateTime _now = DateTime.now();
@@ -96,16 +99,45 @@ class _ExpertWaitingRoomScreenState extends State<ExpertWaitingRoomScreen>
     return '$h:$m';
   }
 
-  void _enterRoom() {
+  Future<void> _enterRoom() async {
+    if (_isJoining) return;
+    setState(() => _isJoining = true);
+
+    ({String token, String wsUrl})? livekitResult;
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      livekitResult = await repo.getLivekitToken(widget.consultationId);
+    } on Exception catch (e) {
+      if (!mounted) return;
+      setState(() => _isJoining = false);
+      final msg = e.toString().contains('403')
+          ? 'Bạn không phải thành viên của phòng tư vấn này'
+          : e.toString().contains('404')
+              ? 'Không tìm thấy buổi tư vấn'
+              : 'Không thể kết nối phòng, vui lòng thử lại';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _isJoining = false);
     context.push(
       '/video-consultation/${widget.consultationId}',
       extra: {
-        'expertName': widget.patientName,   // video screen param (same field, used as title)
+        'expertName': widget.patientName,
         'expertSpecialty': widget.consultationType,
         'isExpertMode': true,
         'initialMicOn': _isMicOn,
         'initialCameraOn': _isCameraOn,
         'afterCallRoute': '/expert-video-waiting/${widget.consultationId}',
+        'livekitToken': livekitResult.token,
+        'wsUrl': livekitResult.wsUrl,
       },
     );
   }
@@ -547,11 +579,18 @@ class _ExpertWaitingRoomScreenState extends State<ExpertWaitingRoomScreen>
         SizedBox(
           height: 52,
           child: ElevatedButton.icon(
-            onPressed: _enterRoom,
-            icon: const Icon(Icons.video_call, size: 22),
-            label: const Text(
-              'Bắt Đầu Tư Vấn',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            onPressed: _isJoining ? null : _enterRoom,
+            icon: _isJoining
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.video_call, size: 22),
+            label: Text(
+              _isJoining ? 'Đang kết nối...' : 'Bắt Đầu Tư Vấn',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: _enterColor,
