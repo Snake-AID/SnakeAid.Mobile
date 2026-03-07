@@ -10,7 +10,7 @@ import '../../repository/symptom_repository.dart';
 class SymptomReportScreen extends ConsumerStatefulWidget {
   final String incidentId;
   final String? recognitionResultId;
-  
+
   const SymptomReportScreen({
     super.key,
     required this.incidentId,
@@ -18,23 +18,27 @@ class SymptomReportScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<SymptomReportScreen> createState() => _SymptomReportScreenState();
+  ConsumerState<SymptomReportScreen> createState() =>
+      _SymptomReportScreenState();
 }
 
 class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
   File? _biteImage;
   final ImagePicker _picker = ImagePicker();
-  
-  // Symptom configs from API
-  List<SymptomConfig> _allSymptoms = [];
+
+  // Grouped symptom configs from API
+  List<GroupedSymptomConfig> _symptomGroups = [];
+
+  // Selected symptom IDs (can be from multiple groups)
   final Set<int> _selectedSymptomIds = {};
+
+  // Expansion state for collapsible sections
+  final Map<String, bool> _expandedSections = {};
+
   bool _isLoading = true;
   String? _errorMessage;
-  
-  // Bite location (from BITE_LOCATION_CORE)
-  int? _selectedBiteLocationId;
-  
-  int _timeSinceBiteMinutes = 15; // Track in minutes
+
+  int _timeSinceBiteMinutes = 0; // Track in minutes (0 = at SOS time)
   final TextEditingController _otherInfoController = TextEditingController();
 
   @override
@@ -61,10 +65,20 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
 
       if (response.isSuccess && response.data != null) {
         setState(() {
-          _allSymptoms = response.data!
-              .where((s) => s.isActive)
-              .toList()
+          // Sort groups by displayOrder
+          _symptomGroups = response.data!
             ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+
+          // Initialize expansion state
+          for (var group in _symptomGroups) {
+            // CRITICAL sections always expanded
+            // BITE_LOCATION expanded by default
+            // Others collapsed
+            _expandedSections[group.attributeKey] =
+                group.groupName == 'CRITICAL' ||
+                group.attributeKey == 'BITE_LOCATION';
+          }
+
           _isLoading = false;
         });
       } else {
@@ -79,13 +93,6 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
         _isLoading = false;
       });
     }
-  }
-
-  // Get symptoms by attribute key
-  List<SymptomConfig> _getSymptomsByKey(String attributeKey) {
-    return _allSymptoms
-        .where((s) => s.attributeKey == attributeKey)
-        .toList();
   }
 
   void _showCriticalAlert(String message) {
@@ -120,9 +127,9 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi khi chọn ảnh: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Lỗi khi chọn ảnh: $e')));
       }
     }
   }
@@ -146,7 +153,10 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library, color: Color(0xFF228B22)),
+              leading: const Icon(
+                Icons.photo_library,
+                color: Color(0xFF228B22),
+              ),
               title: const Text('Chọn từ thư viện'),
               onTap: () {
                 context.pop();
@@ -161,11 +171,11 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
   }
 
   void _analyzeSymptoms() async {
-    // Validate at least one symptom or bite location selected
-    if (_selectedSymptomIds.isEmpty && _selectedBiteLocationId == null) {
+    // Validate at least one symptom selected
+    if (_selectedSymptomIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Vui lòng chọn ít nhất một triệu chứng hoặc vị trí bị cắn'),
+          content: Text('Vui lòng chọn ít nhất một triệu chứng'),
           backgroundColor: Color(0xFFDC3545),
         ),
       );
@@ -194,17 +204,15 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
     );
 
     try {
-      // Combine selected symptom IDs and bite location ID
-      final symptomIdList = <int>[
-        ..._selectedSymptomIds,
-        if (_selectedBiteLocationId != null) _selectedBiteLocationId!,
-      ];
+      // Convert selected IDs to list
+      final symptomIdList = _selectedSymptomIds.toList();
 
       // Call API to update symptoms tracking
       final repository = ref.read(symptomRepositoryProvider);
       final response = await repository.updateSymptomsTracking(
         incidentId: widget.incidentId,
         symptomIdList: symptomIdList,
+        timeSinceBiteMinutes: _timeSinceBiteMinutes,
       );
 
       // Close loading dialog
@@ -216,7 +224,9 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
           try {
             final prefs = await SharedPreferences.getInstance();
             await prefs.setBool('has_symptoms_${widget.incidentId}', true);
-            debugPrint('✅ Saved symptoms report status for incident: ${widget.incidentId}');
+            debugPrint(
+              '✅ Saved symptoms report status for incident: ${widget.incidentId}',
+            );
           } catch (e) {
             debugPrint('❌ Error saving symptoms status: $e');
           }
@@ -245,7 +255,7 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
       // Close loading dialog
       if (mounted) {
         context.pop();
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Lỗi khi phân tích triệu chứng: $e'),
@@ -257,7 +267,9 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
   }
 
   String _formatTimeSinceBite(int minutes) {
-    if (minutes < 60) {
+    if (minutes == 0) {
+      return 'Tại thời điểm SOS';
+    } else if (minutes < 60) {
       return '$minutes phút trước';
     } else {
       final hours = minutes ~/ 60;
@@ -287,67 +299,66 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
         centerTitle: true,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(
-            height: 1,
-            color: const Color(0xFFE5E5E5),
-          ),
+          child: Container(height: 1, color: const Color(0xFFE5E5E5)),
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF228B22)))
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF228B22)),
+            )
           : _errorMessage != null
-              ? _buildErrorView()
-              : SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Info Banner
-                        _buildInfoBanner(),
-                        const SizedBox(height: 20),
+          ? _buildErrorView()
+          : SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Info Banner
+                    _buildInfoBanner(),
+                    const SizedBox(height: 20),
 
-                        // Bite Location Section
-                        _buildBiteLocationSection(),
-                        const SizedBox(height: 24),
+                    // Render symptom groups
+                    ..._symptomGroups.map(
+                      (group) => Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _buildSymptomGroup(group),
+                      ),
+                    ),
 
-                        // Time Since Bite
-                        _buildTimeSinceBiteSection(),
-                        const SizedBox(height: 24),
+                    // Time Since Bite
+                    _buildTimeSinceBiteSection(),
+                    const SizedBox(height: 24),
 
-                        // Core Symptoms Section
-                        _buildCoreSymptomsSection(),
-                        const SizedBox(height: 24),
+                    // Bite Image Upload
+                    _buildBiteImageSection(),
+                    const SizedBox(height: 24),
 
-                        // Bite Image Upload
-                        _buildBiteImageSection(),
-                        const SizedBox(height: 24),
+                    // Other Info
+                    _buildOtherInfoSection(),
+                    const SizedBox(height: 32),
 
-                        // Other Info
-                        _buildOtherInfoSection(),
-                        const SizedBox(height: 32),
+                    // Submit Button
+                    _buildSubmitButton(),
 
-                        // Submit Button
-                        _buildSubmitButton(),
-                        
-                        // Skip Link
-                        Center(
-                          child: TextButton(
-                            onPressed: () => context.pop(),
-                            child: Text(
-                              'Bỏ qua bước này',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            ),
+                    // Skip Link
+                    Center(
+                      child: TextButton(
+                        onPressed: () => context.pop(),
+                        child: Text(
+                          'Bỏ qua bước này',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
                           ),
                         ),
-                        const SizedBox(height: 16),
-                      ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                  ],
                 ),
+              ),
+            ),
     );
   }
 
@@ -358,11 +369,7 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Color(0xFFDC3545),
-            ),
+            const Icon(Icons.error_outline, size: 64, color: Color(0xFFDC3545)),
             const SizedBox(height: 16),
             Text(
               _errorMessage ?? 'Đã xảy ra lỗi',
@@ -411,95 +418,214 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
     );
   }
 
-  Widget _buildBiteLocationSection() {
-    final locations = _getSymptomsByKey('BITE_LOCATION_CORE');
-    
-    if (locations.isEmpty) return const SizedBox.shrink();
+  Widget _buildSymptomGroup(GroupedSymptomConfig group) {
+    final isExpanded = _expandedSections[group.attributeKey] ?? false;
+    final isCritical = group.groupName == 'CRITICAL';
+    final isRadioGroup =
+        group.attributeKey == 'AGE_GROUP' ||
+        group.attributeKey == 'BITE_LOCATION';
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Vị trí bị cắn',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF191910),
-          ),
+    // Color coding based on group priority
+    Color headerColor;
+    Color bgColor;
+    IconData icon;
+
+    if (isCritical) {
+      headerColor = const Color(0xFFDC3545); // Red
+      bgColor = const Color(0xFFFEF2F2);
+      icon = Icons.warning_amber;
+    } else if (group.attributeKey == 'BITE_LOCATION') {
+      headerColor = const Color(0xFFF59E0B); // Orange
+      bgColor = const Color(0xFFFFFBEB);
+      icon = Icons.location_on;
+    } else if (group.groupName == 'LOCAL') {
+      headerColor = const Color(0xFF228B22); // Green
+      bgColor = const Color(0xFFF0F9FF);
+      icon = Icons.healing;
+    } else {
+      headerColor = const Color(0xFF666666); // Grey
+      bgColor = const Color(0xFFF9FAFB);
+      icon = Icons.info_outline;
+    }
+
+    return Card(
+      elevation: isCritical ? 3 : 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isCritical ? headerColor : Colors.transparent,
+          width: isCritical ? 2 : 0,
         ),
-        const SizedBox(height: 12),
-        ...locations.map((location) {
-          final isSelected = _selectedBiteLocationId == location.id;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: InkWell(
-              onTap: () {
+      ),
+      child: Column(
+        children: [
+          // Section Header
+          InkWell(
+            onTap: () {
+              if (!isCritical && group.attributeKey != 'BITE_LOCATION') {
                 setState(() {
-                  _selectedBiteLocationId = isSelected ? null : location.id;
+                  _expandedSections[group.attributeKey] = !isExpanded;
                 });
-                if (!isSelected && location.isCritical && location.alertMessage != null) {
-                  _showCriticalAlert(location.alertMessage!);
-                }
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFFE8F5E9) : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected
-                        ? const Color(0xFF228B22)
-                        : const Color(0xFFE0E0E0),
-                    width: isSelected ? 2 : 1,
+              }
+            },
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.vertical(
+                  top: const Radius.circular(12),
+                  bottom: isExpanded ? Radius.zero : const Radius.circular(12),
+                ),
+                border: Border(left: BorderSide(color: headerColor, width: 4)),
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, color: headerColor, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      group.attributeLabel,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: headerColor,
+                      ),
+                    ),
                   ),
-                ),
-                child: Row(
-                  children: [
+                  if (!isCritical && group.attributeKey != 'BITE_LOCATION')
                     Icon(
-                      isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                      color: isSelected ? const Color(0xFF228B22) : const Color(0xFF999999),
-                      size: 24,
+                      isExpanded ? Icons.expand_less : Icons.expand_more,
+                      color: headerColor,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            location.name,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                              color: const Color(0xFF191910),
-                            ),
-                          ),
-                          ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            location.description,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                        ],
-                      ),
-                    ),
-                    if (location.isCritical)
-                      const Icon(
-                        Icons.warning_amber,
-                        color: Color(0xFFDC3545),
-                        size: 20,
-                      ),
-                  ],
-                ),
+                ],
               ),
             ),
-          );
-        }),
-      ],
+          ),
+
+          // Section Content
+          if (isExpanded)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: group.options
+                    .where((option) => option.isActive)
+                    .map(
+                      (option) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildSymptomOption(
+                          option,
+                          isRadioGroup,
+                          group.attributeKey,
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSymptomOption(
+    SymptomOption option,
+    bool isRadioGroup,
+    String attributeKey,
+  ) {
+    final isSelected = _selectedSymptomIds.contains(option.id);
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          if (isRadioGroup) {
+            // Radio behavior: deselect all options in this group first
+            final groupOptions = _symptomGroups
+                .firstWhere((g) => g.attributeKey == attributeKey)
+                .options;
+            for (var opt in groupOptions) {
+              _selectedSymptomIds.remove(opt.id);
+            }
+            // Then select this option
+            _selectedSymptomIds.add(option.id);
+          } else {
+            // Checkbox behavior: toggle selection
+            if (isSelected) {
+              _selectedSymptomIds.remove(option.id);
+            } else {
+              _selectedSymptomIds.add(option.id);
+            }
+          }
+        });
+
+        // Show critical alert if needed
+        if (!isSelected && option.isCritical && option.alertMessage != null) {
+          _showCriticalAlert(option.alertMessage!);
+        }
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFE8F5E9) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF228B22)
+                : const Color(0xFFE0E0E0),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isRadioGroup
+                  ? (isSelected
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked)
+                  : (isSelected
+                        ? Icons.check_box
+                        : Icons.check_box_outline_blank),
+              color: isSelected
+                  ? const Color(0xFF228B22)
+                  : const Color(0xFF999999),
+              size: 24,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    option.name,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w500,
+                      color: const Color(0xFF191910),
+                    ),
+                  ),
+                  if (option.description != null &&
+                      option.description!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      option.description!,
+                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (option.isCritical)
+              const Icon(
+                Icons.warning_amber,
+                color: Color(0xFFDC3545),
+                size: 20,
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -528,9 +654,7 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
               value: _timeSinceBiteMinutes,
               isExpanded: true,
               icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF228B22)),
-              items: [
-                10, 15, 30, 45, 60, 90, 120, 180, 240
-              ].map((minutes) {
+              items: [10, 15, 30, 45, 60, 90, 120, 180, 240].map((minutes) {
                 return DropdownMenuItem<int>(
                   value: minutes,
                   child: Text(_formatTimeSinceBite(minutes)),
@@ -546,110 +670,6 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
             ),
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildCoreSymptomsSection() {
-    final symptoms = _getSymptomsByKey('CORE_SIGNS');
-    
-    if (symptoms.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Triệu chứng hiện tại',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF191910),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Chọn tất cả triệu chứng bạn đang gặp phải',
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey[600],
-          ),
-        ),
-        const SizedBox(height: 12),
-        ...symptoms.map((symptom) {
-          final isSelected = _selectedSymptomIds.contains(symptom.id);
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: InkWell(
-              onTap: () {
-                setState(() {
-                  if (isSelected) {
-                    _selectedSymptomIds.remove(symptom.id);
-                  } else {
-                    _selectedSymptomIds.add(symptom.id);
-                    if (symptom.isCritical && symptom.alertMessage != null) {
-                      _showCriticalAlert(symptom.alertMessage!);
-                    }
-                  }
-                });
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFFE8F5E9) : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected
-                        ? const Color(0xFF228B22)
-                        : const Color(0xFFE0E0E0),
-                    width: isSelected ? 2 : 1,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      isSelected ? Icons.check_box : Icons.check_box_outline_blank,
-                      color: isSelected ? const Color(0xFF228B22) : const Color(0xFF999999),
-                      size: 24,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            symptom.name,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                              color: const Color(0xFF191910),
-                            ),
-                          ),
-                          ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            symptom.description,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                        ],
-                      ),
-                    ),
-                    if (symptom.isCritical)
-                      const Icon(
-                        Icons.warning_amber,
-                        color: Color(0xFFDC3545),
-                        size: 20,
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }),
       ],
     );
   }
@@ -687,7 +707,11 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
                   radius: 16,
                   child: IconButton(
                     padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.close, size: 18, color: Colors.white),
+                    icon: const Icon(
+                      Icons.close,
+                      size: 18,
+                      color: Colors.white,
+                    ),
                     onPressed: () {
                       setState(() {
                         _biteImage = null;
@@ -707,13 +731,20 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFFF5F5F5),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE0E0E0), style: BorderStyle.solid),
+                border: Border.all(
+                  color: const Color(0xFFE0E0E0),
+                  style: BorderStyle.solid,
+                ),
               ),
               child: const Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.add_photo_alternate, size: 48, color: Color(0xFF999999)),
+                    Icon(
+                      Icons.add_photo_alternate,
+                      size: 48,
+                      color: Color(0xFF999999),
+                    ),
                     SizedBox(height: 8),
                     Text(
                       'Thêm ảnh vết cắn',
@@ -783,10 +814,7 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
         ),
         child: const Text(
           'Phân tích triệu chứng',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
       ),
     );

@@ -299,7 +299,9 @@ class _RescuerNavigationScreenState
     // Auto-suggest arrival when very close (100 meters = 0.1km)
     if (_distanceToVictim != null &&
         _distanceToVictim! < 0.1 &&
-        (previousDistance == null || previousDistance >= 0.1)) {
+        (previousDistance == null || previousDistance >= 0.1) &&
+        widget.mission.status == 'EnRoute' &&
+        widget.mission.arrivedAt == null) {
       // Show arrival confirmation automatically
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -386,7 +388,6 @@ class _RescuerNavigationScreenState
   }
 
   /// Check if rescuer is off-route (too far from polyline)
-  /// 🔋 Thermal optimization: throttled to run every 15s max
   void _checkOffRoute(Position position) {
     // Throttle: only check every 15 seconds
     final now = DateTime.now();

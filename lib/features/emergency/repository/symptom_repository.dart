@@ -33,12 +33,14 @@ class SymptomRepository {
   Future<SymptomTrackingResponse> updateSymptomsTracking({
     required String incidentId,
     required List<int> symptomIdList,
+    required int timeSinceBiteMinutes,
   }) async {
     try {
       final response = await _httpService.put(
         '/api/incidents/$incidentId/symptoms-tracking',
         data: {
           'symptomIdList': symptomIdList,
+          'timeSinceBiteMinutes': timeSinceBiteMinutes,
         },
       );
       return SymptomTrackingResponse.fromJson(response.data);

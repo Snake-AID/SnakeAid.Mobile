@@ -39,7 +39,8 @@ class DetectionData {
   factory DetectionData.fromJson(Map<String, dynamic> json) {
     return DetectionData(
       aiMetadata: AiMetadata.fromJson(json['ai_metadata'] ?? {}),
-      results: (json['results'] as List<dynamic>?)
+      results:
+          (json['results'] as List<dynamic>?)
               ?.map((r) => DetectionResult.fromJson(r))
               .toList() ??
           [],
@@ -78,10 +79,7 @@ class DetectionResult {
   final AiDetection aiDetection;
   final SnakeInfo snake;
 
-  DetectionResult({
-    required this.aiDetection,
-    required this.snake,
-  });
+  DetectionResult({required this.aiDetection, required this.snake});
 
   factory DetectionResult.fromJson(Map<String, dynamic> json) {
     return DetectionResult(
@@ -181,16 +179,20 @@ class SnakeInfo {
       identificationSummary: json['identificationSummary'] ?? '',
       primaryVenomType: json['primaryVenomType'] ?? '',
       identification: Identification.fromJson(json['identification'] ?? {}),
-      symptomsByTime: (json['symptomsByTime'] as List<dynamic>?)
+      symptomsByTime:
+          (json['symptomsByTime'] as List<dynamic>?)
               ?.map((s) => SymptomByTime.fromJson(s))
               .toList() ??
           [],
       firstAidGuidelineOverride: json['firstAidGuidelineOverride'] != null
-          ? FirstAidGuidelineOverride.fromJson(json['firstAidGuidelineOverride'])
+          ? FirstAidGuidelineOverride.fromJson(
+              json['firstAidGuidelineOverride'],
+            )
           : null,
       riskLevel: json['riskLevel'] ?? 0,
       isVenomous: json['isVenomous'] ?? false,
-      speciesVenoms: (json['speciesVenoms'] as List<dynamic>?)
+      speciesVenoms:
+          (json['speciesVenoms'] as List<dynamic>?)
               ?.map((v) => SpeciesVenom.fromJson(v))
               .toList() ??
           [],
@@ -211,11 +213,13 @@ class Identification {
 
   factory Identification.fromJson(Map<String, dynamic> json) {
     return Identification(
-      physicalTraits: (json['physicalTraits'] as List<dynamic>?)
+      physicalTraits:
+          (json['physicalTraits'] as List<dynamic>?)
               ?.map((t) => t.toString())
               .toList() ??
           [],
-      behaviors: (json['behaviors'] as List<dynamic>?)
+      behaviors:
+          (json['behaviors'] as List<dynamic>?)
               ?.map((b) => b.toString())
               .toList() ??
           [],
@@ -238,7 +242,8 @@ class SymptomByTime {
   factory SymptomByTime.fromJson(Map<String, dynamic> json) {
     return SymptomByTime(
       timeRange: json['timeRange'] ?? '',
-      signs: (json['signs'] as List<dynamic>?)
+      signs:
+          (json['signs'] as List<dynamic>?)
               ?.map((s) => s.toString())
               .toList() ??
           [],
@@ -251,15 +256,13 @@ class FirstAidGuidelineOverride {
   final String mode;
   final List<String> steps;
 
-  FirstAidGuidelineOverride({
-    required this.mode,
-    required this.steps,
-  });
+  FirstAidGuidelineOverride({required this.mode, required this.steps});
 
   factory FirstAidGuidelineOverride.fromJson(Map<String, dynamic> json) {
     return FirstAidGuidelineOverride(
       mode: json['mode'] ?? '',
-      steps: (json['steps'] as List<dynamic>?)
+      steps:
+          (json['steps'] as List<dynamic>?)
               ?.map((s) => s.toString())
               .toList() ??
           [],
@@ -273,9 +276,7 @@ class SpeciesVenom {
   SpeciesVenom({required this.venomType});
 
   factory SpeciesVenom.fromJson(Map<String, dynamic> json) {
-    return SpeciesVenom(
-      venomType: VenomType.fromJson(json['venomType'] ?? {}),
-    );
+    return SpeciesVenom(venomType: VenomType.fromJson(json['venomType'] ?? {}));
   }
 }
 
@@ -294,7 +295,9 @@ class VenomType {
     return VenomType(
       name: json['name'] ?? '',
       description: json['description'] ?? '',
-      firstAidGuideline: FirstAidGuideline.fromJson(json['firstAidGuideline'] ?? {}),
+      firstAidGuideline: FirstAidGuideline.fromJson(
+        json['firstAidGuideline'] ?? {},
+      ),
     );
   }
 }
@@ -323,25 +326,35 @@ class FirstAidContent {
   final List<FirstAidStep> steps;
   final List<FirstAidStep> dos;
   final List<FirstAidStep> donts;
+  final List<String> notes;
 
   FirstAidContent({
     required this.steps,
     required this.dos,
     required this.donts,
+    this.notes = const [],
   });
 
   factory FirstAidContent.fromJson(Map<String, dynamic> json) {
     return FirstAidContent(
-      steps: (json['steps'] as List<dynamic>?)
+      steps:
+          (json['steps'] as List<dynamic>?)
               ?.map((s) => FirstAidStep.fromJson(s))
               .toList() ??
           [],
-      dos: (json['dos'] as List<dynamic>?)
+      dos:
+          (json['dos'] as List<dynamic>?)
               ?.map((d) => FirstAidStep.fromJson(d))
               .toList() ??
           [],
-      donts: (json['donts'] as List<dynamic>?)
+      donts:
+          (json['donts'] as List<dynamic>?)
               ?.map((d) => FirstAidStep.fromJson(d))
+              .toList() ??
+          [],
+      notes:
+          (json['notes'] as List<dynamic>?)
+              ?.map((n) => n.toString())
               .toList() ??
           [],
     );
@@ -352,10 +365,7 @@ class FirstAidStep {
   final String text;
   final String mediaUrl;
 
-  FirstAidStep({
-    required this.text,
-    required this.mediaUrl,
-  });
+  FirstAidStep({required this.text, required this.mediaUrl});
 
   factory FirstAidStep.fromJson(Map<String, dynamic> json) {
     return FirstAidStep(

@@ -1,3 +1,5 @@
+import 'snake_identification_response.dart';
+
 /// API Wrapper Response
 class DetailedIncidentResponse {
   final int statusCode;
@@ -50,11 +52,19 @@ class DetailedIncidentData {
   final int severityLevel;
   final DateTime? incidentOccurredAt;
 
+  // Rescue attempts tracking
+  final int totalRescueAttempts;
+  final int failedAttemptsCount;
+
   // Related entities
   final BriefMemberProfile user;
   final BriefRescuerProfile? assignedRescuer;
-  final RescueMission? rescueMission;
+  final RescueMission? activeMission;
   final List<SnakeAIDetectMedia> media;
+
+  // Identification results
+  final DetectedSnakeSpecies? identifiedSnakeSpecies;
+  final SnakeIdentificationContext? identificationContext;
 
   DetailedIncidentData({
     required this.id,
@@ -69,10 +79,14 @@ class DetailedIncidentData {
     this.cancellationReason,
     required this.severityLevel,
     this.incidentOccurredAt,
+    required this.totalRescueAttempts,
+    required this.failedAttemptsCount,
     required this.user,
     this.assignedRescuer,
-    this.rescueMission,
+    this.activeMission,
     required this.media,
+    this.identifiedSnakeSpecies,
+    this.identificationContext,
   });
 
   factory DetailedIncidentData.fromJson(Map<String, dynamic> json) {
@@ -97,18 +111,28 @@ class DetailedIncidentData {
       incidentOccurredAt: json['incidentOccurredAt'] != null
           ? DateTime.parse(json['incidentOccurredAt'])
           : null,
+      totalRescueAttempts: json['totalRescueAttempts'] ?? 0,
+      failedAttemptsCount: json['failedAttemptsCount'] ?? 0,
       user: BriefMemberProfile.fromJson(json['user'] ?? {}),
       assignedRescuer: json['assignedRescuer'] != null
           ? BriefRescuerProfile.fromJson(json['assignedRescuer'])
           : null,
-      rescueMission: json['rescueMission'] != null
-          ? RescueMission.fromJson(json['rescueMission'])
+      activeMission: json['activeMission'] != null
+          ? RescueMission.fromJson(json['activeMission'])
           : null,
       media:
           (json['media'] as List<dynamic>?)
               ?.map((m) => SnakeAIDetectMedia.fromJson(m))
               .toList() ??
           [],
+      // Backend returns 'identifiedSnake' not 'identified_snake_species'
+      identifiedSnakeSpecies: json['identifiedSnake'] != null
+          ? DetectedSnakeSpecies.fromJson(json['identifiedSnake'])
+          : null,
+      // Backend returns 'identificationContext' not 'identification_context'
+      identificationContext: json['identificationContext'] != null
+          ? SnakeIdentificationContext.fromJson(json['identificationContext'])
+          : null,
     );
   }
 
@@ -125,17 +149,21 @@ class DetailedIncidentData {
     'cancellationReason': cancellationReason,
     'severityLevel': severityLevel,
     'incidentOccurredAt': incidentOccurredAt?.toIso8601String(),
+    'totalRescueAttempts': totalRescueAttempts,
+    'failedAttemptsCount': failedAttemptsCount,
     'user': user.toJson(),
     'assignedRescuer': assignedRescuer?.toJson(),
-    'rescueMission': rescueMission?.toJson(),
+    'activeMission': activeMission?.toJson(),
     'media': media.map((m) => m.toJson()).toList(),
+    'identifiedSnake': identifiedSnakeSpecies?.toJson(),
+    'identificationContext': identificationContext?.toJson(),
   };
 
   /// Check if rescuer is assigned
   bool get hasAssignedRescuer => assignedRescuer != null;
 
   /// Check if mission exists
-  bool get hasMission => rescueMission != null;
+  bool get hasMission => activeMission != null;
 
   /// Get severity text in Vietnamese
   String get severityText {
@@ -169,6 +197,9 @@ class GeoPointCoordinates {
 /// Brief Member Profile (Victim/User)
 class BriefMemberProfile {
   final String accountId;
+  final String? userName;
+  final String? email;
+  final String? phoneNumber;
   final double rating;
   final int ratingCount;
   final List<String> emergencyContacts;
@@ -177,6 +208,9 @@ class BriefMemberProfile {
 
   BriefMemberProfile({
     required this.accountId,
+    this.userName,
+    this.email,
+    this.phoneNumber,
     required this.rating,
     required this.ratingCount,
     required this.emergencyContacts,
@@ -187,6 +221,9 @@ class BriefMemberProfile {
   factory BriefMemberProfile.fromJson(Map<String, dynamic> json) {
     return BriefMemberProfile(
       accountId: json['accountId'] ?? '',
+      userName: json['userName'],
+      email: json['email'],
+      phoneNumber: json['phoneNumber'],
       rating: (json['rating'] ?? 0.0).toDouble(),
       ratingCount: json['ratingCount'] ?? 0,
       emergencyContacts:
@@ -203,6 +240,9 @@ class BriefMemberProfile {
 
   Map<String, dynamic> toJson() => {
     'accountId': accountId,
+    'userName': userName,
+    'email': email,
+    'phoneNumber': phoneNumber,
     'rating': rating,
     'ratingCount': ratingCount,
     'emergencyContacts': emergencyContacts,
@@ -285,6 +325,8 @@ class UserInfo {
   final String? phoneNumber;
   final String? email;
   final String? avatarUrl;
+  final String? role;
+  final bool isActive;
 
   UserInfo({
     required this.id,
@@ -292,6 +334,8 @@ class UserInfo {
     this.phoneNumber,
     this.email,
     this.avatarUrl,
+    this.role,
+    this.isActive = true,
   });
 
   factory UserInfo.fromJson(Map<String, dynamic> json) {
@@ -301,6 +345,8 @@ class UserInfo {
       phoneNumber: json['phoneNumber'],
       email: json['email'],
       avatarUrl: json['avatarUrl'],
+      role: json['role'],
+      isActive: json['isActive'] ?? true,
     );
   }
 
@@ -310,6 +356,8 @@ class UserInfo {
     'phoneNumber': phoneNumber,
     'email': email,
     'avatarUrl': avatarUrl,
+    'role': role,
+    'isActive': isActive,
   };
 }
 
@@ -408,7 +456,7 @@ class SnakeAIDetectMedia {
   final bool isProcessed;
   final DateTime? processedAt;
   final int? sequenceOrder;
-  final List<SnakeAIRecognitionResult> aiRecognitionResults;
+  final List<DetectedSnakeSpecies> detectedSpecies;
 
   SnakeAIDetectMedia({
     required this.id,
@@ -418,7 +466,7 @@ class SnakeAIDetectMedia {
     required this.isProcessed,
     this.processedAt,
     this.sequenceOrder,
-    required this.aiRecognitionResults,
+    required this.detectedSpecies,
   });
 
   factory SnakeAIDetectMedia.fromJson(Map<String, dynamic> json) {
@@ -434,9 +482,9 @@ class SnakeAIDetectMedia {
           ? DateTime.parse(json['processedAt'])
           : null,
       sequenceOrder: json['sequenceOrder'],
-      aiRecognitionResults:
-          (json['aiRecognitionResults'] as List<dynamic>?)
-              ?.map((r) => SnakeAIRecognitionResult.fromJson(r))
+      detectedSpecies:
+          (json['detectedSpecies'] as List<dynamic>?)
+              ?.map((s) => DetectedSnakeSpecies.fromJson(s))
               .toList() ??
           [],
     );
@@ -450,57 +498,85 @@ class SnakeAIDetectMedia {
     'isProcessed': isProcessed,
     'processedAt': processedAt?.toIso8601String(),
     'sequenceOrder': sequenceOrder,
-    'aiRecognitionResults': aiRecognitionResults
-        .map((r) => r.toJson())
-        .toList(),
+    'detectedSpecies': detectedSpecies.map((s) => s.toJson()).toList(),
   };
+
+  /// Check if has any detected species
+  bool get hasDetectedSpecies => detectedSpecies.isNotEmpty;
+
+  /// Get first detected species (highest confidence)
+  DetectedSnakeSpecies? get primarySpecies =>
+      detectedSpecies.isNotEmpty ? detectedSpecies.first : null;
 }
 
-/// Snake AI Recognition Result
-class SnakeAIRecognitionResult {
-  final String id;
-  final String reportMediaId;
-  final String yoloClassName;
-  final double confidence;
-  final int? detectedSpeciesId;
-  final bool isMapped;
-  final RecognitionStatus status;
+/// Detected Snake Species (from AI recognition)
+class DetectedSnakeSpecies {
+  final int id;
+  final String scientificName;
+  final String slug;
+  final String commonName;
+  final String? imageUrl;
+  final String? description;
+  final String? identificationSummary;
+  final VenomType primaryVenomType;
+  final int riskLevel;
+  final bool isVenomous;
+  final bool isActive;
 
-  SnakeAIRecognitionResult({
+  DetectedSnakeSpecies({
     required this.id,
-    required this.reportMediaId,
-    required this.yoloClassName,
-    required this.confidence,
-    this.detectedSpeciesId,
-    required this.isMapped,
-    required this.status,
+    required this.scientificName,
+    required this.slug,
+    required this.commonName,
+    this.imageUrl,
+    this.description,
+    this.identificationSummary,
+    required this.primaryVenomType,
+    required this.riskLevel,
+    required this.isVenomous,
+    required this.isActive,
   });
 
-  factory SnakeAIRecognitionResult.fromJson(Map<String, dynamic> json) {
-    return SnakeAIRecognitionResult(
-      id: json['id'] ?? '',
-      reportMediaId: json['reportMediaId'] ?? '',
-      yoloClassName: json['yoloClassName'] ?? '',
-      confidence: (json['confidence'] ?? 0.0).toDouble(),
-      detectedSpeciesId: json['detectedSpeciesId'],
-      isMapped: json['isMapped'] ?? false,
-      status: RecognitionStatus.fromString(json['status'] ?? 'Pending'),
+  factory DetectedSnakeSpecies.fromJson(Map<String, dynamic> json) {
+    return DetectedSnakeSpecies(
+      id: json['id'] ?? 0,
+      scientificName: json['scientificName'] ?? '',
+      slug: json['slug'] ?? '',
+      commonName: json['commonName'] ?? '',
+      imageUrl: json['imageUrl'],
+      description: json['description'],
+      identificationSummary: json['identificationSummary'],
+      primaryVenomType: VenomType.fromString(
+        json['primaryVenomType'] ?? 'Neurotoxic',
+      ),
+      riskLevel: json['riskLevel'] ?? 0,
+      isVenomous: json['isVenomous'] ?? false,
+      isActive: json['isActive'] ?? true,
     );
   }
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'reportMediaId': reportMediaId,
-    'yoloClassName': yoloClassName,
-    'confidence': confidence,
-    'detectedSpeciesId': detectedSpeciesId,
-    'isMapped': isMapped,
-    'status': status.value,
+    'scientificName': scientificName,
+    'slug': slug,
+    'commonName': commonName,
+    'imageUrl': imageUrl,
+    'description': description,
+    'identificationSummary': identificationSummary,
+    'primaryVenomType': primaryVenomType.value,
+    'riskLevel': riskLevel,
+    'isVenomous': isVenomous,
+    'isActive': isActive,
   };
 
-  /// Get formatted confidence percentage
-  String get confidencePercentage =>
-      '${(confidence * 100).toStringAsFixed(1)}%';
+  /// Get risk level text in Vietnamese
+  String get riskLevelText {
+    if (riskLevel >= 8) return 'Cực kỳ nguy hiểm';
+    if (riskLevel >= 6) return 'Rất Nguy hiểm';
+    if (riskLevel >= 5) return 'Nguy hiểm';
+    if (riskLevel > 4) return 'Trung bình';
+    return 'Thấp';
+  }
 }
 
 // ============================================================================
@@ -611,8 +687,11 @@ enum MissionStatus {
 
 /// Media Reference Type
 enum MediaReferenceType {
-  incident('Incident'),
-  rescueMission('RescueMission');
+  communityReport('CommunityReport'),
+  snakebiteIncident('SnakebiteIncident'),
+  rescueMission('RescueMission'),
+  snakeCatchingRequest('SnakeCatchingRequest'),
+  snakeCatchingMission('SnakeCatchingMission');
 
   final String value;
   const MediaReferenceType(this.value);
@@ -620,7 +699,7 @@ enum MediaReferenceType {
   static MediaReferenceType fromString(String value) {
     return MediaReferenceType.values.firstWhere(
       (e) => e.value.toLowerCase() == value.toLowerCase(),
-      orElse: () => MediaReferenceType.incident,
+      orElse: () => MediaReferenceType.snakebiteIncident,
     );
   }
 }
@@ -628,7 +707,11 @@ enum MediaReferenceType {
 /// Media Purpose
 enum MediaPurpose {
   evidence('Evidence'),
-  snakeIdentification('SnakeIdentification');
+  snakeIdentification('SnakeIdentification'),
+  locationProof('LocationProof'),
+  injuryPhoto('InjuryPhoto'),
+  beforeAfter('BeforeAfter'),
+  snakeOthers('SnakeOthers');
 
   final String value;
   const MediaPurpose(this.value);
@@ -641,20 +724,39 @@ enum MediaPurpose {
   }
 }
 
-/// Recognition Status
-enum RecognitionStatus {
-  pending('Pending'),
-  success('Success'),
-  failed('Failed'),
-  noDetection('NoDetection');
+/// Venom Type
+enum VenomType {
+  neurotoxic('Neurotoxic'),
+  hemotoxic('Hemotoxic'),
+  cytotoxic('Cytotoxic'),
+  cardiotoxic('Cardiotoxic'),
+  myotoxic('Myotoxic'),
+  none('None');
 
   final String value;
-  const RecognitionStatus(this.value);
+  const VenomType(this.value);
 
-  static RecognitionStatus fromString(String value) {
-    return RecognitionStatus.values.firstWhere(
+  static VenomType fromString(String value) {
+    return VenomType.values.firstWhere(
       (e) => e.value.toLowerCase() == value.toLowerCase(),
-      orElse: () => RecognitionStatus.pending,
+      orElse: () => VenomType.none,
     );
+  }
+
+  String get displayText {
+    switch (this) {
+      case VenomType.neurotoxic:
+        return 'Độc thần kinh';
+      case VenomType.hemotoxic:
+        return 'Độc huyết';
+      case VenomType.cytotoxic:
+        return 'Độc tế bào';
+      case VenomType.cardiotoxic:
+        return 'Độc tim';
+      case VenomType.myotoxic:
+        return 'Độc cơ';
+      case VenomType.none:
+        return 'Không độc';
+    }
   }
 }

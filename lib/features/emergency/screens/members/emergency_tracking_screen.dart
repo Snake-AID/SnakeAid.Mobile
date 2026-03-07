@@ -54,6 +54,8 @@ class _EmergencyTrackingScreenState
   // ── Member location broadcast throttle ───────────────────────────────────
   Timer? _memberBroadcastThrottle;
   bool _isMemberBroadcastThrottled = false;
+  bool _hasInitialLocationBroadcast =
+      false; // Track if we've sent first location
 
   // ── SOS origin (static pin — where SOS was first pressed) ────────────────
   LatLng? _sosOriginPosition;
@@ -78,9 +80,6 @@ class _EmergencyTrackingScreenState
   // ── SOS countdown ─────────────────────────────────────────────────────────
   int _remainingSeconds = 330;
   Timer? _countdownTimer;
-
-  // ── Bottom-sheet expand state ─────────────────────────────────────────────
-  bool _showWhileWaitingExpanded = false;
 
   // ── Member blue-dot pulse (also used for rescuer & SOS origin) ───────────
   late AnimationController _pulseController;
@@ -130,11 +129,14 @@ class _EmergencyTrackingScreenState
     _startCountdown();
     _startMemberGps();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _ensureMissionHubConnected();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _ensureMissionHubConnected();
       _setupMissionHubListeners();
       // Rescuer may have accepted while member was navigating to this screen
       _checkAlreadyAccepted();
+
+      // ✅ CRITICAL: Broadcast initial member location now that MissionHub is connected
+      _broadcastInitialLocationIfReady();
 
       // Recalc ETA and fetch route if rescuer position was restored
       if (_rescuerPosition != null) {
@@ -201,9 +203,28 @@ class _EmergencyTrackingScreenState
     }
 
     // Broadcast member live GPS to MissionHub (rescuer sees it on their map)
-    if (!_isMemberBroadcastThrottled && widget.incidentId != null) {
+    // ✅ Special case: Initial broadcast happens immediately when MissionHub ready
+    if (!_hasInitialLocationBroadcast && widget.incidentId != null) {
       final svc = ref.read(missionHubServiceProvider);
       if (svc.isConnected) {
+        debugPrint(
+          '📍 Broadcasting INITIAL member location: ${pos.latitude}, ${pos.longitude}',
+        );
+        svc.updateLocation(widget.incidentId!, pos.latitude, pos.longitude);
+        _hasInitialLocationBroadcast = true;
+        _isMemberBroadcastThrottled = true;
+        _memberBroadcastThrottle = Timer(const Duration(seconds: 15), () {
+          _isMemberBroadcastThrottled = false;
+        });
+      }
+    }
+    // ✅ Subsequent broadcasts use throttle
+    else if (!_isMemberBroadcastThrottled && widget.incidentId != null) {
+      final svc = ref.read(missionHubServiceProvider);
+      if (svc.isConnected) {
+        debugPrint(
+          '📍 Broadcasting member location (periodic): ${pos.latitude}, ${pos.longitude}',
+        );
         svc.updateLocation(widget.incidentId!, pos.latitude, pos.longitude);
         _isMemberBroadcastThrottled = true;
         _memberBroadcastThrottle = Timer(const Duration(seconds: 15), () {
@@ -259,6 +280,49 @@ class _EmergencyTrackingScreenState
     } catch (e) {
       debugPrint('❌ Failed to reconnect MissionHub: $e');
     }
+  }
+
+  /// Broadcast initial member location after MissionHub is connected
+  /// Fixes race condition: GPS may have position before MissionHub connected
+  void _broadcastInitialLocationIfReady() {
+    if (_hasInitialLocationBroadcast) {
+      debugPrint('ℹ️ Initial location already broadcasted, skipping');
+      return;
+    }
+
+    if (_memberPosition == null) {
+      debugPrint(
+        '⚠️ Cannot broadcast initial location: GPS position not ready yet',
+      );
+      return;
+    }
+
+    if (widget.incidentId == null) {
+      debugPrint('⚠️ Cannot broadcast initial location: incidentId is null');
+      return;
+    }
+
+    final svc = ref.read(missionHubServiceProvider);
+    if (!svc.isConnected) {
+      debugPrint(
+        '⚠️ Cannot broadcast initial location: MissionHub not connected',
+      );
+      return;
+    }
+
+    debugPrint(
+      '📍 Broadcasting INITIAL member location (missed during GPS startup): ${_memberPosition!.latitude}, ${_memberPosition!.longitude}',
+    );
+    svc.updateLocation(
+      widget.incidentId!,
+      _memberPosition!.latitude,
+      _memberPosition!.longitude,
+    );
+    _hasInitialLocationBroadcast = true;
+    _isMemberBroadcastThrottled = true;
+    _memberBroadcastThrottle = Timer(const Duration(seconds: 15), () {
+      _isMemberBroadcastThrottled = false;
+    });
   }
 
   void _setupMissionHubListeners() {
@@ -1121,7 +1185,7 @@ class _EmergencyTrackingScreenState
                           const SizedBox(height: 16),
                           _buildConnectionStatus(),
                           const SizedBox(height: 16),
-                          _buildWhileWaitingSection(),
+                          _buildQuickActions(),
                         ],
                       )
                     : _buildSearchingRescuerSheet(),
@@ -1214,7 +1278,7 @@ class _EmergencyTrackingScreenState
         const SizedBox(height: 16),
         _buildConnectionStatus(),
         const SizedBox(height: 16),
-        _buildWhileWaitingSection(),
+        _buildQuickActions(),
       ],
     );
   }
@@ -1451,125 +1515,196 @@ class _EmergencyTrackingScreenState
     );
   }
 
-  Widget _buildWhileWaitingSection() {
-    return Container(
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0xFFF3F4F6))),
-      ),
-      child: Column(
-        children: [
-          InkWell(
-            onTap: () => setState(
-              () => _showWhileWaitingExpanded = !_showWhileWaitingExpanded,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, size: 20, color: Colors.grey[600]),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Trong lúc chờ',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF191910),
-                    ),
-                  ),
-                  const Spacer(),
-                  Icon(
-                    _showWhileWaitingExpanded
-                        ? Icons.keyboard_arrow_up
-                        : Icons.keyboard_arrow_right,
-                    color: Colors.grey[600],
-                  ),
-                ],
-              ),
+  Widget _buildQuickActions() {
+    final incident = ref.read(activeIncidentProvider).incident;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            'Hành động nhanh',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF191910),
             ),
           ),
-          if (_showWhileWaitingExpanded) ...[
-            _buildWaitingItem(
-              icon: Icons.medical_information,
-              title: 'Hướng dẫn sơ cứu',
-              subtitle: 'Xem các bước sơ cứu',
-              onTap: () => context.push(
-                '/emergency/first-aid-steps',
-                extra: 'King Cobra',
-              ),
-            ),
-            const SizedBox(height: 10),
-            _buildWaitingItem(
-              icon: Icons.assessment,
-              title: 'Báo cáo triệu chứng',
-              subtitle: 'Cập nhật triệu chứng hiện tại',
-              onTap: () {},
-            ),
-            const SizedBox(height: 10),
-            _buildWaitingItem(
-              icon: Icons.warning_amber,
-              title: 'Mức độ nghiêm trọng',
-              subtitle: 'Điểm: 85/100 – Nghiêm trọng',
-              color: const Color(0xFFDC3545),
-              onTap: () {},
-            ),
-            const SizedBox(height: 8),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWaitingItem({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    Color? color,
-    required VoidCallback onTap,
-  }) {
-    final c = color ?? const Color(0xFF228B22);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
         ),
-        child: Row(
+        const SizedBox(height: 12),
+        // Row 1: Snake ID + First Aid
+        Row(
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: c.withOpacity(0.1),
-                shape: BoxShape.circle,
+            Expanded(
+              child: _buildQuickActionCard(
+                icon: Icons.camera_alt,
+                label: 'Nhận dạng',
+                subtitle: 'AI Camera',
+                color: const Color(0xFF228B22),
+                onTap: () {
+                  if (incident == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Không tìm thấy thông tin sự cố'),
+                        backgroundColor: Color(0xFFDC3545),
+                      ),
+                    );
+                    return;
+                  }
+                  context.push(
+                    '/emergency-tracking/snake-identification',
+                    extra: {'incident': incident},
+                  );
+                },
               ),
-              child: Icon(icon, color: c, size: 20),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF191910),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
+              child: _buildQuickActionCard(
+                icon: Icons.medical_information,
+                label: 'Sơ cứu',
+                subtitle: 'Khẩn cấp',
+                color: const Color(0xFFDC3545),
+                onTap: () {
+                  context.push(
+                    '/first-aid-steps',
+                    extra: {'incident': incident},
+                  );
+                },
               ),
             ),
-            Icon(Icons.chevron_right, color: Colors.grey[400], size: 20),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Row 2: Symptoms + Severity
+        Row(
+          children: [
+            Expanded(
+              child: _buildQuickActionCard(
+                icon: Icons.assessment,
+                label: 'Triệu chứng',
+                subtitle: 'Báo cáo',
+                color: const Color(0xFFFFA500),
+                onTap: () {
+                  if (incident == null) return;
+                  context.push(
+                    '/symptom-report',
+                    extra: {'incidentId': incident.id},
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildQuickActionCard(
+                icon: Icons.warning_amber,
+                label: 'Mức độ',
+                subtitle: 'Đánh giá',
+                color: const Color(0xFFFF6B00),
+                onTap: () {
+                  context.push('/severity-assessment');
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Row 3: Chat Expert + Incident Detail
+        Row(
+          children: [
+            Expanded(
+              child: _buildQuickActionCard(
+                icon: Icons.chat_bubble_outline,
+                label: 'Tư vấn',
+                subtitle: 'Chat Expert',
+                color: const Color(0xFF2196F3),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ChatScreen(
+                        recipientName: 'Chuyên gia',
+                        isExpert: true,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildQuickActionCard(
+                icon: Icons.description,
+                label: 'Chi tiết',
+                subtitle: 'Xem đầy đủ',
+                color: const Color(0xFF6B7280),
+                onTap: () {
+                  if (incident == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Không tìm thấy thông tin sự cố'),
+                        backgroundColor: Color(0xFFDC3545),
+                      ),
+                    );
+                    return;
+                  }
+                  context.push(
+                    '/emergency-tracking/incident-detail',
+                    extra: {'incidentId': incident.id},
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActionCard({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),

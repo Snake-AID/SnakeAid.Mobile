@@ -1,4 +1,5 @@
 import 'package:json_annotation/json_annotation.dart';
+import 'package:snakeaid_mobile/features/emergency/models/snake_identification_response.dart';
 import 'detailed_incident_response.dart';
 
 part 'rescue_mission_response.g.dart';
@@ -179,6 +180,14 @@ class BriefIncidentForMission {
   @JsonKey(name: 'currentRadiusKm')
   final int currentRadiusKm;
 
+  // Backend returns 'identifiedSnake' not 'identified_snake_species'
+  @JsonKey(name: 'identifiedSnake')
+  final DetectedSnakeSpecies? identifiedSnakeSpecies;
+
+  // Backend returns 'identificationContext' not 'identification_context'
+  @JsonKey(name: 'identificationContext')
+  final SnakeIdentificationContext? identificationContext;
+
   @JsonKey(name: 'media')
   final List<SnakeAIDetectMedia> media;
 
@@ -192,6 +201,8 @@ class BriefIncidentForMission {
     this.assignedAt,
     required this.currentSessionNumber,
     required this.currentRadiusKm,
+    this.identifiedSnakeSpecies,
+    this.identificationContext,
     required this.media,
   });
 

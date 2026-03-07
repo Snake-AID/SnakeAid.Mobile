@@ -853,7 +853,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
   }
 
   Widget _buildMissionPriceCard() {
-    final mission = _incident!.rescueMission;
+    final mission = _incident!.activeMission;
     final hasPrice = mission != null;
 
     return Container(
@@ -1204,7 +1204,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
     final hasMedia = media.isNotEmpty && media.first.mediaUrl.trim().isNotEmpty;
 
     final firstMedia = hasMedia ? media.first : null;
-    final hasAI = firstMedia?.aiRecognitionResults.isNotEmpty ?? false;
+    final hasAI = firstMedia?.detectedSpecies.isNotEmpty ?? false;
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -1300,10 +1300,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  firstMedia
-                                      .aiRecognitionResults
-                                      .first
-                                      .yoloClassName,
+                                  firstMedia.detectedSpecies.first.commonName,
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 13,
@@ -1311,7 +1308,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
                                   ),
                                 ),
                                 Text(
-                                  'Độ chính xác: ${firstMedia.aiRecognitionResults.first.confidencePercentage}',
+                                  'Loài: ${firstMedia.detectedSpecies.first.scientificName}',
                                   style: const TextStyle(
                                     color: Colors.white70,
                                     fontSize: 11,

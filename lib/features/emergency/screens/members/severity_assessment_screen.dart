@@ -499,8 +499,7 @@ class _SeverityAssessmentScreenState
           // Back to Emergency Alert Button
           ElevatedButton(
             onPressed: () {
-              // Navigate to emergency tracking screen
-              context.goNamed('emergency_tracking');
+              context.pop();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF228B22),
