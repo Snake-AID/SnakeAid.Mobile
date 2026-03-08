@@ -1,7 +1,48 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'expert_profile_screen.dart';
+import '../../consultation/repository/consultation_repository.dart';
+import '../../consultation/models/consultation_booking_response.dart';
+
+/// FutureProvider for the current expert's bookings from the API.
+final _expertBookingsFutureProvider =
+    FutureProvider<List<ConsultationBookingResponse>>((ref) {
+  return ref.read(consultationRepositoryProvider).getExpertBookings();
+});
+
+/// Map a [ConsultationBookingResponse] to the internal [_ExpertConsultation].
+_ExpertConsultation _bookingToExpertConsultation(ConsultationBookingResponse b) {
+  final now = DateTime.now();
+  final scheduled = b.slotStartTime ?? b.scheduledTime;
+  final _ExpertConsultationStatus status;
+  switch (b.status) {
+    case ConsultationBookingStatus.confirmed:
+      final diff = scheduled.difference(now);
+      // Dùng 120 phút để tiện test — production chỉnh lại thành 10
+      status = diff.inMinutes <= 120
+          ? _ExpertConsultationStatus.waiting
+          : _ExpertConsultationStatus.upcoming;
+      break;
+    case ConsultationBookingStatus.completed:
+      status = _ExpertConsultationStatus.completed;
+      break;
+    default:
+      status = _ExpertConsultationStatus.cancelled;
+  }
+  return _ExpertConsultation(
+    id: b.consultationId ?? b.id,
+    patientName: b.userName ?? 'Bệnh nhân',
+    consultationType:
+        b.consultationType == 'Instant' ? 'Khẩn Cấp' : 'Đặt Lịch',
+    snakeSuspect: 'Chưa xác định',
+    scheduledTime: scheduled,
+    status: status,
+    feeCost: b.feeCost,
+    problemDescription: b.problemDescription,
+  );
+}
 
 /// Expert Home Screen - Dashboard for snake experts
 class ExpertHomeScreen extends StatefulWidget {
@@ -107,15 +148,15 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 }
 
 // Home Tab
-class _HomeTab extends StatefulWidget {
+class _HomeTab extends ConsumerStatefulWidget {
   final VoidCallback onSeeAll;
   const _HomeTab({required this.onSeeAll});
 
   @override
-  State<_HomeTab> createState() => _HomeTabState();
+  ConsumerState<_HomeTab> createState() => _HomeTabState();
 }
 
-class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin {
+class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderStateMixin {
   bool _isAvailable = true;
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnimation;
@@ -856,11 +897,17 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
 
   List<_ExpertConsultation> get _upcomingConsultations {
     final now = DateTime.now();
-    return _ConsultationsTabState._consultations.where((c) {
-      return (c.status == _ExpertConsultationStatus.upcoming ||
-              c.status == _ExpertConsultationStatus.waiting) &&
-          !now.isAfter(c.scheduledTime.add(const Duration(minutes: 5)));
-    }).toList()
+    final consultations = ref
+            .watch(_expertBookingsFutureProvider)
+            .whenOrNull(data: (bookings) =>
+                bookings.map(_bookingToExpertConsultation).toList()) ??
+        [];
+    return consultations
+        .where((c) =>
+            (c.status == _ExpertConsultationStatus.upcoming ||
+                c.status == _ExpertConsultationStatus.waiting) &&
+            !now.isAfter(c.scheduledTime.add(const Duration(minutes: 5))))
+        .toList()
       ..sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
   }
 
@@ -1273,14 +1320,14 @@ class _ExpertConsultation {
   });
 }
 
-class _ConsultationsTab extends StatefulWidget {
+class _ConsultationsTab extends ConsumerStatefulWidget {
   const _ConsultationsTab({super.key});
 
   @override
-  State<_ConsultationsTab> createState() => _ConsultationsTabState();
+  ConsumerState<_ConsultationsTab> createState() => _ConsultationsTabState();
 }
 
-class _ConsultationsTabState extends State<_ConsultationsTab>
+class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late DateTime _selectedDay;
@@ -1288,189 +1335,8 @@ class _ConsultationsTabState extends State<_ConsultationsTab>
 
   static const Color _purple = Color(0xFF6C47C2);
 
-  static final _consultations = <_ExpertConsultation>[
-    // ── Today ──
-    _ExpertConsultation(
-      id: 'c1',
-      patientName: 'Trần Văn C',
-      patientPhone: '0901 234 567',
-      consultationType: 'Đặt Lịch',
-      snakeSuspect: 'Rắn Hổ Mang Chúa',
-      hasSnakeImage: true,
-      scheduledTime: DateTime(
-        DateTime.now().year, DateTime.now().month, DateTime.now().day, 9, 0),
-      status: _ExpertConsultationStatus.upcoming,
-      feeCost: 350000,
-      durationMinutes: 45,
-      consultationMethod: 'video',
-      problemDescription:
-          'Con rắn xuất hiện trong vườn nhà tôi, dài khoảng 1.5m, có phần cổ phồng to khi bị đe dọa. Tôi lo ngại đây là rắn cực độc.',
-      questions: 'Tôi cần làm gì để đuổi rắn ra khỏi vườn an toàn? Có cần gọi đội chuyên nghiệp không?',
-    ),
-    _ExpertConsultation(
-      id: 'c2',
-      patientName: 'Nguyễn Thị D',
-      patientPhone: '0912 345 678',
-      consultationType: 'Tái Khám',
-      snakeSuspect: 'Rắn Ráo Trâu',
-      hasSnakeImage: true,
-      scheduledTime: DateTime(
-        DateTime.now().year, DateTime.now().month, DateTime.now().day, 11, 0),
-      status: _ExpertConsultationStatus.upcoming,
-      feeCost: 180000,
-      durationMinutes: 30,
-      consultationMethod: 'video',
-      problemDescription:
-          'Tôi thấy con rắn này bò qua sân nhà khoảng 3 lần trong tuần qua. Muốn xác định loài và mức độ nguy hiểm.',
-      questions: 'Rắn này có độc không? Nó có xu hướng tấn công người không?',
-    ),
-    _ExpertConsultation(
-      id: 'c3',
-      patientName: 'Lê Văn E',
-      patientPhone: '0923 456 789',
-      consultationType: 'Khẩn Cấp',
-      snakeSuspect: 'Rắn Lục',
-      hasSnakeImage: true,
-      scheduledTime: DateTime(
-        DateTime.now().year, DateTime.now().month, DateTime.now().day, 14, 0),
-      status: _ExpertConsultationStatus.waiting,
-      feeCost: 350000,
-      durationMinutes: 30,
-      consultationMethod: 'chat',
-      problemDescription:
-          'Bị rắn cắn vào tay trái khoảng 15 phút trước. Có hai vết răng rõ ràng, vùng xung quanh đang sưng và đau nhức.',
-    ),
-    _ExpertConsultation(
-      id: 'c4',
-      patientName: 'Phạm Thị F',
-      patientPhone: '0934 567 890',
-      consultationType: 'Đặt Lịch',
-      snakeSuspect: 'Rắn Hổ Mang',
-      hasSnakeImage: false,
-      scheduledTime: DateTime(
-        DateTime.now().year, DateTime.now().month, DateTime.now().day, 16, 30),
-      status: _ExpertConsultationStatus.upcoming,
-      feeCost: 200000,
-      durationMinutes: 45,
-      consultationMethod: 'video',
-      problemDescription:
-          'Có rắn trong nhà tắm, không dám vào. Rắn màu đen, dài tầm 80cm.',
-      questions: 'Làm sao để đuổi rắn ra khỏi nhà một cách an toàn?',
-    ),
-    _ExpertConsultation(
-      id: 'c5',
-      patientName: 'Hoàng Văn G',
-      patientPhone: '0945 678 901',
-      consultationType: 'Đặt Lịch',
-      snakeSuspect: 'Rắn Đất',
-      hasSnakeImage: true,
-      scheduledTime: DateTime(
-        DateTime.now().year, DateTime.now().month, DateTime.now().day, 19, 0),
-      status: _ExpertConsultationStatus.upcoming,
-      feeCost: 150000,
-      durationMinutes: 30,
-      consultationMethod: 'video',
-      problemDescription:
-          'Tìm thấy con rắn này dưới đống gạch trong vườn. Muốn biết loài và có nên giữ lại nuôi không.',
-    ),
-    // ── Tomorrow ──
-    _ExpertConsultation(
-      id: 'c6',
-      patientName: 'Vũ Thị H',
-      patientPhone: '0956 789 012',
-      consultationType: 'Đặt Lịch',
-      snakeSuspect: 'Rắn Lục Tre',
-      hasSnakeImage: true,
-      scheduledTime: DateTime.now().add(const Duration(days: 1))
-          .copyWith(hour: 10, minute: 0, second: 0, millisecond: 0),
-      status: _ExpertConsultationStatus.upcoming,
-      feeCost: 200000,
-      durationMinutes: 45,
-      consultationMethod: 'video',
-      problemDescription:
-          'Con rắn xanh lá cây bắt được trong vườn, dài 60cm, đang nhốt trong hộp.',
-      questions: 'Có nên thả ra hay liên hệ cơ quan nào để xử lý?',
-    ),
-    _ExpertConsultation(
-      id: 'c7',
-      patientName: 'Đỗ Văn I',
-      patientPhone: '0967 890 123',
-      consultationType: 'Tái Khám',
-      snakeSuspect: 'Rắn Hổ Đất',
-      hasSnakeImage: false,
-      scheduledTime: DateTime.now().add(const Duration(days: 1))
-          .copyWith(hour: 15, minute: 30, second: 0, millisecond: 0),
-      status: _ExpertConsultationStatus.upcoming,
-      feeCost: 180000,
-      durationMinutes: 30,
-      consultationMethod: 'video',
-      problemDescription: 'Tái khám sau khi bị rắn cắn tuần trước, vết thương hồi phục chậm.',
-    ),
-    // ── Day after tomorrow ──
-    _ExpertConsultation(
-      id: 'c8',
-      patientName: 'Bùi Thị K',
-      patientPhone: '0978 901 234',
-      consultationType: 'Đặt Lịch',
-      snakeSuspect: 'Rắn Cạp Nong',
-      hasSnakeImage: true,
-      scheduledTime: DateTime.now().add(const Duration(days: 2))
-          .copyWith(hour: 9, minute: 30, second: 0, millisecond: 0),
-      status: _ExpertConsultationStatus.upcoming,
-      feeCost: 350000,
-      durationMinutes: 60,
-      consultationMethod: 'video',
-      problemDescription:
-          'Phát hiện rắn sọc đen vàng trong nhà kho. Rất lo lắng vì có trẻ em trong nhà.',
-      questions: 'Rắn cạp nong có độc mạnh không? Triệu chứng cắn thế nào?',
-    ),
-    // ── History ──
-    _ExpertConsultation(
-      id: 'h1',
-      patientName: 'Phạm Đức D',
-      patientPhone: '0901 111 222',
-      consultationType: 'Đặt Lịch',
-      snakeSuspect: 'Rắn Hổ Mang Thường',
-      hasSnakeImage: true,
-      scheduledTime: DateTime.now().subtract(const Duration(days: 1)),
-      status: _ExpertConsultationStatus.completed,
-      feeCost: 200000,
-      durationSeconds: 2340,
-      durationMinutes: 45,
-      consultationMethod: 'video',
-      rating: 5.0,
-      problemDescription: 'Rắn trong sân vườn, chiều dài 1.2m.',
-    ),
-    _ExpertConsultation(
-      id: 'h2',
-      patientName: 'Hoàng Thị E',
-      patientPhone: '0912 222 333',
-      consultationType: 'Khẩn Cấp',
-      snakeSuspect: 'Rắn Lục Tre',
-      hasSnakeImage: true,
-      scheduledTime: DateTime.now().subtract(const Duration(days: 3)),
-      status: _ExpertConsultationStatus.completed,
-      feeCost: 350000,
-      durationSeconds: 1800,
-      durationMinutes: 30,
-      consultationMethod: 'video',
-      rating: 4.5,
-      problemDescription: 'Bị cắn vào ngón tay trong lúc làm vườn.',
-    ),
-    _ExpertConsultation(
-      id: 'h3',
-      patientName: 'Vũ Văn F',
-      patientPhone: '0923 333 444',
-      consultationType: 'Đặt Lịch',
-      snakeSuspect: 'Chưa xác định',
-      hasSnakeImage: false,
-      scheduledTime: DateTime.now().subtract(const Duration(days: 5)),
-      status: _ExpertConsultationStatus.cancelled,
-      feeCost: 150000,
-      durationMinutes: 30,
-      consultationMethod: 'video',
-    ),
-  ];
+  List<_ExpertConsultation> _consultations = [];
+  bool _isLoadingConsultations = false;
 
   List<_ExpertConsultation> _consultationsForDay(DateTime day) {
     final now = DateTime.now();
@@ -1481,12 +1347,6 @@ class _ConsultationsTabState extends State<_ConsultationsTab>
       }
       if (c.status != _ExpertConsultationStatus.waiting &&
           c.status != _ExpertConsultationStatus.upcoming) {
-        return false;
-      }
-      // Hide consultations whose time has passed by more than 5 minutes
-      // (unless they are actively waiting)
-      if (c.status != _ExpertConsultationStatus.waiting &&
-          now.isAfter(c.scheduledTime.add(const Duration(minutes: 5)))) {
         return false;
       }
       return true;
@@ -1509,14 +1369,13 @@ class _ConsultationsTabState extends State<_ConsultationsTab>
     _tabController = TabController(length: 2, vsync: this);
     final today = DateTime.now();
     _selectedDay = DateTime(today.year, today.month, today.day);
-    // Monday of current week
-    final weekday = today.weekday; // 1=Mon
-    _weekStart = DateTime(today.year, today.month, today.day)
-        .subtract(Duration(days: weekday - 1));
+    // Week starts from today (not Monday), showing today + next 6 days
+    _weekStart = _selectedDay;
     // Rebuild every minute so time-based logic stays current
     _refreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
     });
+    _loadConsultations();
   }
 
   @override
@@ -1524,6 +1383,23 @@ class _ConsultationsTabState extends State<_ConsultationsTab>
     _refreshTimer?.cancel();
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadConsultations() async {
+    if (!mounted) return;
+    setState(() => _isLoadingConsultations = true);
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      final bookings = await repo.getExpertBookings();
+      if (!mounted) return;
+      setState(() {
+        _consultations = bookings.map(_bookingToExpertConsultation).toList();
+        _isLoadingConsultations = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingConsultations = false);
+    }
   }
 
   // Navigate to detail screen
@@ -1585,8 +1461,7 @@ class _ConsultationsTabState extends State<_ConsultationsTab>
                 final day = DateTime(picked.year, picked.month, picked.day);
                 setState(() {
                   _selectedDay = day;
-                  final weekday = day.weekday;
-                  _weekStart = day.subtract(Duration(days: weekday - 1));
+                  _weekStart = day; // re-anchor week to picked day
                 });
               }
             },
@@ -1611,9 +1486,14 @@ class _ConsultationsTabState extends State<_ConsultationsTab>
 
   // ── Schedule tab ──────────────────────────────────────────────────────────
 
+  /// Nhãn thứ trong tuần cho một ngày bất kỳ
+  String _dayLabel(DateTime day) {
+    const labels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+    return labels[day.weekday - 1];
+  }
+
   Widget _buildScheduleTab(BuildContext context) {
     final dayConsultations = _consultationsForDay(_selectedDay);
-    final weekDays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
     final today = DateTime.now();
     final todayNorm =
         DateTime(today.year, today.month, today.day);
@@ -1636,7 +1516,10 @@ class _ConsultationsTabState extends State<_ConsultationsTab>
                 final isToday = day == todayNorm;
                 final count = _consultationsForDay(day).length;
                 return GestureDetector(
-                  onTap: () => setState(() => _selectedDay = day),
+                  onTap: () => setState(() {
+                    _selectedDay = day;
+                    // _weekStart KHÔNG thay đổi — giữ nguyên tuần hiện tại
+                  }),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     width: 60,
@@ -1663,7 +1546,7 @@ class _ConsultationsTabState extends State<_ConsultationsTab>
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          weekDays[i],
+                          _dayLabel(day),
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -1754,9 +1637,14 @@ class _ConsultationsTabState extends State<_ConsultationsTab>
 
         // Consultation list
         Expanded(
-          child: dayConsultations.isEmpty
-              ? _buildEmptyDay()
-              : _buildDayList(context, dayConsultations),
+          child: RefreshIndicator(
+            onRefresh: _loadConsultations,
+            child: dayConsultations.isEmpty
+                ? ListView(
+                    children: [SizedBox(height: 120, child: _buildEmptyDay())],
+                  )
+                : _buildDayList(context, dayConsultations),
+          ),
         ),
       ],
     );
@@ -1828,8 +1716,8 @@ class _ConsultationsTabState extends State<_ConsultationsTab>
     final now = DateTime.now();
     final isWaiting = c.status == _ExpertConsultationStatus.waiting;
     // Allow starting 2 minutes before the scheduled time
-    final canStart = isWaiting ||
-        !now.isBefore(c.scheduledTime.subtract(const Duration(minutes: 2)));
+    // Cho phép bắt đầu bất kỳ lúc nào khi status là waiting — tiện test
+    final canStart = isWaiting || true;
     final hour = c.scheduledTime.hour;
     final minute = c.scheduledTime.minute.toString().padLeft(2, '0');
     final amPm = hour < 12 ? 'AM' : 'PM';
@@ -2126,11 +2014,14 @@ class _ConsultationsTabState extends State<_ConsultationsTab>
         ),
       );
     }
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: list.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (_, i) => _buildHistoryCard(context, list[i]),
+    return RefreshIndicator(
+      onRefresh: _loadConsultations,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: list.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (_, i) => _buildHistoryCard(context, list[i]),
+      ),
     );
   }
 

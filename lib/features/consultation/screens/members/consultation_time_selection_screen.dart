@@ -164,27 +164,41 @@ class _ConsultationTimeSelectionScreenState
       return;
     }
 
+    final now = DateTime.now();
     final availability = ref.read(expertDetailProvider(widget.expertId))
         .expert
         ?.availability ?? const <AvailabilityDay>[];
-    final displayDates = availability.isNotEmpty
-        ? availability.map((d) => AvailableDate(
+
+    // Lọc ngày tương lai (giống trong build)
+    final futureAvailability = availability.where((d) {
+      final dayEnd = DateTime(d.date.year, d.date.month, d.date.day, 23, 59, 59);
+      return !dayEnd.isBefore(now);
+    }).toList();
+
+    final displayDates = futureAvailability.isNotEmpty
+        ? futureAvailability.map((d) => AvailableDate(
               date: d.date,
               dayLabel: d.dayOfWeek,
               hasAvailability: d.isAvailable,
             )).toList()
         : _mockDates;
-    final displaySlots = (availability.isNotEmpty &&
-            _selectedDateIndex != null &&
-            _selectedDateIndex! < availability.length)
-        ? (availability[_selectedDateIndex!].timeSlots ?? const <TimeSlotEntry>[])
-            .map((e) => TimeSlot(
-                  startTime: e.startTime,
-                  endTime: e.endTime,
-                  isAvailable: true,
-                ))
-            .toList()
-        : _mockTimeSlots;
+
+    // Lọc slot chưa qua cho ngày đang chọn
+    List<TimeSlotEntry> rawSlots = const [];
+    List<TimeSlot> displaySlots = _mockTimeSlots;
+    if (futureAvailability.isNotEmpty &&
+        _selectedDateIndex! < futureAvailability.length) {
+      final selectedDay = futureAvailability[_selectedDateIndex!];
+      rawSlots = (selectedDay.timeSlots ?? const <TimeSlotEntry>[]).where((e) {
+        final parts = e.startTime.split(':');
+        final slotStart = DateTime(selectedDay.date.year, selectedDay.date.month,
+            selectedDay.date.day, int.parse(parts[0]), int.parse(parts[1]));
+        return slotStart.isAfter(now);
+      }).toList();
+      displaySlots = rawSlots
+          .map((e) => TimeSlot(startTime: e.startTime, endTime: e.endTime, isAvailable: true))
+          .toList();
+    }
 
     final selectedDate = displayDates[_selectedDateIndex!];
     final selectedTimeSlot = displaySlots[_selectedTimeSlotIndex!];
@@ -217,26 +231,61 @@ class _ConsultationTimeSelectionScreenState
 
     // Derive display dates and slots from provider when available
     final availability = state.expert?.availability ?? const <AvailabilityDay>[];
+    final now = DateTime.now();
+    // Chỉ giữ ngày mà còn ít nhất 1 slot chưa qua
+    final futureAvailability = availability.where((d) {
+      // Nếu không có slot data, giữ lại nếu ngày chưa hết
+      if (d.timeSlots == null || d.timeSlots!.isEmpty) {
+        final dayEnd = DateTime(d.date.year, d.date.month, d.date.day, 23, 59, 59);
+        return !dayEnd.isBefore(now);
+      }
+      // Có slot data: chỉ giữ nếu còn ít nhất 1 slot trong tương lai
+      return d.timeSlots!.any((e) {
+        final parts = e.startTime.split(':');
+        final slotStart = DateTime(d.date.year, d.date.month, d.date.day,
+            int.parse(parts[0]), int.parse(parts[1]));
+        return slotStart.isAfter(now);
+      });
+    }).toList();
+
     // Use mock dates only while data hasn't loaded yet
-    final displayDates = availability.isNotEmpty
-        ? availability.map((d) => AvailableDate(
+    final displayDates = futureAvailability.isNotEmpty
+        ? futureAvailability.map((d) => AvailableDate(
               date: d.date,
               dayLabel: d.dayOfWeek,
               hasAvailability: d.isAvailable,
             )).toList()
         : (_dataLoaded ? const <AvailableDate>[] : _mockDates);
+
+    // Helper: parse "HH:mm" thành DateTime của ngày được chọn
+    DateTime _slotDateTime(DateTime date, String timeStr) {
+      final parts = timeStr.split(':');
+      return DateTime(date.year, date.month, date.day,
+          int.parse(parts[0]), int.parse(parts[1]));
+    }
+
     final List<TimeSlot> displaySlots;
-    if (availability.isNotEmpty &&
+    final List<TimeSlotEntry> rawSlotsForSelected;
+    if (futureAvailability.isNotEmpty &&
         _selectedDateIndex != null &&
-        _selectedDateIndex! < availability.length) {
-      displaySlots = (availability[_selectedDateIndex!].timeSlots ?? const <TimeSlotEntry>[])
+        _selectedDateIndex! < futureAvailability.length) {
+      final selectedDay = futureAvailability[_selectedDateIndex!];
+      final allSlots = selectedDay.timeSlots ?? const <TimeSlotEntry>[];
+      // Lọc bỏ slot đã qua (so sánh startTime với thời điểm hiện tại)
+      rawSlotsForSelected = allSlots.where((e) {
+        final slotStart = _slotDateTime(selectedDay.date, e.startTime);
+        return slotStart.isAfter(now);
+      }).toList();
+      displaySlots = rawSlotsForSelected
           .map((e) => TimeSlot(startTime: e.startTime, endTime: e.endTime, isAvailable: true))
           .toList();
     } else if (!_dataLoaded) {
       // Still loading — show mock slots so UI isn't empty
+      rawSlotsForSelected = const [];
       displaySlots = _selectedDateIndex != null ? _mockTimeSlots : const [];
     } else {
       // Data loaded but no availability
+      rawSlotsForSelected = const [];
       displaySlots = const [];
     }
 
@@ -291,7 +340,7 @@ class _ConsultationTimeSelectionScreenState
                             Padding(
                               padding: const EdgeInsets.all(16),
                               child: _buildAvailableTimesSection(
-                                  displayDates, displaySlots, availability, theme),
+                                  displayDates, displaySlots, rawSlotsForSelected, theme),
                             ),
                           ],
                         ),
@@ -516,7 +565,7 @@ class _ConsultationTimeSelectionScreenState
   Widget _buildAvailableTimesSection(
     List<AvailableDate> displayDates,
     List<TimeSlot> displaySlots,
-    List<AvailabilityDay> availability,
+    List<TimeSlotEntry> rawSlots,
     ThemeData theme,
   ) {
     if (_selectedDateIndex == null) {
@@ -580,17 +629,10 @@ class _ConsultationTimeSelectionScreenState
                   ? () {
                       setState(() {
                         _selectedTimeSlotIndex = index;
-                        // Store real slot ID if available
-                        if (availability.isNotEmpty &&
-                            _selectedDateIndex != null &&
-                            _selectedDateIndex! < availability.length) {
-                          final slots = availability[_selectedDateIndex!].timeSlots;
-                          _selectedSlotId = slots != null && index < slots.length
-                              ? slots[index].id
-                              : null;
-                        } else {
-                          _selectedSlotId = null;
-                        }
+                        // Lấy slot ID từ rawSlotsForSelected (đã lọc past slots)
+                        _selectedSlotId = index < rawSlots.length
+                            ? rawSlots[index].id
+                            : null;
                       });
                     }
                   : null,

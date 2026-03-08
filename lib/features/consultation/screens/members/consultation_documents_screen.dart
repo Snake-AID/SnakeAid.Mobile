@@ -148,10 +148,11 @@ class _ConsultationDocumentsScreenState
             ? '${booking.feeCost.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} VNĐ'
             : widget.price ?? '150,000 VNĐ';
 
-        // Navigate to payment screen with real consultationId
+        // Navigate to payment screen with real bookingId & consultationId
         context.push(
           '/payment-confirmation/${widget.expertId}',
           extra: {
+            'bookingId': booking.id,
             'consultationId': booking.consultationId ?? '',
             'expertName': booking.expertName,
             'consultationType': 'scheduled',

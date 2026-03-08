@@ -26,6 +26,8 @@ class ConsultationBookingResponse {
   final DateTime? slotStartTime;
   final DateTime? slotEndTime;
   final DateTime? paymentDeadline;
+  final String? userName;             // Patient name (from expert's view)
+  final String? problemDescription;  // Problem submitted by patient
 
   const ConsultationBookingResponse({
     required this.id,
@@ -44,6 +46,8 @@ class ConsultationBookingResponse {
     this.slotStartTime,
     this.slotEndTime,
     this.paymentDeadline,
+    this.userName,
+    this.problemDescription,
   });
 
   factory ConsultationBookingResponse.fromJson(Map<String, dynamic> json) {
@@ -79,6 +83,8 @@ class ConsultationBookingResponse {
       paymentDeadline: json['paymentDeadline'] != null
           ? DateTime.parse(json['paymentDeadline'] as String)
           : null,
+      userName: json['userName'] as String?,
+      problemDescription: json['problemDescription'] as String?,
     );
   }
 

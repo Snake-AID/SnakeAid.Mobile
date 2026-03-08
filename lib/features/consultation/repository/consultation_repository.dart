@@ -34,8 +34,10 @@ class ConsultationRepository {
   /// Returns [ExpertListResponse] with list of experts
   Future<ExpertListResponse> getExperts({
     String? specialty,
-    bool onlineOnly = false,
+    /// null = tất cả, true = chỉ online, false = chỉ offline
+    bool? isOnlineFilter,
     String? sortBy,
+    String? sortOrder,
     int page = 1,
     int pageSize = 20,
   }) async {
@@ -43,30 +45,34 @@ class ConsultationRepository {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       debugPrint('📋 Fetching experts list');
       debugPrint('   Specialty: $specialty');
-      debugPrint('   Online only: $onlineOnly');
-      debugPrint('   Sort by: $sortBy');
+      debugPrint('   IsOnline filter: $isOnlineFilter (null=tất cả)');
+      debugPrint('   Sort by: $sortBy, order: $sortOrder');
       debugPrint('   Page: $page, Size: $pageSize');
 
-      // Build query parameters
+      // Build query parameters — field names match Swagger exactly
       final queryParams = <String, dynamic>{
-        'pageNumber': page,
-        'pageSize': pageSize,
+        'PageNumber': page,
+        'PageSize': pageSize,
       };
 
       if (specialty != null && specialty.isNotEmpty) {
-        queryParams['specialty'] = specialty;
+        queryParams['Specialization'] = specialty;
       }
 
-      if (onlineOnly) {
-        queryParams['onlineOnly'] = true;
+      // Chỉ gửi IsOnline khi được chọn rõ ràng (null = không filter = cả hai)
+      if (isOnlineFilter != null) {
+        queryParams['IsOnline'] = isOnlineFilter;
       }
 
       if (sortBy != null && sortBy.isNotEmpty) {
-        queryParams['sortBy'] = sortBy;
+        queryParams['SortBy'] = sortBy;
+        if (sortOrder != null && sortOrder.isNotEmpty) {
+          queryParams['SortOrder'] = sortOrder;
+        }
       }
 
       final response = await httpService.get(
-        '/api/v1/experts',
+        '/api/experts',
         queryParameters: queryParams,
       );
 
@@ -105,7 +111,7 @@ class ConsultationRepository {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       debugPrint('📋 Fetching expert by id: $expertId');
 
-      final response = await httpService.get('/api/v1/experts/$expertId');
+      final response = await httpService.get('/api/experts/$expertId');
 
       debugPrint('✅ Expert fetched successfully');
 
@@ -146,21 +152,21 @@ class ConsultationRepository {
   /// Get full expert detail: profile + reviews + time slots (3 parallel calls)
   ///
   /// Returns [ExpertDetailModel] assembled from:
-  /// - `GET /api/v1/experts/{id}`
-  /// - `GET /api/v1/experts/{id}/reviews`
-  /// - `GET /api/v1/experts/{id}/time-slots`
+  /// - `GET /api/experts/{id}`
+  /// - `GET /api/experts/{id}/reviews`
+  /// - `GET /api/experts/{id}/time-slots`
   Future<ExpertDetailModel> getExpertDetail(String expertId) async {
     debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     debugPrint('📋 Fetching expert detail (3 parallel): $expertId');
 
     // Start all 3 requests in parallel
-    final profileFuture = httpService.get('/api/v1/experts/$expertId');
+    final profileFuture = httpService.get('/api/experts/$expertId');
     final reviewsFuture = httpService.get(
-      '/api/v1/experts/$expertId/reviews',
+      '/api/experts/$expertId/reviews',
       queryParameters: {'pageNumber': 1, 'pageSize': 10},
     );
     final slotsFuture =
-        httpService.get('/api/v1/experts/$expertId/time-slots');
+        httpService.get('/api/experts/$expertId/time-slots');
 
     // Await results (all running in parallel)
     final profileResponse = await profileFuture;
@@ -218,7 +224,7 @@ class ConsultationRepository {
 
   /// Get reviews for an expert
   ///
-  /// API: `GET /api/v1/experts/{expertId}/reviews`
+  /// API: `GET /api/experts/{expertId}/reviews`
   Future<List<ReviewModel>> getExpertReviews(
     String expertId, {
     int pageNumber = 1,
@@ -228,7 +234,7 @@ class ConsultationRepository {
       debugPrint('📋 Fetching reviews for expert: $expertId');
 
       final response = await httpService.get(
-        '/api/v1/experts/$expertId/reviews',
+        '/api/experts/$expertId/reviews',
         queryParameters: {'pageNumber': pageNumber, 'pageSize': pageSize},
       );
 
@@ -252,13 +258,13 @@ class ConsultationRepository {
 
   /// Get available time slots for an expert
   ///
-  /// API: `GET /api/v1/experts/{expertId}/time-slots`
+  /// API: `GET /api/experts/{expertId}/time-slots`
   Future<List<AvailabilityDay>> getExpertTimeSlots(String expertId) async {
     try {
       debugPrint('📋 Fetching time slots for expert: $expertId');
 
       final response =
-          await httpService.get('/api/v1/experts/$expertId/time-slots');
+          await httpService.get('/api/experts/$expertId/time-slots');
 
       final body = response.data as Map<String, dynamic>;
       if (body['is_success'] == true && body['data'] != null) {
@@ -297,12 +303,11 @@ class ConsultationRepository {
       if (status != null && status != 'Available') continue;
 
       final slotId = (slot['id'] as String?) ?? '';
-      // Use .toUtc() — backend stores Vietnam local time labelled as UTC (no tz conversion),
-      // so we must NOT call .toLocal() or times will be shifted by +7h on device.
-      final startTime = DateTime.parse(startTimeStr).toUtc();
+      // Backend stores real UTC — convert to device local time (Vietnam UTC+7)
+      final startTime = DateTime.parse(startTimeStr).toLocal();
       final endTimeStr = slot['endTime'] as String?;
       final endTime = endTimeStr != null
-          ? DateTime.parse(endTimeStr).toUtc()
+          ? DateTime.parse(endTimeStr).toLocal()
           : startTime.add(const Duration(minutes: 30));
 
       final dateKey =
@@ -346,12 +351,12 @@ class ConsultationRepository {
 
   /// Get all bookings for the current logged-in member
   ///
-  /// API: `GET /api/v1/consultation-bookings/my-bookings`
+  /// API: `GET /api/users/me/consultation-bookings`
   Future<List<ConsultationBookingResponse>> getMyBookings() async {
     try {
       debugPrint('📋 Fetching my bookings');
       final response =
-          await httpService.get('/api/v1/consultation-bookings/my-bookings');
+          await httpService.get('/api/users/me/consultation-bookings');
 
       final body = response.data as Map<String, dynamic>;
       if (body['is_success'] == true && body['data'] != null) {
@@ -374,7 +379,7 @@ class ConsultationRepository {
 
   /// Create a new consultation booking
   ///
-  /// API: `POST /api/v1/consultation-bookings`
+  /// API: `POST /api/consultation-bookings`
   ///
   /// Throws:
   /// - `409` when the slot has already been booked (race condition)
@@ -385,7 +390,7 @@ class ConsultationRepository {
     debugPrint('📋 Creating booking for slot: ${request.timeSlotId}');
 
     final response = await httpService.post(
-      '/api/v1/consultation-bookings',
+      '/api/consultation-bookings',
       data: request.toJson(),
     );
 
@@ -436,7 +441,7 @@ class ConsultationRepository {
 
   /// End a consultation session.
   ///
-  /// API: `POST /api/v1/consultations/{consultationId}/end`
+  /// API: `POST /api/consultations/{consultationId}/end`
   ///
   /// Returns true on success; does not throw — failures are logged only
   /// so the UI can always navigate away.
@@ -444,7 +449,7 @@ class ConsultationRepository {
     try {
       debugPrint('🏁 Ending consultation: $consultationId');
       final response = await httpService.post(
-        '/api/v1/consultations/$consultationId/end',
+        '/api/consultations/$consultationId/end',
       );
       final body = response.data as Map<String, dynamic>;
       return body['is_success'] == true;
@@ -456,7 +461,7 @@ class ConsultationRepository {
 
   /// Submit a review for a completed consultation.
   ///
-  /// API: `POST /api/v1/consultations/{consultationId}/reviews`
+  /// API: `POST /api/consultations/{consultationId}/reviews`
   ///
   /// Throws on validation errors or permission errors.
   Future<void> submitReview({
@@ -467,10 +472,10 @@ class ConsultationRepository {
     debugPrint('⭐ Submitting review for consultation: $consultationId, rating: $rating');
 
     final response = await httpService.post(
-      '/api/v1/consultations/$consultationId/reviews',
+      '/api/consultations/$consultationId/reviews',
       data: {
         'rating': rating,
-        'comment': comment,
+        'comments': comment,
       },
     );
 
@@ -486,7 +491,7 @@ class ConsultationRepository {
 
   /// Update the current expert's profile settings.
   ///
-  /// API: `PUT /api/v1/experts/me/settings`
+  /// API: `PUT /api/experts/me/settings`
   ///
   /// Provide at least one of [consultationFee], [biography], [specializations].
   /// Null values are omitted from the request body.
@@ -506,7 +511,7 @@ class ConsultationRepository {
     debugPrint('⚙️  Updating expert settings: $body');
 
     final response = await httpService.put(
-      '/api/v1/experts/me/settings',
+      '/api/experts/me/settings',
       data: body,
     );
 
@@ -540,7 +545,7 @@ class ConsultationRepository {
     debugPrint('📅 Submitting bulk time slots for week $weekStartDate (${days.length} days)');
 
     final response = await httpService.post(
-      '/api/v1/experts/me/time-slots/bulk',
+      '/api/experts/me/time-slots/bulk',
       data: {
         'weekStartDate': weekStartDate,
         'days': days,
@@ -557,6 +562,70 @@ class ConsultationRepository {
         throw Exception('Một số khung giờ đã bị trùng, vui lòng thử lại');
       }
       throw Exception(body['message'] ?? 'Không thể lưu lịch làm việc');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Payment methods
+  // ---------------------------------------------------------------------------
+
+  /// Pay for a scheduled consultation booking.
+  ///
+  /// API: `POST /api/consultation-bookings/{bookingId}/payments`
+  ///
+  /// Throws:
+  /// - 409 when booking already paid or not in `PendingPayment`
+  /// - 409 when wallet balance is insufficient
+  Future<void> payBooking(String bookingId) async {
+    debugPrint('💳 Paying booking: $bookingId');
+
+    final response = await httpService.post(
+      '/api/consultation-bookings/$bookingId/payments',
+      data: {'paymentMethod': 'WalletBalance'},
+    );
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] != true) {
+      final statusCode = body['status_code'] as int? ?? 0;
+      final msg = (body['message'] as String?) ?? '';
+      if (statusCode == 409 &&
+          (msg.toLowerCase().contains('balance') ||
+              msg.toLowerCase().contains('wallet'))) {
+        throw Exception('Số dư ví không đủ để thanh toán');
+      }
+      throw Exception(msg.isNotEmpty ? msg : 'Không thể thanh toán');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Expert booking methods
+  // ---------------------------------------------------------------------------
+
+  /// Get all bookings for the current logged-in expert.
+  ///
+  /// API: `GET /api/experts/me/consultation-bookings`
+  Future<List<ConsultationBookingResponse>> getExpertBookings() async {
+    try {
+      debugPrint('📋 Fetching expert bookings');
+      final response =
+          await httpService.get('/api/experts/me/consultation-bookings');
+
+      final body = response.data as Map<String, dynamic>;
+      if (body['is_success'] == true && body['data'] != null) {
+        final list = body['data'] as List<dynamic>;
+        return list
+            .map((e) => ConsultationBookingResponse.fromJson(
+                  e as Map<String, dynamic>,
+                ))
+            .toList();
+      }
+      return [];
+    } on DioException catch (e) {
+      debugPrint('❌ Failed to fetch expert bookings: ${e.message}');
+      return [];
+    } catch (e) {
+      debugPrint('❌ Unexpected error fetching expert bookings: $e');
+      return [];
     }
   }
 }

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/expert_detail_provider.dart';
+import '../../providers/consultation_bookings_provider.dart';
+import '../../repository/consultation_repository.dart';
 
 // Primary color constant
 const Color _primaryColor = Color(0xFF228B22);
@@ -27,6 +29,8 @@ class PaymentConfirmationScreen extends ConsumerStatefulWidget {
   final int uploadedImagesCount;
   final String? problemDescription;
   final String? questions;
+  /// Booking ID for payment API call
+  final String? bookingId;
   /// Real consultation ID from createBooking response
   final String? consultationId;
   /// Expert name from createBooking response
@@ -44,6 +48,7 @@ class PaymentConfirmationScreen extends ConsumerStatefulWidget {
     this.uploadedImagesCount = 0,
     this.problemDescription,
     this.questions,
+    this.bookingId,
     this.consultationId,
     this.expertName,
   });
@@ -57,31 +62,34 @@ class _PaymentConfirmationScreenState
     extends ConsumerState<PaymentConfirmationScreen> {
   PaymentMethod _selectedPaymentMethod = PaymentMethod.payos;
   bool _agreedToTerms = false;
+  bool _isPaymentLoading = false;
 
-  void _handlePayment() {
-    if (widget.consultationId != null && widget.consultationId!.isNotEmpty) {
-      // Real booking — navigate to waiting room
-      final state = ref.read(expertDetailProvider(widget.expertId));
-      final expertDisplayName = widget.expertName ??
-          state.expert?.displayName ??
-          'Chuyên Gia';
-      final expertSpecialty = state.expert?.primarySpecialty ?? '';
-      context.push(
-        '/video-waiting/${widget.consultationId}',
-        extra: {
-          'expertName': expertDisplayName,
-          'expertSpecialty': expertSpecialty,
-        },
-      );
+  Future<void> _handlePayment() async {
+    if (widget.bookingId == null || widget.bookingId!.isEmpty) {
+      context.go('/consultation-home');
       return;
     }
-    // Fallback mock (no real consultationId)
-    final newConsultationId =
-        'new_${DateTime.now().millisecondsSinceEpoch}';
-    context.go(
-      '/consultation-home',
-      extra: {'newConsultationId': newConsultationId},
-    );
+    setState(() => _isPaymentLoading = true);
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      await repo.payBooking(widget.bookingId!);
+      ref.invalidate(consultationBookingsProvider);
+      if (!mounted) return;
+      context.go(
+        '/consultation-home',
+        extra: {'newConsultationId': widget.bookingId},
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isPaymentLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _handleCancel() {
@@ -807,20 +815,29 @@ class _PaymentConfirmationScreenState
               width: double.infinity,
               height: 48,
               child: FilledButton(
-                onPressed: _handlePayment,
+                onPressed: _isPaymentLoading ? null : _handlePayment,
                 style: FilledButton.styleFrom(
                   backgroundColor: _primaryColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'Xác Nhận & Thanh Toán',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                child: _isPaymentLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Xác Nhận & Thanh Toán',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ),
             const SizedBox(height: 12),

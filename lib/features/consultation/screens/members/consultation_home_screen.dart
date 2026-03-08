@@ -15,7 +15,8 @@ enum ConsultationStatus {
 
 /// Internal UI model for a consultation card
 class _ConsultationItem {
-  final String id;
+  final String id;             // bookingId — dùng cho highlight, display
+  final String? consultationId; // consultationId thật — dùng cho LiveKit token
   final String expertName;
   final String expertSpecialty;
   final String? expertAvatarUrl;
@@ -27,6 +28,7 @@ class _ConsultationItem {
 
   const _ConsultationItem({
     required this.id,
+    this.consultationId,
     required this.expertName,
     required this.expertSpecialty,
     this.expertAvatarUrl,
@@ -55,6 +57,7 @@ class _ConsultationItem {
 
     return _ConsultationItem(
       id: b.id,
+      consultationId: b.consultationId,
       expertName: b.expertName,
       expertSpecialty: b.expertSpecialty ?? '',
       expertAvatarUrl: b.expertAvatarUrl,
@@ -1051,8 +1054,9 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
   }
 
   void _joinConsultation(BuildContext context, _ConsultationItem item) {
+    final roomId = item.consultationId ?? item.id;
     context.push(
-      '/video-waiting/${item.id}',
+      '/video-waiting/$roomId',
       extra: {
         'expertName': item.expertName,
         'expertSpecialty': item.expertSpecialty,

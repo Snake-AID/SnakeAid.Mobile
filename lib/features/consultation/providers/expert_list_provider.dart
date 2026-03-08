@@ -10,8 +10,9 @@ class ExpertListState {
   final bool isLoading;
   final String? error;
   final String? selectedSpecialty;
-  final bool onlineOnly;
-  final String sortBy; // 'rating', 'fee', 'reviews'
+  /// null = tất cả, true = chỉ online, false = chỉ offline
+  final bool? isOnlineFilter;
+  final String sortBy;
   final int totalCount;
   final int onlineCount;
   final List<String> specialties;
@@ -22,8 +23,8 @@ class ExpertListState {
     this.isLoading = false,
     this.error,
     this.selectedSpecialty,
-    this.onlineOnly = false,
-    this.sortBy = 'online', // Default: online first
+    this.isOnlineFilter,   // null = default (cả hai)
+    this.sortBy = 'online', // Default: sort online lên trước (client-side)
     this.totalCount = 0,
     this.onlineCount = 0,
     this.specialties = const [],
@@ -35,13 +36,14 @@ class ExpertListState {
     bool? isLoading,
     String? error,
     String? selectedSpecialty,
-    bool? onlineOnly,
+    bool? isOnlineFilter,
     String? sortBy,
     int? totalCount,
     int? onlineCount,
     List<String>? specialties,
     bool clearError = false,
     bool clearSpecialty = false,
+    bool clearIsOnlineFilter = false,
   }) {
     return ExpertListState(
       experts: experts ?? this.experts,
@@ -51,7 +53,8 @@ class ExpertListState {
       selectedSpecialty: clearSpecialty
           ? null
           : (selectedSpecialty ?? this.selectedSpecialty),
-      onlineOnly: onlineOnly ?? this.onlineOnly,
+      isOnlineFilter:
+          clearIsOnlineFilter ? null : (isOnlineFilter ?? this.isOnlineFilter),
       sortBy: sortBy ?? this.sortBy,
       totalCount: totalCount ?? this.totalCount,
       onlineCount: onlineCount ?? this.onlineCount,
@@ -89,10 +92,33 @@ class ExpertListNotifier extends StateNotifier<ExpertListState> {
 
       state = state.copyWith(isLoading: true, clearError: true);
 
+      // Map UI sort key → API SortBy/SortOrder
+      // 'online' chỉ sort client-side, KHÔNG gửi IsOnline lên API
+      String? apiSortBy;
+      String? apiSortOrder;
+      switch (state.sortBy) {
+        case 'online':
+          // client-side only — API trả về tất cả, sau đó sort local
+          break;
+        case 'Rating':
+          apiSortBy = 'Rating';
+          apiSortOrder = 'desc';
+          break;
+        case 'ConsultationFee':
+          apiSortBy = 'ConsultationFee';
+          apiSortOrder = 'asc';
+          break;
+        case 'ReviewCount':
+          apiSortBy = 'ReviewCount';
+          apiSortOrder = 'desc';
+          break;
+      }
+
       final response = await _repository.getExperts(
         specialty: state.selectedSpecialty,
-        onlineOnly: state.onlineOnly,
-        sortBy: state.sortBy,
+        isOnlineFilter: state.isOnlineFilter, // null=tất cả, true=online, false=offline
+        sortBy: apiSortBy,
+        sortOrder: apiSortOrder,
       );
 
       if (response.isSuccess && response.data != null) {
@@ -136,7 +162,7 @@ class ExpertListNotifier extends StateNotifier<ExpertListState> {
   }
 
   /// Filter by specialty
-  void filterBySpecialty(String? specialty) {
+  Future<void> filterBySpecialty(String? specialty) async {
     debugPrint('🔍 Filtering by specialty: $specialty');
 
     state = state.copyWith(
@@ -144,34 +170,26 @@ class ExpertListNotifier extends StateNotifier<ExpertListState> {
       clearSpecialty: specialty == null || specialty == 'Tất cả chuyên môn',
     );
 
-    // Apply filters
-    state = state.copyWith(
-      filteredExperts: _applyFiltersAndSort(state.experts),
-    );
+    await loadExperts();
   }
 
-  /// Toggle online only filter
-  void toggleOnlineOnly(bool onlineOnly) {
-    debugPrint('🔍 Toggle online only: $onlineOnly');
-
-    state = state.copyWith(onlineOnly: onlineOnly);
-
-    // Apply filters
+  /// Set IsOnline filter: null = tất cả, true = chỉ online, false = chỉ offline
+  Future<void> setIsOnlineFilter(bool? value) async {
+    debugPrint('🔍 IsOnline filter: $value');
     state = state.copyWith(
-      filteredExperts: _applyFiltersAndSort(state.experts),
+      isOnlineFilter: value,
+      clearIsOnlineFilter: value == null,
     );
+    await loadExperts();
   }
 
   /// Change sort order
-  void changeSortOrder(String sortBy) {
+  Future<void> changeSortOrder(String sortBy) async {
     debugPrint('🔄 Changing sort order: $sortBy');
 
     state = state.copyWith(sortBy: sortBy);
 
-    // Apply filters
-    state = state.copyWith(
-      filteredExperts: _applyFiltersAndSort(state.experts),
-    );
+    await loadExperts();
   }
 
   /// Clear all filters
@@ -180,7 +198,7 @@ class ExpertListNotifier extends StateNotifier<ExpertListState> {
 
     state = state.copyWith(
       clearSpecialty: true,
-      onlineOnly: false,
+      clearIsOnlineFilter: true,
       filteredExperts: _applyFiltersAndSort(state.experts),
     );
   }
@@ -199,20 +217,22 @@ class ExpertListNotifier extends StateNotifier<ExpertListState> {
       }).toList();
     }
 
-    // Filter by online status
-    if (state.onlineOnly) {
+    // Filter by online status (client-side mirror của IsOnline API filter)
+    if (state.isOnlineFilter == true) {
       filtered = filtered.where((expert) => expert.isOnline).toList();
+    } else if (state.isOnlineFilter == false) {
+      filtered = filtered.where((expert) => !expert.isOnline).toList();
     }
 
-    // Sort
+    // Sort (client-side fallback)
     switch (state.sortBy) {
-      case 'rating':
+      case 'Rating':
         filtered.sort((a, b) => b.rating.compareTo(a.rating));
         break;
-      case 'fee':
+      case 'ConsultationFee':
         filtered.sort((a, b) => a.consultationFee.compareTo(b.consultationFee));
         break;
-      case 'reviews':
+      case 'ReviewCount':
         filtered.sort((a, b) => b.reviewCount.compareTo(a.reviewCount));
         break;
       case 'online':

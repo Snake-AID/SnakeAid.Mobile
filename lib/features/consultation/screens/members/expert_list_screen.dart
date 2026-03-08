@@ -40,7 +40,7 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
 
             // Active Filter Chips
             if (expertState.selectedSpecialty != null ||
-                expertState.onlineOnly)
+                expertState.isOnlineFilter != null)
               _buildFilterChips(context, expertState),
 
             // Stats
@@ -216,17 +216,19 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
                 },
               ),
 
-            // Online Only Chip
-            if (state.onlineOnly)
+            // IsOnline Filter Chip
+            if (state.isOnlineFilter != null)
               Padding(
                 padding: EdgeInsets.only(
                     left: state.selectedSpecialty != null ? 8 : 0),
                 child: _buildFilterChip(
-                  label: 'Đang Online',
+                  label: state.isOnlineFilter == true
+                      ? 'Chỉ Online'
+                      : 'Chỉ Offline',
                   onRemove: () {
                     ref
                         .read(expertListProvider.notifier)
-                        .toggleOnlineOnly(false);
+                        .setIsOnlineFilter(null);
                   },
                 ),
               ),
@@ -646,9 +648,9 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
   void _showSortByPicker(BuildContext context, ExpertListState state) {
     final sortOptions = {
       'online': 'Đang Online',
-      'rating': 'Đánh giá cao nhất',
-      'fee': 'Phí thấp nhất',
-      'reviews': 'Nhiều đánh giá nhất',
+      'Rating': 'Đánh giá cao nhất',
+      'ConsultationFee': 'Phí thấp nhất',
+      'ReviewCount': 'Nhiều đánh giá nhất',
     };
 
     showModalBottomSheet(
@@ -693,11 +695,11 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
   /// Get sort by label
   String _getSortByLabel(String sortBy) {
     switch (sortBy) {
-      case 'rating':
+      case 'Rating':
         return 'Đánh giá cao nhất';
-      case 'fee':
+      case 'ConsultationFee':
         return 'Phí thấp nhất';
-      case 'reviews':
+      case 'ReviewCount':
         return 'Nhiều đánh giá nhất';
       case 'online':
       default:

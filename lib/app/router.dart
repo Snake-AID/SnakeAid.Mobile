@@ -482,6 +482,7 @@ final router = GoRouter(
           uploadedImagesCount: extraData?['uploadedImagesCount'] ?? 0,
           problemDescription: extraData?['problemDescription'],
           questions: extraData?['questions'],
+          bookingId: extraData?['bookingId'] as String?,
           consultationId: extraData?['consultationId'] as String?,
           expertName: extraData?['expertName'] as String?,
         );
