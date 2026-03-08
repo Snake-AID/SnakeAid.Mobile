@@ -11,9 +11,11 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import '../models/rescue_request.dart';
 import '../models/detailed_incident_response.dart';
+import '../models/rescue_mission_response.dart';
 import '../repository/incident_repository.dart';
 import '../providers/rescuer_emergency_provider.dart';
 import '../providers/mission_hub_provider.dart';
+import '../providers/active_mission_provider.dart';
 import '../../rescuer/providers/tracking_provider.dart';
 import '../../../core/services/nominatim_service.dart';
 import '../../../core/utils/distance_utils.dart';
@@ -356,6 +358,23 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
             backgroundColor: Colors.green,
           ),
         );
+
+        // Save mission to active_mission_provider for persistence
+        if (response.missionId != null && response.incidentId != null) {
+          final basicMission = BasicRescueMissionResponse(
+            missionId: response.missionId!,
+            incidentId: response.incidentId!,
+            status: 'Preparing', // Initial status when accepted
+            acceptedAt: DateTime.now(),
+            startedAt: null,
+          );
+          await ref
+              .read(activeMissionProvider.notifier)
+              .saveActiveMission(basicMission);
+          debugPrint(
+            '💾 [RescueRequestModal] Active mission saved: ${response.missionId}',
+          );
+        }
 
         // Navigate FIRST for instant UI response
         if (response.missionId != null) {
@@ -1162,7 +1181,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
   Widget _buildSymptomsCard() {
     final hasSymptoms =
         _incident!.symptomsReport != null &&
-        _incident!.symptomsReport!.trim().isNotEmpty;
+        _incident!.symptomsReport!.isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -1176,9 +1195,22 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
         ),
       ),
       child: hasSymptoms
-          ? Text(
-              _incident!.symptomsReport!,
-              style: const TextStyle(fontSize: 14, color: Color(0xFFE65100)),
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: _incident!.symptomsReport!
+                  .map(
+                    (symptom) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        '• ${symptom.symptomName}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFFE65100),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
             )
           : Row(
               children: [

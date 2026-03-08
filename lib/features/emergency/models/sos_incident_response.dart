@@ -30,12 +30,40 @@ class SosIncidentResponse {
   String toString() => 'SosIncidentResponse(isSuccess: $isSuccess, message: $message)';
 }
 
+/// Report Symptom Model
+/// Individual symptom reported by member
+class ReportSymptom {
+  final int symptomId;
+  final String symptomName;
+  final String symptomDescription;
+
+  ReportSymptom({
+    required this.symptomId,
+    required this.symptomName,
+    required this.symptomDescription,
+  });
+
+  factory ReportSymptom.fromJson(Map<String, dynamic> json) {
+    return ReportSymptom(
+      symptomId: json['symptomId'] ?? 0,
+      symptomName: json['symptomName'] ?? '',
+      symptomDescription: json['symptomDescription'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'symptomId': symptomId,
+    'symptomName': symptomName,
+    'symptomDescription': symptomDescription,
+  };
+}
+
 /// Incident Data
 class IncidentData {
   final String id;
   final String userId;
   final LocationCoordinates locationCoordinates;
-  final String? symptomsReport;
+  final List<ReportSymptom>? symptomsReport;
   final String status; // "Pending", "InProgress", "Completed", etc.
   final int currentSessionNumber;
   final int currentRadiusKm;
@@ -69,7 +97,9 @@ class IncidentData {
       id: json['id'] ?? '',
       userId: json['userId'] ?? '',
       locationCoordinates: LocationCoordinates.fromJson(json['locationCoordinates'] ?? {}),
-      symptomsReport: json['symptomsReport'],
+      symptomsReport: (json['symptomsReport'] as List<dynamic>?)
+          ?.map((s) => ReportSymptom.fromJson(s))
+          .toList(),
       status: json['status'] ?? 'Pending',
       currentSessionNumber: json['currentSessionNumber'] ?? 1,
       currentRadiusKm: json['currentRadiusKm'] ?? 5,
@@ -96,7 +126,7 @@ class IncidentData {
     'id': id,
     'userId': userId,
     'locationCoordinates': locationCoordinates.toJson(),
-    'symptomsReport': symptomsReport,
+    'symptomsReport': symptomsReport?.map((s) => s.toJson()).toList(),
     'status': status,
     'currentSessionNumber': currentSessionNumber,
     'currentRadiusKm': currentRadiusKm,

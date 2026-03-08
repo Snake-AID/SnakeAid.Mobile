@@ -12,6 +12,7 @@ import '../../models/rescue_mission_response.dart';
 import '../../models/detailed_incident_response.dart';
 import '../../models/route_navigation_data.dart';
 import '../../providers/mission_detail_provider.dart';
+import '../../providers/active_mission_provider.dart';
 import '../../widgets/snake_risk_badges.dart';
 import '../../../../core/utils/distance_utils.dart';
 import '../../../../core/providers/openroute_provider.dart';
@@ -344,7 +345,7 @@ class _RescuerMissionDetailScreenState
                 IconButton(
                   icon: const Icon(Icons.phone),
                   onPressed: () =>
-                      _makePhoneCall(mission.user.account?.phoneNumber ?? ''),
+                      _makePhoneCall(mission.user.phoneNumber ?? ''),
                   style: IconButton.styleFrom(
                     backgroundColor: const Color(0xFFFF8800).withOpacity(0.1),
                   ),
@@ -825,7 +826,7 @@ class _RescuerMissionDetailScreenState
               ),
               IconButton(
                 icon: const Icon(Icons.phone, color: Color(0xFFFF8800)),
-                onPressed: () => _makePhoneCall(account?.phoneNumber ?? ''),
+                onPressed: () => _makePhoneCall(user.phoneNumber ?? ''),
               ),
             ],
           ),
@@ -1063,7 +1064,7 @@ class _RescuerMissionDetailScreenState
   Widget _buildSymptomsCard(DetailRescueMissionResponse mission) {
     final hasSymptoms =
         mission.incident.symptomsReport != null &&
-        mission.incident.symptomsReport!.trim().isNotEmpty;
+        mission.incident.symptomsReport!.isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1101,12 +1102,22 @@ class _RescuerMissionDetailScreenState
           ),
           const SizedBox(height: 12),
           hasSymptoms
-              ? Text(
-                  mission.incident.symptomsReport!,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFFE65100),
-                  ),
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: mission.incident.symptomsReport!
+                      .map(
+                        (symptom) => Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text(
+                            '• ${symptom.symptomName}',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFFE65100),
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
                 )
               : Row(
                   children: [
@@ -1329,8 +1340,9 @@ class _RescuerMissionDetailScreenState
                                   ],
                                 ),
                                 const SizedBox(height: 10),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceEvenly,
                                   children: [
                                     SnakeRiskBadges.buildRiskLevelBadge(
                                       currentMedia
@@ -1398,17 +1410,16 @@ class _RescuerMissionDetailScreenState
                                 const SizedBox(
                                   width: 20,
                                   height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Color(0xFFFF9800),
-                                    ),
+                                  child: Icon(
+                                    Icons.hourglass_top,
+                                    size: 20,
+                                    color: Color(0xFFFF9800),
                                   ),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    'Đang xử lý AI...',
+                                    'Chưa có kết quả nhận diện.',
                                     style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,
@@ -1819,6 +1830,12 @@ class _RescuerMissionDetailScreenState
     if (!mounted) return;
 
     if (success) {
+      // Update active mission status to EnRoute
+      await ref
+          .read(activeMissionProvider.notifier)
+          .updateMissionStatus('EnRoute');
+      debugPrint('💾 Active mission status updated: EnRoute');
+
       final mission = ref.read(missionDetailProvider).mission;
       final routeData = ref.read(missionDetailProvider).routeData;
 

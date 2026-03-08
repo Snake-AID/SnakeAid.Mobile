@@ -1,4 +1,5 @@
 import 'snake_identification_response.dart';
+import 'sos_incident_response.dart';
 
 /// API Wrapper Response
 class DetailedIncidentResponse {
@@ -37,7 +38,7 @@ class DetailedIncidentResponse {
 class DetailedIncidentData {
   final String id;
   final GeoPointCoordinates locationCoordinates;
-  final String? symptomsReport;
+  final List<ReportSymptom>? symptomsReport;
   final IncidentStatus status;
 
   // Session info
@@ -95,7 +96,9 @@ class DetailedIncidentData {
       locationCoordinates: GeoPointCoordinates.fromJson(
         json['locationCoordinates'] ?? {},
       ),
-      symptomsReport: json['symptomsReport'],
+      symptomsReport: (json['symptomsReport'] as List<dynamic>?)
+          ?.map((s) => ReportSymptom.fromJson(s as Map<String, dynamic>))
+          .toList(),
       status: IncidentStatus.fromString(json['status'] ?? 'Pending'),
       currentSessionNumber: json['currentSessionNumber'] ?? 1,
       currentRadiusKm: json['currentRadiusKm'] ?? 5,
@@ -139,7 +142,7 @@ class DetailedIncidentData {
   Map<String, dynamic> toJson() => {
     'id': id,
     'locationCoordinates': locationCoordinates.toJson(),
-    'symptomsReport': symptomsReport,
+    'symptomsReport': symptomsReport?.map((s) => s.toJson()).toList(),
     'status': status.value,
     'currentSessionNumber': currentSessionNumber,
     'currentRadiusKm': currentRadiusKm,
@@ -257,6 +260,7 @@ class BriefRescuerProfile {
   final bool isOnline;
   final double rating;
   final int ratingCount;
+  final String? phoneNumber;
   final RescuerType type;
   final GeoPointCoordinates? lastLocation;
   final DateTime? lastLocationUpdate;
@@ -270,6 +274,7 @@ class BriefRescuerProfile {
     required this.rating,
     required this.ratingCount,
     required this.type,
+    this.phoneNumber,
     this.lastLocation,
     this.lastLocationUpdate,
     required this.totalMissions,
@@ -284,6 +289,7 @@ class BriefRescuerProfile {
       rating: (json['rating'] ?? 0.0).toDouble(),
       ratingCount: json['ratingCount'] ?? 0,
       type: RescuerType.fromString(json['type'] ?? 'Emergency'),
+      phoneNumber: json['phoneNumber'],
       lastLocation: json['lastLocation'] != null
           ? GeoPointCoordinates.fromJson(json['lastLocation'])
           : null,
@@ -303,6 +309,7 @@ class BriefRescuerProfile {
     'isOnline': isOnline,
     'rating': rating,
     'ratingCount': ratingCount,
+    'phoneNumber': phoneNumber,
     'type': type.value,
     'lastLocation': lastLocation?.toJson(),
     'lastLocationUpdate': lastLocationUpdate?.toIso8601String(),

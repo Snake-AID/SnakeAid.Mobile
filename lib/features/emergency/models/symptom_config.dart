@@ -15,15 +15,63 @@ class SymptomConfigResponse {
   });
 
   factory SymptomConfigResponse.fromJson(Map<String, dynamic> json) {
+    List<GroupedSymptomConfig>? groupedData;
+
+    if (json['data'] != null) {
+      final rawData = json['data'] as List<dynamic>;
+
+      // Check if data is already grouped (has 'options' key) or flat list
+      if (rawData.isNotEmpty && rawData[0]['options'] != null) {
+        // Already grouped format from backend
+        groupedData = rawData
+            .map((g) => GroupedSymptomConfig.fromJson(g))
+            .toList();
+      } else {
+        // Flat list format - need to group by attributeKey
+        // Use LinkedHashMap to preserve order
+        final Map<String, Map<String, dynamic>> groupMap = {};
+        final Map<String, List<Map<String, dynamic>>> optionsMap = {};
+
+        for (var item in rawData) {
+          final attributeKey = item['attributeKey'] as String;
+          
+          // Store first occurrence for group metadata
+          if (!groupMap.containsKey(attributeKey)) {
+            groupMap[attributeKey] = item;
+            optionsMap[attributeKey] = [];
+          }
+          
+          // Collect all options for this attributeKey
+          optionsMap[attributeKey]!.add(item);
+        }
+
+        // Convert to GroupedSymptomConfig list
+        groupedData = groupMap.entries.map((entry) {
+          final attributeKey = entry.key;
+          final firstItem = entry.value;
+          final options = optionsMap[attributeKey]!;
+          
+          return GroupedSymptomConfig(
+            groupName: firstItem['groupName'] ?? '',
+            attributeKey: attributeKey,
+            attributeLabel: firstItem['attributeLabel'] ?? '',
+            displayOrder: firstItem['displayOrder'] ?? 0,
+            options: options
+                .map((item) => SymptomOption.fromJson(item))
+                .toList(),
+          );
+        }).toList();
+        
+        // Sort by displayOrder
+        groupedData.sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+      }
+    }
+
     return SymptomConfigResponse(
       statusCode: json['status_code'] ?? 0,
       message: json['message'] ?? '',
       isSuccess: json['is_success'] ?? false,
-      data: json['data'] != null
-          ? (json['data'] as List<dynamic>)
-                .map((g) => GroupedSymptomConfig.fromJson(g))
-                .toList()
-          : null,
+      data: groupedData,
       error: json['error'],
     );
   }

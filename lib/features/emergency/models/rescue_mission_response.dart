@@ -1,6 +1,7 @@
 import 'package:json_annotation/json_annotation.dart';
 import 'package:snakeaid_mobile/features/emergency/models/snake_identification_response.dart';
 import 'detailed_incident_response.dart';
+import 'sos_incident_response.dart';
 
 part 'rescue_mission_response.g.dart';
 
@@ -163,7 +164,7 @@ class BriefIncidentForMission {
   final String status;
 
   @JsonKey(name: 'symptomsReport')
-  final String? symptomsReport;
+  final List<ReportSymptom>? symptomsReport;
 
   @JsonKey(name: 'severityLevel')
   final int? severityLevel;
@@ -263,4 +264,51 @@ class CancelMissionRequest {
       _$CancelMissionRequestFromJson(json);
 
   Map<String, dynamic> toJson() => _$CancelMissionRequestToJson(this);
+}
+
+/// Basic Rescue Mission Response
+/// Lightweight mission data for persistence in SharedPreferences
+/// Used by active_mission_provider for caching active mission
+@JsonSerializable()
+class BasicRescueMissionResponse {
+  @JsonKey(name: 'missionId')
+  final String missionId;
+
+  @JsonKey(name: 'incidentId')
+  final String incidentId;
+
+  @JsonKey(name: 'status')
+  final String status;
+
+  @JsonKey(name: 'startedAt')
+  final DateTime? startedAt;
+
+  @JsonKey(name: 'acceptedAt')
+  final DateTime? acceptedAt;
+
+  BasicRescueMissionResponse({
+    required this.missionId,
+    required this.incidentId,
+    required this.status,
+    this.startedAt,
+    this.acceptedAt,
+  });
+
+  factory BasicRescueMissionResponse.fromJson(Map<String, dynamic> json) =>
+      _$BasicRescueMissionResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$BasicRescueMissionResponseToJson(this);
+
+  /// Convert from detailed mission
+  factory BasicRescueMissionResponse.fromDetailed(
+    DetailRescueMissionResponse detailed,
+  ) {
+    return BasicRescueMissionResponse(
+      missionId: detailed.id,
+      incidentId: detailed.incidentId,
+      status: detailed.status,
+      startedAt: detailed.startedAt,
+      acceptedAt: detailed.createdAt,
+    );
+  }
 }

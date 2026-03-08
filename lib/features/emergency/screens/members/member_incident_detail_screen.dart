@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/detailed_incident_response.dart';
 import '../../models/snake_identification_response.dart';
-import '../../repository/incident_repository.dart';
+import '../../providers/detailed_incident_provider.dart';
+import '../../providers/incident_provider.dart';
 import '../../widgets/snake_risk_badges.dart';
 
 /// Member Incident Detail Screen
@@ -30,56 +31,49 @@ class MemberIncidentDetailScreen extends ConsumerStatefulWidget {
 
 class _MemberIncidentDetailScreenState
     extends ConsumerState<MemberIncidentDetailScreen> {
-  DetailedIncidentData? _detailedIncident;
-  bool _isLoading = true;
-  String? _errorMessage;
-
   @override
   void initState() {
     super.initState();
     debugPrint('📋 [IncidentDetail] Opened for incident: ${widget.incidentId}');
-    _loadDetailedIncident();
-  }
 
-  Future<void> _loadDetailedIncident() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    // Load detailed incident via provider (uses smart caching)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Get incident ID - prefer from active incident provider if widget.incidentId is empty
+      final activeIncidentId = ref
+          .read(activeIncidentProvider)
+          .activeIncidentId;
+      final incidentId = widget.incidentId.isNotEmpty
+          ? widget.incidentId
+          : (activeIncidentId ?? '');
 
-    try {
-      final repository = ref.read(incidentRepositoryProvider);
-      final response = await repository.getDetailedIncident(widget.incidentId);
+      debugPrint('🔍 Using incident ID: $incidentId');
 
-      if (!mounted) return;
-
-      if (response.isSuccess && response.data != null) {
-        setState(() {
-          _detailedIncident = response.data;
-          _isLoading = false;
-        });
-        debugPrint(
-          '✅ [IncidentDetail] Loaded detailed incident: ${response.data!.id}',
-        );
-      } else {
-        setState(() {
-          _errorMessage = response.message;
-          _isLoading = false;
-        });
-        debugPrint('❌ [IncidentDetail] Failed to load: ${response.message}');
+      if (incidentId.isEmpty) {
+        debugPrint('❌ No incident ID available!');
+        return;
       }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = e.toString();
-        _isLoading = false;
-      });
-      debugPrint('❌ [IncidentDetail] Error loading incident: $e');
-    }
+
+      // Check if we already have cached data
+      final detailedIncidentState = ref.read(detailedIncidentProvider);
+      final hasValidCache =
+          detailedIncidentState.incident?.id == incidentId &&
+          detailedIncidentState.isCacheFresh;
+
+      if (hasValidCache) {
+        debugPrint('✅ Using cached incident data (fresh)');
+        return; // Use cached data, no need to fetch
+      }
+
+      // Otherwise, load from API (will use smart caching)
+      ref.read(detailedIncidentProvider.notifier).loadIfStale(incidentId);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final detailedIncidentState = ref.watch(detailedIncidentProvider);
+    final incident = detailedIncidentState.incident;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7F5),
       appBar: AppBar(
@@ -102,7 +96,11 @@ class _MemberIncidentDetailScreenState
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Color(0xFF666666)),
-            onPressed: _loadDetailedIncident,
+            onPressed: () {
+              ref
+                  .read(detailedIncidentProvider.notifier)
+                  .refreshDetailedIncident();
+            },
             tooltip: 'Làm mới',
           ),
         ],
@@ -120,7 +118,7 @@ class _MemberIncidentDetailScreenState
         ),
         backgroundColor: const Color(0xFF228B22),
       ),
-      body: _isLoading
+      body: detailedIncidentState.isLoading
           ? const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -134,7 +132,7 @@ class _MemberIncidentDetailScreenState
                 ],
               ),
             )
-          : _errorMessage != null
+          : detailedIncidentState.error != null
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
@@ -147,22 +145,29 @@ class _MemberIncidentDetailScreenState
                       color: Color(0xFFE53935),
                     ),
                     const SizedBox(height: 16),
-                    Text(
+                    const Text(
                       'Không thể tải thông tin sự cố',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _errorMessage!,
+                      detailedIncidentState.error!,
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Color(0xFF666666)),
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton.icon(
-                      onPressed: _loadDetailedIncident,
+                      onPressed: () {
+                        ref
+                            .read(detailedIncidentProvider.notifier)
+                            .loadDetailedIncident(
+                              widget.incidentId,
+                              forceRefresh: true,
+                            );
+                      },
                       icon: const Icon(Icons.refresh),
                       label: const Text('Thử lại'),
                       style: ElevatedButton.styleFrom(
@@ -177,59 +182,72 @@ class _MemberIncidentDetailScreenState
                 ),
               ),
             )
-          : _detailedIncident == null
+          : incident == null
           ? const Center(child: Text('Không tìm thấy thông tin sự cố'))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // SECTION 1: Status Overview
-                  _buildStatusOverview(_detailedIncident!),
-                  const SizedBox(height: 16),
+          : RefreshIndicator(
+              onRefresh: () async {
+                await ref
+                    .read(detailedIncidentProvider.notifier)
+                    .refreshDetailedIncident();
+              },
+              color: const Color(0xFF228B22),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // SECTION 1: Status Overview
+                    _buildStatusOverview(incident),
+                    const SizedBox(height: 16),
 
-                  // SECTION 2: Identified Snake Species (QUAN TRỌNG)
-                  _detailedIncident!.identifiedSnakeSpecies != null
-                      ? _buildIdentifiedSnakeCard(
-                          _detailedIncident!.identifiedSnakeSpecies!,
-                          _detailedIncident!.identificationContext,
-                        )
-                      : _buildWaitingForIdentificationCard(),
-                  const SizedBox(height: 16),
+                    // SECTION 2: Identified Snake Species (QUAN TRỌNG)
+                    incident.identifiedSnakeSpecies != null
+                        ? _buildIdentifiedSnakeCard(
+                            incident.identifiedSnakeSpecies!,
+                            incident.identificationContext,
+                          )
+                        : _buildWaitingForIdentificationCard(),
+                    const SizedBox(height: 16),
 
-                  // SECTION 3: Incident Information
-                  _buildLocationCard(_detailedIncident!),
-                  const SizedBox(height: 16),
+                    // SECTION 2.5: Severity Assessment (if available)
+                    if (incident.severityLevel > 0)
+                      _buildSeverityScoreCard(incident),
+                    if (incident.severityLevel > 0) const SizedBox(height: 16),
 
-                  _buildSymptomsCard(_detailedIncident!),
-                  const SizedBox(height: 16),
+                    // SECTION 3: Incident Information
+                    _buildLocationCard(incident),
+                    const SizedBox(height: 16),
 
-                  // SECTION 4: User Info
-                  _buildUserInfoCard(_detailedIncident!.user),
-                  const SizedBox(height: 16),
+                    _buildSymptomsCard(incident),
+                    const SizedBox(height: 16),
 
-                  // SECTION 5: Mission Info (if rescuer accepted)
-                  if (_detailedIncident!.activeMission != null &&
-                      _detailedIncident!.assignedRescuer != null)
-                    _buildMissionSection(
-                      _detailedIncident!.activeMission!,
-                      _detailedIncident!.assignedRescuer!,
-                    )
-                  else
-                    _buildWaitingForRescuerCard(),
+                    // SECTION 4: User Info
+                    _buildUserInfoCard(incident.user),
+                    const SizedBox(height: 16),
 
-                  const SizedBox(height: 16),
+                    // SECTION 5: Mission Info (if rescuer accepted)
+                    if (incident.activeMission != null &&
+                        incident.assignedRescuer != null)
+                      _buildMissionSection(
+                        incident.activeMission!,
+                        incident.assignedRescuer!,
+                      )
+                    else
+                      _buildWaitingForRescuerCard(),
 
-                  // ═══════════════════════════════════════════════════
-                  // SECTION 6: Media & AI Detection (Reference)
-                  // Shows uploaded photos with AI analysis results
-                  // ═══════════════════════════════════════════════════
-                  if (_detailedIncident!.media.isNotEmpty) ...[
-                    _buildMediaDetectionCard(_detailedIncident!.media),
+                    const SizedBox(height: 16),
+
+                    // ═══════════════════════════════════════════════════
+                    // SECTION 6: Media & AI Detection (Reference)
+                    // Shows uploaded photos with AI analysis results
+                    // ═══════════════════════════════════════════════════
+                    if (incident.media.isNotEmpty) ...[
+                      _buildMediaDetectionCard(incident.media),
+                    ],
+
+                    const SizedBox(height: 80), // Space for FAB
                   ],
-
-                  const SizedBox(height: 80), // Space for FAB
-                ],
+                ),
               ),
             ),
     );
@@ -418,27 +436,27 @@ class _MemberIncidentDetailScreenState
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: hasSymptoms ? const Color(0xFFFFF3E0) : Colors.grey[100],
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(
+          color: hasSymptoms
+              ? const Color(0xFFFF9800).withOpacity(0.3)
+              : Colors.grey[300]!,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
               Icon(
-                Icons.medical_information,
-                color: Color(0xFFFF6B35),
+                Icons.medical_services,
+                color: hasSymptoms
+                    ? const Color.fromARGB(255, 218, 2, 2)
+                    : Colors.grey[600],
                 size: 20,
               ),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Text(
                 'Triệu chứng',
                 style: TextStyle(
@@ -451,15 +469,168 @@ class _MemberIncidentDetailScreenState
           ),
           const SizedBox(height: 12),
           if (hasSymptoms)
-            Text(
-              incident.symptomsReport!,
-              style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: incident.symptomsReport!
+                  .map(
+                    (symptom) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        '• ${symptom.symptomName}',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                      ),
+                    ),
+                  )
+                  .toList(),
             )
           else
             Text(
               'Chưa có triệu chứng nào được ghi nhận',
               style: TextStyle(fontSize: 14, color: Colors.grey[500]),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSeverityScoreCard(DetailedIncidentData incident) {
+    final severity = incident.severityLevel;
+
+    Color getSeverityColor() {
+      if (severity >= 70) {
+        return const Color(0xFFDC3545); // Critical red
+      } else if (severity >= 40) {
+        return const Color(0xFFF59E0B); // Warning amber
+      } else {
+        return const Color(0xFF228B22); // Safe green
+      }
+    }
+
+    String getSeverityLabel() {
+      if (severity >= 70) {
+        return 'Nghiêm trọng';
+      } else if (severity >= 40) {
+        return 'Trung bình';
+      } else {
+        return 'Nhẹ';
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: severity >= 70
+              ? [const Color(0xFFFFEBEE), const Color(0xFFFFCDD2)]
+              : severity >= 40
+              ? [const Color(0xFFFFF3E0), const Color(0xFFFFE0B2)]
+              : [const Color(0xFFE8F5E9), const Color(0xFFC8E6C9)],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Score circle (compact version)
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(blurRadius: 4, color: Colors.black.withOpacity(0.1)),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                '$severity',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: getSeverityColor(),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.medical_services,
+                      size: 16,
+                      color: getSeverityColor(),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Mức độ nghiêm trọng',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  getSeverityLabel(),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: getSeverityColor(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // View full assessment button
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => context.pushNamed(
+                'severity_assessment',
+                extra: {
+                  'incidentId': incident.id,
+                  'recognitionResultId':
+                      incident.identificationContext?.recognitionResultId,
+                },
+              ),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Chi tiết',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: getSeverityColor(),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.arrow_forward_ios,
+                      size: 14,
+                      color: getSeverityColor(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -504,7 +675,7 @@ class _MemberIncidentDetailScreenState
             _buildInfoRow(
               Icons.phone,
               'Điện thoại',
-              rescuer.account!.phoneNumber ?? 'N/A',
+              rescuer.phoneNumber ?? 'N/A',
             ),
           ],
           if (mission.startedAt != null) ...[
@@ -1007,13 +1178,9 @@ class _MemberIncidentDetailScreenState
               'Họ tên',
               user.account!.fullName ?? 'N/A',
             ),
-            if (user.account!.phoneNumber != null) ...[
+            if (user.phoneNumber != null) ...[
               const SizedBox(height: 8),
-              _buildInfoRow(
-                Icons.phone,
-                'Điện thoại',
-                user.account!.phoneNumber!,
-              ),
+              _buildInfoRow(Icons.phone, 'Điện thoại', user.phoneNumber!),
             ],
             if (user.account!.email != null) ...[
               const SizedBox(height: 8),

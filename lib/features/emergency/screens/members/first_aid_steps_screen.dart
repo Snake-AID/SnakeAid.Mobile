@@ -19,11 +19,12 @@ class FirstAidStepsScreen extends ConsumerStatefulWidget {
 
 class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
   int _currentStep = 0;
-  int _remainingSeconds = 135; // 2:15
-  Timer? _timer;
   final PageController _pageController = PageController(initialPage: 0);
 
   late List<StepData> _steps;
+  List<FirstAidStep> _dos = [];
+  List<FirstAidStep> _donts = [];
+  List<String> _notes = [];
   FirstAidRecommendationResponse? _recommendation;
   bool _isLoading = true;
   String? _errorMessage;
@@ -46,7 +47,6 @@ class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
 
       _recommendation = response;
       _buildStepsFromRecommendation();
-      _startTimer();
       setState(() {
         _isLoading = false;
         _errorMessage = null;
@@ -71,6 +71,11 @@ class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
     final override = _recommendation!.snake?.firstAidGuidelineOverride;
     final venomType =
         _recommendation!.snake?.primaryVenomType ?? 'Sơ cứu chung';
+
+    // Extract dos, donts, notes separately
+    _dos = guideline.dos;
+    _donts = guideline.donts;
+    _notes = guideline.notes;
 
     // Handle Replace mode - completely replace with override steps
     if (override != null && override.mode.toLowerCase() == 'replace') {
@@ -126,6 +131,7 @@ class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
 
     final apiSteps = guideline.steps;
 
+    // Only add core steps to PageView (exclude dos/donts/notes)
     for (int i = 0; i < apiSteps.length; i++) {
       final step = apiSteps[i];
       _steps.add(
@@ -136,77 +142,9 @@ class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
           illustrationUrl: step.mediaUrl.isNotEmpty ? step.mediaUrl : null,
           illustrationIcon: _getIconForStep(i),
           instructions: [step.text],
-          tipTitle: i == 0 && guideline.notes.isNotEmpty
-              ? 'LƯU Ý:'
-              : 'Lưu ý quan trọng:',
-          tipDescription: i == 0 && guideline.notes.isNotEmpty
-              ? guideline.notes.join(' ')
-              : 'Thực hiện đúng các bước để đảm bảo an toàn',
+          tipTitle: 'Lưu ý quan trọng:',
+          tipDescription: 'Thực hiện đúng các bước để đảm bảo an toàn',
           tipImageUrl: null,
-        ),
-      );
-    }
-
-    // Add "Dos" as additional steps
-    if (guideline.dos.isNotEmpty) {
-      for (int i = 0; i < guideline.dos.length; i++) {
-        final doItem = guideline.dos[i];
-        _steps.add(
-          StepData(
-            stepNumber: i + 1,
-            title: 'Nên làm',
-            subtitle: venomType,
-            illustrationUrl: doItem.mediaUrl.isNotEmpty
-                ? doItem.mediaUrl
-                : null,
-            illustrationIcon: Icons.check_circle,
-            instructions: [doItem.text],
-            tipTitle: 'Khuyến cáo:',
-            tipDescription: 'Thực hiện đúng để tăng hiệu quả sơ cứu',
-            tipImageUrl: null,
-            isRecommendation: true,
-          ),
-        );
-      }
-    }
-
-    // Add "Don'ts" as warning steps (RED THEME)
-    if (guideline.donts.isNotEmpty) {
-      for (int i = 0; i < guideline.donts.length; i++) {
-        final dontItem = guideline.donts[i];
-        _steps.add(
-          StepData(
-            stepNumber: i + 1,
-            title: 'TUYỆT ĐỐI KHÔNG',
-            subtitle: venomType,
-            illustrationUrl: dontItem.mediaUrl.isNotEmpty
-                ? dontItem.mediaUrl
-                : null,
-            illustrationIcon: Icons.cancel,
-            instructions: [dontItem.text],
-            tipTitle: 'Cảnh báo:',
-            tipDescription: 'Vi phạm có thể gây nguy hiểm cho nạn nhân',
-            tipImageUrl: null,
-            isWarning: true,
-          ),
-        );
-      }
-    }
-
-    // Add "Notes" as a final summary step
-    if (guideline.notes.isNotEmpty) {
-      _steps.add(
-        StepData(
-          stepNumber: 0,
-          title: 'Lưu ý quan trọng',
-          subtitle: venomType,
-          illustrationUrl: null,
-          illustrationIcon: Icons.info_outline,
-          instructions: guideline.notes,
-          tipTitle: 'Ghi chú:',
-          tipDescription: 'Đọc kỹ để nắm rõ các thông tin bổ sung',
-          tipImageUrl: null,
-          isHighlightNote: true,
         ),
       );
     }
@@ -287,26 +225,7 @@ class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
   @override
   void dispose() {
     _pageController.dispose();
-    _timer?.cancel();
     super.dispose();
-  }
-
-  void _startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_remainingSeconds > 0) {
-        setState(() {
-          _remainingSeconds--;
-        });
-      } else {
-        timer.cancel();
-      }
-    });
-  }
-
-  String _formatTime(int seconds) {
-    final minutes = seconds ~/ 60;
-    final secs = seconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
   void _nextStep() {
@@ -443,6 +362,9 @@ class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
                     // Snake ID Card
                     _buildSnakeIdCard(),
 
+                    // Important Notes (always visible below snake info)
+                    if (_notes.isNotEmpty) _buildNotesCard(),
+
                     // Progress Stepper
                     _buildProgressStepper(),
 
@@ -520,7 +442,7 @@ class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
             ),
           ),
 
-          // Step Indicator
+          // Title
           Expanded(
             child: Text(
               'Hướng dẫn sơ cứu',
@@ -533,16 +455,19 @@ class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
             ),
           ),
 
-          // Timer
-          SizedBox(
-            width: 48,
+          // Step Counter
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF228B22).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
             child: Text(
-              _formatTime(_remainingSeconds),
-              textAlign: TextAlign.right,
+              '${_currentStep + 1}/${_steps.length}',
               style: const TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF6B7280),
+                color: Color(0xFF228B22),
               ),
             ),
           ),
@@ -1017,6 +942,58 @@ class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Reference Buttons Row
+          Row(
+            children: [
+              // "Nên làm" button
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _dos.isEmpty ? null : () => _showDosBottomSheet(),
+                  icon: const Icon(Icons.check_circle, size: 18),
+                  label: Text('Nên làm (${_dos.length})'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF228B22),
+                    side: BorderSide(
+                      color: _dos.isEmpty
+                          ? Colors.grey.shade300
+                          : const Color(0xFF228B22),
+                      width: 1.5,
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // "Không nên làm" button
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _donts.isEmpty
+                      ? null
+                      : () => _showDontsBottomSheet(),
+                  icon: const Icon(Icons.cancel, size: 18),
+                  label: Text('Không nên (${_donts.length})'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFDC3545),
+                    side: BorderSide(
+                      color: _donts.isEmpty
+                          ? Colors.grey.shade300
+                          : const Color(0xFFDC3545),
+                      width: 1.5,
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
           // Main Action Button
           ElevatedButton(
             onPressed: isLastStep
@@ -1087,6 +1064,352 @@ class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  // Show "Notes" Card below snake info
+  Widget _buildNotesCard() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFFFFF3E0),
+            const Color(0xFFFFF3E0).withOpacity(0.7),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFE0B2), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE65100).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.info_outline,
+                  color: Color(0xFFE65100),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Lưu ý quan trọng',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFE65100),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ..._notes.map((note) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '• ',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF856404),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      note,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF856404),
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  // Show "Dos" bottom sheet
+  void _showDosBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) {
+          return Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            child: Column(
+              children: [
+                // Handle bar
+                Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: Colors.grey.shade200, width: 1),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF228B22).withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check_circle,
+                          color: Color(0xFF228B22),
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Những điều NÊN làm',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF191910),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                // Content
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _dos.length,
+                    itemBuilder: (context, index) {
+                      final doItem = _dos[index];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF228B22).withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFF228B22).withOpacity(0.2),
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF228B22),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.check,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                doItem.text,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF1C100D),
+                                  height: 1.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // Show "Donts" bottom sheet
+  void _showDontsBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) {
+          return Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            child: Column(
+              children: [
+                // Handle bar
+                Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: Colors.grey.shade200, width: 1),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDC3545).withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.cancel,
+                          color: Color(0xFFDC3545),
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Những điều TUYỆT ĐỐI KHÔNG làm',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF191910),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                // Content
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _donts.length,
+                    itemBuilder: (context, index) {
+                      final dontItem = _donts[index];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDC3545).withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFDC3545).withOpacity(0.3),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFDC3545),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                dontItem.text,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF1C100D),
+                                  height: 1.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

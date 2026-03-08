@@ -542,9 +542,7 @@ final router = GoRouter(
       builder: (context, state) {
         final data = state.extra as Map<String, dynamic>?;
         return SeverityAssessmentScreen(
-          severityLevel: data?['severityLevel'] as int? ?? 0,
-          symptomsReport: data?['symptomsReport'] as List<String>? ?? [],
-          timeSinceBite: data?['timeSinceBite'] as String? ?? '15 phút',
+          incidentId: data?['incidentId'] as String? ?? '',
           recognitionResultId: data?['recognitionResultId'] as String?,
         );
       },

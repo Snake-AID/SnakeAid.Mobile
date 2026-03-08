@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/symptom_config.dart';
 import '../../repository/symptom_repository.dart';
+import '../../providers/detailed_incident_provider.dart';
 
 class SymptomReportScreen extends ConsumerStatefulWidget {
   final String incidentId;
@@ -32,6 +33,9 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
   // Selected symptom IDs (can be from multiple groups)
   final Set<int> _selectedSymptomIds = {};
 
+  // Track if symptoms were pre-loaded from previous submission
+  bool _hasPreviousSymptoms = false;
+
   // Expansion state for collapsible sections
   final Map<String, bool> _expandedSections = {};
 
@@ -44,7 +48,63 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSymptomConfigs();
+    _loadData();
+  }
+
+  /// Load both symptom configs and previously selected symptoms
+  Future<void> _loadData() async {
+    await _loadSymptomConfigs();
+    await _loadPreviouslySelectedSymptoms();
+  }
+
+  /// Load previously selected symptoms from incident (if any)
+  Future<void> _loadPreviouslySelectedSymptoms() async {
+    try {
+      // Load incident details
+      final incidentProvider = ref.read(detailedIncidentProvider.notifier);
+      await incidentProvider.loadDetailedIncident(widget.incidentId);
+
+      // Read cached state
+      final incidentState = ref.read(detailedIncidentProvider);
+      final incidentData = incidentState.incident;
+
+      if (incidentData != null && incidentData.symptomsReport != null) {
+        final previousSymptomIds = incidentData.symptomsReport!
+            .map((symptom) => symptom.symptomId)
+            .toSet();
+
+        if (previousSymptomIds.isNotEmpty) {
+          setState(() {
+            _selectedSymptomIds.addAll(previousSymptomIds);
+            _hasPreviousSymptoms = true; // Mark that symptoms were pre-loaded
+          });
+
+          debugPrint(
+            '✅ Loaded ${previousSymptomIds.length} previously selected symptoms: $previousSymptomIds',
+          );
+
+          // Show info to user
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Đã tải ${previousSymptomIds.length} triệu chứng đã chọn trước đó',
+                ),
+                backgroundColor: const Color(0xFF228B22),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        }
+      } else {
+        debugPrint(
+          'ℹ️ No previous symptoms found for incident ${widget.incidentId}',
+        );
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error loading previous symptoms: $e');
+      // Non-critical error - continue without pre-filling
+    }
   }
 
   @override
@@ -65,18 +125,39 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
 
       if (response.isSuccess && response.data != null) {
         setState(() {
-          // Sort groups by displayOrder
-          _symptomGroups = response.data!
-            ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+          // Data is already sorted in model, no need to sort again
+          _symptomGroups = response.data!;
+
+          // Debug: Log grouped structure
+          debugPrint('📊 Total groups: ${_symptomGroups.length}');
+          for (var group in _symptomGroups) {
+            debugPrint(
+              '  ├─ ${group.attributeKey} (${group.groupName}): ${group.options.length} options',
+            );
+            debugPrint('  │  Label: "${group.attributeLabel}"');
+            debugPrint('  │  DisplayOrder: ${group.displayOrder}');
+            for (var i = 0; i < group.options.length; i++) {
+              final opt = group.options[i];
+              debugPrint('  │  └─ [${i + 1}] ${opt.name} (ID: ${opt.id})');
+            }
+            debugPrint('  │');
+          }
 
           // Initialize expansion state
           for (var group in _symptomGroups) {
-            // CRITICAL sections always expanded
-            // BITE_LOCATION expanded by default
-            // Others collapsed
-            _expandedSections[group.attributeKey] =
+            // Emergency-optimized expansion:
+            // - CRITICAL (CORE_SIGNS) = always expanded
+            // - LOCAL (SYMPTOM_LOCAL) = expanded (wound assessment)
+            // - BITE_LOCATION = expanded (important context)
+            // - BACKGROUND (AGE_GROUP, MEDICAL_HISTORY) = collapsed (optional)
+            final shouldExpand =
                 group.groupName == 'CRITICAL' ||
+                group.groupName == 'LOCAL' ||
                 group.attributeKey == 'BITE_LOCATION';
+
+            _expandedSections[group.attributeKey] = shouldExpand;
+
+            debugPrint('  📌 ${group.attributeKey} expansion: $shouldExpand');
           }
 
           _isLoading = false;
@@ -231,13 +312,24 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
             debugPrint('❌ Error saving symptoms status: $e');
           }
 
-          // Navigate to severity assessment screen with API response
+          // Invalidate detailed incident cache - symptoms updated, severity may change
+          try {
+            ref.read(detailedIncidentProvider.notifier).invalidateCache();
+            debugPrint('🔄 Invalidated incident cache after symptom update');
+          } catch (e) {
+            debugPrint('⚠️ Could not invalidate cache: $e');
+          }
+
+          // Pop symptom report screen first, then navigate to severity
+          // This prevents user from going back to symptom report from severity screen
+          context.pop(); // Close symptom report
+
+          // Navigate to severity assessment screen
+          // Severity will fetch data from incident DB using incidentId
           context.pushNamed(
             'severity_assessment',
             extra: {
-              'severityLevel': response.data!.severityLevel,
-              'symptomsReport': response.data!.symptomsReport,
-              'timeSinceBite': _formatTimeSinceBite(_timeSinceBiteMinutes),
+              'incidentId': widget.incidentId,
               'recognitionResultId': widget.recognitionResultId,
             },
           );
@@ -316,7 +408,17 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
                   children: [
                     // Info Banner
                     _buildInfoBanner(),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
+
+                    // Time Since Bite (MOVED TO TOP - Critical context)
+                    _buildTimeSinceBiteSection(),
+                    const SizedBox(height: 16),
+
+                    // Selected Count Indicator
+                    if (_selectedSymptomIds.isNotEmpty)
+                      _buildSelectedCountBanner(),
+                    if (_selectedSymptomIds.isNotEmpty)
+                      const SizedBox(height: 16),
 
                     // Render symptom groups
                     ..._symptomGroups.map(
@@ -326,11 +428,7 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
                       ),
                     ),
 
-                    // Time Since Bite
-                    _buildTimeSinceBiteSection(),
-                    const SizedBox(height: 24),
-
-                    // Bite Image Upload
+                    // Bite Image Upload (moved down - optional)
                     _buildBiteImageSection(),
                     const SizedBox(height: 24),
 
@@ -378,7 +476,7 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _loadSymptomConfigs,
+              onPressed: _loadData,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF228B22),
                 foregroundColor: Colors.white,
@@ -395,24 +493,123 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
+        color: _hasPreviousSymptoms
+            ? const Color(0xFFE3F2FD) // Blue tint for update mode
+            : const Color(0xFFF5F5F5),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE0E0E0)),
+        border: Border.all(
+          color: _hasPreviousSymptoms
+              ? const Color(0xFF2196F3)
+              : const Color(0xFFE0E0E0),
+        ),
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, color: Color(0xFF666666), size: 24),
+          Icon(
+            _hasPreviousSymptoms ? Icons.update : Icons.info_outline,
+            color: _hasPreviousSymptoms
+                ? const Color(0xFF2196F3)
+                : const Color(0xFF666666),
+            size: 24,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Thông tin này giúp đội cứu hộ đánh giá mức độ nguy hiểm và chuẩn bị tốt hơn',
+              _hasPreviousSymptoms
+                  ? 'Bạn đã báo cáo triệu chứng trước đó. Có thể chọn thêm hoặc bỏ chọn để cập nhật.'
+                  : 'Thông tin này giúp đội cứu hộ đánh giá mức độ nguy hiểm và chuẩn bị tốt hơn',
               style: TextStyle(
                 fontSize: 13,
-                color: Colors.brown[800],
+                color: _hasPreviousSymptoms
+                    ? const Color(0xFF1565C0)
+                    : Colors.brown[800],
                 height: 1.4,
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSelectedCountBanner() {
+    final criticalCount = _selectedSymptomIds.where((id) {
+      for (var group in _symptomGroups) {
+        final option = group.options.firstWhere(
+          (opt) => opt.id == id,
+          orElse: () => group.options.first,
+        );
+        if (option.id == id && option.isCritical) {
+          return true;
+        }
+      }
+      return false;
+    }).length;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: criticalCount > 0
+            ? const Color(0xFFFFEBEE)
+            : const Color(0xFFE8F5E9),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: criticalCount > 0
+              ? const Color(0xFFDC3545)
+              : const Color(0xFF228B22),
+          width: 2,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            criticalCount > 0 ? Icons.warning_amber : Icons.check_circle,
+            color: criticalCount > 0
+                ? const Color(0xFFDC3545)
+                : const Color(0xFF228B22),
+            size: 24,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Đã chọn: ${_selectedSymptomIds.length} triệu chứng',
+                  style: TextStyle(
+                    color: criticalCount > 0
+                        ? const Color(0xFFDC3545)
+                        : const Color(0xFF228B22),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+                if (criticalCount > 0) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    '⚠️ Có $criticalCount triệu chứng nguy hiểm',
+                    style: const TextStyle(
+                      color: Color(0xFFDC3545),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (_selectedSymptomIds.isNotEmpty)
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _selectedSymptomIds.clear();
+                });
+              },
+              child: const Text(
+                'Xóa hết',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+            ),
         ],
       ),
     );
@@ -424,6 +621,11 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
     final isRadioGroup =
         group.attributeKey == 'AGE_GROUP' ||
         group.attributeKey == 'BITE_LOCATION';
+
+    // Debug render state
+    debugPrint(
+      '🎨 Rendering ${group.attributeKey}: expanded=$isExpanded, options=${group.options.length}',
+    );
 
     // Color coding based on group priority
     Color headerColor;
@@ -654,7 +856,7 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
               value: _timeSinceBiteMinutes,
               isExpanded: true,
               icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF228B22)),
-              items: [10, 15, 30, 45, 60, 90, 120, 180, 240].map((minutes) {
+              items: [0, 10, 15, 30, 45, 60, 90, 120, 180, 240].map((minutes) {
                 return DropdownMenuItem<int>(
                   value: minutes,
                   child: Text(_formatTimeSinceBite(minutes)),
@@ -812,9 +1014,18 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
           ),
           elevation: 2,
         ),
-        child: const Text(
-          'Phân tích triệu chứng',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(_hasPreviousSymptoms ? Icons.update : Icons.analytics),
+            const SizedBox(width: 8),
+            Text(
+              _hasPreviousSymptoms
+                  ? 'Cập nhật triệu chứng'
+                  : 'Phân tích triệu chứng',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ],
         ),
       ),
     );

@@ -72,7 +72,9 @@ BriefIncidentForMission _$BriefIncidentForMissionFromJson(
     json['locationCoordinates'] as Map<String, dynamic>,
   ),
   status: json['status'] as String,
-  symptomsReport: json['symptomsReport'] as String?,
+  symptomsReport: (json['symptomsReport'] as List<dynamic>?)
+      ?.map((e) => ReportSymptom.fromJson(e as Map<String, dynamic>))
+      .toList(),
   severityLevel: (json['severityLevel'] as num?)?.toInt(),
   incidentOccurredAt: json['incidentOccurredAt'] == null
       ? null
@@ -103,7 +105,7 @@ Map<String, dynamic> _$BriefIncidentForMissionToJson(
   'id': instance.id,
   'locationCoordinates': instance.locationCoordinates.toJson(),
   'status': instance.status,
-  'symptomsReport': instance.symptomsReport,
+  'symptomsReport': instance.symptomsReport?.map((e) => e.toJson()).toList(),
   'severityLevel': instance.severityLevel,
   'incidentOccurredAt': instance.incidentOccurredAt?.toIso8601String(),
   'assignedAt': instance.assignedAt?.toIso8601String(),
@@ -137,3 +139,27 @@ CancelMissionRequest _$CancelMissionRequestFromJson(
 Map<String, dynamic> _$CancelMissionRequestToJson(
   CancelMissionRequest instance,
 ) => <String, dynamic>{'cancellationReason': instance.cancellationReason};
+
+BasicRescueMissionResponse _$BasicRescueMissionResponseFromJson(
+  Map<String, dynamic> json,
+) => BasicRescueMissionResponse(
+  missionId: json['missionId'] as String,
+  incidentId: json['incidentId'] as String,
+  status: json['status'] as String,
+  startedAt: json['startedAt'] == null
+      ? null
+      : DateTime.parse(json['startedAt'] as String),
+  acceptedAt: json['acceptedAt'] == null
+      ? null
+      : DateTime.parse(json['acceptedAt'] as String),
+);
+
+Map<String, dynamic> _$BasicRescueMissionResponseToJson(
+  BasicRescueMissionResponse instance,
+) => <String, dynamic>{
+  'missionId': instance.missionId,
+  'incidentId': instance.incidentId,
+  'status': instance.status,
+  'startedAt': instance.startedAt?.toIso8601String(),
+  'acceptedAt': instance.acceptedAt?.toIso8601String(),
+};

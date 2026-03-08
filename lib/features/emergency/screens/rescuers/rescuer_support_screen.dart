@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../models/first_aid_recommendation_response.dart';
+import '../../models/snake_detection_response.dart';
+import '../../repository/snake_ai_repository.dart';
 
-class RescuerSupportScreen extends StatefulWidget {
+class RescuerSupportScreen extends ConsumerStatefulWidget {
   final String missionId;
   final String incidentId;
 
@@ -13,13 +17,17 @@ class RescuerSupportScreen extends StatefulWidget {
   });
 
   @override
-  State<RescuerSupportScreen> createState() => _RescuerSupportScreenState();
+  ConsumerState<RescuerSupportScreen> createState() => _RescuerSupportScreenState();
 }
 
-class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
+class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
   int _selectedTab = 0;
   int _elapsedSeconds = 0;
   Timer? _timer;
+
+  FirstAidRecommendationResponse? _firstAidRecommendation;
+  bool _isLoadingFirstAid = true;
+  String? _firstAidError;
 
   final List<String> _tabs = [
     'Sơ Cứu Ban Đầu',
@@ -32,6 +40,28 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
   void initState() {
     super.initState();
     _startTimer();
+    _loadFirstAidGuideline();
+  }
+
+  Future<void> _loadFirstAidGuideline() async {
+    try {
+      final repository = ref.read(snakeAiRepositoryProvider);
+      final response = await repository.getFirstAidRecommendation(
+        incidentId: widget.incidentId,
+      );
+
+      setState(() {
+        _firstAidRecommendation = response;
+        _isLoadingFirstAid = false;
+        _firstAidError = null;
+      });
+    } catch (e) {
+      debugPrint('❌ Error loading first aid: $e');
+      setState(() {
+        _isLoadingFirstAid = false;
+        _firstAidError = e.toString();
+      });
+    }
   }
 
   void _startTimer() {
@@ -282,93 +312,8 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
 
                   const SizedBox(height: 16),
 
-                  // First Aid Content
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFF8800).withOpacity(0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.healing,
-                                color: Color(0xFFFF8800),
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            const Expanded(
-                              child: Text(
-                                'Kiểm Tra Băng Ép',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1C100D),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        const Text(
-                          'Đảm bảo băng không quá chặt. Kiểm tra tuần hoàn bằng cách nhấn nhẹ vào ngón tay/chân - phải hồng lại trong 2 giây.',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF666666),
-                            height: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Container(
-                          width: double.infinity,
-                          height: 150,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF0F0F0),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.image_outlined,
-                                  size: 48,
-                                  color: Color(0xFFCCCCCC),
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  'Sơ đồ minh họa',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFF999999),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  // First Aid Content (Real Data)
+                  _buildFirstAidContent(),
 
                   const SizedBox(height: 16),
                   // Emergency Card
@@ -743,6 +688,456 @@ class _RescuerSupportScreenState extends State<RescuerSupportScreen> {
             const SizedBox(width: 4),
             Icon(Icons.keyboard_arrow_down, size: 16, color: color),
           ],
+        ],
+      ),
+    );
+  }
+
+  // ─── FIRST AID CONTENT (REAL DATA) ───────────────────────────────────────────
+
+  Widget _buildFirstAidContent() {
+    if (_isLoadingFirstAid) {
+      return Container(
+        padding: const EdgeInsets.all(48),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(color: Color(0xFFFF8800)),
+        ),
+      );
+    }
+
+    if (_firstAidError != null) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            const Icon(
+              Icons.error_outline,
+              size: 48,
+              color: Color(0xFFDC3545),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Không thể tải hướng dẫn sơ cứu',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _firstAidError!,
+              style: const TextStyle(fontSize: 13, color: Color(0xFF999999)),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadFirstAidGuideline,
+              child: const Text('Thử lại'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_firstAidRecommendation == null) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Center(
+          child: Text('Chưa có hướng dẫn sơ cứu'),
+        ),
+      );
+    }
+
+    final guideline = _firstAidRecommendation!.firstAidGuideline;
+    final snake = _firstAidRecommendation!.snake;
+
+    // Filter content based on selected tab
+    List<FirstAidStep> relevantSteps = [];
+    List<FirstAidStep> relevantDos = [];
+    List<FirstAidStep> relevantDonts = [];
+
+    switch (_selectedTab) {
+      case 0: // Sơ Cứu Ban Đầu
+        relevantSteps = guideline.steps.take(3).toList();
+        relevantDos = guideline.dos;
+        break;
+      case 1: // Xử Lý Vết Cắn
+        relevantSteps = guideline.steps.skip(3).take(3).toList();
+        break;
+      case 2: // Giảm Đau
+        relevantDonts = guideline.donts;
+        break;
+      case 3: // Di Chuyển
+        if (guideline.steps.length > 6) {
+          relevantSteps = guideline.steps.skip(6).toList();
+        }
+        break;
+    }
+
+    return Column(
+      children: [
+        // Snake Info Card (show on all tabs)
+        if (snake != null) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFFFF8800).withOpacity(0.1),
+                  const Color(0xFFFF6B35).withOpacity(0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFFF8800).withOpacity(0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    snake.imageUrl,
+                    width: 60,
+                    height: 60,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 60,
+                        height: 60,
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.image_not_supported),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        snake.commonName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1C100D),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        snake.scientificName,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontStyle: FontStyle.italic,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          _buildVenomBadge(snake.isVenomous),
+                          const SizedBox(width: 8),
+                          _buildRiskBadge(snake.riskLevel),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // Steps Section
+        if (relevantSteps.isNotEmpty) ...[
+          ...relevantSteps.asMap().entries.map((entry) {
+            final index = entry.key + 1;
+            final step = entry.value;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFFFF8800), Color(0xFFFF6B35)],
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          '$index',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        step.text,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF1C100D),
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+
+        // Dos Section
+        if (relevantDos.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.only(top: 8, bottom: 12),
+            child: Text(
+              '✅ NÊN LÀM',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF228B22),
+              ),
+            ),
+          ),
+          ...relevantDos.map((doItem) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF228B22).withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFF228B22).withOpacity(0.2),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.check_circle,
+                      color: Color(0xFF228B22),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        doItem.text,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF1C100D),
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+
+        // Don'ts Section
+        if (relevantDonts.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.only(top: 8, bottom: 12),
+            child: Text(
+              '❌ KHÔNG NÊN LÀM',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFDC3545),
+              ),
+            ),
+          ),
+          ...relevantDonts.map((dontItem) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDC3545).withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFFDC3545).withOpacity(0.2),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.cancel,
+                      color: Color(0xFFDC3545),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        dontItem.text,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF1C100D),
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+
+        // Notes Section
+        if (guideline.notes.isNotEmpty && _selectedTab == 0) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF3CD),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFF856404).withOpacity(0.3),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: const Color(0xFF856404),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Lưu ý quan trọng',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF856404),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ...guideline.notes.map((note) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      '• $note',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: const Color(0xFF856404),
+                        height: 1.5,
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // Helper widgets for badges
+  Widget _buildVenomBadge(bool isVenomous) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isVenomous ? Colors.red[700] : Colors.green[700],
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isVenomous ? Icons.warning : Icons.check_circle,
+            size: 12,
+            color: Colors.white,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            isVenomous ? 'Độc' : 'Không độc',
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRiskBadge(int riskLevel) {
+    Color getRiskColor() {
+      if (riskLevel >= 8) return Colors.red[900]!;
+      if (riskLevel >= 6) return Colors.red[700]!;
+      if (riskLevel >= 4) return Colors.orange[700]!;
+      return Colors.yellow[700]!;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: getRiskColor(),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.speed,
+            size: 12,
+            color: Colors.white,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'Mức $riskLevel/10',
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
         ],
       ),
     );

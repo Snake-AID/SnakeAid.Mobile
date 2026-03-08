@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
-import 'dart:convert';
 import '../../models/sos_incident_response.dart';
 import '../../providers/incident_provider.dart';
 import '../../providers/mission_hub_provider.dart';
@@ -152,19 +151,13 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
     }
   }
 
-  List<String> _parseSymptomsReport(String? symptomsReport) {
+  List<String> _parseSymptomsReport(List<ReportSymptom>? symptomsReport) {
     if (symptomsReport == null || symptomsReport.isEmpty) {
       return [];
     }
 
-    try {
-      // symptomsReport is a JSON string like: "[\"symptom1\", \"symptom2\"]"
-      final List<dynamic> decoded = jsonDecode(symptomsReport);
-      return decoded.map((e) => e.toString()).toList();
-    } catch (e) {
-      debugPrint('❌ Error parsing symptoms report: $e');
-      return [];
-    }
+    // Extract symptom names from the ReportSymptom list
+    return symptomsReport.map((symptom) => symptom.symptomName).toList();
   }
 
   void _startCountdown() {

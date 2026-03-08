@@ -216,9 +216,7 @@ class _RescuerArrivedScreenState extends ConsumerState<RescuerArrivedScreen>
         missionData.user.userName ??
         'Bệnh nhân';
     final memberPhone =
-        missionData.user.account?.phoneNumber ??
-        missionData.user.phoneNumber ??
-        '';
+        missionData.user.phoneNumber ?? missionData.user.phoneNumber ?? '';
 
     return Container(
       padding: const EdgeInsets.all(16),

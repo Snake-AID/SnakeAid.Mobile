@@ -7,6 +7,7 @@ import 'rescuer_profile_screen.dart';
 import 'rescuer_income_management_screen.dart';
 import '../../emergency/providers/rescuer_emergency_provider.dart';
 import '../../emergency/providers/mission_hub_provider.dart';
+import '../../emergency/providers/active_mission_provider.dart';
 import '../../emergency/widgets/rescue_request_modal.dart';
 import '../managers/location_manager.dart';
 import '../providers/tracking_provider.dart';
@@ -426,6 +427,10 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
     final rescueModeState = ref.watch(rescueModeProvider);
     _isOnline = rescueModeState.isActive && rescueModeState.isConnected;
 
+    // Watch active mission state
+    final activeMissionState = ref.watch(activeMissionProvider);
+    final hasActiveMission = activeMissionState.hasActiveMission;
+
     return SafeArea(
       child: Stack(
         children: [
@@ -503,6 +508,10 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // ═══ Active Mission Recovery Banner ═══════════════════
+                      if (hasActiveMission) _buildActiveMissionBanner(),
+                      if (hasActiveMission) const SizedBox(height: 16),
+
                       // Status Card
                       _buildStatusCard(),
                       const SizedBox(height: 24),
@@ -603,6 +612,112 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
         ],
       ),
     );
+  }
+
+  Widget _buildActiveMissionBanner() {
+    final mission = ref.watch(activeMissionProvider).mission;
+    if (mission == null) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFF6B35), Color(0xFFFF8C5A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF6B35).withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Nhiệm Vụ Đang Hoạt Động',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Bạn có nhiệm vụ cần tiếp tục',
+                      style: TextStyle(fontSize: 13, color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _navigateToActiveMission,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFFFF6B35),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Quay Lại Nhiệm Vụ',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Navigate to active mission
+  Future<void> _navigateToActiveMission() async {
+    final mission = ref.read(activeMissionProvider).mission;
+
+    if (mission == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không tìm thấy thông tin nhiệm vụ'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Navigate to mission detail
+    context.push('/rescuer/mission-detail/${mission.missionId}');
   }
 
   Widget _buildStatusCard() {
