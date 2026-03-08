@@ -30,6 +30,11 @@ class _RescuerMissionSuccessScreenState
   String? _error;
   bool _isSubmittingFeedback = false;
 
+  // Local state để hiển thị "Đã gửi đánh giá" ngay cả khi API không trả về
+  // feedback rescuer→member trong response của getRequestById
+  int? _submittedRating;
+  String? _submittedComments;
+
   @override
   void initState() {
     super.initState();
@@ -117,7 +122,7 @@ class _RescuerMissionSuccessScreenState
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF343A40)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
         ),
         title: const Text(
           'Đơn đã hoàn thành',
@@ -216,20 +221,31 @@ class _RescuerMissionSuccessScreenState
   }
 
   Widget _buildPaymentStatusBadge() {
+    final isPaid = _data.status == 'Paid' || _data.status == 'Completed';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFFD7E14).withOpacity(0.1),
+        color: isPaid
+            ? const Color(0xFF28A745).withOpacity(0.1)
+            : const Color(0xFFFD7E14).withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: const [
-          Icon(Icons.schedule, size: 16, color: Color(0xFFFD7E14)),
-          SizedBox(width: 6),
+        children: [
+          Icon(
+            isPaid ? Icons.check_circle_outline : Icons.schedule,
+            size: 16,
+            color: isPaid ? const Color(0xFF28A745) : const Color(0xFFFD7E14),
+          ),
+          const SizedBox(width: 6),
           Text(
-            'Đang chờ khách hàng thanh toán',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFFFD7E14)),
+            isPaid ? 'Khách hàng đã thanh toán' : 'Đang chờ khách hàng thanh toán',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: isPaid ? const Color(0xFF28A745) : const Color(0xFFFD7E14),
+            ),
           ),
         ],
       ),
@@ -543,15 +559,8 @@ class _RescuerMissionSuccessScreenState
         'Khách hàng';
     final memberAvatar = _data.user?.account?.avatarUrl;
 
-    debugPrint('━━━━ [FeedbackCard] ━━━━━━━━━━━━━━━━━━━━━━━━');
-    debugPrint('[FeedbackCard] currentUser.id  = ${currentUser?.id}');
-    debugPrint('[FeedbackCard] memberUserId    = $memberUserId');
-    debugPrint('[FeedbackCard] feedbacks.count = ${_data.feedbacks.length}');
-    for (final f in _data.feedbacks) {
-      debugPrint('[FeedbackCard] feedback → raterId=${f.raterId} targetUserId=${f.targetUserId} rating=${f.rating}');
-    }
-
-    final existing = currentUser != null
+    // Ưu tiên check local state trước (API có thể không trả về feedback rescuer→member)
+    final existingFromApi = currentUser != null
         ? _data.feedbacks
             .where((f) =>
                 f.raterId == currentUser.id &&
@@ -559,8 +568,9 @@ class _RescuerMissionSuccessScreenState
                 f.referenceId == _data.id)
             .firstOrNull
         : null;
-    debugPrint('[FeedbackCard] existing = $existing');
-    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    final hasLocalSubmit = _submittedRating != null;
+    final existing = existingFromApi; // dùng để hiển thị nội dung nếu API trả về
+    final alreadyRated = existingFromApi != null || hasLocalSubmit;
 
     return _buildCard(
       child: Column(
@@ -598,25 +608,26 @@ class _RescuerMissionSuccessScreenState
           ),
           const SizedBox(height: 14),
 
-          if (existing != null) ...[
+          if (alreadyRated) ...[
             Row(
               children: List.generate(
                 5,
                 (i) => Icon(
-                  i < existing.rating
+                  i < (existing?.rating ?? _submittedRating ?? 0)
                       ? Icons.star_rounded
                       : Icons.star_border_rounded,
                   size: 22,
-                  color: i < existing.rating
+                  color: i < (existing?.rating ?? _submittedRating ?? 0)
                       ? const Color(0xFFFFB300)
                       : Colors.grey[300],
                 ),
               ),
             ),
-            if (existing.comments != null && existing.comments!.isNotEmpty) ...[
+            if ((existing?.comments ?? _submittedComments) != null &&
+                (existing?.comments ?? _submittedComments)!.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
-                '"${existing.comments!}"',
+                '"${(existing?.comments ?? _submittedComments)!}"',
                 style: const TextStyle(
                     fontSize: 13,
                     fontStyle: FontStyle.italic,
@@ -672,7 +683,6 @@ class _RescuerMissionSuccessScreenState
     required String memberName,
     String? memberAvatar,
   }) {
-    debugPrint('━━━━ [FeedbackSheet] open memberUserId=$memberUserId isSubmitting=$_isSubmittingFeedback');
     int selectedRating = 0;
     final commentController = TextEditingController();
 
@@ -742,7 +752,6 @@ class _RescuerMissionSuccessScreenState
                   children: List.generate(5, (i) {
                     return GestureDetector(
                       onTap: () {
-                        debugPrint('[FeedbackSheet] star tapped: ${i + 1}');
                         setSheet(() => selectedRating = i + 1);
                       },
                       child: Padding(
@@ -818,7 +827,6 @@ class _RescuerMissionSuccessScreenState
                         onPressed: selectedRating == 0 || _isSubmittingFeedback
                             ? null
                             : () async {
-                                debugPrint('[FeedbackSheet] submit pressed rating=$selectedRating memberUserId=$memberUserId');
                                 Navigator.pop(ctx);
                                 await _submitFeedback(
                                   targetUserId: memberUserId,
@@ -861,13 +869,6 @@ class _RescuerMissionSuccessScreenState
     required int rating,
     required String comments,
   }) async {
-    debugPrint('━━━━ [SubmitFeedback] ━━━━━━━━━━━━━━━━━━━━━━');
-    debugPrint('[SubmitFeedback] targetUserId  = $targetUserId');
-    debugPrint('[SubmitFeedback] referenceId   = ${_data.id}');
-    debugPrint('[SubmitFeedback] rating        = $rating');
-    debugPrint('[SubmitFeedback] comments      = $comments');
-    debugPrint('[SubmitFeedback] targetRole    = Member');
-    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     setState(() => _isSubmittingFeedback = true);
     try {
       await ref.read(feedbackRepositoryProvider).submitFeedback(
@@ -877,11 +878,16 @@ class _RescuerMissionSuccessScreenState
               type: 'Catching',
               rating: rating,
               comments: comments.isEmpty ? null : comments,
-              targetUserRole: 'Member',
+              targetUserRole: 'User',
             ),
           );
       if (!mounted) return;
-      setState(() => _isSubmittingFeedback = false);
+      setState(() {
+        _isSubmittingFeedback = false;
+        // Lưu local để UI hiển thị ngay, không phụ thuộc vào API response
+        _submittedRating = rating;
+        _submittedComments = comments.isEmpty ? null : comments;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Row(children: [
@@ -896,7 +902,11 @@ class _RescuerMissionSuccessScreenState
         ),
       );
       _fetchFreshData();
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('━━━━ [SubmitFeedback] ERROR ━━━━━━━━━━━━━━━━━');
+      debugPrint('[SubmitFeedback] error     = $e');
+      debugPrint('[SubmitFeedback] stackTrace = $st');
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       if (!mounted) return;
       setState(() => _isSubmittingFeedback = false);
       ScaffoldMessenger.of(context).showSnackBar(

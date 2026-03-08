@@ -41,9 +41,10 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
 
   bool _isLocating = true;
   bool _hasLocationError = false;
-  bool _bottomSheetExpanded = true;
   bool _routeLoading = false;
   bool _isArriving = false;
+
+  final DraggableScrollableController _sheetController = DraggableScrollableController();
 
   StreamSubscription<Position>? _positionSub;
   Timer? _routeRefreshTimer;
@@ -68,6 +69,7 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
     _positionSub?.cancel();
     _routeRefreshTimer?.cancel();
     _pulseController.dispose();
+    _sheetController.dispose();
     _dio.close(force: true);
     super.dispose();
   }
@@ -243,13 +245,18 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
 
   @override
   Widget build(BuildContext context) {
+    final screenH = MediaQuery.of(context).size.height;
     return Scaffold(
       body: Stack(
         children: [
           _buildMap(),
           _buildHeader(),
           _buildBottomSheet(),
-          if (_canMarkArrived) _buildArrivedButton(),
+          if (_canMarkArrived)
+            ListenableBuilder(
+              listenable: _sheetController,
+              builder: (_, __) => _buildArrivedButton(screenH),
+            ),
         ],
       ),
     );
@@ -457,11 +464,11 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
     );
   }
 
-  Widget _buildArrivedButton() {
-    final double sheetApproxHeight = _bottomSheetExpanded ? 290 : 100;
+  Widget _buildArrivedButton(double screenH) {
+    final double sheetFrac = _sheetController.isAttached ? _sheetController.size : 0.30;
     return Positioned(
       right: 16,
-      bottom: sheetApproxHeight + 14,
+      bottom: sheetFrac * screenH + 14,
       child: GestureDetector(
         onTap: _confirmArrived,
         child: Container(
@@ -499,46 +506,49 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
   }
 
   Widget _buildBottomSheet() {
-    return Positioned(
-      bottom: 0, left: 0, right: 0,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 16, offset: const Offset(0, -4))],
-        ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              GestureDetector(
-                onTap: () => setState(() => _bottomSheetExpanded = !_bottomSheetExpanded),
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
+    return DraggableScrollableSheet(
+      controller: _sheetController,
+      initialChildSize: 0.30,
+      minChildSize: 0.12,
+      maxChildSize: 0.56,
+      snap: true,
+      snapSizes: const [0.12, 0.30, 0.56],
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 16, offset: const Offset(0, -4))],
+          ),
+          child: SafeArea(
+            top: false,
+            child: CustomScrollView(
+              controller: scrollController,
+              slivers: [
+                SliverToBoxAdapter(
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(width: 36, height: 4,
-                          decoration: BoxDecoration(color: const Color(0xFFDDDDDD), borderRadius: BorderRadius.circular(2))),
-                      const SizedBox(height: 3),
-                      Icon(_bottomSheetExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
-                          color: const Color(0xFFAAAAAA), size: 18),
+                      // Drag handle
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Container(
+                          width: 36, height: 4,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDDDDDD),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      _buildSheetExpanded(),
                     ],
                   ),
                 ),
-              ),
-              AnimatedCrossFade(
-                firstChild: _buildSheetExpanded(),
-                secondChild: _buildSheetCollapsed(),
-                crossFadeState: _bottomSheetExpanded ? CrossFadeState.showFirst : CrossFadeState.showSecond,
-                duration: const Duration(milliseconds: 220),
-                sizeCurve: Curves.easeInOut,
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -588,6 +598,7 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [

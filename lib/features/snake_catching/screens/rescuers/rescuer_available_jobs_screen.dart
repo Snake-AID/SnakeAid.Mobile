@@ -1066,51 +1066,353 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
     return request.status;
   }
 
+  // ── Per-species data helper ──────────────────────────────────────────────
+  ({String badge, Color color}) _dangerInfo(SnakeSpecies? species) {
+    if (species == null) return (badge: 'CHƯA RÕ', color: const Color(0xFF999999));
+    if (!species.isVenomous) return (badge: 'KHÔNG ĐỘC', color: const Color(0xFF28A745));
+    if (species.riskLevel >= 8.0) return (badge: 'CỰC ĐỘC',  color: const Color(0xFFDC3545));
+    if (species.riskLevel >= 6.0) return (badge: 'ĐỘC MẠNH', color: const Color(0xFFFF6B35));
+    if (species.riskLevel >= 4.0) return (badge: 'CÓ ĐỘC',   color: const Color(0xFFFFA500));
+    return (badge: 'ÍT ĐỘC', color: const Color(0xFFFFC107));
+  }
+
+  Widget _buildSnakeImageTile({
+    required String? imageUrl,
+    required String dangerBadge,
+    required Color dangerColor,
+    double? height,
+    BorderRadius? borderRadius,
+  }) {
+    final br = borderRadius ?? BorderRadius.circular(8);
+    return ClipRRect(
+      borderRadius: br,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Container(
+            color: const Color(0xFFF0F0F0),
+            child: imageUrl != null
+                ? Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Center(
+                      child: Icon(Icons.image, size: 40, color: Color(0xFFCCCCCC)),
+                    ),
+                  )
+                : const Center(
+                    child: Icon(Icons.image_not_supported, size: 40, color: Color(0xFFCCCCCC)),
+                  ),
+          ),
+          // Gradient scrim for readability
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            child: Container(
+              height: 48,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [Colors.black.withOpacity(0.55), Colors.transparent],
+                ),
+              ),
+            ),
+          ),
+          // Danger badge — top right
+          Positioned(
+            top: 6, right: 6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+              decoration: BoxDecoration(
+                color: dangerColor,
+                borderRadius: BorderRadius.circular(6),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 4, offset: const Offset(0, 2))],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.warning_rounded, size: 12, color: Colors.white),
+                  const SizedBox(width: 3),
+                  Text(dangerBadge, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSingleSpeciesInfo(
+    ({SnakeSpeciesDetail detail, SnakeSpecies? species, String? imageUrl, String badge, Color color}) d,
+    int totalQty,
+  ) {
+    final name = d.species?.commonName ?? d.detail.snakeSpeciesName;
+    final scientific = d.detail.snakeSpeciesScientificName;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                name,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF222222)),
+              ),
+              if (scientific.isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Text(
+                  scientific,
+                  style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF999999)),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0F0F0),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            'SL: ${totalQty.toString().padLeft(2, '0')}',
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF555555)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMultiSpeciesInfo(
+    List<({SnakeSpeciesDetail detail, SnakeSpecies? species, String? imageUrl, String badge, Color color})> list,
+    int totalQty,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Heading row: "N loài rắn" + total qty badge
+        Row(
+          children: [
+            Text(
+              '${list.length} loài rắn',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF222222)),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F0F0),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'Tổng SL: ${totalQty.toString().padLeft(2, '0')}',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF555555)),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // Per-species rows
+        ...list.map((d) {
+          final name = d.species?.commonName ?? d.detail.snakeSpeciesName;
+          final scientific = d.detail.snakeSpeciesScientificName;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                // Color-coded danger dot
+                Container(
+                  width: 6, height: 6,
+                  margin: const EdgeInsets.only(top: 2, right: 8),
+                  decoration: BoxDecoration(color: d.color, shape: BoxShape.circle),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
+                      ),
+                      if (scientific.isNotEmpty)
+                        Text(
+                          scientific,
+                          style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Color(0xFF999999)),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Danger chip
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: d.color.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(color: d.color.withOpacity(0.4)),
+                  ),
+                  child: Text(
+                    d.badge,
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: d.color),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // Qty badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0F0F0),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: Text(
+                    'x${d.detail.quantity}',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF555555)),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
   Widget _buildJobCard(SnakeCatchingRequestData request) {
     final distance = _calculateDistance(request.locationCoordinates);
     final timeAgo = _getTimeAgo(request.requestDate);
-    final speciesDetail = request.details.isNotEmpty ? request.details.first : null;
-    final totalQuantity = request.details.fold<int>(0, (sum, detail) => sum + detail.quantity);
-    
-    // Get snake species details from cache
-    SnakeSpecies? species;
-    if (speciesDetail != null && _speciesCache.containsKey(speciesDetail.snakeSpeciesId)) {
-      species = _speciesCache[speciesDetail.snakeSpeciesId];
-    }
-    
-    final snakeTitle = species?.commonName ?? speciesDetail?.snakeSpeciesName ?? 'Rắn chưa xác định';
-    
-    // Get image from species (preferred) or user media
-    String? imageUrl = species?.imageUrl;
-    if (imageUrl == null && request.media.isNotEmpty) {
-      imageUrl = request.media.first.url;
-    }
-    
-    // Get danger level from species info
-    String dangerBadge = 'CHƯA RÕ';
-    Color dangerColor = const Color(0xFF999999);
-    
-    if (species != null) {
-      if (species.isVenomous) {
-        if (species.riskLevel >= 8.0) {
-          dangerBadge = 'CỰC ĐỘC';
-          dangerColor = const Color(0xFFDC3545); // Bright red
-        } else if (species.riskLevel >= 6.0) {
-          dangerBadge = 'ĐỘC MẠNH';
-          dangerColor = const Color(0xFFFF6B35); // Orange red
-        } else if (species.riskLevel >= 4.0) {
-          dangerBadge = 'CÓ ĐỘC';
-          dangerColor = const Color(0xFFFFA500); // Orange
-        } else {
-          dangerBadge = 'ÍT ĐỘC';
-          dangerColor = const Color(0xFFFFC107); // Yellow
-        }
-      } else {
-        dangerBadge = 'KHÔNG ĐỘC';
-        dangerColor = const Color(0xFF28A745); // Green
+    final totalQuantity = request.details.fold<int>(0, (sum, d) => sum + d.quantity);
+    final isMultiSpecies = request.details.length > 1;
+
+    // Build per-species resolved data
+    final speciesDataList = request.details.asMap().entries.map((entry) {
+      final idx = entry.key;
+      final SnakeSpeciesDetail detail = entry.value;
+      final species = _speciesCache[detail.snakeSpeciesId];
+      // Image: prefer species DB image, fall back to user-uploaded media by index
+      String? imageUrl = species?.imageUrl;
+      if (imageUrl == null && idx < request.media.length) {
+        imageUrl = request.media[idx].url;
       }
+      final danger = _dangerInfo(species);
+      return (detail: detail, species: species, imageUrl: imageUrl, badge: danger.badge, color: danger.color);
+    }).toList();
+
+    // ── Image section ────────────────────────────────────────────────────────
+    Widget imageSection;
+    if (!isMultiSpecies) {
+      // Single species: full-width 4:3 image
+      final d = speciesDataList.first;
+      imageSection = SizedBox(
+        height: 200,
+        child: _buildSnakeImageTile(
+          imageUrl: d.imageUrl,
+          dangerBadge: d.badge,
+          dangerColor: d.color,
+        ),
+      );
+    } else if (speciesDataList.length == 2) {
+      // Two species: side by side
+      imageSection = SizedBox(
+        height: 160,
+        child: Row(
+          children: [
+            Expanded(
+              child: _buildSnakeImageTile(
+                imageUrl: speciesDataList[0].imageUrl,
+                dangerBadge: speciesDataList[0].badge,
+                dangerColor: speciesDataList[0].color,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(8), bottomLeft: Radius.circular(8),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: _buildSnakeImageTile(
+                imageUrl: speciesDataList[1].imageUrl,
+                dangerBadge: speciesDataList[1].badge,
+                dangerColor: speciesDataList[1].color,
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(8), bottomRight: Radius.circular(8),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // 3+ species: first image dominant (left 60%), others stacked on right (40%)
+      final others = speciesDataList.sublist(1, speciesDataList.length.clamp(0, 3));
+      imageSection = SizedBox(
+        height: 180,
+        child: Row(
+          children: [
+            Expanded(
+              flex: 6,
+              child: _buildSnakeImageTile(
+                imageUrl: speciesDataList[0].imageUrl,
+                dangerBadge: speciesDataList[0].badge,
+                dangerColor: speciesDataList[0].color,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(8), bottomLeft: Radius.circular(8),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              flex: 4,
+              child: Column(
+                children: others.asMap().entries.map((e) {
+                  final isLast = e.key == others.length - 1;
+                  final hasSibling = speciesDataList.length > 3 && isLast;
+                  return Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: isLast ? 0 : 4),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          _buildSnakeImageTile(
+                            imageUrl: e.value.imageUrl,
+                            dangerBadge: e.value.badge,
+                            dangerColor: e.value.color,
+                            borderRadius: BorderRadius.only(
+                              topRight: e.key == 0 ? const Radius.circular(8) : Radius.zero,
+                              bottomRight: isLast ? const Radius.circular(8) : Radius.zero,
+                            ),
+                          ),
+                          // "+N more" overlay on last tile if there are hidden species
+                          if (hasSibling)
+                            Positioned.fill(
+                              child: ClipRRect(
+                                borderRadius: const BorderRadius.only(bottomRight: Radius.circular(8)),
+                                child: Container(
+                                  color: Colors.black54,
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    '+${speciesDataList.length - 3} loài',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      );
     }
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -1127,7 +1429,7 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header với badges
+          // ── Header: distance / time / status badges ───────────────────────
           Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
@@ -1145,34 +1447,20 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                       const SizedBox(width: 4),
                       Text(
                         '${distance.toStringAsFixed(1)} km',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 8),
-                
-                // Time Badge
                 Row(
                   children: [
                     const Icon(Icons.access_time, size: 14, color: Color(0xFF999999)),
                     const SizedBox(width: 4),
-                    Text(
-                      timeAgo,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF999999),
-                      ),
-                    ),
+                    Text(timeAgo, style: const TextStyle(fontSize: 12, color: Color(0xFF999999))),
                   ],
                 ),
                 const Spacer(),
-                
-                // Status Badge (for accepted orders)
                 if (request.status != 'Pending') ...[
                   Builder(builder: (_) {
                     final displayStatus = _resolveDisplayStatus(request);
@@ -1185,18 +1473,12 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                       ),
                       child: Text(
                         _getStatusText(displayStatus),
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: _getStatusColor(displayStatus),
-                        ),
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _getStatusColor(displayStatus)),
                       ),
                     );
                   }),
                   const SizedBox(width: 4),
                 ],
-
-                // Priority Badge
                 if (request.priority == 'High')
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1208,150 +1490,28 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                       children: [
                         Icon(Icons.priority_high, size: 12, color: Color(0xFFDC3545)),
                         SizedBox(width: 2),
-                        Text(
-                          'KHẨN',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFDC3545),
-                          ),
-                        ),
+                        Text('KHẨN', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFDC3545))),
                       ],
                     ),
                   ),
               ],
             ),
           ),
-          
-          // Snake Image
+
+          // ── Image section ─────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    width: double.infinity,
-                    height: 200,
-                    color: const Color(0xFFF0F0F0),
-                    child: imageUrl != null
-                        ? Image.network(
-                            imageUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Center(
-                                child: Icon(Icons.image, size: 60, color: Color(0xFFCCCCCC)),
-                              );
-                            },
-                          )
-                        : const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.image_not_supported, size: 60, color: Color(0xFFCCCCCC)),
-                                SizedBox(height: 8),
-                                Text(
-                                  'Chưa có ảnh',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF999999),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                  ),
-                ),
-                
-                // Danger Badge (show when we have species info)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: dangerColor,
-                      borderRadius: BorderRadius.circular(6),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.warning, size: 14, color: Colors.white),
-                        const SizedBox(width: 4),
-                        Text(
-                          dangerBadge,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            child: imageSection,
           ),
-          
+
           const SizedBox(height: 12),
-          
-          // Title & Quantity
+
+          // ── Species info ──────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Title with Quantity
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        snakeTitle,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF333333),
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0F0F0),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'SL: ${totalQuantity.toString().padLeft(2, '0')}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF666666),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                
-                // Scientific name if available
-                if (speciesDetail != null)
-                  Text(
-                    speciesDetail.snakeSpeciesScientificName,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                      color: Color(0xFF999999),
-                    ),
-                  ),
-              ],
-            ),
+            child: isMultiSpecies
+                ? _buildMultiSpeciesInfo(speciesDataList, totalQuantity)
+                : _buildSingleSpeciesInfo(speciesDataList.first, totalQuantity),
           ),
           
           const SizedBox(height: 12),

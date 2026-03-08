@@ -194,13 +194,16 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
       final repo = ref.read(snakeCatchingRepositoryProvider);
       await repo.completeMission(widget.missionId, catchingEnvironmentId: _catchingEnvironmentId!);
       if (!mounted) return;
-      Navigator.of(context).push(MaterialPageRoute(
-        builder: (context) => RescuerMissionSuccessScreen(
-          requestData: widget.requestData,
-          missionId: widget.missionId,
-          photoCount: widget.capturedPhotos.length,
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => RescuerMissionSuccessScreen(
+            requestData: widget.requestData,
+            missionId: widget.missionId,
+            photoCount: widget.capturedPhotos.length,
+          ),
         ),
-      ));
+        (route) => route.isFirst,
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

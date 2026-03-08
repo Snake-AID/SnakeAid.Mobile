@@ -9,6 +9,7 @@ import '../../models/snake_catching_request.dart';
 import '../../repository/snake_species_repository.dart';
 import '../../repository/snake_catching_repository.dart';
 import '../../widgets/location_picker_dialog.dart';
+import '../../../emergency/models/snake_detection_response.dart';
 
 /// Screen for members to submit detailed snake report with photos
 class SnakeReportDetailScreen extends ConsumerStatefulWidget {
@@ -26,9 +27,11 @@ class SnakeReportDetailScreen extends ConsumerStatefulWidget {
 
 class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScreen> {
   bool _isPhotoTab = true; // true = Chụp Ảnh, false = Chọn Loài Rắn
-  File? _mainPhoto;
-  File? _photo2;
-  File? _photo3;
+
+  // Photo slots: slot 1 = main (required), 2-5 = additional
+  // 'single'/'many': max 3   |   'few': max 5
+  final Map<int, File> _photos = {};
+
   final _addressDetailController = TextEditingController(); // Ghi chú địa chỉ chi tiết
   final _specificLocationController = TextEditingController();
   final _behaviorController = TextEditingController();
@@ -52,6 +55,21 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
   // Map<SnakeSpecies, int> - species to quantity mapping
   Map<SnakeSpecies, int> _selectedSpeciesMap = {};
 
+  // AI detection state (per photo slot: 1=main, 2, 3)
+  final Map<int, String> _mediaIds = {};
+  final Map<int, DetectionResult?> _detectionResults = {};
+  final Map<int, bool> _isAnalyzingSlot = {};
+
+  // AI card carousel
+  final PageController _aiCardPageController = PageController();
+  int _aiCardPage = 0;
+
+  // Per-species quantity for photo-tab: snakeId -> count (only for few/many)
+  final Map<int, int> _speciesQuantityMap = {};
+
+  // Quantity for single-mode (how many individuals of this 1 species)
+  int _singleQuantity = 1;
+
   final ImagePicker _picker = ImagePicker();
 
   @override
@@ -71,6 +89,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
     _specificLocationController.dispose();
     _behaviorController.dispose();
     _searchController.dispose();
+    _aiCardPageController.dispose();
     super.dispose();
   }
 
@@ -117,11 +136,11 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
   String get _titleText {
     switch (widget.quantity) {
       case 'single':
-        return 'Báo Cáo: 1 Con Rắn';
+        return 'Báo Cáo: 1 Loài Rắn';
       case 'few':
-        return 'Báo Cáo: 2-5 Con Rắn';
+        return 'Báo Cáo: 2-5 Loài Rắn';
       case 'many':
-        return 'Báo Cáo: Nhiều Con / Ổ Rắn';
+        return 'Báo Cáo: Ổ Rắn';
       default:
         return 'Báo Cáo Phát Hiện Rắn';
     }
@@ -130,11 +149,11 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
   String get _photoSectionTitle {
     switch (widget.quantity) {
       case 'single':
-        return 'Chụp ảnh con rắn (1-3 góc độ)';
+        return 'Chụp ảnh loài rắn (1-3 góc độ)';
       case 'few':
-        return 'Chụp ảnh các con rắn (1-3 góc độ)';
+        return 'Chụp ảnh các loài rắn (1-3 ảnh)';
       case 'many':
-        return 'Chụp ảnh khu vực/ổ rắn (1-3 góc độ)';
+        return 'Chụp ảnh khu vực ổ rắn (1-3 ảnh)';
       default:
         return 'Chụp ảnh (1-3 góc độ)';
     }
@@ -157,7 +176,13 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
     //    - For single: has selected species
     //    - For few/many: has at least one species in map
     if (_isPhotoTab) {
-      return _mainPhoto != null;
+      if (!_photos.containsKey(1)) return false;
+      // Block while upload/AI detection is still running — mediaIds not ready yet
+      if (_isAnalyzingSlot.values.any((analyzing) => analyzing == true)) return false;
+      // Require at least one successful AI detection — user must either retake photo
+      // with a visible snake or switch to the species tab to select manually
+      if (!_detectionResults.values.any((r) => r != null)) return false;
+      return true;
     } else {
       if (widget.quantity == 'single') {
         return _selectedSpecies != null;
@@ -167,26 +192,100 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
     }
   }
 
+  void _clearSlot(int slot) {
+    setState(() {
+      _photos.remove(slot);
+      _detectionResults.remove(slot);
+      _mediaIds.remove(slot);
+      _isAnalyzingSlot.remove(slot);
+      // Prune species no longer detected in any remaining slot
+      final remainingIds = _detectionResults.values
+          .whereType<DetectionResult>()
+          .map((r) => r.snake.id)
+          .toSet();
+      _speciesQuantityMap.removeWhere((id, _) => !remainingIds.contains(id));
+    });
+  }
+
   Future<void> _pickImage(int slot) async {
+    // Show source picker
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Text(
+                'Chọn nguồn ảnh',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildSourceOption(
+                      icon: Icons.camera_alt,
+                      label: 'Chụp ảnh',
+                      color: const Color(0xFF228B22),
+                      onTap: () => Navigator.pop(context, ImageSource.camera),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildSourceOption(
+                      icon: Icons.photo_library,
+                      label: 'Album ảnh',
+                      color: const Color(0xFF1565C0),
+                      onTap: () => Navigator.pop(context, ImageSource.gallery),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
     try {
       final XFile? image = await _picker.pickImage(
-        source: ImageSource.camera,
+        source: source,
         imageQuality: 85,
       );
       if (image != null) {
+        final file = File(image.path);
         setState(() {
-          switch (slot) {
-            case 1:
-              _mainPhoto = File(image.path);
-              break;
-            case 2:
-              _photo2 = File(image.path);
-              break;
-            case 3:
-              _photo3 = File(image.path);
-              break;
-          }
+          _photos[slot] = file;
+          // Reset detection state for this slot
+          _detectionResults.remove(slot);
+          _mediaIds.remove(slot);
+          _isAnalyzingSlot[slot] = true;
+          // Prune species no longer detected in any remaining slot
+          final remainingIds = _detectionResults.values
+              .whereType<DetectionResult>()
+              .map((r) => r.snake.id)
+              .toSet();
+          _speciesQuantityMap.removeWhere((id, _) => !remainingIds.contains(id));
         });
+        // Upload + AI detection in background (non-blocking)
+        _uploadAndDetect(slot, file);
       }
     } catch (e) {
       if (mounted) {
@@ -194,6 +293,73 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
           SnackBar(content: Text('Lỗi: ${e.toString()}')),
         );
       }
+    }
+  }
+
+  Widget _buildSourceOption({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.25)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 32),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _uploadAndDetect(int slot, File imageFile) async {
+    try {
+      final repository = ref.read(snakeCatchingRepositoryProvider);
+
+      // Step 1: Upload image to media service
+      final uploadResponse = await repository.uploadSnakeReportImage(imageFile);
+      if (!uploadResponse.isSuccess || uploadResponse.data == null) {
+        if (mounted) setState(() => _isAnalyzingSlot[slot] = false);
+        return;
+      }
+      final mediaId = uploadResponse.data!.id;
+      if (mounted) setState(() => _mediaIds[slot] = mediaId);
+
+      // Step 2: AI snake detection
+      final detectResponse = await repository.detectSnakeFromMedia(mediaId);
+      if (mounted) {
+        setState(() {
+          _isAnalyzingSlot[slot] = false;
+          if (detectResponse.isSuccess &&
+              detectResponse.data != null &&
+              detectResponse.data!.results.isNotEmpty) {
+            final detected = detectResponse.data!.results.first;
+            _detectionResults[slot] = detected;
+            // Register this species with default quantity=1 if not already set
+            _speciesQuantityMap.putIfAbsent(detected.snake.id, () => 1);
+          }
+        });
+      }
+    } catch (e) {
+      // Detection failure is non-blocking — user can still submit without AI result
+      if (mounted) setState(() => _isAnalyzingSlot[slot] = false);
     }
   }
 
@@ -372,16 +538,37 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
+                      else if (_isPhotoTab && _isAnalyzingSlot.values.any((v) => v == true))
+                        const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            ),
+                            SizedBox(width: 10),
+                            Text(
+                              'Đang tải ảnh...',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        )
                       else
                         Text(
-                          _isPhotoTab ? 'Gửi Báo Cáo' : 'Gửi Báo Cáo',
+                          'Gửi Báo Cáo',
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                      if (!_isSubmitting) const SizedBox(width: 8),
-                      if (!_isSubmitting) const Icon(Icons.arrow_forward, size: 20),
+                      if (!_isSubmitting && !(_isPhotoTab && _isAnalyzingSlot.values.any((v) => v == true)))
+                        const SizedBox(width: 8),
+                      if (!_isSubmitting && !(_isPhotoTab && _isAnalyzingSlot.values.any((v) => v == true)))
+                        const Icon(Icons.arrow_forward, size: 20),
                     ],
                   ),
                 ),
@@ -390,17 +577,51 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.smart_toy, size: 16, color: Colors.grey[400]),
-                  const SizedBox(width: 6),
-                  Text(
-                    _isPhotoTab 
-                        ? 'AI sẽ phân tích loài rắn'
-                        : 'Thông tin giúp cứu hộ nhanh hơn',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[400],
-                    ),
-                  ),
+                  Builder(builder: (_) {
+                    // Contextual hint below submit button
+                    final isAnalyzing = _isPhotoTab && _isAnalyzingSlot.values.any((v) => v == true);
+                    final hasPhoto = _photos.containsKey(1);
+                    final hasDetection = _detectionResults.values.any((r) => r != null);
+                    final showNoDetectionHint = _isPhotoTab && hasPhoto && !isAnalyzing && !hasDetection;
+
+                   if (showNoDetectionHint) {
+                        return Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.warning_amber_rounded,
+                                size: 18,
+                                color: Colors.orange[700],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'AI không nhận diện được — hãy chọn loài thủ công\nhoặc chụp lại để nhận diện rắn rõ hơn',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.orange[700],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.smart_toy, size: 16, color: Colors.grey[400]),
+                        const SizedBox(width: 6),
+                        Text(
+                          _isPhotoTab
+                              ? 'AI sẽ phân tích loài rắn'
+                              : 'Thông tin giúp cứu hộ nhanh hơn',
+                          style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                        ),
+                      ],
+                    );
+                  }),
                 ],
               ),
             ],
@@ -411,76 +632,146 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
   }
 
   Widget _buildPhotoTab() {
+    final isSingle = widget.quantity == 'single';
+    final isMany = widget.quantity == 'many';
+    final isFew = widget.quantity == 'few';
+    final isMultiple = !isSingle;
+    final int maxSlots = isFew ? 5 : 3;
+
+    // Compute how many slots to render:
+    // last filled slot + 1 (shows one empty "add" placeholder), min 3, capped at maxSlots.
+    // For single/many always 3 fixed.
+    final int lastFilled = [1, 2, 3, 4, 5].lastWhere(
+      (s) => _photos.containsKey(s),
+      orElse: () => 0,
+    );
+    final int actualVisible =
+        isFew ? (lastFilled + 1).clamp(3, maxSlots) : 3;
+
+    // Slot label helpers
+    String slotLabel(int slot) {
+      if (slot == 1) {
+        return isSingle
+            ? 'Ảnh rắn (bắt buộc)'
+            : isMany
+                ? 'Ảnh khu vực (bắt buộc)'
+                : 'Ảnh tổng quát (bắt buộc)';
+      }
+      if (isSingle) {
+        return slot == 2 ? 'Góc khác\n(khuyến nghị)' : 'Góc phụ\n(tùy chọn)';
+      }
+      if (isMany) {
+        return slot == 2 ? 'Góc rộng\n(khuyến nghị)' : 'Chi tiết ổ\n(tùy chọn)';
+      }
+      // few
+      const labels = {
+        2: 'Loài 2\n(khuyến nghị)',
+        3: 'Loài 3\n(tùy chọn)',
+        4: 'Loài 4\n(tùy chọn)',
+        5: 'Loài 5\n(tùy chọn)',
+      };
+      return labels[slot] ?? 'Tùy chọn';
+    }
+
+    Color badgeColorFor(int slot) {
+      if (slot == 1) return Colors.red;
+      if (slot == 2) return Colors.orange;
+      return Colors.grey;
+    }
+
+    String badgeTextFor(int slot) {
+      if (slot == 1) return 'Bắt buộc';
+      if (slot == 2) return 'Khuyến nghị';
+      return 'Tùy chọn';
+    }
+
+    // Build the photo grid
+    final List<Widget> gridRows = [
+      _buildPhotoSlot(
+        slot: 1,
+        label: slotLabel(1),
+        badgeText: badgeTextFor(1),
+        badgeColor: badgeColorFor(1),
+        aspectRatio: 4 / 3,
+        photo: _photos[1],
+      ),
+    ];
+
+    for (int i = 2; i <= actualVisible; i += 2) {
+      final int slotA = i;
+      final int slotB = i + 1;
+      gridRows.add(const SizedBox(height: 12));
+      gridRows.add(Row(
+        children: [
+          Expanded(
+            child: _buildPhotoSlot(
+              slot: slotA,
+              label: slotLabel(slotA),
+              badgeText: badgeTextFor(slotA),
+              badgeColor: badgeColorFor(slotA),
+              aspectRatio: 1,
+              photo: _photos[slotA],
+            ),
+          ),
+          if (slotB <= actualVisible) ...[
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildPhotoSlot(
+                slot: slotB,
+                label: slotLabel(slotB),
+                badgeText: badgeTextFor(slotB),
+                badgeColor: badgeColorFor(slotB),
+                aspectRatio: 1,
+                photo: _photos[slotB],
+              ),
+            ),
+          ] else
+            const Expanded(child: SizedBox()),
+        ],
+      ));
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Photo Section
+        // Section title
         Text(
           _photoSectionTitle,
           style: const TextStyle(
-            fontSize: 18,
+            fontSize: 17,
             fontWeight: FontWeight.bold,
             color: Colors.black87,
           ),
         ),
-        const SizedBox(height: 12),
-        // Photo Grid
-        Column(
-          children: [
-            // Main photo (Required)
-            _buildPhotoSlot(
-              slot: 1,
-              label: 'Ảnh chính (bắt buộc)',
-              badgeText: 'REQUIRED',
-              badgeColor: Colors.red,
-              aspectRatio: 4 / 3,
-              photo: _mainPhoto,
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildPhotoSlot(
-                    slot: 2,
-                    label: 'Góc độ 2\n(khuyến nghị)',
-                    badgeText: 'Recommended',
-                    badgeColor: Colors.orange,
-                    aspectRatio: 1,
-                    photo: _photo2,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildPhotoSlot(
-                    slot: 3,
-                    label: 'Góc độ 3\n(tùy chọn)',
-                    badgeText: 'Optional',
-                    badgeColor: Colors.grey,
-                    aspectRatio: 1,
-                    photo: _photo3,
-                  ),
-                ),
-              ],
-            ),
-          ],
+        const SizedBox(height: 6),
+        Text(
+          isSingle
+              ? 'Chụp ảnh rõ nét từ khoảng cách an toàn'
+              : isMany
+                  ? 'Chụp cảnh khu vực, không cần lại gần ổ rắn'
+                  : 'Mỗi ảnh nên thể hiện một loài rắn khác nhau (tối đa $maxSlots ảnh)',
+          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
         ),
         const SizedBox(height: 12),
-        // Add photo button (disabled if all slots filled)
-        OutlinedButton.icon(
-          onPressed: null,
-          icon: const Icon(Icons.add_a_photo, size: 20),
-          label: const Text('Thêm ảnh +'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFF228B22).withOpacity(0.5),
-            side: BorderSide(
-              color: const Color(0xFF228B22).withOpacity(0.3),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
+        // Photo grid
+        Column(children: gridRows),
+        // "Add photo" button for 'few' when more slots are available
+        if (isFew && actualVisible < maxSlots) ...[
+          const SizedBox(height: 12),
+          _buildAddPhotoButton(nextSlot: actualVisible + 1),
+        ],
+        const SizedBox(height: 12),
+        // Single mode: always-visible quantity stepper
+        if (isSingle) _buildSingleQuantityRow(),
+        // AI Detection carousel
+        if (_detectionResults.values.any((r) => r != null)) ...[
+          const SizedBox(height: 12),
+          _buildAiDetectionCarousel(),
+          const SizedBox(height: 12),
+        ],
+        // Per-species quantity selectors (few/many: after AI detects)
+        if (isMultiple && _speciesQuantityMap.isNotEmpty)
+          _buildSpeciesQuantitySection(),
         const SizedBox(height: 24),
         // Tips Section
         _buildTipsSection(),
@@ -498,6 +789,291 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
     );
   }
 
+  /// "Add another species photo" button for 'few' mode
+  Widget _buildAddPhotoButton({required int nextSlot}) {
+    return GestureDetector(
+      onTap: () => _pickImage(nextSlot),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFDCFCE7),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color(0xFF228B22).withOpacity(0.4),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: const BoxDecoration(
+                color: Color(0xFF228B22),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.add, size: 18, color: Colors.white),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'Thêm ảnh loài rắn khác',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF166534),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Always-visible quantity row for single-mode (how many individuals)
+  Widget _buildSingleQuantityRow() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF228B22).withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.format_list_numbered,
+              size: 16, color: Color(0xFF228B22)),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Số lượng cá thể',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF166534),
+                  ),
+                ),
+                Text(
+                  'Báo cáo có bao nhiêu con rắn loài này',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                ),
+              ],
+            ),
+          ),
+          _buildInlineStepper(
+            value: _singleQuantity,
+            min: 1,
+            max: 99,
+            onChanged: (v) => setState(() => _singleQuantity = v),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSpeciesQuantitySection() {
+    // Build list of unique detected species preserving insertion order
+    final seen = <int>{};
+    final uniqueSpecies = <DetectionResult>[];
+    for (final slot in [1, 2, 3]) {
+      final r = _detectionResults[slot];
+      if (r != null && seen.add(r.snake.id)) {
+        uniqueSpecies.add(r);
+      }
+    }
+    if (uniqueSpecies.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF228B22).withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.format_list_numbered,
+                  size: 16, color: Color(0xFF228B22)),
+              const SizedBox(width: 6),
+              const Text(
+                'Số lượng theo loài',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF166534),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...uniqueSpecies.map((r) => _buildSpeciesQtyRow(r)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSpeciesQtyRow(DetectionResult r) {
+    final snakeId = r.snake.id;
+    final qty = _speciesQuantityMap[snakeId] ?? 1;
+    final isVenomous = r.snake.isVenomous;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          // Thumbnail
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: r.snake.imageUrl.isNotEmpty
+                ? Image.network(
+                    r.snake.imageUrl,
+                    width: 40,
+                    height: 40,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _snakeIconBox(),
+                  )
+                : _snakeIconBox(),
+          ),
+          const SizedBox(width: 10),
+          // Name
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  r.snake.commonName,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (isVenomous)
+                  Container(
+                    margin: const EdgeInsets.only(top: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.red[50],
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.red[200]!),
+                    ),
+                    child: Text(
+                      'Có độc',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.red[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Stepper
+          _buildInlineStepper(
+            value: qty,
+            min: 1,
+            max: widget.quantity == 'few' ? 5 : 99,
+            onChanged: (v) =>
+                setState(() => _speciesQuantityMap[snakeId] = v),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _snakeIconBox() => Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: const Color(0xFFDCFCE7),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Icon(Icons.pest_control,
+            size: 22, color: Color(0xFF228B22)),
+      );
+
+  Widget _buildInlineStepper({
+    required int value,
+    required int min,
+    required int max,
+    required ValueChanged<int> onChanged,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _stepperBtn(
+          icon: Icons.remove,
+          enabled: value > min,
+          onTap: () => onChanged(value - 1),
+        ),
+        SizedBox(
+          width: 34,
+          child: Text(
+            '$value',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF166534),
+            ),
+          ),
+        ),
+        _stepperBtn(
+          icon: Icons.add,
+          enabled: value < max,
+          onTap: () => onChanged(value + 1),
+        ),
+      ],
+    );
+  }
+
+  Widget _stepperBtn({
+    required IconData icon,
+    required bool enabled,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: enabled ? const Color(0xFF228B22) : Colors.grey[300],
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, size: 16, color: Colors.white),
+      ),
+    );
+  }
+
   Widget _buildPhotoSlot({
     required int slot,
     required String label,
@@ -506,6 +1082,9 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
     required double aspectRatio,
     File? photo,
   }) {
+    final isAnalyzing = _isAnalyzingSlot[slot] == true;
+    final hasDetection = _detectionResults.containsKey(slot) && _detectionResults[slot] != null;
+
     return GestureDetector(
       onTap: () => _pickImage(slot),
       child: AspectRatio(
@@ -517,8 +1096,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
               color: photo != null
                   ? const Color(0xFF228B22)
                   : Colors.grey[300]!,
-              width: photo != null ? 2 : 2,
-              style: photo != null ? BorderStyle.solid : BorderStyle.solid,
+              width: 2,
             ),
             borderRadius: BorderRadius.circular(12),
           ),
@@ -561,32 +1139,418 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                     ],
                   ),
                 ),
-              // Badge
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
+              // Badge (only when no photo)
+              if (photo == null)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: badgeColor,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      badgeText,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
+                ),
+              // Delete button (top-right, when photo is set and not uploading)
+              if (photo != null && !isAnalyzing)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: GestureDetector(
+                    onTap: () => _clearSlot(slot),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.65),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.close, size: 16, color: Colors.white),
+                    ),
+                  ),
+                ),
+              // Analyzing overlay
+              if (isAnalyzing)
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      color: Colors.black54,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 3,
+                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4CAF50)),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'AI đang\nnhận diện...',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: aspectRatio == 1 ? 10 : 12,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              // Detection success badge (bottom-left)
+              if (!isAnalyzing && hasDetection)
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF228B22),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.smart_toy, size: 12, color: Colors.white),
+                        const SizedBox(width: 4),
+                        Text(
+                          'AI ✓',
+                          style: TextStyle(
+                            fontSize: aspectRatio == 1 ? 9 : 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAiDetectionCarousel() {
+    // Build ordered list of available results
+    const slotLabels = {1: 'Ảnh chính', 2: 'Góc độ 2', 3: 'Góc độ 3'};
+    final entries = [1, 2, 3]
+        .where((s) => _detectionResults[s] != null)
+        .map((s) => (slot: s, result: _detectionResults[s]!))
+        .toList();
+
+    if (entries.isEmpty) return const SizedBox.shrink();
+
+    final total = entries.length;
+
+    return Column(
+      children: [
+        SizedBox(
+          // Fixed height so the Column parent doesn't need to measure
+          height: 230,
+          child: PageView.builder(
+            controller: _aiCardPageController,
+            itemCount: total,
+            onPageChanged: (i) => setState(() => _aiCardPage = i),
+            itemBuilder: (context, i) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: _buildAiDetectionCard(
+                  entries[i].result,
+                  slotLabel: slotLabels[entries[i].slot]!,
+                ),
+              );
+            },
+          ),
+        ),
+        // Dot indicators — only if more than 1 card
+        if (total > 1) ...[
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(total, (i) {
+              final active = _aiCardPage == i;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                width: active ? 20 : 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: active
+                      ? const Color(0xFF228B22)
+                      : const Color(0xFF228B22).withOpacity(0.25),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              );
+            }),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildAiDetectionCard(DetectionResult result, {String slotLabel = 'Ảnh chính'}) {
+    final ai = result.aiDetection;
+    final snake = result.snake;
+    final confidencePct = (ai.confidence * 100).toStringAsFixed(0);
+    final isHighConfidence = ai.confidence >= 0.7;
+    final isMediumConfidence = ai.confidence >= 0.4;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF228B22).withOpacity(0.4),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF228B22).withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+            decoration: const BoxDecoration(
+              color: Color(0xFFDCFCE7),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: badgeColor,
-                    borderRadius: BorderRadius.circular(6),
+                    color: const Color(0xFF228B22),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.smart_toy, size: 16, color: Colors.white),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'AI nhận diện · $slotLabel',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF166534),
+                        ),
+                      ),
+                      const Text(
+                        'Kết quả phân tích từ ảnh chụp',
+                        style: TextStyle(fontSize: 11, color: Color(0xFF15803D)),
+                      ),
+                    ],
+                  ),
+                ),
+                // Confidence badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isHighConfidence
+                        ? const Color(0xFF228B22)
+                        : isMediumConfidence
+                            ? Colors.orange
+                            : Colors.red,
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    badgeText,
-                    style: TextStyle(
-                      fontSize: 10,
+                    '$confidencePct%',
+                    style: const TextStyle(
+                      fontSize: 13,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+          // Content
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Snake thumbnail
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: snake.imageUrl.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: snake.imageUrl,
+                          width: 72,
+                          height: 72,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            width: 72,
+                            height: 72,
+                            color: Colors.grey[200],
+                            child: const Icon(Icons.image, color: Colors.grey),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            width: 72,
+                            height: 72,
+                            color: const Color(0xFFF0FDF4),
+                            child: const Icon(Icons.pets, color: Color(0xFF228B22), size: 30),
+                          ),
+                        )
+                      : Container(
+                          width: 72,
+                          height: 72,
+                          color: const Color(0xFFF0FDF4),
+                          child: const Icon(Icons.pets, color: Color(0xFF228B22), size: 30),
+                        ),
+                ),
+                const SizedBox(width: 14),
+                // Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              snake.commonName.isNotEmpty ? snake.commonName : ai.className,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ),
+                          if (snake.isVenomous)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.red[50],
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.red[200]!),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.warning_amber_rounded, size: 12, color: Colors.red[700]),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    'Độc',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.red[700],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                      if (snake.scientificName.isNotEmpty)
+                        Text(
+                          snake.scientificName,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      const SizedBox(height: 8),
+                      // Confidence bar
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Độ tin cậy',
+                                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                              ),
+                              Text(
+                                isHighConfidence
+                                    ? 'Cao'
+                                    : isMediumConfidence
+                                        ? 'Trung bình'
+                                        : 'Thấp',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: isHighConfidence
+                                      ? const Color(0xFF228B22)
+                                      : isMediumConfidence
+                                          ? Colors.orange
+                                          : Colors.red,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: ai.confidence,
+                              backgroundColor: Colors.grey[200],
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                isHighConfidence
+                                    ? const Color(0xFF228B22)
+                                    : isMediumConfidence
+                                        ? Colors.orange
+                                        : Colors.red,
+                              ),
+                              minHeight: 6,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Footer note
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+            child: Text(
+              isHighConfidence
+                  ? '✓ AI nhận diện với độ tin cậy cao. Thông tin đã được lưu vào yêu cầu.'
+                  : '⚠ Độ tin cậy thấp. Bạn có thể chụp lại hoặc chọn loài từ tab "Chọn Loài Rắn".',
+              style: TextStyle(
+                fontSize: 11,
+                color: isHighConfidence ? const Color(0xFF15803D) : Colors.orange[800],
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2027,41 +2991,57 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
       return;
     }
 
-    // Validate species selection
+    // Build species list
     List<SnakeSpeciesItem> snakeSpeciesList = [];
-    
-    if (widget.quantity == 'single') {
-      // Single snake
-      if (_selectedSpecies == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Vui lòng chọn loài rắn'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
+
+    if (_isPhotoTab) {
+      // Photo tab: collect uniquely detected species with user-set quantities
+      final seen = <int>{};
+      for (final slot in [1, 2, 3]) {
+        final r = _detectionResults[slot];
+        if (r != null && r.snake.id > 0 && seen.add(r.snake.id)) {
+          snakeSpeciesList.add(SnakeSpeciesItem(
+            snakeSpeciesId: r.snake.id,
+            quantity: widget.quantity == 'single'
+                ? _singleQuantity
+                : (_speciesQuantityMap[r.snake.id] ?? 1),
+          ));
+        }
       }
-      snakeSpeciesList.add(SnakeSpeciesItem(
-        snakeSpeciesId: _selectedSpecies!.id,
-        quantity: 1,
-      ));
+      // No detection → empty list is fine; BE records the media for manual review
     } else {
-      // Few or many snakes
-      if (_selectedSpeciesMap.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Vui lòng chọn ít nhất 1 loài rắn'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
+      // Species tab: require manual selection
+      if (widget.quantity == 'single') {
+        if (_selectedSpecies == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Vui lòng chọn loài rắn'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+        snakeSpeciesList.add(SnakeSpeciesItem(
+          snakeSpeciesId: _selectedSpecies!.id,
+          quantity: _singleQuantity,
+        ));
+      } else {
+        if (_selectedSpeciesMap.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Vui lòng chọn ít nhất 1 loài rắn'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+        snakeSpeciesList = _selectedSpeciesMap.entries
+            .map((entry) => SnakeSpeciesItem(
+                  snakeSpeciesId: entry.key.id,
+                  quantity: entry.value,
+                ))
+            .toList();
       }
-      snakeSpeciesList = _selectedSpeciesMap.entries
-          .map((entry) => SnakeSpeciesItem(
-                snakeSpeciesId: entry.key.id,
-                quantity: entry.value,
-              ))
-          .toList();
     }
 
     // additionalDetails = Ghi chú địa chỉ chi tiết (gần chùa, gần hẻm, etc.) — required by BE
@@ -2087,6 +3067,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
         : null;
 
     // Create request
+    final mediaIdList = _mediaIds.values.toList();
     final request = SnakeCatchingRequest(
       address: _selectedAddress!,
       lng: _selectedLongitude!,
@@ -2094,6 +3075,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
       additionalDetails: additionalDetails,
       notes: notes,
       snakeSpeciesList: snakeSpeciesList,
+      mediaIdList: mediaIdList.isNotEmpty ? mediaIdList : null,
     );
 
     // Show loading

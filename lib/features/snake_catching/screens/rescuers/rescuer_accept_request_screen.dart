@@ -187,14 +187,27 @@ class _RescuerAcceptRequestScreenState
       final repo = ref.read(snakeCatchingRepositoryProvider);
       // Get missionId — prefer from widget data, refresh if missing
       String? missionId = widget.requestData.mission?.id;
+      debugPrint('━━━━ [StartMission] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint('[StartMission] requestId           = ${widget.requestData.id}');
+      debugPrint('[StartMission] requestStatus       = ${widget.requestData.status}');
+      debugPrint('[StartMission] missionId (widget)  = $missionId');
+      debugPrint('[StartMission] missionStatus       = ${widget.requestData.mission?.status}');
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
       if (missionId == null || missionId.isEmpty) {
+        debugPrint('[StartMission] missionId missing → fetching fresh request...');
         final response = await repo.getRequestById(widget.requestData.id);
+        debugPrint('[StartMission] fresh requestStatus = ${response.data?.status}');
+        debugPrint('[StartMission] fresh missionId     = ${response.data?.mission?.id}');
+        debugPrint('[StartMission] fresh missionStatus = ${response.data?.mission?.status}');
         missionId = response.data?.mission?.id;
       }
       if (missionId == null || missionId.isEmpty) {
+        debugPrint('[StartMission] ❌ missionId still null after refresh!');
         throw Exception('Không tìm thấy nhiệm vụ. Vui lòng thử lại.');
       }
 
+      debugPrint('[StartMission] ✅ calling startMission with missionId=$missionId');
       await repo.startMission(missionId);
 
       if (!mounted) return;

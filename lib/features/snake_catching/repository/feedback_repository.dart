@@ -87,14 +87,10 @@ class FeedbackRepository {
   Future<FeedbackData> submitFeedback(FeedbackRequest request) async {
     try {
       final body = request.toJson();
-      debugPrint('━━━━ [FeedbackRepo] POST /api/feedback ━━━━━');
-      debugPrint('[FeedbackRepo] body = $body');
       final response = await _http.post(
         '/api/feedback',
         data: body,
       );
-      debugPrint('[FeedbackRepo] statusCode = ${response.statusCode}');
-      debugPrint('[FeedbackRepo] response   = ${response.data}');
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = response.data['data'] ?? response.data;
         return FeedbackData.fromJson(data as Map<String, dynamic>);

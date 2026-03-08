@@ -1326,7 +1326,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   border: Border.all(color: statusColor.withOpacity(0.3)),
                 ),
                 child: Text(
-                  'Yêu cầu: Đã Phân Công',
+                  effectiveStatus == 'en_route'
+                  ? 'Tài xế đang trên đường đến'
+                  : 'Tài xế đã đến nơi',                  
                   style: TextStyle(
                     fontSize: 12,
                     color: statusColor,
@@ -1490,26 +1492,44 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           if ((request.status == 'Finished' || request.status == 'Paid' ||
                request.status == 'Completed') && request.details.isNotEmpty) ...[
             const SizedBox(height: 24),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'Rắn Đã Bắt Được (${request.details.length})',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF333333),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: request.details.map((detail) => _buildSpeciesChip(detail)).toList(),
-              ),
-            ),
+            Builder(builder: (_) {
+              // Build quantity map from actual missionDetails (rescuer-confirmed)
+              final missionDetails = request.mission?.missionDetails ?? [];
+              final Map<int, int> missionQtyMap = {
+                for (final md in missionDetails) md.snakeSpeciesId: md.quantity,
+              };
+              final int displayCount = missionDetails.isNotEmpty
+                  ? missionDetails.fold(0, (s, d) => s + d.quantity)
+                  : request.details.fold(0, (s, d) => s + d.quantity);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      'Rắn Đã Bắt Được ($displayCount)',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF333333),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: request.details.map((detail) => _buildSpeciesChip(
+                        detail,
+                        quantityOverride: missionQtyMap[detail.snakeSpeciesId],
+                      )).toList(),
+                    ),
+                  ),
+                ],
+              );
+            }),
           ] else if (request.details.isNotEmpty) ...[
             const SizedBox(height: 24),
             Padding(
@@ -2874,12 +2894,13 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     );
   }
 
-  Widget _buildSpeciesChip(SnakeSpeciesDetail detail) {
+  Widget _buildSpeciesChip(SnakeSpeciesDetail detail, {int? quantityOverride}) {
     final speciesDetail = _speciesDetailsMap[detail.snakeSpeciesId];
     final isLoading = _loadingSpeciesIds.contains(detail.snakeSpeciesId);
+    final int displayQty = quantityOverride ?? detail.quantity;
 
     return InkWell(
-      onTap: speciesDetail != null ? () => _showSpeciesDetailModal(speciesDetail, detail.quantity) : null,
+      onTap: speciesDetail != null ? () => _showSpeciesDetailModal(speciesDetail, displayQty) : null,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(12),
@@ -2998,7 +3019,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          'SL: ${detail.quantity}',
+                          'SL: $displayQty',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -3735,12 +3756,14 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   /// Returns a display-level status key that reflects mission sub-statuses
   /// (En_Route / Arrived) when the request is still in 'Assigned' state.
   String _getEffectiveStatus(SnakeCatchingRequestData request) {
-    if (request.status == 'Assigned' && request.mission != null) {
-      final ms = request.mission!.status.toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
-      // Handle both 'en_route' and 'enroute'
-      if (ms == 'en_route' || ms == 'enroute') return 'en_route';
-      if (ms == 'arrived') return 'arrived';
-      // Rescuer is still Preparing — show Deposited if deposit paid
+    if (request.status == 'Assigned') {
+      // Mission sub-statuses take priority (En_Route / Arrived)
+      if (request.mission != null) {
+        final ms = request.mission!.status.toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+        if (ms == 'en_route' || ms == 'enroute') return 'en_route';
+        if (ms == 'arrived') return 'arrived';
+      }
+      // Deposit paid (regardless of whether mission object is present yet)
       if (_transaction != null && _transaction!.isDeposited) return 'deposited';
     }
     return request.status;
@@ -3780,6 +3803,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         return Icons.schedule;
       case 'assigned':
         return Icons.assignment_ind;
+      case 'deposited':
+        return Icons.payments_rounded;
       case 'en_route':
         return Icons.directions_car;
       case 'arrived':

@@ -6,6 +6,8 @@ class SnakeCatchingRequest {
   final String? additionalDetails;
   final String? notes;
   final List<SnakeSpeciesItem> snakeSpeciesList;
+  // Media IDs from uploaded photos (optional — attached for AI detection history)
+  final List<String>? mediaIdList;
 
   SnakeCatchingRequest({
     required this.address,
@@ -14,6 +16,7 @@ class SnakeCatchingRequest {
     this.additionalDetails,
     this.notes,
     required this.snakeSpeciesList,
+    this.mediaIdList,
   });
 
   Map<String, dynamic> toJson() {
@@ -24,6 +27,7 @@ class SnakeCatchingRequest {
       if (additionalDetails != null) 'additionalDetails': additionalDetails,
       if (notes != null) 'notes': notes,
       'snakeSpeciesList': snakeSpeciesList.map((e) => e.toJson()).toList(),
+      if (mediaIdList != null && mediaIdList!.isNotEmpty) 'mediaIdList': mediaIdList,
     };
   }
 }
@@ -272,7 +276,9 @@ class SnakeCatchingRequestData {
           : null,
       mission: json['mission'] != null
           ? MissionData.fromJson(json['mission'] as Map<String, dynamic>)
-          : null,
+          : (json['missions'] as List<dynamic>?)?.isNotEmpty == true
+              ? MissionData.fromJson((json['missions'] as List<dynamic>).first as Map<String, dynamic>)
+              : null,
       media: (json['media'] as List<dynamic>?)
               ?.map((e) => RequestMedia.fromJson(e as Map<String, dynamic>))
               .toList() ??
