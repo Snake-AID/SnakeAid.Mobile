@@ -53,6 +53,7 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
   // ── Timer ──────────────────────────────────────────────────────────────────
   late Timer _timer;
   int _secondsElapsed = 0;
+  Timer? _trackSubscriptionTimer;
 
   // ── Controls ───────────────────────────────────────────────────────────────
   late bool _isMicOn;
@@ -107,11 +108,19 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
         dynacast: true,
       ),
     );
+    
+    // Listen to all important room events
     _room.addListener(_onRoomChanged);
+    
     _connectToRoom();
 
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _secondsElapsed++);
+    });
+
+    // Periodic check to subscribe to remote tracks
+    _trackSubscriptionTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) _subscribeToRemoteTracks();
     });
 
     _liveBadgeController = AnimationController(
@@ -134,8 +143,25 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
     try {
       await _room.connect(wsUrl, widget.livekitToken);
       if (!mounted) return;
+      
+      // Enable microphone
       await _room.localParticipant?.setMicrophoneEnabled(_isMicOn);
-      await _room.localParticipant?.setCameraEnabled(_isCameraOn);
+      
+      // Enable camera with proper capture options
+      if (_isCameraOn) {
+        await _room.localParticipant?.setCameraEnabled(
+          true,
+          cameraCaptureOptions: CameraCaptureOptions(
+            cameraPosition: _isFrontCamera 
+                ? CameraPosition.front 
+                : CameraPosition.back,
+          ),
+        );
+      }
+      
+      // Subscribe to any existing remote participant tracks
+      _subscribeToRemoteTracks();
+      
       if (mounted) setState(() => _isConnecting = false);
     } catch (e) {
       if (mounted) {
@@ -151,9 +177,26 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
     if (mounted) setState(() {});
   }
 
+  /// Subscribe to remote participant's tracks
+  void _subscribeToRemoteTracks() {
+    final remoteParticipants = _room.remoteParticipants.values;
+    for (final participant in remoteParticipants) {
+      for (final publication in participant.trackPublications.values) {
+        if (!publication.subscribed) {
+          try {
+            publication.subscribe();
+          } catch (e) {
+            debugPrint('Failed to subscribe to track: $e');
+          }
+        }
+      }
+    }
+  }
+
   @override
   void dispose() {
     _timer.cancel();
+    _trackSubscriptionTimer?.cancel();
     _liveBadgeController.dispose();
     _notesController.dispose();
     _room.removeListener(_onRoomChanged);
@@ -175,22 +218,21 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1a1022),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Kết Thúc Phiên',
+        title: const Text('Quay Về Sảnh Chờ?',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: const Text('Bạn có chắc muốn kết thúc buổi tư vấn?',
+        content: const Text('Bạn có muốn tạm rời khỏi cuộc gọi và quay về sảnh chờ không?\nBạn có thể vào lại bất cứ lúc nào.',
             style: TextStyle(color: Colors.white70)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Tiếp Tục',
+            child: const Text('Ở Lại',
                 style: TextStyle(color: Color(0xFF228B22))),
           ),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              // Best-effort: call end API, then navigate regardless of result
-              final repo = ref.read(consultationRepositoryProvider);
-              await repo.endConsultation(widget.consultationId);
+              // Just navigate back to waiting room, don't call end API
+              // User will end consultation from waiting room with separate button
 
               if (!mounted) return;
               final targetRoute = widget.afterCallRoute ??
@@ -213,7 +255,7 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('Kết Thúc',
+            child: const Text('Về Sảnh Chờ',
                 style: TextStyle(
                     color: Colors.white, fontWeight: FontWeight.bold)),
           ),

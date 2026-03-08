@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/consultation_booking_response.dart';
 import '../../providers/consultation_bookings_provider.dart';
+import '../../repository/consultation_repository.dart';
 
 /// Trạng thái hiển thị của một buổi tư vấn (derived from ConsultationBookingStatus)
 enum ConsultationStatus {
@@ -17,6 +18,7 @@ enum ConsultationStatus {
 class _ConsultationItem {
   final String id;             // bookingId — dùng cho highlight, display
   final String? consultationId; // consultationId thật — dùng cho LiveKit token
+  final String expertId;
   final String expertName;
   final String expertSpecialty;
   final String? expertAvatarUrl;
@@ -29,6 +31,7 @@ class _ConsultationItem {
   const _ConsultationItem({
     required this.id,
     this.consultationId,
+    required this.expertId,
     required this.expertName,
     required this.expertSpecialty,
     this.expertAvatarUrl,
@@ -58,6 +61,7 @@ class _ConsultationItem {
     return _ConsultationItem(
       id: b.id,
       consultationId: b.consultationId,
+      expertId: b.expertId,
       expertName: b.expertName,
       expertSpecialty: b.expertSpecialty ?? '',
       expertAvatarUrl: b.expertAvatarUrl,
@@ -91,6 +95,9 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
   String? _highlightedId;
   late AnimationController _flashController;
   late Animation<Color?> _flashColorAnimation;
+
+  // ── Payment loading ───────────────────────────────────────────────────────
+  String? _payingId; // bookingId đang được thanh toán
 
   /// Derive UI item list from provider bookings
   List<_ConsultationItem> _toItems(
@@ -148,13 +155,16 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
       curve: Curves.easeInOut,
     ));
 
-    // Nếu có buổi tư vấn vừa được tạo, highlight nó khi danh sách load xong
-    if (widget.highlightedId != null) {
-      _highlightedId = widget.highlightedId;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+    // Reload data mỗi khi vào màn hình
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(consultationBookingsProvider.notifier).loadBookings();
+      
+      // Nếu có buổi tư vấn vừa được tạo, highlight nó khi danh sách load xong
+      if (widget.highlightedId != null) {
+        _highlightedId = widget.highlightedId;
         _startFlashAnimation();
-      });
-    }
+      }
+    });
   }
 
   Future<void> _startFlashAnimation() async {
@@ -552,7 +562,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                     // Nút chính (vào / thanh toán / chờ)
                     Expanded(
                       flex: 2,
-                      child: isActive
+                      child: isActive || item.status == ConsultationStatus.upcoming
                           ? ElevatedButton.icon(
                               onPressed: () => _joinConsultation(context, item),
                               icon: const Icon(Icons.video_call, size: 18),
@@ -576,13 +586,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                             )
                           : item.status == ConsultationStatus.pendingPayment
                               ? ElevatedButton.icon(
-                                  onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Thanh toán - Đang phát triển'),
-                                      ),
-                                    );
-                                  },
+                                  onPressed: () => _goToPayment(context, item),
                                   icon: const Icon(Icons.payment, size: 18),
                                   label: const Text(
                                     'Thanh Toán Ngay',
@@ -1062,5 +1066,43 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
         'expertSpecialty': item.expertSpecialty,
       },
     );
+  }
+
+  void _goToPayment(BuildContext context, _ConsultationItem item) {
+    final date = item.scheduledTime;
+    final dateStr =
+        '${_weekdayLabel(date.weekday)}, ${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    final timeStr =
+        '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')} (30 phút)';
+    final feeStr = item.feeCost <= 0
+        ? 'Miễn phí'
+        : '${item.feeCost.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} VNĐ';
+
+    context.push(
+      '/payment-confirmation/${item.expertId}',
+      extra: {
+        'consultationType': item.serviceType,
+        'selectedDate': dateStr,
+        'selectedTime': timeStr,
+        'duration': '30 phút',
+        'price': feeStr,
+        'bookingId': item.id,
+        'consultationId': item.consultationId,
+        'expertName': item.expertName,
+      },
+    );
+  }
+
+  String _weekdayLabel(int weekday) {
+    const labels = {
+      DateTime.monday: 'Thứ Hai',
+      DateTime.tuesday: 'Thứ Ba',
+      DateTime.wednesday: 'Thứ Tư',
+      DateTime.thursday: 'Thứ Năm',
+      DateTime.friday: 'Thứ Sáu',
+      DateTime.saturday: 'Thứ Bảy',
+      DateTime.sunday: 'Chủ Nhật',
+    };
+    return labels[weekday] ?? '';
   }
 }

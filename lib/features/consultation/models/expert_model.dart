@@ -12,7 +12,9 @@ class ExpertModel {
   final bool isOnline;
   final double rating;
   final int reviewCount;
-  final double consultationFee; // Phí tư vấn (VNĐ)
+  final double consultationFee; // Phí tư vấn (VNĐ) — legacy fallback
+  final double scheduledConsultationFee; // Phí đặt lịch tư vấn
+  final double emergencyConsultationFee; // Phí tư vấn ngay (khẩn cấp)
   final int consultationDuration; // Thời gian tư vấn (phút)
   final String? bio; // Giới thiệu
   final int yearsOfExperience;
@@ -32,6 +34,8 @@ class ExpertModel {
     required this.rating,
     required this.reviewCount,
     required this.consultationFee,
+    this.scheduledConsultationFee = 0,
+    this.emergencyConsultationFee = 0,
     this.consultationDuration = 30, // Default 30 phút
     this.bio,
     this.yearsOfExperience = 0,
@@ -76,6 +80,10 @@ class ExpertModel {
               0) as int,
       consultationFee:
           ((json['consultationFee'] ?? json['fee'] ?? 0) as num).toDouble(),
+      scheduledConsultationFee:
+          ((json['scheduledConsultationFee'] ?? json['consultationFee'] ?? json['fee'] ?? 0) as num).toDouble(),
+      emergencyConsultationFee:
+          ((json['emergencyConsultationFee'] ?? 0) as num).toDouble(),
       consultationDuration: (json['consultationDuration'] ?? 30) as int,
       // biography (production) | bio/introduction/description (legacy)
       bio: (json['biography'] ?? json['bio'] ?? json['introduction'] ?? json['description'])
@@ -106,6 +114,8 @@ class ExpertModel {
       'rating': rating,
       'reviewCount': reviewCount,
       'consultationFee': consultationFee,
+      'scheduledConsultationFee': scheduledConsultationFee,
+      'emergencyConsultationFee': emergencyConsultationFee,
       'consultationDuration': consultationDuration,
       'bio': bio,
       'yearsOfExperience': yearsOfExperience,

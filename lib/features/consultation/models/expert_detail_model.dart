@@ -26,6 +26,8 @@ class ExpertDetailModel extends ExpertModel {
     required super.rating,
     required super.reviewCount,
     required super.consultationFee,
+    super.scheduledConsultationFee,
+    super.emergencyConsultationFee,
     super.consultationDuration,
     super.bio,
     super.yearsOfExperience,
@@ -57,6 +59,8 @@ class ExpertDetailModel extends ExpertModel {
       rating: (json['rating'] ?? 0).toDouble(),
       reviewCount: json['reviewCount'] ?? 0,
       consultationFee: (json['consultationFee'] ?? 0).toDouble(),
+      scheduledConsultationFee: ((json['scheduledConsultationFee'] ?? json['consultationFee'] ?? 0) as num).toDouble(),
+      emergencyConsultationFee: ((json['emergencyConsultationFee'] ?? 0) as num).toDouble(),
       consultationDuration: json['consultationDuration'] ?? 30,
       bio: json['bio'],
       yearsOfExperience: json['yearsOfExperience'] ?? 0,
@@ -69,9 +73,11 @@ class ExpertDetailModel extends ExpertModel {
       experienceList: json['experienceList'] != null
           ? List<String>.from(json['experienceList'])
           : [],
-      totalConsultations: json['totalConsultations'] ?? 0,
-      averageResponseTime: json['averageResponseTime'] ?? '< 5 phút',
-      successRate: (json['successRate'] ?? 0).toDouble(),
+      totalConsultations: (json['totalConsultations'] ?? 0) as int,
+      averageResponseTime: json['averageResponseTimeMinutes'] != null
+          ? '${json['averageResponseTimeMinutes']} phút'
+          : (json['averageResponseTime'] ?? '< 5 phút') as String,
+      successRate: ((json['successRate'] ?? 0) as num).toDouble(),
       consultationFees: json['consultationFees'] != null
           ? Map<int, double>.from(
               (json['consultationFees'] as Map).map(
@@ -116,6 +122,8 @@ class ExpertDetailModel extends ExpertModel {
       rating: expert.rating,
       reviewCount: expert.reviewCount,
       consultationFee: expert.consultationFee,
+      scheduledConsultationFee: expert.scheduledConsultationFee,
+      emergencyConsultationFee: expert.emergencyConsultationFee,
       consultationDuration: expert.consultationDuration,
       bio: expert.bio,
       yearsOfExperience: expert.yearsOfExperience,

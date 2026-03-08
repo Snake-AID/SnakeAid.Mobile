@@ -60,6 +60,10 @@ class _ConsultationTimeSelectionScreenState
   /// Real slot ID from backend (used as timeSlotId in booking request)
   String? _selectedSlotId;
 
+  /// Captured at selection time — used directly in _handleContinue (avoids re-filtering)
+  DateTime? _selectedDateObj;
+  TimeSlot? _selectedSlotObj;
+
   // Fallback mock dates when provider has no availability yet
   late List<AvailableDate> _mockDates;
 
@@ -82,6 +86,10 @@ class _ConsultationTimeSelectionScreenState
   void initState() {
     super.initState();
     _initializeMockDates();
+    // Force fresh fetch every time screen opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.invalidate(expertDetailProvider(widget.expertId));
+    });
   }
 
   void _initializeMockDates() {
@@ -156,62 +164,29 @@ class _ConsultationTimeSelectionScreenState
     }
   }
 
+  /// Format giá tiền thành chuỗi VNĐ
+  String _formatFee(double fee) {
+    if (fee <= 0) return 'Miễn phí';
+    return '${fee.toInt().toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} VNĐ';
+  }
+
   void _handleContinue() {
-    if (_selectedDateIndex == null || _selectedTimeSlotIndex == null) {
+    if (_selectedDateObj == null || _selectedSlotObj == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Vui lòng chọn ngày và giờ tư vấn')),
       );
       return;
     }
 
-    final now = DateTime.now();
-    final availability = ref.read(expertDetailProvider(widget.expertId))
-        .expert
-        ?.availability ?? const <AvailabilityDay>[];
-
-    // Lọc ngày tương lai (giống trong build)
-    final futureAvailability = availability.where((d) {
-      final dayEnd = DateTime(d.date.year, d.date.month, d.date.day, 23, 59, 59);
-      return !dayEnd.isBefore(now);
-    }).toList();
-
-    final displayDates = futureAvailability.isNotEmpty
-        ? futureAvailability.map((d) => AvailableDate(
-              date: d.date,
-              dayLabel: d.dayOfWeek,
-              hasAvailability: d.isAvailable,
-            )).toList()
-        : _mockDates;
-
-    // Lọc slot chưa qua cho ngày đang chọn
-    List<TimeSlotEntry> rawSlots = const [];
-    List<TimeSlot> displaySlots = _mockTimeSlots;
-    if (futureAvailability.isNotEmpty &&
-        _selectedDateIndex! < futureAvailability.length) {
-      final selectedDay = futureAvailability[_selectedDateIndex!];
-      rawSlots = (selectedDay.timeSlots ?? const <TimeSlotEntry>[]).where((e) {
-        final parts = e.startTime.split(':');
-        final slotStart = DateTime(selectedDay.date.year, selectedDay.date.month,
-            selectedDay.date.day, int.parse(parts[0]), int.parse(parts[1]));
-        return slotStart.isAfter(now);
-      }).toList();
-      displaySlots = rawSlots
-          .map((e) => TimeSlot(startTime: e.startTime, endTime: e.endTime, isAvailable: true))
-          .toList();
-    }
-
-    final selectedDate = displayDates[_selectedDateIndex!];
-    final selectedTimeSlot = displaySlots[_selectedTimeSlotIndex!];
-
     // Navigate to documents screen with consultation details + real timeSlotId
     context.push(
       '/consultation-documents/${widget.expertId}',
       extra: {
         'consultationType': 'scheduled',
-        'selectedDate': _formatDate(selectedDate.date),
-        'selectedTime': '${selectedTimeSlot.startTime} (30 phút)',
+        'selectedDate': _formatDate(_selectedDateObj!),
+        'selectedTime': '${_selectedSlotObj!.startTime} (30 phút)',
         'duration': '30 phút',
-        'price': '150,000 VNĐ',
+        'price': _formatFee(ref.read(expertDetailProvider(widget.expertId)).expert?.scheduledConsultationFee ?? 0),
         if (_selectedSlotId != null) 'timeSlotId': _selectedSlotId!,
       },
     );
@@ -231,18 +206,19 @@ class _ConsultationTimeSelectionScreenState
 
     // Derive display dates and slots from provider when available
     final availability = state.expert?.availability ?? const <AvailabilityDay>[];
-    final now = DateTime.now();
+    // now dùng UTC+7 để khớp với giờ VN thực tế (device timezone có thể khác)
+    final now = DateTime.now().toUtc().add(const Duration(hours: 7));
     // Chỉ giữ ngày mà còn ít nhất 1 slot chưa qua
     final futureAvailability = availability.where((d) {
       // Nếu không có slot data, giữ lại nếu ngày chưa hết
       if (d.timeSlots == null || d.timeSlots!.isEmpty) {
-        final dayEnd = DateTime(d.date.year, d.date.month, d.date.day, 23, 59, 59);
+        final dayEnd = DateTime.utc(d.date.year, d.date.month, d.date.day, 23, 59, 59);
         return !dayEnd.isBefore(now);
       }
       // Có slot data: chỉ giữ nếu còn ít nhất 1 slot trong tương lai
       return d.timeSlots!.any((e) {
         final parts = e.startTime.split(':');
-        final slotStart = DateTime(d.date.year, d.date.month, d.date.day,
+        final slotStart = DateTime.utc(d.date.year, d.date.month, d.date.day,
             int.parse(parts[0]), int.parse(parts[1]));
         return slotStart.isAfter(now);
       });
@@ -257,10 +233,10 @@ class _ConsultationTimeSelectionScreenState
             )).toList()
         : (_dataLoaded ? const <AvailableDate>[] : _mockDates);
 
-    // Helper: parse "HH:mm" thành DateTime của ngày được chọn
+    // Helper: parse "HH:mm" thành DateTime UTC (= giờ VN wall-clock) của ngày được chọn
     DateTime _slotDateTime(DateTime date, String timeStr) {
       final parts = timeStr.split(':');
-      return DateTime(date.year, date.month, date.day,
+      return DateTime.utc(date.year, date.month, date.day,
           int.parse(parts[0]), int.parse(parts[1]));
     }
 
@@ -279,6 +255,12 @@ class _ConsultationTimeSelectionScreenState
       displaySlots = rawSlotsForSelected
           .map((e) => TimeSlot(startTime: e.startTime, endTime: e.endTime, isAvailable: true))
           .toList();
+      // Reset selection if the previously selected slot was filtered out
+      if (_selectedTimeSlotIndex != null && _selectedTimeSlotIndex! >= displaySlots.length) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() { _selectedTimeSlotIndex = null; _selectedSlotId = null; });
+        });
+      }
     } else if (!_dataLoaded) {
       // Still loading — show mock slots so UI isn't empty
       rawSlotsForSelected = const [];
@@ -437,8 +419,10 @@ class _ConsultationTimeSelectionScreenState
             onTap: () {
               setState(() {
                 _selectedDateIndex = index;
-                _selectedTimeSlotIndex = null; // Reset time selection
+                _selectedTimeSlotIndex = null;
                 _selectedSlotId = null;
+                _selectedDateObj = null;
+                _selectedSlotObj = null;
               });
             },
             child: Container(
@@ -633,6 +617,11 @@ class _ConsultationTimeSelectionScreenState
                         _selectedSlotId = index < rawSlots.length
                             ? rawSlots[index].id
                             : null;
+                        // Lưu đối tượng được chọn để dùng trong _handleContinue (tránh re-filter)
+                        _selectedDateObj = _selectedDateIndex != null
+                            ? displayDates[_selectedDateIndex!].date
+                            : null;
+                        _selectedSlotObj = timeSlot;
                       });
                     }
                   : null,
@@ -681,8 +670,9 @@ class _ConsultationTimeSelectionScreenState
     List<TimeSlot> displaySlots,
     ThemeData theme,
   ) {
-    final selectedDate = displayDates[_selectedDateIndex!];
-    final selectedTimeSlot = displaySlots[_selectedTimeSlotIndex!];
+    if (_selectedDateObj == null || _selectedSlotObj == null) return const SizedBox.shrink();
+    final selectedDate = _selectedDateObj!;
+    final selectedTimeSlot = _selectedSlotObj!;
 
     return Container(
       decoration: BoxDecoration(
@@ -721,7 +711,7 @@ class _ConsultationTimeSelectionScreenState
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    _formatDate(selectedDate.date),
+                    _formatDate(selectedDate),
                     style: theme.textTheme.bodyMedium,
                   ),
                 ],
@@ -755,7 +745,7 @@ class _ConsultationTimeSelectionScreenState
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    '150,000 VNĐ',
+                    _formatFee(ref.read(expertDetailProvider(widget.expertId)).expert?.scheduledConsultationFee ?? 0),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: _primaryColor,

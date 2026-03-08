@@ -11,7 +11,7 @@ const Color _primaryColor = Color(0xFF228B22);
 /// Expert Profile Detail Screen
 /// Displays comprehensive expert information including profile, experience,
 /// statistics, consultation fees, availability, and patient reviews
-class ExpertProfileDetailScreen extends ConsumerWidget {
+class ExpertProfileDetailScreen extends ConsumerStatefulWidget {
   final String expertId;
 
   const ExpertProfileDetailScreen({
@@ -20,8 +20,24 @@ class ExpertProfileDetailScreen extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(expertDetailProvider(expertId));
+  ConsumerState<ExpertProfileDetailScreen> createState() =>
+      _ExpertProfileDetailScreenState();
+}
+
+class _ExpertProfileDetailScreenState
+    extends ConsumerState<ExpertProfileDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Invalidate mỗi lần mở screen — đảm bảo lịch trống luôn là data mới nhất
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.invalidate(expertDetailProvider(widget.expertId));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(expertDetailProvider(widget.expertId));
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -37,7 +53,7 @@ class ExpertProfileDetailScreen extends ConsumerWidget {
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: () {
-                          ref.read(expertDetailProvider(expertId).notifier).refresh();
+                          ref.read(expertDetailProvider(widget.expertId).notifier).refresh();
                         },
                         child: const Text('Thử lại'),
                       ),
@@ -497,6 +513,14 @@ class ExpertProfileDetailScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: 'VNĐ');
 
+    String formatFee(double fee) =>
+        fee <= 0 ? 'Miễn phí' : currencyFormat.format(fee);
+
+    final fees = [
+      ('Đặt lịch tư vấn', expert.scheduledConsultationFee as double),
+      ('Tư vấn khẩn cấp', expert.emergencyConsultationFee as double),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -515,21 +539,24 @@ class ExpertProfileDetailScreen extends ConsumerWidget {
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
-            children: expert.consultationFees.entries.map<Widget>((entry) {
-              final isLast = entry.key == expert.consultationFees.keys.last;
+            children: fees.asMap().entries.map<Widget>((entry) {
+              final index = entry.key;
+              final label = entry.value.$1;
+              final fee = entry.value.$2;
+              final isLast = index == fees.length - 1;
               return Column(
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '${entry.key} phút',
+                        label,
                         style: theme.textTheme.bodyLarge?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                       Text(
-                        currencyFormat.format(entry.value),
+                        formatFee(fee),
                         style: theme.textTheme.bodyLarge?.copyWith(
                           color: _primaryColor,
                           fontWeight: FontWeight.bold,

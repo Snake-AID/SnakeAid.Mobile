@@ -210,13 +210,19 @@ class ConsultationRepository {
       debugPrint('⚠️ Failed to parse time slots: $e');
     }
 
+    // Parse stats from profile data
+    final avgMinutes = profileData['averageResponseTimeMinutes'] as int?;
+    final avgResponseStr = avgMinutes == null
+        ? '< 5 phút'
+        : '$avgMinutes phút';
+
     return ExpertDetailModel.fromExpertModel(
       expert,
       experienceList: const [],
-      totalConsultations: 0,
-      averageResponseTime: '< 5 phút',
-      successRate: 0.0,
-      consultationFees: {30: expert.consultationFee},
+      totalConsultations: (profileData['totalConsultations'] ?? 0) as int,
+      averageResponseTime: avgResponseStr,
+      successRate: ((profileData['successRate'] ?? 0) as num).toDouble(),
+      consultationFees: {30: expert.scheduledConsultationFee > 0 ? expert.scheduledConsultationFee : expert.consultationFee},
       availability: availability,
       reviews: reviews,
     );
@@ -303,12 +309,18 @@ class ConsultationRepository {
       if (status != null && status != 'Available') continue;
 
       final slotId = (slot['id'] as String?) ?? '';
-      // Backend stores real UTC — convert to device local time (Vietnam UTC+7)
-      final startTime = DateTime.parse(startTimeStr).toLocal();
+      // Backend stores VN wall-clock time tagged as +00 (no real UTC conversion on backend)
+      // So use UTC components directly as VN time — no offset needed
+      final startUtc = DateTime.parse(startTimeStr).toUtc();
+      final startTime = DateTime.utc(startUtc.year, startUtc.month, startUtc.day, startUtc.hour, startUtc.minute);
       final endTimeStr = slot['endTime'] as String?;
-      final endTime = endTimeStr != null
-          ? DateTime.parse(endTimeStr).toLocal()
-          : startTime.add(const Duration(minutes: 30));
+      DateTime endTime;
+      if (endTimeStr != null) {
+        final endUtc = DateTime.parse(endTimeStr).toUtc();
+        endTime = DateTime.utc(endUtc.year, endUtc.month, endUtc.day, endUtc.hour, endUtc.minute);
+      } else {
+        endTime = startTime.add(const Duration(minutes: 30));
+      }
 
       final dateKey =
           '${startTime.year.toString().padLeft(4, '0')}-'
@@ -323,7 +335,7 @@ class ConsultationRepository {
           '${endTime.minute.toString().padLeft(2, '0')}';
 
       dayToDate[dateKey] =
-          DateTime(startTime.year, startTime.month, startTime.day);
+          DateTime.utc(startTime.year, startTime.month, startTime.day);
       dayToEntries.putIfAbsent(dateKey, () => []).add(
             TimeSlotEntry(id: slotId, startTime: startStr, endTime: endStr),
           );
@@ -457,6 +469,26 @@ class ConsultationRepository {
       debugPrint('⚠️ endConsultation failed (non-critical): $e');
       return false;
     }
+  }
+
+  /// Get current user's wallet information.
+  ///
+  /// API: `GET /api/wallet/me`
+  ///
+  /// Returns wallet data including balance.
+  /// Throws Exception if API call fails.
+  Future<Map<String, dynamic>> getMyWallet() async {
+    debugPrint('💰 Fetching wallet information');
+    
+    final response = await httpService.get('/api/wallet/me');
+    final body = response.data as Map<String, dynamic>;
+    
+    if (body['is_success'] == true && body['data'] != null) {
+      debugPrint('✅ Wallet fetched: ${body['data']}');
+      return body['data'] as Map<String, dynamic>;
+    }
+    
+    throw Exception(body['message'] ?? 'Không thể lấy thông tin ví');
   }
 
   /// Submit a review for a completed consultation.

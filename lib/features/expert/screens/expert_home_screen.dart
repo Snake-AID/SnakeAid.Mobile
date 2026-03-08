@@ -14,14 +14,17 @@ final _expertBookingsFutureProvider =
 
 /// Map a [ConsultationBookingResponse] to the internal [_ExpertConsultation].
 _ExpertConsultation _bookingToExpertConsultation(ConsultationBookingResponse b) {
-  final now = DateTime.now();
+  // now dùng UTC+7 để khớp với giờ VN wall-clock của backend
+  final now = DateTime.now().toUtc().add(const Duration(hours: 7));
   final scheduled = b.slotStartTime ?? b.scheduledTime;
+  // Chuẩn hoá scheduled về cùng kiểu UTC (Đây là VN wall-clock được tag +00)
+  final scheduledVn = scheduled.toUtc();
   final _ExpertConsultationStatus status;
   switch (b.status) {
     case ConsultationBookingStatus.confirmed:
-      final diff = scheduled.difference(now);
-      // Dùng 120 phút để tiện test — production chỉnh lại thành 10
-      status = diff.inMinutes <= 120
+      final diff = scheduledVn.difference(now);
+      // Chỉ hiện "Đến giờ" khi trong vòng 15 phút trước giờ hẹn
+      status = diff.inMinutes <= 15
           ? _ExpertConsultationStatus.waiting
           : _ExpertConsultationStatus.upcoming;
       break;
@@ -55,6 +58,7 @@ class ExpertHomeScreen extends StatefulWidget {
 
 class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
   late int _selectedIndex;
+  final _homeKey = GlobalKey<_HomeTabState>();
   final _consultationsKey = GlobalKey<_ConsultationsTabState>();
 
   @override
@@ -73,7 +77,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final screens = [
-      _HomeTab(onSeeAll: () => setState(() => _selectedIndex = 1)),
+      _HomeTab(key: _homeKey, onSeeAll: () => setState(() => _selectedIndex = 1)),
       _ConsultationsTab(key: _consultationsKey),
       const _IncomeTab(),
       _ProfileTab(onGoToHistory: _goToConsultationHistory),
@@ -119,6 +123,15 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
         setState(() {
           _selectedIndex = index;
         });
+        
+        // Reload data when switching to tab
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (index == 0) {
+            _homeKey.currentState?.reload();
+          } else if (index == 1) {
+            _consultationsKey.currentState?.reload();
+          }
+        });
       },
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -150,7 +163,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 // Home Tab
 class _HomeTab extends ConsumerStatefulWidget {
   final VoidCallback onSeeAll;
-  const _HomeTab({required this.onSeeAll});
+  const _HomeTab({super.key, required this.onSeeAll});
 
   @override
   ConsumerState<_HomeTab> createState() => _HomeTabState();
@@ -191,6 +204,18 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
     
     _pulseController.repeat(reverse: true);
     _startCountdown();
+    
+    // Reload data mỗi khi vào màn hình
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.invalidate(_expertBookingsFutureProvider);
+    });
+  }
+
+  // Public method to reload data when tab is selected
+  void reload() {
+    if (mounted) {
+      ref.invalidate(_expertBookingsFutureProvider);
+    }
   }
 
   void _startCountdown() {
@@ -896,7 +921,7 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
   }
 
   List<_ExpertConsultation> get _upcomingConsultations {
-    final now = DateTime.now();
+    final now = DateTime.now().toUtc().add(const Duration(hours: 7));
     final consultations = ref
             .watch(_expertBookingsFutureProvider)
             .whenOrNull(data: (bookings) =>
@@ -1375,7 +1400,18 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
     _refreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
     });
-    _loadConsultations();
+    
+    // Reload data mỗi khi vào màn hình
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadConsultations();
+    });
+  }
+
+  // Public method to reload data when tab is selected
+  void reload() {
+    if (mounted) {
+      _loadConsultations();
+    }
   }
 
   @override
@@ -1713,11 +1749,11 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
   }
 
   Widget _buildScheduleCard(BuildContext context, _ExpertConsultation c) {
-    final now = DateTime.now();
+    final now = DateTime.now().toUtc().add(const Duration(hours: 7));
     final isWaiting = c.status == _ExpertConsultationStatus.waiting;
-    // Allow starting 2 minutes before the scheduled time
-    // Cho phép bắt đầu bất kỳ lúc nào khi status là waiting — tiện test
-    final canStart = isWaiting || true;
+    // Cho phép expert vào video call bất cứ lúc nào (không cần chờ đến giờ)
+    final canStart = c.status == _ExpertConsultationStatus.waiting ||
+                     c.status == _ExpertConsultationStatus.upcoming;
     final hour = c.scheduledTime.hour;
     final minute = c.scheduledTime.minute.toString().padLeft(2, '0');
     final amPm = hour < 12 ? 'AM' : 'PM';

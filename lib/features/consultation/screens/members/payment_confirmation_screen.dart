@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -63,12 +64,47 @@ class _PaymentConfirmationScreenState
   PaymentMethod _selectedPaymentMethod = PaymentMethod.payos;
   bool _agreedToTerms = false;
   bool _isPaymentLoading = false;
+  double? _walletBalance;
+  bool _isLoadingWallet = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchWallet();
+  }
+
+  Future<void> _fetchWallet() async {
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      final walletData = await repo.getMyWallet();
+      if (mounted) {
+        setState(() {
+          _walletBalance = (walletData['balance'] as num?)?.toDouble();
+          _isLoadingWallet = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch wallet: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingWallet = false;
+        });
+      }
+    }
+  }
 
   Future<void> _handlePayment() async {
     if (widget.bookingId == null || widget.bookingId!.isEmpty) {
       context.go('/consultation-home');
       return;
     }
+
+    // If SnakeAid Pay is selected, show confirmation dialog first
+    if (_selectedPaymentMethod == PaymentMethod.snakeaidPay) {
+      final confirmed = await _showWalletPaymentDialog();
+      if (confirmed != true) return;
+    }
+
     setState(() => _isPaymentLoading = true);
     try {
       final repo = ref.read(consultationRepositoryProvider);
@@ -90,6 +126,205 @@ class _PaymentConfirmationScreenState
         ),
       );
     }
+  }
+
+  /// Show wallet payment confirmation dialog
+  Future<bool?> _showWalletPaymentDialog() async {
+    final priceAmount = _getPriceAmount();
+    final price = int.parse(priceAmount);
+    final theme = Theme.of(context);
+    
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Xác nhận thanh toán',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+        content: Container(
+          constraints: const BoxConstraints(maxWidth: 300),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                ),
+                child: Column(
+                  children: [
+                    // Current balance
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.account_balance_wallet,
+                              size: 18,
+                              color: Color(0xFF228B22),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Số dư hiện tại',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: const Color(0xFF374151),
+                              ),
+                            ),
+                          ],
+                        ),
+                        _isLoadingWallet
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                _walletBalance != null
+                                    ? _formatPrice(_walletBalance!.toInt().toString())
+                                    : 'Không có dữ liệu',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF228B22),
+                                ),
+                              ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Amount to deduct
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Số tiền thanh toán',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: const Color(0xFF374151),
+                          ),
+                        ),
+                        Text(
+                          '-${_formatPrice(priceAmount)}',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Divider(color: Color(0xFFBBF7D0)),
+                    ),
+                    
+                    // Balance after payment
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Số dư sau thanh toán',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF1F2937),
+                          ),
+                        ),
+                        _isLoadingWallet
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                _walletBalance != null
+                                    ? _formatPrice(((_walletBalance! - price).toInt()).toString())
+                                    : 'Không có dữ liệu',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: _walletBalance != null && _walletBalance! >= price
+                                      ? const Color(0xFF228B22)
+                                      : Colors.red,
+                                ),
+                              ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Insufficient balance warning
+              if (_walletBalance != null && _walletBalance! < price) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.red.shade700,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Số dư không đủ. Vui lòng nạp thêm tiền vào ví.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.red.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text(
+              'Hủy',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: _walletBalance != null && _walletBalance! >= price
+                ? () => Navigator.of(context).pop(true)
+                : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF228B22),
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.grey.shade300,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Xác nhận thanh toán',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _handleCancel() {
@@ -499,6 +734,86 @@ class _PaymentConfirmationScreenState
                   ),
                 ],
               ),
+              
+              // Wallet balance
+              const SizedBox(height: 16),
+              Divider(color: Colors.grey.shade200),
+              const SizedBox(height: 12),
+              
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.account_balance_wallet,
+                        size: 18,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Số dư ví hiện tại',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                  _isLoadingWallet
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Text(
+                          _walletBalance != null
+                              ? _formatPrice(_walletBalance!.toInt().toString())
+                              : 'Không có dữ liệu',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: _walletBalance != null &&
+                                    _walletBalance! >= int.parse(priceAmount)
+                                ? _primaryColor
+                                : Colors.red,
+                          ),
+                        ),
+                ],
+              ),
+              
+              // Insufficient balance warning
+              if (_walletBalance != null && 
+                  _walletBalance! < int.parse(priceAmount)) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 20,
+                        color: Colors.red.shade700,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Số dư không đủ. Vui lòng nạp thêm tiền vào ví.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.red.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -508,6 +823,9 @@ class _PaymentConfirmationScreenState
 
   /// Build payment methods section
   Widget _buildPaymentMethods(ThemeData theme) {
+    final priceAmount = _getPriceAmount();
+    final price = int.parse(priceAmount);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

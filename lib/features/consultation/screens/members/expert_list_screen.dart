@@ -18,6 +18,15 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // Reload data mỗi khi vào màn hình
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(expertListProvider.notifier).refresh();
+    });
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -471,7 +480,9 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        expert.rating.toStringAsFixed(1),
+                        expert.reviewCount > 0
+                            ? expert.rating.toStringAsFixed(1)
+                            : 'Chưa có',
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -480,7 +491,9 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '(${expert.reviewCount} đánh giá)',
+                        expert.reviewCount > 0
+                            ? '(${expert.reviewCount} đánh giá)'
+                            : 'đánh giá',
                         style: const TextStyle(
                           fontSize: 14,
                           color: Color(0xFF6B7280),

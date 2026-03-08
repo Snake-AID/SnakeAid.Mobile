@@ -139,6 +139,74 @@ class _ConsultationWaitingRoomScreenState
     );
   }
 
+  Future<void> _endConsultation() async {
+    // Show confirmation dialog first
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Kết Thúc Tư Vấn?',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'Bạn có chắc chắn muốn kết thúc buổi tư vấn này không?\nSau khi kết thúc, bạn sẽ không thể quay lại cuộc gọi.',
+          style: TextStyle(fontSize: 15),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Kết Thúc',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Call API to end consultation
+    final repo = ref.read(consultationRepositoryProvider);
+    final result = await repo.endConsultation(widget.consultationId);
+    
+    if (!mounted) return;
+    
+    if (result) {
+      // Navigate to review/completion screen
+      context.go(
+        '/consultation-complete',
+        extra: {
+          'expertName': widget.expertName,
+          'expertSpecialty': widget.expertSpecialty,
+          'durationSeconds': widget.durationSeconds,
+          'consultationId': widget.consultationId,
+        },
+      );
+    } else {
+      // Show error if API call failed
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không thể kết thúc buổi tư vấn, vui lòng thử lại'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   void _confirmComplete() {
     context.go(
       '/consultation-complete',
@@ -544,23 +612,23 @@ class _ConsultationWaitingRoomScreenState
             ),
           ),
 
-          // Xác nhận hoàn thành — chỉ hiện sau khi kết thúc call
+          // Kết thúc buổi tư vấn — chỉ hiện sau khi kết thúc call
           if (widget.showCompleteButton) ...[
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: _confirmComplete,
+                onPressed: _endConsultation,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _green,
+                  backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text(
-                  'Xác nhận hoàn thành',
+                  'Hoàn Thành Tư Vấn',
                   style: TextStyle(
                       fontSize: 16, fontWeight: FontWeight.bold),
                 ),

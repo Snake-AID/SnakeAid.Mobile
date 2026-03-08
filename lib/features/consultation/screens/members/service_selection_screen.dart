@@ -9,6 +9,11 @@ import '../../providers/expert_detail_provider.dart';
 const Color _primaryColor = Color(0xFF228B22);
 const Color _backgroundColor = Color(0xFFF6F8F6);
 
+String _formatFee(double fee) {
+  if (fee <= 0) return 'Miễn phí';
+  return '${fee.toInt().toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} VNĐ';
+}
+
 /// Service Selection Screen
 /// Allows users to choose between instant consultation or scheduled appointment
 class ServiceSelectionScreen extends ConsumerWidget {
@@ -218,7 +223,7 @@ class ServiceSelectionScreen extends ConsumerWidget {
 
           // Price
           Text(
-            '200,000 VNĐ',
+            _formatFee(expert.emergencyConsultationFee),
             style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.bold,
               color: _primaryColor,
@@ -263,7 +268,7 @@ class ServiceSelectionScreen extends ConsumerWidget {
                         '/consultation-documents/${expert.userId}',
                         extra: {
                           'consultationType': 'instant',
-                          'price': '200,000 VNĐ',
+                          'price': _formatFee(expert.emergencyConsultationFee),
                         },
                       );
                     }
@@ -343,7 +348,7 @@ class ServiceSelectionScreen extends ConsumerWidget {
 
           // Price
           Text(
-            '150,000 VNĐ',
+            _formatFee(expert.scheduledConsultationFee),
             style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.bold,
               color: _primaryColor,

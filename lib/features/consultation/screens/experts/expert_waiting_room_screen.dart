@@ -142,45 +142,6 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
     );
   }
 
-  void _confirmComplete() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Xác nhận hoàn thành?',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Text(
-            'Buổi tư vấn sẽ được đánh dấu là hoàn thành và thu nhập sẽ được cập nhật.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Hủy',
-                style: TextStyle(color: Color(0xFF999999))),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              context.go('/expert-consultation-complete', extra: {
-                'patientName': widget.patientName,
-                'consultationType': widget.consultationType,
-                'durationSeconds': widget.durationSeconds,
-                'feeCost': widget.feeCost,
-              });
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _purple,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Xác nhận'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _cancelCall() {
     showDialog(
       context: context,
@@ -601,30 +562,6 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
             ),
           ),
         ),
-
-        // Confirm complete button (shown after call ends)
-        if (widget.showCompleteButton) ...[
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 52,
-            child: ElevatedButton.icon(
-              onPressed: _confirmComplete,
-              icon: const Icon(Icons.check_circle_outline, size: 22),
-              label: const Text(
-                'Xác Nhận Hoàn Thành',
-                style:
-                    TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _purple,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
-              ),
-            ),
-          ),
-        ],
 
         const SizedBox(height: 12),
 

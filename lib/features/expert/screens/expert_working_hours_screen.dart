@@ -66,6 +66,12 @@ class _ExpertWorkingHoursScreenState extends ConsumerState<ExpertWorkingHoursScr
     return '$h:$m';
   }
 
+  /// Format end time — backend requires 24:00:00 instead of 00:00 for midnight end
+  String _formatEndTime(TimeOfDay t) {
+    if (t.hour == 0 && t.minute == 0) return '24:00:00';
+    return _formatTime(t);
+  }
+
   Future<void> _pickTime(
     int weekday,
     int slotIndex, {
@@ -191,7 +197,7 @@ class _ExpertWorkingHoursScreenState extends ConsumerState<ExpertWorkingHoursScr
       final timeBlocks = _slots[day]!
           .map((slot) => {
                 'startTime': _formatTime(slot.start),
-                'endTime': _formatTime(slot.end),
+                'endTime': _formatEndTime(slot.end),
               })
           .toList();
       weekGroups.putIfAbsent(weekStart, () => []).add({
