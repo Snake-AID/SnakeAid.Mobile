@@ -187,6 +187,95 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
     }
   }
 
+  Future<void> _confirmAndSubmit() async {
+    if (!_isValid || _isSubmitting) return;
+    final totalSnakes = _confirmedSnakes.fold<int>(0, (s, e) => s + e.quantity);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.send_rounded, color: Color(0xFF28A745)),
+            SizedBox(width: 8),
+            Text('Xác nhận gửi kết quả', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Bạn sắp gửi kết quả cho khách hàng:', style: TextStyle(fontSize: 14, color: Color(0xFF666666))),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FFF4),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF28A745).withOpacity(0.35)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ..._confirmedSnakes.map((e) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.pest_control, size: 14, color: Color(0xFFFF6B35)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(e.species.commonName,
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                                  color: Color(0xFF333333))),
+                        ),
+                        Text('× ${e.quantity}',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold,
+                                color: Color(0xFFFF6B35))),
+                      ],
+                    ),
+                  )),
+                  const Divider(height: 12, color: Color(0xFFDDEEDD)),
+                  Row(
+                    children: [
+                      const Icon(Icons.summarize_outlined, size: 14, color: Color(0xFF28A745)),
+                      const SizedBox(width: 6),
+                      Text('Tổng cộng: $totalSnakes con',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold,
+                              color: Color(0xFF28A745))),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text('Sau khi gửi sẽ không thể chỉnh sửa.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF999999))),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Kiểm tra lại', style: TextStyle(color: Color(0xFF666666))),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.send_rounded, size: 16),
+            label: const Text('Gửi ngay', style: TextStyle(fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF28A745),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    _submitResult();
+  }
+
   Future<void> _submitResult() async {
     if (!_isValid || _isSubmitting) return;
     setState(() => _isSubmitting = true);
@@ -1209,7 +1298,7 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
           width: double.infinity,
           height: 55,
           child: ElevatedButton.icon(
-            onPressed: (_isValid && !_isSubmitting) ? _submitResult : null,
+            onPressed: (_isValid && !_isSubmitting) ? _confirmAndSubmit : null,
             icon: _isSubmitting
                 ? const SizedBox(width: 20, height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
