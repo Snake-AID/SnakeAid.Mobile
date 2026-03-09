@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/first_aid_recommendation_response.dart';
-import '../../models/snake_detection_response.dart';
 import '../../repository/snake_ai_repository.dart';
 
 class RescuerSupportScreen extends ConsumerStatefulWidget {
@@ -17,24 +16,17 @@ class RescuerSupportScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<RescuerSupportScreen> createState() => _RescuerSupportScreenState();
+  ConsumerState<RescuerSupportScreen> createState() =>
+      _RescuerSupportScreenState();
 }
 
 class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
-  int _selectedTab = 0;
   int _elapsedSeconds = 0;
   Timer? _timer;
 
   FirstAidRecommendationResponse? _firstAidRecommendation;
   bool _isLoadingFirstAid = true;
   String? _firstAidError;
-
-  final List<String> _tabs = [
-    'Sơ Cứu Ban Đầu',
-    'Xử Lý Vết Cắn',
-    'Giảm Đau',
-    'Di Chuyển',
-  ];
 
   @override
   void initState() {
@@ -192,295 +184,15 @@ class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  // Patient Condition Monitoring
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Theo Dõi Tình Trạng Bệnh Nhân',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1C100D),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _buildStatusChip(
-                              'Ý thức: Tỉnh táo',
-                              const Color(0xFF28A745),
-                              true,
-                            ),
-                            _buildStatusChip(
-                              'Hô hấp: Bình thường',
-                              const Color(0xFF28A745),
-                              true,
-                            ),
-                            _buildStatusChip(
-                              'Đau: 7/10',
-                              const Color(0xFFFFC107),
-                              false,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: GestureDetector(
-                            onTap: () {},
-                            child: const Text(
-                              'Cập nhật tình trạng',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF007AFF),
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Tabs
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(
-                          color: Colors.grey.withOpacity(0.2),
-                          width: 1,
-                        ),
-                      ),
-                    ),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: List.generate(_tabs.length, (index) {
-                          final isSelected = _selectedTab == index;
-                          return GestureDetector(
-                            onTap: () => setState(() => _selectedTab = index),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                border: Border(
-                                  bottom: BorderSide(
-                                    color: isSelected
-                                        ? const Color(0xFFFF8800)
-                                        : Colors.transparent,
-                                    width: 2,
-                                  ),
-                                ),
-                              ),
-                              child: Text(
-                                _tabs[index],
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.w500,
-                                  color: isSelected
-                                      ? const Color(0xFFFF8800)
-                                      : const Color(0xFF999999),
-                                ),
-                              ),
-                            ),
-                          );
-                        }),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // First Aid Content (Real Data)
+                  // Main First Aid Content
                   _buildFirstAidContent(),
-
-                  const SizedBox(height: 16),
-                  // Emergency Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFFDC3545).withOpacity(0.5),
-                        width: 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFDC3545).withOpacity(0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.dangerous,
-                                color: Color(0xFFDC3545),
-                                size: 28,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            const Text(
-                              'Tình Trạng Xấu Đi?',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFFDC3545),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () => context.pushNamed('find_hospital'),
-                            icon: const Icon(Icons.local_hospital, size: 18),
-                            label: const Text('Tìm bệnh viện gần nhất'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFDC3545),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Expert Support Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF8A2BE2).withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFF8A2BE2).withOpacity(0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF8A2BE2).withOpacity(0.2),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.support_agent,
-                                color: Color(0xFF8A2BE2),
-                                size: 22,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            const Expanded(
-                              child: Text(
-                                'Cần tư vấn chuyên gia rắn?',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF1C100D),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF28A745),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              '2 chuyên gia đang online',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF28A745),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () {},
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF8A2BE2),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'Kết Nối Với Chuyên Gia',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
                   const SizedBox(height: 16),
                 ],
               ),
             ),
           ),
 
-          // Bottom Action Bar with Two Options
+          // Bottom Action Bar with Reference Buttons and Main Actions
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -501,35 +213,90 @@ class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Info banner
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF3E0),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: Color(0xFFFF8800),
-                          size: 18,
-                        ),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Nạn nhân có cần vận chuyển đến bệnh viện?',
+                  // Reference Buttons Row
+                  Row(
+                    children: [
+                      // "Nên làm" button
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _showDosBottomSheet,
+                          icon: const Icon(Icons.check_circle, size: 18),
+                          label: const Text(
+                            'Nên làm',
                             style: TextStyle(
                               fontSize: 13,
-                              color: Color(0xFF1C100D),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF228B22),
+                            side: const BorderSide(
+                              color: Color(0xFF228B22),
+                              width: 2,
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 8),
+                      // "Không nên làm" button
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _showDontsBottomSheet,
+                          icon: const Icon(Icons.cancel, size: 18),
+                          label: const Text(
+                            'Không nên',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFDC3545),
+                            side: const BorderSide(
+                              color: Color(0xFFDC3545),
+                              width: 2,
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // "Lưu ý" button
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _showNotesBottomSheet,
+                          icon: const Icon(Icons.info_outline, size: 18),
+                          label: const Text(
+                            'Lưu ý',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFFF8800),
+                            side: const BorderSide(
+                              color: Color(0xFFFF8800),
+                              width: 2,
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  // Two action buttons
+                  const SizedBox(height: 12),
+                  // Main Action Buttons Row
                   Row(
                     children: [
                       // Complete mission button
@@ -666,33 +433,6 @@ class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
     );
   }
 
-  Widget _buildStatusChip(String label, Color color, bool hasDropdown) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-          if (hasDropdown) ...[
-            const SizedBox(width: 4),
-            Icon(Icons.keyboard_arrow_down, size: 16, color: color),
-          ],
-        ],
-      ),
-    );
-  }
-
   // ─── FIRST AID CONTENT (REAL DATA) ───────────────────────────────────────────
 
   Widget _buildFirstAidContent() {
@@ -718,11 +458,7 @@ class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
         ),
         child: Column(
           children: [
-            const Icon(
-              Icons.error_outline,
-              size: 48,
-              color: Color(0xFFDC3545),
-            ),
+            const Icon(Icons.error_outline, size: 48, color: Color(0xFFDC3545)),
             const SizedBox(height: 12),
             const Text(
               'Không thể tải hướng dẫn sơ cứu',
@@ -751,37 +487,15 @@ class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Center(
-          child: Text('Chưa có hướng dẫn sơ cứu'),
-        ),
+        child: const Center(child: Text('Chưa có hướng dẫn sơ cứu')),
       );
     }
 
     final guideline = _firstAidRecommendation!.firstAidGuideline;
     final snake = _firstAidRecommendation!.snake;
 
-    // Filter content based on selected tab
-    List<FirstAidStep> relevantSteps = [];
-    List<FirstAidStep> relevantDos = [];
-    List<FirstAidStep> relevantDonts = [];
-
-    switch (_selectedTab) {
-      case 0: // Sơ Cứu Ban Đầu
-        relevantSteps = guideline.steps.take(3).toList();
-        relevantDos = guideline.dos;
-        break;
-      case 1: // Xử Lý Vết Cắn
-        relevantSteps = guideline.steps.skip(3).take(3).toList();
-        break;
-      case 2: // Giảm Đau
-        relevantDonts = guideline.donts;
-        break;
-      case 3: // Di Chuyển
-        if (guideline.steps.length > 6) {
-          relevantSteps = guideline.steps.skip(6).toList();
-        }
-        break;
-    }
+    // Show all steps by default
+    final allSteps = guideline.steps;
 
     return Column(
       children: [
@@ -859,11 +573,24 @@ class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
           const SizedBox(height: 16),
         ],
 
-        // Steps Section
-        if (relevantSteps.isNotEmpty) ...[
-          ...relevantSteps.asMap().entries.map((entry) {
+        // Steps Section (Always show all steps)
+        if (allSteps.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: Text(
+              '🩺 CÁC BƯỚC SƠ CỨU',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFFF8800),
+              ),
+            ),
+          ),
+          ...allSteps.asMap().entries.map((entry) {
             final index = entry.key + 1;
             final step = entry.value;
+            final hasMedia = step.mediaUrl.isNotEmpty;
+
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Container(
@@ -879,201 +606,698 @@ class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
                     ),
                   ],
                 ),
-                child: Row(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFFFF8800), Color(0xFFFF6B35)],
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Color(0xFFFF8800), Color(0xFFFF6B35)],
+                            ),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              '$index',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
                         ),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(
-                          '$index',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            step.text,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF1C100D),
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (hasMedia) ...[
+                      const SizedBox(height: 12),
+                      GestureDetector(
+                        onTap: () => _showImagePreview(step.mediaUrl),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            step.mediaUrl,
+                            width: double.infinity,
+                            height: 160,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: double.infinity,
+                                height: 160,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.image_not_supported,
+                                    color: Colors.grey,
+                                    size: 40,
+                                  ),
+                                ),
+                              );
+                            },
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Container(
+                                width: double.infinity,
+                                height: 160,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFFFF8800),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        step.text,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF1C100D),
-                          height: 1.5,
-                        ),
+                      const SizedBox(height: 4),
+                      const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.zoom_in, size: 14, color: Colors.grey),
+                          SizedBox(width: 4),
+                          Text(
+                            'Nhấn để phóng to',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
             );
           }),
         ],
+      ],
+    );
+  }
 
-        // Dos Section
-        if (relevantDos.isNotEmpty) ...[
-          const Padding(
-            padding: EdgeInsets.only(top: 8, bottom: 12),
-            child: Text(
-              '✅ NÊN LÀM',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF228B22),
-              ),
-            ),
-          ),
-          ...relevantDos.map((doItem) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF228B22).withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFF228B22).withOpacity(0.2),
-                  ),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.check_circle,
-                      color: Color(0xFF228B22),
-                      size: 24,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        doItem.text,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF1C100D),
-                          height: 1.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
-        ],
+  // Show "Dos" bottom sheet
+  void _showDosBottomSheet() {
+    if (_firstAidRecommendation == null) return;
 
-        // Don'ts Section
-        if (relevantDonts.isNotEmpty) ...[
-          const Padding(
-            padding: EdgeInsets.only(top: 8, bottom: 12),
-            child: Text(
-              '❌ KHÔNG NÊN LÀM',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFFDC3545),
-              ),
-            ),
-          ),
-          ...relevantDonts.map((dontItem) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDC3545).withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFFDC3545).withOpacity(0.2),
-                  ),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.cancel,
-                      color: Color(0xFFDC3545),
-                      size: 24,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        dontItem.text,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF1C100D),
-                          height: 1.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
-        ],
+    final dos = _firstAidRecommendation!.firstAidGuideline.dos;
 
-        // Notes Section
-        if (guideline.notes.isNotEmpty && _selectedTab == 0) ...[
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF3CD),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: const Color(0xFF856404).withOpacity(0.3),
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) {
+          return Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
               ),
             ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      color: const Color(0xFF856404),
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Lưu ý quan trọng',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF856404),
-                      ),
-                    ),
-                  ],
+                // Handle bar
+                Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-                const SizedBox(height: 8),
-                ...guideline.notes.map((note) {
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      '• $note',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: const Color(0xFF856404),
-                        height: 1.5,
+                // Header
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF228B22).withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check_circle,
+                          color: Color(0xFF228B22),
+                          size: 24,
+                        ),
                       ),
-                    ),
-                  );
-                }),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          '✅ NÊN LÀM',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF228B22),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                // Content
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: dos.length,
+                    itemBuilder: (context, index) {
+                      final doItem = dos[index];
+                      final hasMedia = doItem.mediaUrl.isNotEmpty;
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF228B22).withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFF228B22).withOpacity(0.2),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(
+                                    Icons.check_circle,
+                                    color: Color(0xFF228B22),
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      doItem.text,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Color(0xFF1C100D),
+                                        height: 1.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (hasMedia) ...[
+                                const SizedBox(height: 12),
+                                GestureDetector(
+                                  onTap: () =>
+                                      _showImagePreview(doItem.mediaUrl),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      doItem.mediaUrl,
+                                      width: double.infinity,
+                                      height: 140,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                            return Container(
+                                              width: double.infinity,
+                                              height: 140,
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey[200],
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: const Center(
+                                                child: Icon(
+                                                  Icons.image_not_supported,
+                                                  color: Colors.grey,
+                                                  size: 32,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.zoom_in,
+                                      size: 12,
+                                      color: Colors.grey,
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Nhấn để xem rõ',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ],
             ),
-          ),
-        ],
-      ],
+          );
+        },
+      ),
+    );
+  }
+
+  // Show "Donts" bottom sheet
+  void _showDontsBottomSheet() {
+    if (_firstAidRecommendation == null) return;
+
+    final donts = _firstAidRecommendation!.firstAidGuideline.donts;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) {
+          return Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            child: Column(
+              children: [
+                // Handle bar
+                Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // Header
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDC3545).withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.cancel,
+                          color: Color(0xFFDC3545),
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          '❌ KHÔNG NÊN LÀM',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFDC3545),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                // Content
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: donts.length,
+                    itemBuilder: (context, index) {
+                      final dontItem = donts[index];
+                      final hasMedia = dontItem.mediaUrl.isNotEmpty;
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDC3545).withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFFDC3545).withOpacity(0.2),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(
+                                    Icons.cancel,
+                                    color: Color(0xFFDC3545),
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      dontItem.text,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Color(0xFF1C100D),
+                                        height: 1.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (hasMedia) ...[
+                                const SizedBox(height: 12),
+                                GestureDetector(
+                                  onTap: () =>
+                                      _showImagePreview(dontItem.mediaUrl),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      dontItem.mediaUrl,
+                                      width: double.infinity,
+                                      height: 140,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                            return Container(
+                                              width: double.infinity,
+                                              height: 140,
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey[200],
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: const Center(
+                                                child: Icon(
+                                                  Icons.image_not_supported,
+                                                  color: Colors.grey,
+                                                  size: 32,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.zoom_in,
+                                      size: 12,
+                                      color: Colors.grey,
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Nhấn để xem rõ',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // Show "Notes" bottom sheet
+  void _showNotesBottomSheet() {
+    if (_firstAidRecommendation == null) return;
+
+    final notes = _firstAidRecommendation!.firstAidGuideline.notes;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) {
+          return Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            child: Column(
+              children: [
+                // Handle bar
+                Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // Header
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF8800).withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.info_outline,
+                          color: Color(0xFFFF8800),
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          '⚠️ LƯU Ý QUAN TRỌNG',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFFF8800),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                // Content
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: notes.length,
+                    itemBuilder: (context, index) {
+                      final note = notes[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF3CD),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFF856404).withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                Icons.info_outline,
+                                color: Color(0xFF856404),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  note,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFF856404),
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // Show Image Preview (Full Screen)
+  void _showImagePreview(String imageUrl) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          children: [
+            // Full screen image
+            Center(
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      padding: const EdgeInsets.all(24),
+                      child: const Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.broken_image,
+                            size: 64,
+                            color: Colors.white,
+                          ),
+                          SizedBox(height: 16),
+                          Text(
+                            'Không thể tải ảnh',
+                            style: TextStyle(color: Colors.white, fontSize: 16),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Center(
+                      child: CircularProgressIndicator(
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                            : null,
+                        color: Colors.white,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            // Close button
+            Positioned(
+              top: 40,
+              right: 16,
+              child: IconButton(
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 24),
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            // Hint text
+            const Positioned(
+              bottom: 40,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Text(
+                  'Pinch để zoom, kéo để di chuyển',
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1124,11 +1348,7 @@ class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.speed,
-            size: 12,
-            color: Colors.white,
-          ),
+          const Icon(Icons.speed, size: 12, color: Colors.white),
           const SizedBox(width: 4),
           Text(
             'Mức $riskLevel/10',

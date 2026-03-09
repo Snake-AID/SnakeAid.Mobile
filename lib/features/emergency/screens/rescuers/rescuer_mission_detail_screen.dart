@@ -2266,6 +2266,12 @@ class _RescuerMissionDetailScreenState
                       .read(missionHubConnectionProvider.notifier)
                       .disconnect();
 
+                  // Clear active mission from provider and local storage
+                  await ref
+                      .read(activeMissionProvider.notifier)
+                      .clearActiveMission();
+                  debugPrint('✅ Active mission cleared after abort');
+
                   // Restart idle tracking so this rescuer is discoverable for new missions
                   try {
                     final prefs = await SharedPreferences.getInstance();

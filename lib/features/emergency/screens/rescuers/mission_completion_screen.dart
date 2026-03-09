@@ -7,6 +7,7 @@ import 'dart:io';
 import '../../repository/media_repository.dart';
 import '../../providers/mission_detail_provider.dart';
 import '../../providers/mission_hub_provider.dart';
+import '../../providers/active_mission_provider.dart';
 import '../../../rescuer/providers/tracking_provider.dart';
 
 class MissionCompletionScreen extends ConsumerStatefulWidget {
@@ -167,6 +168,10 @@ class _MissionCompletionScreenState
         // can receive new SOS requests immediately after this mission ends.
         ref.read(locationManagerProvider).stopMissionTracking();
         await ref.read(missionHubConnectionProvider.notifier).disconnect();
+
+        // Clear active mission from provider and local storage
+        await ref.read(activeMissionProvider.notifier).clearActiveMission();
+        debugPrint('✅ Active mission cleared after completion');
 
         // Restart idle tracking so this rescuer is discoverable for new missions
         try {
