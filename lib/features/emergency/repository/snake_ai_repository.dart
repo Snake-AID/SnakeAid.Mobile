@@ -1,11 +1,14 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:snakeaid_mobile/features/emergency/models/detailed_incident_response.dart';
 import 'dart:io';
 import '../../../core/services/http_service.dart';
 import '../../../core/providers/http_provider.dart';
 import '../models/media_upload_response.dart';
 import '../models/snake_detection_response.dart';
+import '../models/snake_identification_response.dart';
+import '../models/first_aid_recommendation_response.dart';
 
 /// Snake AI Repository
 class SnakeAiRepository {
@@ -14,7 +17,7 @@ class SnakeAiRepository {
   SnakeAiRepository({required this.httpService});
 
   /// Upload snake image for identification
-  /// 
+  ///
   /// POST /api/media/report
   /// - Type: SnakebiteIncident
   /// - Purpose: SnakeIdentification
@@ -27,7 +30,7 @@ class SnakeAiRepository {
     try {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       debugPrint('📸 Uploading snake image for incident: $incidentId');
-      
+
       // Create form data
       final fileName = imageFile.path.split('/').last;
       final formData = FormData.fromMap({
@@ -35,19 +38,19 @@ class SnakeAiRepository {
           imageFile.path,
           filename: fileName,
         ),
-        'Type': 'SnakebiteIncident',
-        'Purpose': 'SnakeIdentification',
         'ReferenceId': incidentId,
       });
 
       final response = await httpService.post(
         '/api/media/report',
         data: formData,
-        options: Options(
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        ),
+        queryParameters: {
+          'type':
+              MediaReferenceType.snakebiteIncident.value, // "SnakebiteIncident"
+          'purpose': MediaPurpose
+              .snakeIdentification
+              .value, // "SnakeIdentification" (AI processing)
+        },
       );
 
       debugPrint('✅ Image uploaded successfully');
@@ -61,7 +64,7 @@ class SnakeAiRepository {
   }
 
   /// Detect snake from uploaded image
-  /// 
+  ///
   /// POST /api/detection/detect/{reportMediaId}
   Future<SnakeDetectionResponse> detectSnake({
     required String reportMediaId,
@@ -85,7 +88,7 @@ class SnakeAiRepository {
   }
 
   /// Get detection result by recognition result ID
-  /// 
+  ///
   /// GET /api/detection/{id}
   /// Returns the same structure as detectSnake
   Future<SnakeDetectionResponse> getDetectionResult({
@@ -109,6 +112,69 @@ class SnakeAiRepository {
     }
   }
 
+  /// Confirm AI identification and save to incident
+  ///
+  /// POST /api/incidents/{incidentId}/identify/ai
+  /// Body: { "recognitionResultId": "uuid" }
+  /// Returns: IdentifySnakeResponse
+  Future<IdentifySnakeResponse> confirmAIIdentification({
+    required String incidentId,
+    required String recognitionResultId,
+  }) async {
+    try {
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint('✅ Confirming AI identification for incident: $incidentId');
+      debugPrint('   Recognition Result ID: $recognitionResultId');
+
+      final response = await httpService.post(
+        '/api/incidents/$incidentId/identify/ai',
+        data: {
+          'recognitionResultId': recognitionResultId,
+        },
+      );
+
+      debugPrint('✅ Identification confirmed successfully');
+      debugPrint('✅ Full Response: ${response.data}');
+
+      // Backend response structure: {status_code, message, is_success, data: {...}}
+      final data = response.data['data'] as Map<String, dynamic>;
+
+      return IdentifySnakeResponse.fromJson(data);
+    } on DioException catch (e) {
+      debugPrint('❌ Confirm identification failed: ${e.message}');
+      throw _handleError(e);
+    }
+  }
+
+  /// Get first aid recommendation for incident
+  ///
+  /// GET /api/first-aid-guidelines/recommendation/incident/{incidentId}
+  /// Returns: FirstAidRecommendationResponse with snake, guideline, source
+  Future<FirstAidRecommendationResponse> getFirstAidRecommendation({
+    required String incidentId,
+  }) async {
+    try {
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint('🩺 Getting first aid recommendation for incident: $incidentId');
+
+      final response = await httpService.get(
+        '/api/first-aid-guidelines/recommendation/incident/$incidentId',
+      );
+
+      // Backend response structure: {status_code, message, is_success, data: {...}}
+      final data = response.data['data'] as Map<String, dynamic>;
+
+      debugPrint('✅ First aid recommendation retrieved successfully');
+      debugPrint('   Source: ${data['source']}');
+      debugPrint('   Guideline: ${data['guidelineName']}');
+
+      return FirstAidRecommendationResponse.fromJson(data);
+    } on DioException catch (e) {
+      debugPrint('❌ Get first aid recommendation failed: ${e.message}');
+      throw _handleError(e);
+    }
+  }
+
   /// Handle API errors
   Exception _handleError(DioException e) {
     String errorMessage = 'Đã có lỗi xảy ra';
@@ -117,10 +183,8 @@ class SnakeAiRepository {
       final data = e.response?.data;
 
       if (data is Map<String, dynamic>) {
-        errorMessage = data['message'] ?? 
-                      data['error'] ?? 
-                      data['title'] ??
-                      errorMessage;
+        errorMessage =
+            data['message'] ?? data['error'] ?? data['title'] ?? errorMessage;
       } else if (data is String) {
         errorMessage = data;
       }
@@ -150,7 +214,7 @@ class SnakeAiRepository {
           break;
       }
     } else if (e.type == DioExceptionType.connectionTimeout ||
-               e.type == DioExceptionType.receiveTimeout) {
+        e.type == DioExceptionType.receiveTimeout) {
       errorMessage = 'Kết nối timeout, vui lòng kiểm tra mạng';
     } else if (e.type == DioExceptionType.connectionError) {
       errorMessage = 'Không thể kết nối tới máy chủ';

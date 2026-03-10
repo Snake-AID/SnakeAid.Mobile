@@ -1,20 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/widgets/chat_screen.dart';
+import '../../providers/incident_provider.dart';
 
-class RescuerArrivedScreen extends StatefulWidget {
+class RescuerArrivedScreen extends ConsumerStatefulWidget {
   const RescuerArrivedScreen({super.key});
 
   @override
-  State<RescuerArrivedScreen> createState() => _RescuerArrivedScreenState();
+  ConsumerState<RescuerArrivedScreen> createState() => _RescuerArrivedScreenState();
 }
 
-class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
+class _RescuerArrivedScreenState extends ConsumerState<RescuerArrivedScreen> {
   int _tapCount = 0;
   DateTime? _lastTapTime;
 
   @override
   Widget build(BuildContext context) {
+    // Get incident from provider
+    final incidentState = ref.watch(activeIncidentProvider);
+    final incident = incidentState.incident;
+    final hasRescuer = incident?.assignedRescuerId != null;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F8F6),
       appBar: AppBar(
@@ -89,12 +96,12 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
               _buildSuccessBanner(),
               const SizedBox(height: 16),
 
-              // Main Status Card
+              // Main Status Card, mission
               _buildMainStatusCard(),
               const SizedBox(height: 16),
 
               // Rescuer Information Card
-              _buildRescuerInfoCard(context),
+              if (hasRescuer) _buildRescuerInfoCard(context),
               const SizedBox(height: 24),
 
               // Section Header
@@ -261,6 +268,10 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
   }
 
   Widget _buildRescuerInfoCard(BuildContext context) {
+    // Member side only has rescuer ID, not full profile
+    // Display generic rescuer info
+    const rescuerName = 'Đội Cứu Hộ SnakeAid';
+    
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -281,7 +292,7 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Nguyễn Văn A',
+                  rescuerName,
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -302,7 +313,15 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () {},
+                        onPressed: () {
+                          // TODO: Implement call rescuer functionality
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Tính năng gọi điện đang được phát triển'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
                         icon: const Icon(Icons.call_rounded, size: 18),
                         label: const Text('Gọi'),
                         style: OutlinedButton.styleFrom(
@@ -329,7 +348,7 @@ class _RescuerArrivedScreenState extends State<RescuerArrivedScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => const ChatScreen(
-                                recipientName: 'Nguyễn Văn A',
+                                recipientName: rescuerName,
                                 recipientAvatar: '🚑',
                                 isExpert: true,
                               ),

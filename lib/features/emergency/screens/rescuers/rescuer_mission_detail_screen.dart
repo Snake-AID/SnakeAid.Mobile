@@ -4,15 +4,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:snakeaid_mobile/features/emergency/models/snake_identification_response.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/rescue_mission_response.dart';
 import '../../models/detailed_incident_response.dart';
 import '../../models/route_navigation_data.dart';
 import '../../providers/mission_detail_provider.dart';
+import '../../providers/active_mission_provider.dart';
+import '../../providers/rescuer_emergency_provider.dart';
+import '../../widgets/snake_risk_badges.dart';
 import '../../../../core/utils/distance_utils.dart';
 import '../../../../core/providers/openroute_provider.dart';
 import '../../../../core/services/openroute_service.dart';
+import '../../providers/mission_hub_provider.dart' hide MissionStatus;
+import '../../../rescuer/providers/tracking_provider.dart';
 
 /// Rescuer Mission Detail Screen
 /// Main screen for rescuer to view mission details and manage status
@@ -33,6 +40,7 @@ class _RescuerMissionDetailScreenState
   StreamSubscription<Position>? _locationSubscription;
   RouteNavigationData? _routeData; // Route data from OpenRouteService
   String? _routeError;
+  final List<StreamSubscription> _missionHubSubscriptions = [];
 
   @override
   void initState() {
@@ -44,6 +52,16 @@ class _RescuerMissionDetailScreenState
   void dispose() {
     _elapsedTimer?.cancel();
     _locationSubscription?.cancel();
+    for (final s in _missionHubSubscriptions) {
+      s.cancel();
+    }
+
+    // NOTE: We do NOT stop LocationManager or disconnect MissionHub here because:
+    // 1. User may navigate to Navigation screen → still need GPS broadcast
+    // 2. LocationManager and MissionHub must persist across screen transitions
+    // 3. They will be stopped only when mission truly ends (completed/cancelled)
+    // 4. This matches member-side architecture where connections persist globally
+
     super.dispose();
   }
 
@@ -59,6 +77,46 @@ class _RescuerMissionDetailScreenState
             missionId: widget.missionId,
             rescuerLocation: position,
           );
+
+      // Connect to MissionHub for real-time bidirectional GPS
+      final mission = ref.read(missionDetailProvider).mission;
+      if (mission != null) {
+        try {
+          await ref
+              .read(missionHubConnectionProvider.notifier)
+              .connectForIncident(mission.incident.id);
+          debugPrint(
+            '✅ Rescuer connected to MissionHub for incident: ${mission.incident.id}',
+          );
+
+          // Setup listener for member location updates
+          _setupMissionHubListeners();
+
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            final rescuerId = prefs.getString('user_id');
+            if (rescuerId != null) {
+              final missionHubService = ref.read(missionHubServiceProvider);
+              await ref
+                  .read(locationManagerProvider)
+                  .startMissionTracking(
+                    rescuerId,
+                    mission.incident.id,
+                    missionHubService,
+                  );
+              debugPrint(
+                '✅ [MissionDetail] Started GPS broadcast to MissionHub',
+              );
+            } else {
+              debugPrint('⚠️ [MissionDetail] No rescuer ID found');
+            }
+          } catch (e) {
+            debugPrint('❌ [MissionDetail] Failed to start GPS broadcast: $e');
+          }
+        } catch (e) {
+          debugPrint('⚠️ Failed to connect to MissionHub: $e');
+        }
+      }
 
       // Start location tracking
       _startLocationTracking();
@@ -76,17 +134,33 @@ class _RescuerMissionDetailScreenState
   }
 
   void _startLocationTracking() {
+    // This stream is ONLY for local provider updates (distance/ETA display)
     _locationSubscription =
         Geolocator.getPositionStream(
           locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.high,
-            distanceFilter: 10, // Update every 10 meters
+            distanceFilter: 15, // Match LocationManager for consistency
           ),
         ).listen((position) {
+          // Update local provider for distance/ETA calculations
           ref
               .read(missionDetailProvider.notifier)
               .updateRescuerLocation(position);
         });
+  }
+
+  void _setupMissionHubListeners() {
+    final svc = ref.read(missionHubServiceProvider);
+
+    // Listen for member live location updates
+    _missionHubSubscriptions.add(
+      svc.memberLocationUpdatedStream.listen((data) {
+        debugPrint(
+          '📍 [RescuerDetail] Member location updated: ${data.latitude}, ${data.longitude}',
+        );
+        // Could update a state variable here if you want to show member location on preview map
+      }),
+    );
   }
 
   void _startElapsedTimer() {
@@ -272,7 +346,7 @@ class _RescuerMissionDetailScreenState
                 IconButton(
                   icon: const Icon(Icons.phone),
                   onPressed: () =>
-                      _makePhoneCall(mission.user.account?.phoneNumber ?? ''),
+                      _makePhoneCall(mission.user.phoneNumber ?? ''),
                   style: IconButton.styleFrom(
                     backgroundColor: const Color(0xFFFF8800).withOpacity(0.1),
                   ),
@@ -596,6 +670,14 @@ class _RescuerMissionDetailScreenState
         children: [
           _buildMissionPriceCard(mission),
           const SizedBox(height: 16),
+          // Identified Snake Section (Official confirmed species)
+          if (mission.incident.identifiedSnakeSpecies != null) ...[
+            _buildIdentifiedSnakeCard(
+              mission.incident.identifiedSnakeSpecies!,
+              mission.incident.identificationContext,
+            ),
+            const SizedBox(height: 16),
+          ],
           _buildVictimInfoCard(mission),
           const SizedBox(height: 16),
           _buildEmergencyContactsCard(mission),
@@ -745,7 +827,7 @@ class _RescuerMissionDetailScreenState
               ),
               IconButton(
                 icon: const Icon(Icons.phone, color: Color(0xFFFF8800)),
-                onPressed: () => _makePhoneCall(account?.phoneNumber ?? ''),
+                onPressed: () => _makePhoneCall(user.phoneNumber ?? ''),
               ),
             ],
           ),
@@ -983,7 +1065,7 @@ class _RescuerMissionDetailScreenState
   Widget _buildSymptomsCard(DetailRescueMissionResponse mission) {
     final hasSymptoms =
         mission.incident.symptomsReport != null &&
-        mission.incident.symptomsReport!.trim().isNotEmpty;
+        mission.incident.symptomsReport!.isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1003,7 +1085,9 @@ class _RescuerMissionDetailScreenState
             children: [
               Icon(
                 Icons.medical_services,
-                color: hasSymptoms ? const Color(0xFFFF9800) : Colors.grey[600],
+                color: hasSymptoms
+                    ? const Color.fromARGB(255, 218, 2, 2)
+                    : Colors.grey[600],
                 size: 20,
               ),
               const SizedBox(width: 8),
@@ -1019,12 +1103,22 @@ class _RescuerMissionDetailScreenState
           ),
           const SizedBox(height: 12),
           hasSymptoms
-              ? Text(
-                  mission.incident.symptomsReport!,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFFE65100),
-                  ),
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: mission.incident.symptomsReport!
+                      .map(
+                        (symptom) => Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text(
+                            '• ${symptom.symptomName}',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFFE65100),
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
                 )
               : Row(
                   children: [
@@ -1049,9 +1143,7 @@ class _RescuerMissionDetailScreenState
 
   Widget _buildSnakeDetectionCard(DetailRescueMissionResponse mission) {
     final media = mission.incident.media;
-    final hasMedia = media.isNotEmpty && media.first.mediaUrl.trim().isNotEmpty;
-    final firstMedia = hasMedia ? media.first : null;
-    final hasAI = firstMedia?.aiRecognitionResults.isNotEmpty ?? false;
+    final hasMedia = media.isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1063,31 +1155,283 @@ class _RescuerMissionDetailScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.image, color: Color(0xFF4CAF50), size: 20),
-              SizedBox(width: 8),
-              Text(
-                '🐍 Hình ảnh & nhận diện',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              const Icon(Icons.image, color: Color(0xFF4CAF50), size: 20),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Hình ảnh & nhận diện',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
               ),
+              if (hasMedia && media.length > 1)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4CAF50).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${media.length} ảnh',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF4CAF50),
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 12),
           if (hasMedia)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                firstMedia!.mediaUrl,
-                height: 200,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 200,
-                    color: Colors.grey[200],
-                    child: const Center(
-                      child: Icon(Icons.error, color: Colors.grey),
+            SizedBox(
+              height: 400,
+              child: PageView.builder(
+                itemCount: media.length,
+                itemBuilder: (context, index) {
+                  final currentMedia = media[index];
+                  final hasAI = currentMedia.detectedSpecies.isNotEmpty;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Image
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(
+                            currentMedia.mediaUrl,
+                            height: 200,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                height: 200,
+                                color: Colors.grey[200],
+                                child: const Center(
+                                  child: Icon(Icons.error, color: Colors.grey),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // Page indicator
+                        if (media.length > 1)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(
+                              media.length,
+                              (i) => Container(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 3,
+                                ),
+                                width: i == index ? 20 : 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: i == index
+                                      ? const Color(0xFF4CAF50)
+                                      : Colors.grey[300],
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (media.length > 1) const SizedBox(height: 12),
+                        // AI Detection Result
+                        if (hasAI)
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: SnakeRiskBadges.getRiskGradient(
+                                  currentMedia.detectedSpecies.first.riskLevel,
+                                ),
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: SnakeRiskBadges.getRiskColor(
+                                  currentMedia.detectedSpecies.first.riskLevel,
+                                ),
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: SnakeRiskBadges.getRiskColor(
+                                    currentMedia
+                                        .detectedSpecies
+                                        .first
+                                        .riskLevel,
+                                  ).withOpacity(0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: SnakeRiskBadges.getRiskColor(
+                                          currentMedia
+                                              .detectedSpecies
+                                              .first
+                                              .riskLevel,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Icon(
+                                        SnakeRiskBadges.getRiskIcon(
+                                          currentMedia
+                                              .detectedSpecies
+                                              .first
+                                              .riskLevel,
+                                        ),
+                                        size: 18,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            currentMedia
+                                                .detectedSpecies
+                                                .first
+                                                .commonName,
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color.fromARGB(
+                                                255,
+                                                5,
+                                                30,
+                                                58,
+                                              ),
+                                            ),
+                                          ),
+                                          Text(
+                                            currentMedia
+                                                .detectedSpecies
+                                                .first
+                                                .scientificName,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontStyle: FontStyle.italic,
+                                              color: Colors.grey[700],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    SnakeRiskBadges.buildRiskLevelBadge(
+                                      currentMedia
+                                          .detectedSpecies
+                                          .first
+                                          .riskLevel,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    SnakeRiskBadges.buildVenomTypeBadge(
+                                      currentMedia
+                                          .detectedSpecies
+                                          .first
+                                          .primaryVenomType,
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          )
+                        else if (currentMedia.isProcessed)
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.grey[400]!,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  size: 20,
+                                  color: Colors.grey[700],
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Không nhận diện được loài rắn',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF3E0),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFFFF9800),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: Icon(
+                                    Icons.hourglass_top,
+                                    size: 20,
+                                    color: Color(0xFFFF9800),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Chưa có kết quả nhận diện.',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.orange[900],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   );
                 },
@@ -1118,41 +1462,6 @@ class _RescuerMissionDetailScreenState
                 ),
               ),
             ),
-          if (hasAI) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.smart_toy, size: 16, color: Colors.blue),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          firstMedia!.aiRecognitionResults.first.yoloClassName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Độ chính xác: ${(firstMedia.aiRecognitionResults.first.confidence * 100).toStringAsFixed(1)}%',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -1269,7 +1578,211 @@ class _RescuerMissionDetailScreenState
     }
   }
 
+  // Helper widgets
+
+  /// Build identified snake card (official confirmed species for this incident)
+  Widget _buildIdentifiedSnakeCard(
+    DetectedSnakeSpecies species,
+    SnakeIdentificationContext? context,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF228B22), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF228B22).withOpacity(0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with badge
+          Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF228B22),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.verified,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Loài rắn của sự cố này',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1C100D),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (context != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: context.method == SnakeIdentificationMethod.ai
+                        ? const Color(0xFF2196F3).withOpacity(0.1)
+                        : const Color(0xFF9C27B0).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        context.method == SnakeIdentificationMethod.ai
+                            ? Icons.smart_toy
+                            : Icons.person,
+                        size: 12,
+                        color: context.method == SnakeIdentificationMethod.ai
+                            ? const Color(0xFF2196F3)
+                            : const Color(0xFF9C27B0),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        context.method == SnakeIdentificationMethod.ai
+                            ? 'AI'
+                            : 'Chuyên gia',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: context.method == SnakeIdentificationMethod.ai
+                              ? const Color(0xFF2196F3)
+                              : const Color(0xFF9C27B0),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Snake image
+          if (species.imageUrl != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                species.imageUrl!,
+                height: 160,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    height: 160,
+                    color: Colors.grey[200],
+                    child: const Center(
+                      child: Icon(Icons.pets, size: 48, color: Colors.grey),
+                    ),
+                  );
+                },
+              ),
+            ),
+          const SizedBox(height: 12),
+          // Species info card
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: SnakeRiskBadges.getRiskGradient(species.riskLevel),
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: SnakeRiskBadges.getRiskColor(species.riskLevel),
+                width: 2,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: SnakeRiskBadges.getRiskColor(species.riskLevel),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        SnakeRiskBadges.getRiskIcon(species.riskLevel),
+                        size: 18,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            species.commonName,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: SnakeRiskBadges.getRiskColor(
+                                species.riskLevel,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            species.scientificName,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontStyle: FontStyle.italic,
+                              color: SnakeRiskBadges.getRiskColor(
+                                species.riskLevel,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    SnakeRiskBadges.buildRiskLevelBadge(
+                      species.riskLevel,
+                      compact: true,
+                    ),
+                    SnakeRiskBadges.buildVenomTypeBadge(
+                      species.primaryVenomType,
+                      compact: true,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Action methods
+
   Future<void> _makePhoneCall(String phoneNumber) async {
     final cleanedPhone = phoneNumber.trim().replaceAll(RegExp(r'[^0-9+]'), '');
 
@@ -1318,6 +1831,12 @@ class _RescuerMissionDetailScreenState
     if (!mounted) return;
 
     if (success) {
+      // Update active mission status to EnRoute
+      await ref
+          .read(activeMissionProvider.notifier)
+          .updateMissionStatus('EnRoute');
+      debugPrint('💾 Active mission status updated: EnRoute');
+
       final mission = ref.read(missionDetailProvider).mission;
       final routeData = ref.read(missionDetailProvider).routeData;
 
@@ -1741,6 +2260,37 @@ class _RescuerMissionDetailScreenState
                 if (!mounted) return;
 
                 if (success) {
+                  // Clean up: stop mission GPS and disconnect MissionHub
+                  // so the rescuer can receive new SOS requests immediately.
+                  ref.read(locationManagerProvider).stopMissionTracking();
+                  await ref
+                      .read(missionHubConnectionProvider.notifier)
+                      .disconnect();
+
+                  // Clear active mission from provider and local storage
+                  await ref
+                      .read(activeMissionProvider.notifier)
+                      .clearActiveMission();
+                  debugPrint('✅ Active mission cleared after abort');
+
+                  // Restart idle tracking so this rescuer is discoverable for new missions
+                  try {
+                    final prefs = await SharedPreferences.getInstance();
+                    final rescuerId = prefs.getString('user_id');
+                    if (rescuerId != null) {
+                      await ref
+                          .read(locationManagerProvider)
+                          .startTracking(rescuerId);
+                      debugPrint(
+                        '✅ Restarted idle tracking after mission abort',
+                      );
+                    }
+                  } catch (e) {
+                    debugPrint('⚠️ Failed to restart idle tracking: $e');
+                  }
+
+                  if (!mounted) return;
+
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('✅ Đã hủy nhiệm vụ'),

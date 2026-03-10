@@ -11,8 +11,12 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import '../models/rescue_request.dart';
 import '../models/detailed_incident_response.dart';
+import '../models/rescue_mission_response.dart';
 import '../repository/incident_repository.dart';
 import '../providers/rescuer_emergency_provider.dart';
+import '../providers/mission_hub_provider.dart';
+import '../providers/active_mission_provider.dart';
+import '../../rescuer/providers/tracking_provider.dart';
 import '../../../core/services/nominatim_service.dart';
 import '../../../core/utils/distance_utils.dart';
 
@@ -278,6 +282,51 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
     });
   }
 
+  /// Connect rescuer to MissionHub and start broadcasting GPS to the member.
+  Future<void> _connectRescuerToMissionHub(
+    String incidentId,
+    String rescuerId,
+  ) async {
+    try {
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint(
+        '🔌 [RescueRequestModal] _connectRescuerToMissionHub() called',
+      );
+      debugPrint('   Incident ID: $incidentId');
+      debugPrint('   Rescuer ID: $rescuerId');
+
+      debugPrint(
+        '🔌 [RescueRequestModal] Connecting rescuer to MissionHub for incident: $incidentId',
+      );
+      await ref
+          .read(missionHubConnectionProvider.notifier)
+          .connectForIncident(incidentId);
+      debugPrint(
+        '✅ [RescueRequestModal] Rescuer joined MissionHub group: $incidentId',
+      );
+
+      // Start streaming GPS → MissionHub.UpdateLocation → member map
+      debugPrint('📍 [RescueRequestModal] Starting mission tracking...');
+      final missionHubService = ref.read(missionHubServiceProvider);
+      debugPrint(
+        '📍 [RescueRequestModal] MissionHub service connected: ${missionHubService.isConnected}',
+      );
+
+      await ref
+          .read(locationManagerProvider)
+          .startMissionTracking(rescuerId, incidentId, missionHubService);
+      debugPrint(
+        '✅✅✅ [RescueRequestModal] Rescuer GPS tracking started for incident $incidentId ✅✅✅',
+      );
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    } catch (e, stack) {
+      debugPrint(
+        '❌ [RescueRequestModal] Failed to connect rescuer to MissionHub: $e',
+      );
+      debugPrint('Stack trace: $stack');
+    }
+  }
+
   Future<void> _onAccept() async {
     if (_isAccepting || _incident == null) return;
 
@@ -309,13 +358,67 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
             backgroundColor: Colors.green,
           ),
         );
-        widget.onDismiss();
 
-        // Navigate to mission detail screen
+        // 🔌 DISCONNECT from RescuerHub (stop receiving new rescue requests)
+        debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        debugPrint('🔌 Disconnecting from RescuerHub...');
+        debugPrint('   Reason: Mission accepted, switching to MissionHub');
+        try {
+          await ref.read(rescueModeProvider.notifier).stopRescueMode();
+          debugPrint('✅ Disconnected from RescuerHub successfully');
+        } catch (e) {
+          debugPrint('❌ Failed to disconnect RescuerHub: $e');
+          // Continue anyway - not critical
+        }
+        debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+        // Save mission to active_mission_provider for persistence
+        if (response.missionId != null && response.incidentId != null) {
+          final basicMission = BasicRescueMissionResponse(
+            missionId: response.missionId!,
+            incidentId: response.incidentId!,
+            status: 'Preparing', // Initial status when accepted
+            acceptedAt: DateTime.now(),
+            startedAt: null,
+          );
+          await ref
+              .read(activeMissionProvider.notifier)
+              .saveActiveMission(basicMission);
+          debugPrint(
+            '💾 [RescueRequestModal] Active mission saved: ${response.missionId}',
+          );
+        }
+
+        // Navigate FIRST for instant UI response
         if (response.missionId != null) {
-          debugPrint('🚀 Navigating to mission detail: ${response.missionId}');
+          debugPrint(
+            '🚀 [RescueRequestModal] Navigating to mission detail: ${response.missionId}',
+          );
           context.push('/rescuer/mission-detail/${response.missionId}');
+
+          // Dismiss modal AFTER navigation started
+          widget.onDismiss();
+
+          // Connect rescuer to MissionHub and start GPS broadcast to member
+          // Run in background (no await) to not block UI
+          if (response.incidentId != null) {
+            debugPrint(
+              '🔌 [RescueRequestModal] Starting MissionHub connection in background...',
+            );
+            _connectRescuerToMissionHub(response.incidentId!, rescuerId)
+                .then((_) {
+                  debugPrint(
+                    '✅ [RescueRequestModal] Background MissionHub connection completed',
+                  );
+                })
+                .catchError((error) {
+                  debugPrint(
+                    '❌ [RescueRequestModal] Background connection failed: $error',
+                  );
+                });
+          }
         } else {
+          widget.onDismiss();
           debugPrint('⚠️ WARNING: Mission accepted but no missionId returned!');
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -782,7 +885,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
   }
 
   Widget _buildMissionPriceCard() {
-    final mission = _incident!.rescueMission;
+    final mission = _incident!.activeMission;
     final hasPrice = mission != null;
 
     return Container(
@@ -1091,7 +1194,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
   Widget _buildSymptomsCard() {
     final hasSymptoms =
         _incident!.symptomsReport != null &&
-        _incident!.symptomsReport!.trim().isNotEmpty;
+        _incident!.symptomsReport!.isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -1105,9 +1208,22 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
         ),
       ),
       child: hasSymptoms
-          ? Text(
-              _incident!.symptomsReport!,
-              style: const TextStyle(fontSize: 14, color: Color(0xFFE65100)),
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: _incident!.symptomsReport!
+                  .map(
+                    (symptom) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        '• ${symptom.symptomName}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFFE65100),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
             )
           : Row(
               children: [
@@ -1133,7 +1249,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
     final hasMedia = media.isNotEmpty && media.first.mediaUrl.trim().isNotEmpty;
 
     final firstMedia = hasMedia ? media.first : null;
-    final hasAI = firstMedia?.aiRecognitionResults.isNotEmpty ?? false;
+    final hasAI = firstMedia?.detectedSpecies.isNotEmpty ?? false;
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -1229,10 +1345,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  firstMedia
-                                      .aiRecognitionResults
-                                      .first
-                                      .yoloClassName,
+                                  firstMedia.detectedSpecies.first.commonName,
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 13,
@@ -1240,7 +1353,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
                                   ),
                                 ),
                                 Text(
-                                  'Độ chính xác: ${firstMedia.aiRecognitionResults.first.confidencePercentage}',
+                                  'Loài: ${firstMedia.detectedSpecies.first.scientificName}',
                                   style: const TextStyle(
                                     color: Colors.white70,
                                     fontSize: 11,

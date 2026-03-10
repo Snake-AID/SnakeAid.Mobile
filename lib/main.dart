@@ -63,10 +63,10 @@ class MyApp extends ConsumerWidget {
       title: 'SnakeAid Mobile',
       debugShowCheckedModeBanner: false,
 
-      // Use AppTheme from auth branch
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
+      // // Use AppTheme from auth branch
+      // theme: AppTheme.lightTheme,
+      // darkTheme: AppTheme.darkTheme,
+      // themeMode: ThemeMode.system,
 
       // Use go_router configuration
       routerConfig: router,

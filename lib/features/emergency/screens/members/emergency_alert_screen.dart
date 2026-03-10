@@ -3,20 +3,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
-import 'dart:convert';
 import '../../models/sos_incident_response.dart';
 import '../../providers/incident_provider.dart';
+import '../../providers/mission_hub_provider.dart';
 import '../../repository/incident_repository.dart';
+import '../../../../core/services/mission_hub_service.dart';
 
 /// Emergency Alert Screen - Shows when user presses SOS button
 /// Displays map, searching for rescuers, and safety instructions
 class EmergencyAlertScreen extends ConsumerStatefulWidget {
   final IncidentData? incident;
-  
+
   const EmergencyAlertScreen({super.key, this.incident});
 
   @override
-  ConsumerState<EmergencyAlertScreen> createState() => _EmergencyAlertScreenState();
+  ConsumerState<EmergencyAlertScreen> createState() =>
+      _EmergencyAlertScreenState();
 }
 
 class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
@@ -26,14 +28,20 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
   int _countdown = 60;
   Timer? _countdownTimer;
   Timer? _refreshTimer;
-  
+
   // Incident data - from navigation or provider
   IncidentData? _currentIncident;
-  
+
   // Track if user has provided snake detection and symptoms
   String? _recognitionResultId;
   bool _hasSymptomsReport = false;
   List<String> _symptomsList = [];
+
+  // MissionHub subscriptions – cancelled on dispose
+  final List<StreamSubscription> _missionHubSubscriptions = [];
+
+  // Guard against double-navigation to tracking (race condition fix)
+  bool _navigatedToTracking = false;
 
   final List<RescuerMarker> _rescuers = [
     RescuerMarker(top: 0.30, left: 0.20),
@@ -44,28 +52,42 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
   @override
   void initState() {
     super.initState();
-    
+
     // Get incident from parameter or provider
-    _currentIncident = widget.incident ?? ref.read(activeIncidentProvider).incident;
-    
+    _currentIncident =
+        widget.incident ?? ref.read(activeIncidentProvider).incident;
+
     if (_currentIncident != null) {
       debugPrint('🚨 Emergency Alert Screen loaded');
       debugPrint('📍 Incident ID: ${_currentIncident!.id}');
-      debugPrint('📍 Location: ${_currentIncident!.locationCoordinates.latitude}, ${_currentIncident!.locationCoordinates.longitude}');
+      debugPrint(
+        '📍 Location: ${_currentIncident!.locationCoordinates.latitude}, ${_currentIncident!.locationCoordinates.longitude}',
+      );
       debugPrint('📍 Status: ${_currentIncident!.status}');
-      
+
       // Load tracking data
       _loadTrackingData();
-      
+
       // Refresh incident data from API
       _refreshIncidentData();
-      
+
       // Set up periodic refresh every 10 seconds
       _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
         _refreshIncidentData();
       });
+
+      // Connect to MissionHub (idempotent – home screen may have already done this)
+      _ensureMissionHubConnected();
+
+      // Subscribe to MissionHub events
+      _setupMissionHubListeners();
+
+      // If RescuerAccepted fired BEFORE this screen mounted (member was slow
+      // on the SOS dialog), the stream event is gone but the provider cached it.
+      // Check immediately and navigate to tracking if already accepted.
+      _checkAlreadyAccepted();
     }
-    
+
     _radarController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -83,12 +105,14 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
     try {
       final prefs = await SharedPreferences.getInstance();
       final incidentId = _currentIncident!.id;
-      
+
       setState(() {
-        _recognitionResultId = prefs.getString('recognition_result_$incidentId');
+        _recognitionResultId = prefs.getString(
+          'recognition_result_$incidentId',
+        );
         _hasSymptomsReport = prefs.getBool('has_symptoms_$incidentId') ?? false;
       });
-      
+
       debugPrint('📊 Recognition Result ID: $_recognitionResultId');
       debugPrint('📊 Has Symptoms Report: $_hasSymptomsReport');
     } catch (e) {
@@ -100,43 +124,40 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
     try {
       final repository = ref.read(incidentRepositoryProvider);
       final response = await repository.getIncident(_currentIncident!.id);
-      
+
       if (response.isSuccess && response.data != null) {
         setState(() {
           _currentIncident = response.data;
           _symptomsList = _parseSymptomsReport(response.data!.symptomsReport);
         });
-        debugPrint('✅ Incident refreshed. Symptoms count: ${_symptomsList.length}');
+        debugPrint(
+          '✅ Incident refreshed. Symptoms count: ${_symptomsList.length}',
+        );
       }
     } catch (e) {
       final errorMessage = e.toString();
       debugPrint('❌ Error refreshing incident: $errorMessage');
-      
+
       // Nếu gặp lỗi authentication, không hiển thị lỗi cho user
       // App sẽ tiếp tục hoạt động với data hiện tại
       // Token refresh sẽ được thử lại ở lần request tiếp theo
-      if (errorMessage.contains('Authentication') || errorMessage.contains('401')) {
+      if (errorMessage.contains('Authentication') ||
+          errorMessage.contains('401')) {
         debugPrint('⚠️ Auth error during refresh - will retry on next cycle');
       }
-      
+
       // Không throw error để app không crash
       // Incident data hiện tại vẫn được giữ nguyên
     }
   }
 
-  List<String> _parseSymptomsReport(String? symptomsReport) {
+  List<String> _parseSymptomsReport(List<ReportSymptom>? symptomsReport) {
     if (symptomsReport == null || symptomsReport.isEmpty) {
       return [];
     }
-    
-    try {
-      // symptomsReport is a JSON string like: "[\"symptom1\", \"symptom2\"]"
-      final List<dynamic> decoded = jsonDecode(symptomsReport);
-      return decoded.map((e) => e.toString()).toList();
-    } catch (e) {
-      debugPrint('❌ Error parsing symptoms report: $e');
-      return [];
-    }
+
+    // Extract symptom names from the ReportSymptom list
+    return symptomsReport.map((symptom) => symptom.symptomName).toList();
   }
 
   void _startCountdown() {
@@ -153,12 +174,176 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
 
   @override
   void dispose() {
+    for (final sub in _missionHubSubscriptions) {
+      sub.cancel();
+    }
     _radarController.dispose();
     _pulseController.dispose();
     _countdownTimer?.cancel();
     _refreshTimer?.cancel();
     super.dispose();
   }
+
+  // ─────────────────────────────────────────────────
+  // MissionHub integration
+  // ─────────────────────────────────────────────────
+
+  /// Ensure the member is connected to MissionHub for this incident.
+  /// This is idempotent – the provider skips re-connection for the same incidentId.
+  Future<void> _ensureMissionHubConnected() async {
+    if (_currentIncident == null) return;
+    try {
+      await ref
+          .read(missionHubConnectionProvider.notifier)
+          .connectForIncident(_currentIncident!.id);
+    } catch (e) {
+      debugPrint('⚠️ MissionHub connection attempt failed: $e');
+    }
+  }
+
+  /// Subscribe to MissionHub event streams.
+  ///
+  /// Subscriptions are stored in [_missionHubSubscriptions] and cancelled on dispose
+  /// so the screen never leaks listeners.
+  void _setupMissionHubListeners() {
+    final service = ref.read(missionHubServiceProvider);
+
+    // 🚨 A rescuer accepted our SOS request
+    _missionHubSubscriptions.add(
+      service.rescuerAcceptedStream.listen(_handleRescuerAccepted),
+    );
+
+    // 📍 Rescuer location updates (kept for future map integration)
+    _missionHubSubscriptions.add(
+      service.locationUpdatedStream.listen((loc) {
+        debugPrint(
+          '📍 Rescuer location update: ${loc.latitude}, ${loc.longitude}',
+        );
+        // MissionStatusNotifier already updates the global state;
+        // no extra setState needed here unless we draw a live pin.
+      }),
+    );
+
+    // 🎯 Rescuer arrived
+    _missionHubSubscriptions.add(
+      service.rescuerArrivedStream.listen((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🎯 Đội cứu hộ đã đến nơi!'),
+            backgroundColor: Color(0xFF228B22),
+            duration: Duration(seconds: 4),
+          ),
+        );
+        context.pushNamed('member_rescuer_arrived');
+      }),
+    );
+
+    // ✅ Mission completed
+    _missionHubSubscriptions.add(
+      service.missionCompletedStream.listen((_) {
+        if (!mounted) return;
+        context.pushReplacementNamed('emergency_completion');
+      }),
+    );
+
+    // ❌ Mission cancelled
+    _missionHubSubscriptions.add(
+      service.missionCancelledStream.listen((reason) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Nhiệm vụ đã bị hủy: $reason'),
+            backgroundColor: const Color(0xFFDC3545),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }),
+    );
+
+    // ⏰ Session expired (no rescuer found)
+    _missionHubSubscriptions.add(
+      service.sessionExpiredStream.listen((_) => _handleSessionExpired()),
+    );
+  }
+
+  /// Called when a rescuer accepts the SOS request (RescuerAccepted event).
+  ///
+  /// Notifies the user and navigates to the live tracking screen.
+  void _handleRescuerAccepted(RescuerAcceptedData data) {
+    if (!mounted) return;
+    debugPrint(
+      '🚨 EmergencyAlertScreen: RescuerAccepted – navigating to tracking',
+    );
+    debugPrint('   Mission ID: ${data.missionId}');
+    debugPrint('   Rescuer ID: ${data.rescuerId}');
+    _navigateToTracking(data.missionId, data.rescuerId);
+  }
+
+  /// Checks the cached MissionStatus state in case the RescuerAccepted event
+  /// fired before this screen was mounted (member was slow closing the SOS
+  /// activation dialog). Broadcast streams don't replay, but the Riverpod
+  /// provider captures the state globally.
+  void _checkAlreadyAccepted() {
+    final status = ref.read(missionStatusProvider);
+    if (status.hasRescuer) {
+      debugPrint(
+        '✅ EmergencyAlertScreen: RescuerAccepted already cached – navigating immediately',
+      );
+      _navigateToTracking(status.missionId!, status.rescuerId!);
+    }
+  }
+
+  /// Single entry-point for navigating to the tracking screen.
+  /// Guarded by [_navigatedToTracking] to prevent double pushes.
+  void _navigateToTracking(String missionId, String rescuerId) {
+    if (_navigatedToTracking || !mounted) return;
+    _navigatedToTracking = true;
+
+    // Stop the periodic API-refresh to reduce server load while tracking
+    _refreshTimer?.cancel();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('🚑 Đã tìm thấy đội cứu hộ! Đang chuẩn bị tới...'),
+        backgroundColor: Color(0xFF228B22),
+        duration: Duration(seconds: 3),
+      ),
+    );
+
+    // Navigate after a brief moment so the snackbar is visible.
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (!mounted) return;
+      context.pushNamed(
+        'emergency_tracking',
+        extra: {
+          'incidentId': _currentIncident?.id,
+          'missionId': missionId,
+          'rescuerId': rescuerId,
+        },
+      );
+    });
+  }
+
+  /// Called when the session expires without any rescuer accepting.
+  void _handleSessionExpired() {
+    if (!mounted) return;
+
+    debugPrint('⏰ EmergencyAlertScreen: SessionExpired');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          '⏰ Không tìm thấy cứu hộ trong khu vực. Đang mở rộng tìm kiếm...',
+        ),
+        backgroundColor: Color(0xFFFF9800),
+        duration: Duration(seconds: 5),
+      ),
+    );
+    // Trigger a fresh API refresh so the new session appears in the UI
+    _refreshIncidentData();
+  }
+
+  // ─────────────────────────────────────────────────
 
   /// Get current radius from incident data (currentRadiusKm)
   int get _currentRadius {
@@ -170,8 +355,10 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
     if (_currentIncident == null || _currentIncident!.sessions.isEmpty) {
       return 0;
     }
-    return _currentIncident!.sessions
-        .fold(0, (sum, session) => sum + session.rescuersPinged);
+    return _currentIncident!.sessions.fold(
+      0,
+      (sum, session) => sum + session.rescuersPinged,
+    );
   }
 
   /// Get current session number
@@ -194,7 +381,10 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
                 child: SafeArea(
                   bottom: false,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 8,
+                    ),
                     child: Row(
                       children: [
                         IconButton(
@@ -236,7 +426,10 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
               // Emergency Status Banner
               Container(
                 color: const Color(0xFFDC3545),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 child: Row(
                   children: [
                     // Pulsing dot
@@ -306,7 +499,10 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
                                 const SizedBox(width: 8),
                                 const Text(
                                   '•',
-                                  style: TextStyle(color: Colors.white, fontSize: 12),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                  ),
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
@@ -331,171 +527,174 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
 
               // Map Section
               Expanded(
-            child: Stack(
-              children: [
-                // Map Background
-                Container(
-                  color: const Color(0xFFE8F5E9),
-                  child: Center(
-                    child: Icon(
-                      Icons.map,
-                      size: 80,
-                      color: const Color(0xFF228B22).withOpacity(0.2),
+                child: Stack(
+                  children: [
+                    // Map Background
+                    Container(
+                      color: const Color(0xFFE8F5E9),
+                      child: Center(
+                        child: Icon(
+                          Icons.map,
+                          size: 80,
+                          color: const Color(0xFF228B22).withOpacity(0.2),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
 
-                // Radar circles
-                Center(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        width: 300,
-                        height: 300,
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: const Color(0xFF228B22).withOpacity(0.2),
-                          ),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      Container(
-                        width: 200,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: const Color(0xFF228B22).withOpacity(0.3),
-                          ),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      // Radar sweep
-                      RotationTransition(
-                        turns: _radarController,
-                        child: CustomPaint(
-                          size: const Size(250, 250),
-                          painter: RadarSweepPainter(),
-                        ),
-                      ),
-                      // User location
-                      Stack(
+                    // Radar circles
+                    Center(
+                      child: Stack(
                         alignment: Alignment.center,
                         children: [
-                          ScaleTransition(
-                            scale: Tween<double>(begin: 1.0, end: 1.5).animate(
-                              CurvedAnimation(
-                                parent: _pulseController,
-                                curve: Curves.easeOut,
+                          Container(
+                            width: 300,
+                            height: 300,
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: const Color(0xFF228B22).withOpacity(0.2),
                               ),
-                            ),
-                            child: Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF2196F3).withOpacity(0.3),
-                                shape: BoxShape.circle,
-                              ),
+                              shape: BoxShape.circle,
                             ),
                           ),
                           Container(
-                            width: 16,
-                            height: 16,
+                            width: 200,
+                            height: 200,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF2196F3),
-                              shape: BoxShape.circle,
                               border: Border.all(
-                                color: Colors.white,
-                                width: 3,
+                                color: const Color(0xFF228B22).withOpacity(0.3),
                               ),
+                              shape: BoxShape.circle,
                             ),
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Rescuer pins
-                ..._rescuers.map((rescuer) => _buildRescuerPin(rescuer)),
-
-                // Map overlay info
-                Positioned(
-                  bottom: 70,
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.95),
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
+                          // Radar sweep
                           RotationTransition(
                             turns: _radarController,
-                            child: const Icon(
-                              Icons.sync,
-                              color: Color(0xFF228B22),
-                              size: 16,
+                            child: CustomPaint(
+                              size: const Size(250, 250),
+                              painter: RadarSweepPainter(),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _totalRescuersPinged > 0
-                                ? 'Đã ping: $_totalRescuersPinged đội | Bán kính: ${_currentRadius}km'
-                                : 'Đang quét bán kính ${_currentRadius}km...',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF333333),
-                            ),
+                          // User location
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              ScaleTransition(
+                                scale: Tween<double>(begin: 1.0, end: 1.5)
+                                    .animate(
+                                      CurvedAnimation(
+                                        parent: _pulseController,
+                                        curve: Curves.easeOut,
+                                      ),
+                                    ),
+                                child: Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: const Color(
+                                      0xFF2196F3,
+                                    ).withOpacity(0.3),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                width: 16,
+                                height: 16,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2196F3),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 3,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                  ),
-                ),
 
-                // Recenter button
-                Positioned(
-                  bottom: 16,
-                  right: 16,
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+                    // Rescuer pins
+                    ..._rescuers.map((rescuer) => _buildRescuerPin(rescuer)),
+
+                    // Map overlay info
+                    Positioned(
+                      bottom: 70,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.95),
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              RotationTransition(
+                                turns: _radarController,
+                                child: const Icon(
+                                  Icons.sync,
+                                  color: Color(0xFF228B22),
+                                  size: 16,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _totalRescuersPinged > 0
+                                    ? 'Đã ping: $_totalRescuersPinged đội | Bán kính: ${_currentRadius}km'
+                                    : 'Đang quét bán kính ${_currentRadius}km...',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF333333),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
+                      ),
                     ),
-                    child: IconButton(
-                      icon: const Icon(Icons.my_location, size: 20),
-                      onPressed: () {},
+
+                    // Recenter button
+                    Positioned(
+                      bottom: 16,
+                      right: 16,
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.my_location, size: 20),
+                          onPressed: () {},
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
             ],
           ),
 
@@ -510,7 +709,9 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
               return Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.15),
@@ -529,7 +730,8 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
                         top: 40,
                         left: 20,
                         right: 20,
-                        bottom: 320, // Increased to prevent content being hidden by footer
+                        bottom:
+                            320, // Increased to prevent content being hidden by footer
                       ),
                       physics: const ClampingScrollPhysics(),
                       children: [
@@ -564,7 +766,9 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
                       child: Container(
                         decoration: const BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(24),
+                          ),
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         child: Center(
@@ -640,28 +844,22 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
   Widget _buildQuickStats() {
     final rescuersCount = _totalRescuersPinged;
     final radiusKm = _currentRadius;
-    
+
     return Container(
       padding: const EdgeInsets.only(bottom: 12),
       decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Color(0xFFE0E0E0)),
-        ),
+        border: Border(bottom: BorderSide(color: Color(0xFFE0E0E0))),
       ),
       child: Row(
         children: [
           Text(
-            rescuersCount > 0 ? '$rescuersCount đội đã ping' : 'Đang tìm đội cứu hộ',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
+            rescuersCount > 0
+                ? '$rescuersCount đội đã ping'
+                : 'Đang tìm đội cứu hộ',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
           ),
           const SizedBox(width: 12),
-          const CircleAvatar(
-            radius: 2,
-            backgroundColor: Color(0xFFBDBDBD),
-          ),
+          const CircleAvatar(radius: 2, backgroundColor: Color(0xFFBDBDBD)),
           const SizedBox(width: 12),
           const Text(
             'Bán kính: ',
@@ -676,10 +874,7 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
             ),
           ),
           const SizedBox(width: 12),
-          const CircleAvatar(
-            radius: 2,
-            backgroundColor: Color(0xFFBDBDBD),
-          ),
+          const CircleAvatar(radius: 2, backgroundColor: Color(0xFFBDBDBD)),
           const SizedBox(width: 12),
           Text(
             'Vòng $_currentSessionNumber',
@@ -697,7 +892,7 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
   Widget _buildRescuerStatusCard() {
     final rescuersCount = _totalRescuersPinged;
     final hasAssignedRescuer = _currentIncident?.assignedRescuerId != null;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -770,7 +965,7 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          hasAssignedRescuer 
+                          hasAssignedRescuer
                               ? 'Đã tìm thấy đội cứu hộ'
                               : 'Đang tìm đội cứu hộ',
                           style: const TextStyle(
@@ -804,7 +999,7 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
                                 ),
                               ),
                               child: Text(
-                                hasAssignedRescuer 
+                                hasAssignedRescuer
                                     ? 'Đang kết nối...'
                                     : 'Đang chờ phản hồi...',
                                 style: const TextStyle(
@@ -839,10 +1034,7 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
             rescuersCount > 0
                 ? 'Vòng ping $_currentSessionNumber | Bán kính ${_currentRadius}km'
                 : 'Hệ thống đang tìm kiếm đội cứu hộ gần bạn',
-            style: const TextStyle(
-              fontSize: 11,
-              color: Color(0xFF999999),
-            ),
+            style: const TextStyle(fontSize: 11, color: Color(0xFF999999)),
           ),
         ),
       ],
@@ -1000,9 +1192,7 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFFC8E6C9),
-                      ),
+                      border: Border.all(color: const Color(0xFFC8E6C9)),
                     ),
                     child: Center(
                       child: Text(
@@ -1121,9 +1311,7 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Color(0xFFE0E0E0)),
-        ),
+        border: Border(top: BorderSide(color: Color(0xFFE0E0E0))),
         boxShadow: [
           BoxShadow(
             color: Colors.black12,
@@ -1174,7 +1362,7 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
 
               // Dynamic action buttons based on state
               ..._buildActionButtons(),
-              
+
               const SizedBox(height: 8),
 
               // Cancel button
@@ -1184,10 +1372,7 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
                 },
                 child: const Text(
                   'Hủy yêu cầu',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF888888),
-                  ),
+                  style: TextStyle(fontSize: 14, color: Color(0xFF888888)),
                 ),
               ),
             ],
@@ -1213,8 +1398,10 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
           TextButton(
             onPressed: () async {
               // Clear active incident from provider and local storage
-              await ref.read(activeIncidentProvider.notifier).clearActiveIncident();
-              
+              await ref
+                  .read(activeIncidentProvider.notifier)
+                  .clearActiveIncident();
+
               if (mounted) {
                 context.pop(); // Close dialog
                 context.goNamed('member_home'); // Go to member_home
@@ -1248,7 +1435,9 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
             foregroundColor: const Color(0xFF228B22),
             side: const BorderSide(color: Color(0xFF228B22), width: 2),
             padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             minimumSize: const Size(double.infinity, 48),
           ),
           icon: const Icon(Icons.camera_alt),
@@ -1277,7 +1466,9 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
             backgroundColor: const Color(0xFF228B22),
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             minimumSize: const Size(double.infinity, 48),
           ),
           icon: const Icon(Icons.assignment),
@@ -1301,7 +1492,9 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
             foregroundColor: const Color(0xFF228B22),
             side: const BorderSide(color: Color(0xFF228B22), width: 2),
             padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             minimumSize: const Size(double.infinity, 48),
           ),
           icon: const Icon(Icons.healing),
@@ -1328,7 +1521,9 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
             backgroundColor: const Color(0xFF228B22),
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             minimumSize: const Size(double.infinity, 48),
           ),
           icon: const Icon(Icons.healing),
@@ -1352,7 +1547,9 @@ class _EmergencyAlertScreenState extends ConsumerState<EmergencyAlertScreen>
             foregroundColor: const Color(0xFF228B22),
             side: const BorderSide(color: Color(0xFF228B22), width: 2),
             padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             minimumSize: const Size(double.infinity, 48),
           ),
           icon: const Icon(Icons.assignment),
@@ -1371,17 +1568,20 @@ class RadarSweepPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..shader = SweepGradient(
-        colors: [
-          const Color(0xFF228B22).withOpacity(0.0),
-          const Color(0xFF228B22).withOpacity(0.1),
-          const Color(0xFF228B22).withOpacity(0.4),
-        ],
-        stops: const [0.0, 0.7, 1.0],
-      ).createShader(Rect.fromCircle(
-        center: Offset(size.width / 2, size.height / 2),
-        radius: size.width / 2,
-      ));
+      ..shader =
+          SweepGradient(
+            colors: [
+              const Color(0xFF228B22).withOpacity(0.0),
+              const Color(0xFF228B22).withOpacity(0.1),
+              const Color(0xFF228B22).withOpacity(0.4),
+            ],
+            stops: const [0.0, 0.7, 1.0],
+          ).createShader(
+            Rect.fromCircle(
+              center: Offset(size.width / 2, size.height / 2),
+              radius: size.width / 2,
+            ),
+          );
 
     canvas.drawCircle(
       Offset(size.width / 2, size.height / 2),

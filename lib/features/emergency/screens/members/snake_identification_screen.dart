@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:camera/camera.dart';
+import 'package:wechat_assets_picker/wechat_assets_picker.dart';
 import 'dart:io';
 import 'snake_identification_result_screen.dart';
 import '../../../shared/widgets/custom_dialog.dart';
@@ -13,7 +13,7 @@ import '../../repository/snake_ai_repository.dart';
 /// Snake Identification Screen - Camera and image upload for snake identification
 class SnakeIdentificationScreen extends ConsumerStatefulWidget {
   final IncidentData? incident;
-  
+
   const SnakeIdentificationScreen({super.key, this.incident});
 
   @override
@@ -21,8 +21,8 @@ class SnakeIdentificationScreen extends ConsumerStatefulWidget {
       _SnakeIdentificationScreenState();
 }
 
-class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationScreen> {
-  final ImagePicker _picker = ImagePicker();
+class _SnakeIdentificationScreenState
+    extends ConsumerState<SnakeIdentificationScreen> {
   bool _flashOn = false;
   File? _selectedImage;
   CameraController? _cameraController;
@@ -32,13 +32,13 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
   @override
   void initState() {
     super.initState();
-    
+
     if (widget.incident != null) {
       debugPrint('📸 Snake ID Screen - Incident ID: ${widget.incident!.id}');
     } else {
       debugPrint('⚠️ Snake ID Screen - No incident data');
     }
-    
+
     _initializeCamera();
   }
 
@@ -52,14 +52,14 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
     try {
       // Request camera permission
       final status = await Permission.camera.request();
-      
+
       if (status.isDenied || status.isPermanentlyDenied) {
         return;
       }
 
       // Get available cameras
       _cameras = await availableCameras();
-      
+
       if (_cameras == null || _cameras!.isEmpty) {
         return;
       }
@@ -85,7 +85,8 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
 
   Future<void> _takePicture() async {
     try {
-      if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      if (_cameraController == null ||
+          !_cameraController!.value.isInitialized) {
         _showError('Camera chưa sẵn sàng');
         return;
       }
@@ -104,38 +105,54 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
 
   Future<void> _pickImage() async {
     try {
-      // Request storage permission
-      final status = await Permission.photos.request();
-      
-      if (status.isDenied) {
-        _showError('Cần cấp quyền truy cập ảnh');
-        return;
-      }
-      
-      if (status.isPermanentlyDenied) {
-        _showPermissionDialog();
+      // Request photo permission
+      final PermissionState permissionState =
+          await PhotoManager.requestPermissionExtend();
+
+      if (permissionState != PermissionState.authorized &&
+          permissionState != PermissionState.limited) {
+        _showPermissionModal();
         return;
       }
 
-      final XFile? image = await _picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 85,
+      // Show asset picker with custom UI (bottom sheet style)
+      final List<AssetEntity>? assets = await AssetPicker.pickAssets(
+        context,
+        pickerConfig: AssetPickerConfig(
+          maxAssets: 1,
+          requestType: RequestType.image,
+          specialPickerType: SpecialPickerType.noPreview,
+          themeColor: const Color(0xFF228B22),
+          textDelegate: const AssetPickerTextDelegate(),
+        ),
       );
 
-      if (image != null) {
-        setState(() {
-          _selectedImage = File(image.path);
-        });
-        _processImage();
+      if (assets != null && assets.isNotEmpty) {
+        // Convert AssetEntity to File
+        final File? file = await assets.first.file;
+
+        if (file != null) {
+          setState(() {
+            _selectedImage = file;
+          });
+          _processImage();
+        }
       }
     } catch (e) {
-      _showError('Không thể chọn ảnh: $e');
+      debugPrint('⚠️ Error picking image: $e');
+      // If permission is needed, show modal
+      if (e.toString().contains('permission') ||
+          e.toString().contains('denied')) {
+        _showPermissionModal();
+      } else {
+        _showError('Không thể chọn ảnh: $e');
+      }
     }
   }
 
   void _processImage() async {
     if (_selectedImage == null) return;
-    
+
     // Check if we have incident data
     if (widget.incident == null) {
       _showError('Không tìm thấy thông tin yêu cầu SOS');
@@ -177,17 +194,22 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
         // Close loading dialog
         Navigator.pop(context);
 
-        // Navigate to results
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => SnakeIdentificationResultScreen(
-              snakeImage: _selectedImage!,
-              detectionData: detectionResponse.data!,
-              incident: widget.incident!,
-            ),
-          ),
-        );
+        // Wait for Navigator to unlock before pushing new route
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            // Use push instead of pushReplacement for page-based routes
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SnakeIdentificationResultScreen(
+                  snakeImage: _selectedImage!,
+                  detectionData: detectionResponse.data!,
+                  incident: widget.incident!,
+                ),
+              ),
+            );
+          }
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -225,30 +247,115 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
     );
   }
 
-  void _showPermissionDialog() {
-    showDialog(
+  void _showPermissionModal() {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cần cấp quyền'),
-        content: const Text(
-          'Ứng dụng cần quyền truy cập camera và ảnh để nhận diện rắn. Vui lòng cấp quyền trong Cài đặt.',
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => context.pop(),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              context.pop();
-              openAppSettings();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF228B22),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-            child: const Text('Mở Cài đặt'),
-          ),
-        ],
+            const SizedBox(height: 24),
+            // Icon
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3E0),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.photo_library_outlined,
+                size: 36,
+                color: Color(0xFFFF9800),
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Title
+            const Text(
+              'Cần quyền truy cập bộ nhớ',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A1A1A),
+              ),
+            ),
+            const SizedBox(height: 10),
+            // Description
+            const Text(
+              'Để chọn ảnh từ thư viện, ứng dụng cần được cấp quyền truy cập bộ nhớ. Nhấn "Mở Cài đặt" để cấp quyền ngay.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Color(0xFF666666),
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 28),
+            // Open Settings button
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  openAppSettings();
+                },
+                icon: const Icon(Icons.settings_outlined, size: 20),
+                label: const Text(
+                  'Mở Cài đặt',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF228B22),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Cancel button
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                style: TextButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: Color(0xFFE0E0E0)),
+                  ),
+                ),
+                child: const Text(
+                  'Để sau',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF666666),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -261,7 +368,8 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
         iconBackgroundColor: const Color(0xFFFFF3E0),
         iconColor: const Color(0xFFFF9800),
         title: 'Không có ảnh rắn?',
-        description: 'Bạn có thể chọn rắn theo vị trí hoặc liên hệ với chuyên gia để được tư vấn trực tiếp.',
+        description:
+            'Bạn có thể chọn rắn theo vị trí hoặc liên hệ với chuyên gia để được tư vấn trực tiếp.',
         actions: [
           DialogAction(
             label: 'Đóng',
@@ -274,9 +382,7 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
               context.pop();
               context.goNamed(
                 'snake_selection_by_location',
-                extra: {
-                  'incident': widget.incident,
-                },
+                extra: {'incident': widget.incident},
               );
             },
             backgroundColor: const Color(0xFF228B22),
@@ -350,10 +456,7 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          '⚠️ ',
-                          style: TextStyle(fontSize: 16),
-                        ),
+                        Text('⚠️ ', style: TextStyle(fontSize: 16)),
                         Text(
                           'Giữ khoảng cách an toàn - KHÔNG đến gần rắn',
                           style: TextStyle(
@@ -376,11 +479,9 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
                         children: [
                           // Camera preview or captured image
                           if (_selectedImage != null)
-                            Image.file(
-                              _selectedImage!,
-                              fit: BoxFit.cover,
-                            )
-                          else if (_isCameraInitialized && _cameraController != null)
+                            Image.file(_selectedImage!, fit: BoxFit.cover)
+                          else if (_isCameraInitialized &&
+                              _cameraController != null)
                             CameraPreview(_cameraController!)
                           else
                             Container(
@@ -391,10 +492,10 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
                                 ),
                               ),
                             ),
-                          
+
                           // Corner brackets overlay
                           ..._buildCornerBrackets(),
-                          
+
                           // Center guide text (only show when camera is active)
                           if (_selectedImage == null && _isCameraInitialized)
                             const Center(
@@ -405,10 +506,7 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
                                   fontSize: 16,
                                   fontWeight: FontWeight.w500,
                                   shadows: [
-                                    Shadow(
-                                      color: Colors.black,
-                                      blurRadius: 8,
-                                    ),
+                                    Shadow(color: Colors.black, blurRadius: 8),
                                   ],
                                 ),
                                 textAlign: TextAlign.center,
@@ -458,7 +556,10 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
               child: SafeArea(
                 top: false,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 20,
+                  ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -564,9 +665,7 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
               top: BorderSide(color: bracketColor, width: bracketWidth),
               left: BorderSide(color: bracketColor, width: bracketWidth),
             ),
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(8),
-            ),
+            borderRadius: BorderRadius.only(topLeft: Radius.circular(8)),
           ),
         ),
       ),
@@ -582,9 +681,7 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
               top: BorderSide(color: bracketColor, width: bracketWidth),
               right: BorderSide(color: bracketColor, width: bracketWidth),
             ),
-            borderRadius: BorderRadius.only(
-              topRight: Radius.circular(8),
-            ),
+            borderRadius: BorderRadius.only(topRight: Radius.circular(8)),
           ),
         ),
       ),
@@ -600,9 +697,7 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
               bottom: BorderSide(color: bracketColor, width: bracketWidth),
               left: BorderSide(color: bracketColor, width: bracketWidth),
             ),
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(8),
-            ),
+            borderRadius: BorderRadius.only(bottomLeft: Radius.circular(8)),
           ),
         ),
       ),
@@ -618,9 +713,7 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
               bottom: BorderSide(color: bracketColor, width: bracketWidth),
               right: BorderSide(color: bracketColor, width: bracketWidth),
             ),
-            borderRadius: BorderRadius.only(
-              bottomRight: Radius.circular(8),
-            ),
+            borderRadius: BorderRadius.only(bottomRight: Radius.circular(8)),
           ),
         ),
       ),
@@ -635,18 +728,12 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
         children: [
           const Text(
             '• ',
-            style: TextStyle(
-              color: Color(0xFFE0E0E0),
-              fontSize: 13,
-            ),
+            style: TextStyle(color: Color(0xFFE0E0E0), fontSize: 13),
           ),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
-                color: Color(0xFFE0E0E0),
-                fontSize: 13,
-              ),
+              style: const TextStyle(color: Color(0xFFE0E0E0), fontSize: 13),
             ),
           ),
         ],
@@ -667,17 +754,10 @@ class _SnakeIdentificationScreenState extends ConsumerState<SnakeIdentificationS
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              border: Border.all(
-                color: const Color(0xFFBDBDBD),
-                width: 2,
-              ),
+              border: Border.all(color: const Color(0xFFBDBDBD), width: 2),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              icon,
-              color: const Color(0xFF333333),
-              size: 24,
-            ),
+            child: Icon(icon, color: const Color(0xFF333333), size: 24),
           ),
           const SizedBox(height: 4),
           Text(
@@ -816,10 +896,7 @@ class _AnalyzingLoadingDialogState extends State<AnalyzingLoadingDialog>
                 height: 60,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: const Color(0xFFE5E7EB),
-                    width: 4,
-                  ),
+                  border: Border.all(color: const Color(0xFFE5E7EB), width: 4),
                 ),
                 child: Stack(
                   children: [
@@ -843,7 +920,7 @@ class _AnalyzingLoadingDialogState extends State<AnalyzingLoadingDialog>
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Processing text
             Text(
               _steps[_currentStep],
@@ -855,7 +932,7 @@ class _AnalyzingLoadingDialogState extends State<AnalyzingLoadingDialog>
               ),
             ),
             const SizedBox(height: 12),
-            
+
             // Progress indicator
             Row(
               mainAxisAlignment: MainAxisAlignment.center,

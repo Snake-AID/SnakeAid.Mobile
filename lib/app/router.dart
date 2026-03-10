@@ -26,13 +26,12 @@ import 'package:snakeaid_mobile/features/emergency/screens/members/snake_selecti
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_identification_questions_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_filtered_results_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_confirmation_screen.dart';
-import 'package:snakeaid_mobile/features/emergency/screens/members/generic_first_aid_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/first_aid_steps_screen.dart';
-import 'package:snakeaid_mobile/features/emergency/models/snake_detection_response.dart';
 import 'package:snakeaid_mobile/features/emergency/models/sos_incident_response.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/symptom_report_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/severity_assessment_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_tracking_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/members/member_incident_detail_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/rescuer_arrived_screen.dart'
     as member_screens;
 import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_service_completion_screen.dart';
@@ -60,11 +59,8 @@ import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_history_detail_
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_income_management_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_feedback_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_id_documents_screen.dart';
-import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_sos_detail_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_mission_detail_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_navigation_screen.dart';
-import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_arrived_screen.dart'
-    as rescuer_screens;
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_support_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/find_hospital_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/mission_completion_screen.dart';
@@ -395,12 +391,6 @@ final router = GoRouter(
       builder: (context, state) => const RescuerIdDocumentsScreen(),
     ),
 
-    // Rescuer Emergency/SOS Routes
-    GoRoute(
-      path: '/rescuer-sos-detail',
-      name: 'rescuer_sos_detail',
-      builder: (context, state) => const RescuerSosDetailScreen(),
-    ),
     GoRoute(
       path: '/rescuer/mission-detail/:missionId',
       name: 'rescuer_mission_detail',
@@ -420,11 +410,6 @@ final router = GoRouter(
           routeData: data['routeData'] as RouteNavigationData?,
         );
       },
-    ),
-    GoRoute(
-      path: '/rescuer/arrived',
-      name: 'rescuer_arrived',
-      builder: (context, state) => const rescuer_screens.RescuerArrivedScreen(),
     ),
     GoRoute(
       path: '/rescuer/support',
@@ -528,20 +513,11 @@ final router = GoRouter(
       },
     ),
     GoRoute(
-      path: '/generic-first-aid',
-      name: 'generic_first_aid',
-      builder: (context, state) => const GenericFirstAidScreen(),
-    ),
-    GoRoute(
       path: '/first-aid-steps',
       name: 'first_aid_steps',
       builder: (context, state) {
         final data = state.extra as Map<String, dynamic>;
-        return FirstAidStepsScreen(
-          detectionResult: data['detectionResult'] as DetectionResult?,
-          incident: data['incident'] as IncidentData,
-          recognitionResultId: data['recognitionResultId'] as String,
-        );
+        return FirstAidStepsScreen(incident: data['incident'] as IncidentData);
       },
     ),
     GoRoute(
@@ -561,9 +537,7 @@ final router = GoRouter(
       builder: (context, state) {
         final data = state.extra as Map<String, dynamic>?;
         return SeverityAssessmentScreen(
-          severityLevel: data?['severityLevel'] as int? ?? 0,
-          symptomsReport: data?['symptomsReport'] as List<String>? ?? [],
-          timeSinceBite: data?['timeSinceBite'] as String? ?? '15 phút',
+          incidentId: data?['incidentId'] as String? ?? '',
           recognitionResultId: data?['recognitionResultId'] as String?,
         );
       },
@@ -571,7 +545,37 @@ final router = GoRouter(
     GoRoute(
       path: '/emergency-tracking',
       name: 'emergency_tracking',
-      builder: (context, state) => const EmergencyTrackingScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return EmergencyTrackingScreen(
+          incidentId: extra?['incidentId'] as String?,
+          missionId: extra?['missionId'] as String?,
+          rescuerId: extra?['rescuerId'] as String?,
+        );
+      },
+      routes: [
+        // Spoke screen: Snake identification via camera
+        GoRoute(
+          path: 'snake-identification',
+          name: 'emergency_snake_identification',
+          builder: (context, state) {
+            final data = state.extra as Map<String, dynamic>?;
+            return SnakeIdentificationScreen(
+              incident: data?['incident'] as IncidentData?,
+            );
+          },
+        ),
+        // Spoke screen: Incident detail view
+        GoRoute(
+          path: 'incident-detail',
+          name: 'emergency_incident_detail',
+          builder: (context, state) {
+            final data = state.extra as Map<String, dynamic>?;
+            final incidentId = data?['incidentId'] as String?;
+            return MemberIncidentDetailScreen(incidentId: incidentId ?? '');
+          },
+        ),
+      ],
     ),
     GoRoute(
       path: '/member-rescuer-arrived',

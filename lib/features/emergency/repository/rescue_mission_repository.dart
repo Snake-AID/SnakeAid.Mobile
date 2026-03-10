@@ -5,6 +5,8 @@ import '../../../core/providers/http_provider.dart';
 import '../../../core/services/http_service.dart';
 import '../models/rescue_mission_response.dart';
 import '../models/report_media_response.dart';
+import '../models/report_tranfer_hospital_request.dart';
+import '../models/hospital_transfer_pricing_response.dart';
 
 /// Provider for RescueMissionRepository
 final rescueMissionRepositoryProvider = Provider<RescueMissionRepository>((
@@ -230,6 +232,63 @@ class RescueMissionRepository {
     } catch (e) {
       debugPrint('❌ Unexpected error: $e');
       throw Exception('Lỗi khi hủy nhiệm vụ');
+    }
+  }
+
+  /// Report hospital transfer and get pricing
+  ///
+  /// Gọi API PATCH /api/rescue-missions/{missionId}/hospital-transfer
+  /// Returns pricing calculation including hospital transfer fee
+  Future<HospitalTransferPricingResponse> reportTranferToHospital({
+    required String missionId,
+    required int hospitalId,
+    required double distanceToHospitalKm,
+    String? note,
+  }) async {
+    try {
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint('🏥 Reporting transfer to hospital: $missionId');
+      debugPrint('   Hospital ID: $hospitalId');
+      debugPrint('   Distance: $distanceToHospitalKm km');
+      if (note != null) {
+        debugPrint('   Note: $note');
+      }
+
+      final request = ReportTranferHospitalRequest(
+        hospitalId: hospitalId,
+        distanceToHospitalKm: distanceToHospitalKm,
+        note: note,
+      );
+
+      final response = await httpService.patch(
+        '/api/rescue-missions/$missionId/hospital-transfer',
+        data: request.toJson(),
+      );
+
+      debugPrint('response: ${response.data}');
+
+      final pricingResponse = HospitalTransferPricingApiResponse.fromJson(
+        response.data,
+      );
+
+      if (!pricingResponse.isSuccess || pricingResponse.data == null) {
+        throw Exception(pricingResponse.message);
+      }
+
+      debugPrint('✅ Hospital transfer reported');
+      debugPrint('   Hospital: ${pricingResponse.data!.hospitalName}');
+      debugPrint(
+        '   Transfer price: ${pricingResponse.data!.hospitalTransferPrice}',
+      );
+      debugPrint('   Total price: ${pricingResponse.data!.totalPrice}');
+
+      return pricingResponse.data!;
+    } on DioException catch (e) {
+      debugPrint('❌ Report hospital transfer failed: ${e.message}');
+      throw _handleError(e);
+    } catch (e) {
+      debugPrint('❌ Unexpected error: $e');
+      throw Exception('Lỗi khi báo cáo chuyển viện');
     }
   }
 

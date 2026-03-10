@@ -11,11 +11,7 @@ class ActiveIncidentState {
   final bool isLoading;
   final String? error;
 
-  ActiveIncidentState({
-    this.incident,
-    this.isLoading = false,
-    this.error,
-  });
+  ActiveIncidentState({this.incident, this.isLoading = false, this.error});
 
   ActiveIncidentState copyWith({
     IncidentData? incident,
@@ -40,9 +36,21 @@ class ActiveIncidentNotifier extends StateNotifier<ActiveIncidentState> {
   static const String _activeIncidentKey = 'active_sos_incident';
   static const String _activeIncidentIdKey = 'active_sos_incident_id';
 
-  ActiveIncidentNotifier({
-    required this.incidentRepository,
-  }) : super(ActiveIncidentState()) {
+  /// Statuses that mean the incident is over and should NOT be cached.
+  static const _terminalStatuses = {
+    'Completed',
+    'Cancelled',
+    'Finished',
+    'Expired',
+    'NoRescuerFound',
+    'Paid',
+    'Disputed',
+  };
+
+  static bool _isTerminal(String status) => _terminalStatuses.contains(status);
+
+  ActiveIncidentNotifier({required this.incidentRepository})
+    : super(ActiveIncidentState()) {
     _loadActiveIncident();
   }
 
@@ -55,19 +63,26 @@ class ActiveIncidentNotifier extends StateNotifier<ActiveIncidentState> {
       if (incidentJson != null) {
         final incidentMap = jsonDecode(incidentJson) as Map<String, dynamic>;
         final incident = IncidentData.fromJson(incidentMap);
-        
+
         debugPrint('📋 Found cached incident: ${incident.id}');
-        
+
         // Verify incident still exists on server
         try {
           final response = await incidentRepository.getIncident(incident.id);
-          
+
           if (response.isSuccess && response.data != null) {
             // Incident exists on server - update with latest data
             final serverIncident = response.data!;
-            await saveActiveIncident(serverIncident);
-            debugPrint('✅ Incident verified and updated from server');
-            debugPrint('📋 Status: ${serverIncident.status}');
+            if (_isTerminal(serverIncident.status)) {
+              debugPrint(
+                '🏁 Cached incident is terminal (${serverIncident.status}) – auto-clearing',
+              );
+              await clearActiveIncident();
+            } else {
+              await saveActiveIncident(serverIncident);
+              debugPrint('✅ Incident verified and updated from server');
+              debugPrint('📋 Status: ${serverIncident.status}');
+            }
           } else {
             // Incident not found on server - clear local storage
             debugPrint('⚠️ Incident not found on server (deleted/expired)');
@@ -76,7 +91,7 @@ class ActiveIncidentNotifier extends StateNotifier<ActiveIncidentState> {
           }
         } catch (e) {
           final errorMsg = e.toString();
-          
+
           // Check if this is a 404 or other error indicating incident doesn't exist
           if (errorMsg.contains('Không tìm thấy thông tin yêu cầu') ||
               errorMsg.contains('404')) {
@@ -84,8 +99,8 @@ class ActiveIncidentNotifier extends StateNotifier<ActiveIncidentState> {
             debugPrint('🗑️ Incident deleted on server - clearing local cache');
             await clearActiveIncident();
           } else if (errorMsg.contains('Không thể kết nối') ||
-                     errorMsg.contains('timeout') ||
-                     errorMsg.contains('network')) {
+              errorMsg.contains('timeout') ||
+              errorMsg.contains('network')) {
             // Network error - keep cached data temporarily
             debugPrint('⚠️ Network error, cannot verify incident: $e');
             debugPrint('📋 Using cached data temporarily');
@@ -105,8 +120,17 @@ class ActiveIncidentNotifier extends StateNotifier<ActiveIncidentState> {
     }
   }
 
-  /// Save active incident to local storage
+  /// Save active incident to local storage.
+  /// Terminal-status incidents are auto-cleared instead of saved.
   Future<void> saveActiveIncident(IncidentData incident) async {
+    if (_isTerminal(incident.status)) {
+      debugPrint(
+        '🏁 saveActiveIncident: terminal status (${incident.status}) – clearing instead of saving',
+      );
+      await clearActiveIncident();
+      return;
+    }
+
     try {
       final prefs = await SharedPreferences.getInstance();
 
@@ -199,7 +223,7 @@ class ActiveIncidentNotifier extends StateNotifier<ActiveIncidentState> {
 
     try {
       final response = await incidentRepository.getIncident(state.incident!.id);
-      
+
       if (response.isSuccess && response.data != null) {
         // Update with latest data
         await saveActiveIncident(response.data!);
@@ -218,7 +242,8 @@ class ActiveIncidentNotifier extends StateNotifier<ActiveIncidentState> {
 }
 
 /// Provider for Active Incident
-final activeIncidentProvider = StateNotifierProvider<ActiveIncidentNotifier, ActiveIncidentState>((ref) {
-  final incidentRepository = ref.watch(incidentRepositoryProvider);
-  return ActiveIncidentNotifier(incidentRepository: incidentRepository);
-});
+final activeIncidentProvider =
+    StateNotifierProvider<ActiveIncidentNotifier, ActiveIncidentState>((ref) {
+      final incidentRepository = ref.watch(incidentRepositoryProvider);
+      return ActiveIncidentNotifier(incidentRepository: incidentRepository);
+    });

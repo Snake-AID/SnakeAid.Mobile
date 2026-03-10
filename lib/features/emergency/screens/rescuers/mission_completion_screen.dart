@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import '../../repository/media_repository.dart';
 import '../../providers/mission_detail_provider.dart';
+import '../../providers/mission_hub_provider.dart';
+import '../../providers/active_mission_provider.dart';
+import '../../providers/rescuer_emergency_provider.dart';
+import '../../../rescuer/providers/tracking_provider.dart';
 
 class MissionCompletionScreen extends ConsumerStatefulWidget {
   final String missionId;
@@ -101,7 +106,8 @@ class _MissionCompletionScreenState
 
       // Upload each evidence photo
       for (int i = 0; i < _evidenceImages.length; i++) {
-        final newStatus = 'Đang upload ảnh ${i + 1}/${_evidenceImages.length}...';
+        final newStatus =
+            'Đang upload ảnh ${i + 1}/${_evidenceImages.length}...';
         setState(() {
           _uploadStatus = newStatus;
         });
@@ -159,6 +165,37 @@ class _MissionCompletionScreenState
       _dialogSetState = null;
 
       if (success) {
+        // Clean up: stop mission GPS and disconnect MissionHub so the rescuer
+        // can receive new SOS requests immediately after this mission ends.
+        ref.read(locationManagerProvider).stopMissionTracking();
+        await ref.read(missionHubConnectionProvider.notifier).disconnect();
+
+        // Clear active mission from provider and local storage
+        await ref.read(activeMissionProvider.notifier).clearActiveMission();
+        debugPrint('✅ Active mission cleared after completion');
+
+        // 🔄 RECONNECT to RescuerHub (resume receiving new rescue requests)
+        debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        debugPrint('🔄 Reconnecting to RescuerHub...');
+        debugPrint('   Reason: Mission completed, ready for new requests');
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final rescuerId = prefs.getString('user_id');
+          if (rescuerId != null) {
+            // Restart idle tracking so this rescuer is discoverable for new missions
+            await ref.read(locationManagerProvider).startTracking(rescuerId);
+            debugPrint('✅ Restarted idle tracking after mission completion');
+
+            // Reconnect to RescuerHub to receive new rescue requests
+            await ref.read(rescueModeProvider.notifier).startRescueMode(rescuerId);
+            debugPrint('✅ Reconnected to RescuerHub successfully');
+          }
+        } catch (e) {
+          debugPrint('⚠️ Failed to reconnect RescuerHub: $e');
+          // Not critical - rescuer can manually toggle rescue mode
+        }
+        debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
         // Success! Navigate to success screen
         context.go('/rescuer/mission-success');
       } else {
@@ -176,6 +213,22 @@ class _MissionCompletionScreenState
         setState(() {
           _isUploading = false;
         });
+
+        // Always clean up hub/GPS on failure too, so the rescuer isn't stuck.
+        ref.read(locationManagerProvider).stopMissionTracking();
+        await ref.read(missionHubConnectionProvider.notifier).disconnect();
+
+        // Restart idle tracking so this rescuer is discoverable for new missions
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final rescuerId = prefs.getString('user_id');
+          if (rescuerId != null) {
+            await ref.read(locationManagerProvider).startTracking(rescuerId);
+            debugPrint('✅ Restarted idle tracking after mission failure');
+          }
+        } catch (e) {
+          debugPrint('⚠️ Failed to restart idle tracking: $e');
+        }
 
         // Close progress dialog and clear dialogSetState
         if (Navigator.canPop(context)) {
@@ -300,7 +353,7 @@ class _MissionCompletionScreenState
               builder: (context, setDialogState) {
                 // Store the setDialogState so we can call it from _uploadAndComplete
                 _dialogSetState = setDialogState;
-                
+
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -319,7 +372,10 @@ class _MissionCompletionScreenState
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
                           '$_uploadedCount/${_evidenceImages.length} ảnh',
-                          style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
                         ),
                       ),
                   ],

@@ -449,32 +449,29 @@ class RescuerSignalRService {
     }
   }
 
-  /// Update rescuer's current location
+  /// Update rescuer idle location (Scenario 1 – RescuerHub)
   ///
-  /// Calls backend to update location and notify system
-  Future<void> updateLocation(
-    String userId,
-    double latitude,
-    double longitude,
-  ) async {
+  /// Backend method signature: `UpdateLocation(double latitude, double longitude)`
+  /// The user identity is taken from JWT – no userId argument needed.
+  /// Used for PostGIS radius search when a new SOS incident occurs.
+  /// Frequency guideline: every 30-60 s or after 25 m movement.
+  Future<void> updateLocation(double latitude, double longitude) async {
     if (_hubConnection == null || !isConnected) {
-      debugPrint('⚠️ Cannot update location: Not connected');
+      debugPrint('⚠️ Cannot update idle location: Not connected');
       return;
     }
 
     try {
-      debugPrint('📍 Updating location...');
-      debugPrint('   User: $userId');
-      debugPrint('   Lat: $latitude, Lng: $longitude');
+      debugPrint('📍 [Idle] Updating location → $latitude, $longitude');
 
       await _hubConnection!.invoke(
         'UpdateLocation',
-        args: <Object>[userId, latitude, longitude],
+        args: <Object>[latitude, longitude],
       );
 
-      debugPrint('✅ Location updated successfully');
+      debugPrint('✅ Idle location sent to RescuerHub');
     } catch (e) {
-      debugPrint('❌ Failed to update location: $e');
+      debugPrint('❌ Failed to update idle location: $e');
     }
   }
 

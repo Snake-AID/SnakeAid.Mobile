@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'rescuer_profile_screen.dart';
 import 'rescuer_income_management_screen.dart';
 import '../../emergency/providers/rescuer_emergency_provider.dart';
+import '../../emergency/providers/mission_hub_provider.dart';
+import '../../emergency/providers/active_mission_provider.dart';
 import '../../emergency/widgets/rescue_request_modal.dart';
+import '../managers/location_manager.dart';
+import '../providers/tracking_provider.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_available_jobs_screen.dart';
 
 /// Rescuer Home Screen - Dashboard for rescue team members
@@ -41,6 +46,18 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
 
       next.whenData((request) {
         debugPrint('🚨 [GLOBAL] NEW RESCUE REQUEST: ${request.requestId}');
+
+        // Ignore new requests if rescuer is already in an active mission
+        final inActiveMission = ref
+            .read(missionHubConnectionProvider)
+            .isConnected;
+        if (inActiveMission) {
+          debugPrint(
+            '⚠️ [GLOBAL] Ignoring new request – rescuer is in active mission',
+          );
+          return;
+        }
+
         ref.read(activeRescueRequestProvider.notifier).setRequest(request);
         _showEmergencyAlert(request);
       });
@@ -262,6 +279,9 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
       // Stop rescue mode
       await ref.read(rescueModeProvider.notifier).stopRescueMode();
 
+      // Stop idle location tracking
+      ref.read(locationManagerProvider).stopTracking();
+
       setState(() {
         _isOnline = false;
       });
@@ -275,11 +295,25 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
         );
       }
     } else {
-      // Start rescue mode
+      // ── Kiểm tra GPS trước khi bật ─────────────────────────────────────
+      final gpsResult = await ref.read(locationManagerProvider).checkGpsReady();
+
+      if (!mounted) return;
+
+      if (gpsResult != GpsCheckResult.ready) {
+        await _showGpsRequiredDialog(gpsResult);
+        return; // Không tiếp tục bật nếu GPS chưa sẵn sàng
+      }
+
+      // ── GPS OK, bật chế độ cứu hộ ────────────────────────────────────
       try {
         await ref
             .read(rescueModeProvider.notifier)
             .startRescueMode(_rescuerId!);
+
+        // Start idle location tracking so the backend can find this
+        // rescuer during PostGIS radius searches
+        await ref.read(locationManagerProvider).startTracking(_rescuerId!);
 
         setState(() {
           _isOnline = true;
@@ -306,11 +340,96 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
     }
   }
 
+  /// Hiển dialog yêu cầu bật GPS tương ứng với từng lý do thất bại.
+  Future<void> _showGpsRequiredDialog(GpsCheckResult reason) async {
+    String title;
+    String message;
+    String confirmLabel;
+    VoidCallback? onConfirm;
+
+    switch (reason) {
+      case GpsCheckResult.serviceDisabled:
+        title = 'GPS đang tắt';
+        message =
+            'Chế độ cứu hộ yêu cầu GPS được bật để hệ thống có thể xác định vị trí của bạn và gửi yêu cầu cứu hộ gần nhất.';
+        confirmLabel = 'Mở Cài Đặt Vị Trí';
+        onConfirm = () async {
+          Navigator.of(context).pop();
+          await Geolocator.openLocationSettings();
+        };
+      case GpsCheckResult.permissionDenied:
+        title = 'Thiếu quyền truy cập vị trí';
+        message =
+            'Ứng dụng cần quyền truy cập vị trí để hoạt động. Vui lòng cấp quyền và thử lại.';
+        confirmLabel = 'Thử Lại';
+        onConfirm = () {
+          Navigator.of(context).pop();
+          // Gọi lại – Geolocator sẽ hiển dialog xin quyền
+          _toggleRescueMode();
+        };
+      case GpsCheckResult.permissionDeniedForever:
+        title = 'Quyền bị từ chối vĩnh viễn';
+        message =
+            'Quyền vị trí đã bị tắt vĩnh viễn. Vui lòng vào Cài đặt ứng dụng → Quyền → Vị trí để bật lại.';
+        confirmLabel = 'Mở Cài Đặt Ứng Dụng';
+        onConfirm = () async {
+          Navigator.of(context).pop();
+          await Geolocator.openAppSettings();
+        };
+      case GpsCheckResult.ready:
+        return; // Không xảy ra
+    }
+
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.location_off, color: Color(0xFFDC3545), size: 24),
+            const SizedBox(width: 8),
+            Text(title, style: const TextStyle(fontSize: 16)),
+          ],
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(fontSize: 14, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text(
+              'Không, để sau',
+              style: TextStyle(color: Color(0xFF999999)),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: onConfirm,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF6B35),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Watch rescue mode state
     final rescueModeState = ref.watch(rescueModeProvider);
     _isOnline = rescueModeState.isActive && rescueModeState.isConnected;
+
+    // Watch active mission state
+    final activeMissionState = ref.watch(activeMissionProvider);
+    final hasActiveMission = activeMissionState.hasActiveMission;
 
     return SafeArea(
       child: Stack(
@@ -389,6 +508,10 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // ═══ Active Mission Recovery Banner ═══════════════════
+                      if (hasActiveMission) _buildActiveMissionBanner(),
+                      if (hasActiveMission) const SizedBox(height: 16),
+
                       // Status Card
                       _buildStatusCard(),
                       const SizedBox(height: 24),
@@ -489,6 +612,112 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
         ],
       ),
     );
+  }
+
+  Widget _buildActiveMissionBanner() {
+    final mission = ref.watch(activeMissionProvider).mission;
+    if (mission == null) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFF6B35), Color(0xFFFF8C5A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF6B35).withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Nhiệm Vụ Đang Hoạt Động',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Bạn có nhiệm vụ cần tiếp tục',
+                      style: TextStyle(fontSize: 13, color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _navigateToActiveMission,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFFFF6B35),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Quay Lại Nhiệm Vụ',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Navigate to active mission
+  Future<void> _navigateToActiveMission() async {
+    final mission = ref.read(activeMissionProvider).mission;
+
+    if (mission == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không tìm thấy thông tin nhiệm vụ'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Navigate to mission detail
+    context.push('/rescuer/mission-detail/${mission.missionId}');
   }
 
   Widget _buildStatusCard() {

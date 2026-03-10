@@ -30,9 +30,9 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     super.initState();
     _loadRequests();
     // Auto-refresh every 10 seconds
-    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      _silentRefresh();
-    });
+    // _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    //   _silentRefresh();
+    // });
   }
 
   @override
@@ -159,10 +159,10 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _errorMessage != null
-                  ? _buildErrorView()
-                  : _requests.isEmpty
-                      ? _buildEmptyView()
-                      : _buildRequestsList(),
+              ? _buildErrorView()
+              : _requests.isEmpty
+              ? _buildEmptyView()
+              : _buildRequestsList(),
         ),
       ],
     );
@@ -175,11 +175,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Color(0xFFDC3545),
-            ),
+            const Icon(Icons.error_outline, size: 64, color: Color(0xFFDC3545)),
             const SizedBox(height: 16),
             Text(
               _errorMessage!,
@@ -209,11 +205,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.inbox_outlined,
-              size: 80,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.inbox_outlined, size: 80, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
               'Chưa Có Hoạt Động',
@@ -227,10 +219,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
             Text(
               'Bạn chưa gửi yêu cầu bắt rắn nào.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
@@ -242,7 +231,10 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF228B22),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
               ),
             ),
           ],
@@ -273,9 +265,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () {
           context.push('/activity-detail/${request.id}');
@@ -290,7 +280,10 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: statusColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
@@ -308,15 +301,12 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                   const Spacer(),
                   Text(
                     dateFormat.format(request.requestDate.toLocal()),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
-              
+
               // Address
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -363,7 +353,10 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                   runSpacing: 8,
                   children: request.details.take(3).map((detail) {
                     return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF6F8F6),
                         borderRadius: BorderRadius.circular(8),
@@ -403,7 +396,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                     ),
                   ),
               ],
-              
+
               // Priority if high
               if (request.priority != 'Normal') ...[
                 const SizedBox(height: 8),
@@ -431,7 +424,10 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
               if (request.status == 'Assigned') ...[
                 const SizedBox(height: 10),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 7,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFF8E1),
                     borderRadius: BorderRadius.circular(8),
@@ -440,7 +436,11 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.payments_outlined, size: 14, color: Color(0xFFFF8F00)),
+                      Icon(
+                        Icons.payments_outlined,
+                        size: 14,
+                        color: Color(0xFFFF8F00),
+                      ),
                       SizedBox(width: 6),
                       Text(
                         'Nhấn để xem chi tiết & thanh toán phí di chuyển',

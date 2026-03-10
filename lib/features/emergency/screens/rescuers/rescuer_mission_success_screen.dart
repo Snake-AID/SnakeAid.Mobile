@@ -5,10 +5,12 @@ class RescuerMissionSuccessScreen extends StatefulWidget {
   const RescuerMissionSuccessScreen({super.key});
 
   @override
-  State<RescuerMissionSuccessScreen> createState() => _RescuerMissionSuccessScreenState();
+  State<RescuerMissionSuccessScreen> createState() =>
+      _RescuerMissionSuccessScreenState();
 }
 
-class _RescuerMissionSuccessScreenState extends State<RescuerMissionSuccessScreen> {
+class _RescuerMissionSuccessScreenState
+    extends State<RescuerMissionSuccessScreen> {
   bool _isAvailable = true;
 
   @override
@@ -86,7 +88,7 @@ class _RescuerMissionSuccessScreenState extends State<RescuerMissionSuccessScree
                         ),
                         const SizedBox(height: 20),
                         const Text(
-                          'Bạn Đã Cứu Giúp Thành Công!',
+                          'Hoàn Thành Nhiệm Vụ!',
                           style: TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.bold,
@@ -97,7 +99,7 @@ class _RescuerMissionSuccessScreenState extends State<RescuerMissionSuccessScree
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Nhiệm vụ đã được hoàn thành xuất sắc',
+                          'Nhiệm vụ hoàn thành. Cảm ơn bạn đã đóng góp cho cộng đồng!',
                           style: TextStyle(
                             fontSize: 15,
                             color: Color(0xFF666666),
@@ -248,13 +250,26 @@ class _RescuerMissionSuccessScreenState extends State<RescuerMissionSuccessScree
                           ),
                         ),
                         const SizedBox(height: 16),
-                        _buildDetailRow('Mã nhiệm vụ:', '#RES-2025120501', true),
+                        _buildDetailRow(
+                          'Mã nhiệm vụ:',
+                          '#RES-2025120501',
+                          true,
+                        ),
                         const SizedBox(height: 12),
-                        _buildDetailRow('Thời gian:', '05/12/2025 - 15:30', false),
+                        _buildDetailRow(
+                          'Thời gian:',
+                          '05/12/2025 - 15:30',
+                          false,
+                        ),
                         const SizedBox(height: 12),
                         _buildDetailRow('Thời lượng:', '25 phút', false),
                         const SizedBox(height: 12),
-                        _buildDetailRow('Thu nhập:', '300,000 VNĐ', false, isHighlighted: true),
+                        _buildDetailRow(
+                          'Thu nhập:',
+                          '300,000 VNĐ',
+                          false,
+                          isHighlighted: true,
+                        ),
                         const SizedBox(height: 16),
                         Container(
                           padding: const EdgeInsets.all(12),
@@ -425,10 +440,7 @@ class _RescuerMissionSuccessScreenState extends State<RescuerMissionSuccessScree
                                   ),
                                 ),
                                 SizedBox(width: 4),
-                                Text(
-                                  '⭐',
-                                  style: TextStyle(fontSize: 20),
-                                ),
+                                Text('⭐', style: TextStyle(fontSize: 20)),
                               ],
                             ),
                             SizedBox(height: 2),
@@ -484,7 +496,9 @@ class _RescuerMissionSuccessScreenState extends State<RescuerMissionSuccessScree
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    _isAvailable ? 'Bạn đang ONLINE' : 'Bạn đang OFFLINE',
+                                    _isAvailable
+                                        ? 'Bạn đang ONLINE'
+                                        : 'Bạn đang OFFLINE',
                                     style: const TextStyle(
                                       fontSize: 13,
                                       color: Color(0xFF1565C0),
@@ -498,9 +512,12 @@ class _RescuerMissionSuccessScreenState extends State<RescuerMissionSuccessScree
                         ),
                         Switch(
                           value: _isAvailable,
-                          onChanged: (value) => setState(() => _isAvailable = value),
+                          onChanged: (value) =>
+                              setState(() => _isAvailable = value),
                           activeThumbColor: const Color(0xFFFF8800),
-                          activeTrackColor: const Color(0xFFFF8800).withOpacity(0.5),
+                          activeTrackColor: const Color(
+                            0xFFFF8800,
+                          ).withOpacity(0.5),
                         ),
                       ],
                     ),
@@ -554,7 +571,9 @@ class _RescuerMissionSuccessScreenState extends State<RescuerMissionSuccessScree
                                     color: Colors.grey.withOpacity(0.3),
                                     width: 1.5,
                                   ),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
                                   ),
@@ -578,7 +597,9 @@ class _RescuerMissionSuccessScreenState extends State<RescuerMissionSuccessScree
                                     color: Colors.grey.withOpacity(0.3),
                                     width: 1.5,
                                   ),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
                                   ),
@@ -610,10 +631,7 @@ class _RescuerMissionSuccessScreenState extends State<RescuerMissionSuccessScree
             decoration: BoxDecoration(
               color: const Color(0xFFF8F7F5).withOpacity(0.95),
               border: Border(
-                top: BorderSide(
-                  color: Colors.grey.withOpacity(0.2),
-                  width: 1,
-                ),
+                top: BorderSide(color: Colors.grey.withOpacity(0.2), width: 1),
               ),
             ),
             child: SafeArea(
@@ -678,30 +696,40 @@ class _RescuerMissionSuccessScreenState extends State<RescuerMissionSuccessScree
     );
   }
 
-  Widget _buildDetailRow(String label, String value, bool isBold, {bool isHighlighted = false}) {
+  Widget _buildDetailRow(
+    String label,
+    String value,
+    bool isBold, {
+    bool isHighlighted = false,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Color(0xFF666666),
-          ),
+          style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
         ),
         Text(
           value,
           style: TextStyle(
             fontSize: 14,
-            fontWeight: isBold || isHighlighted ? FontWeight.bold : FontWeight.normal,
-            color: isHighlighted ? const Color(0xFFFF8800) : const Color(0xFF1C100D),
+            fontWeight: isBold || isHighlighted
+                ? FontWeight.bold
+                : FontWeight.normal,
+            color: isHighlighted
+                ? const Color(0xFFFF8800)
+                : const Color(0xFF1C100D),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildProgressStep(String label, {required bool isCompleted, required bool isLast}) {
+  Widget _buildProgressStep(
+    String label, {
+    required bool isCompleted,
+    required bool isLast,
+  }) {
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
       child: Row(
@@ -717,16 +745,14 @@ class _RescuerMissionSuccessScreenState extends State<RescuerMissionSuccessScree
                     color: isCompleted ? const Color(0xFFFF8800) : Colors.white,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isCompleted ? const Color(0xFFFF8800) : Colors.grey[300]!,
+                      color: isCompleted
+                          ? const Color(0xFFFF8800)
+                          : Colors.grey[300]!,
                       width: 2,
                     ),
                   ),
                   child: isCompleted
-                      ? const Icon(
-                          Icons.check,
-                          size: 18,
-                          color: Colors.white,
-                        )
+                      ? const Icon(Icons.check, size: 18, color: Colors.white)
                       : Center(
                           child: Container(
                             width: 8,
@@ -739,12 +765,7 @@ class _RescuerMissionSuccessScreenState extends State<RescuerMissionSuccessScree
                         ),
                 ),
                 if (!isLast)
-                  Expanded(
-                    child: Container(
-                      width: 2,
-                      color: Colors.grey[300],
-                    ),
-                  ),
+                  Expanded(child: Container(width: 2, color: Colors.grey[300])),
               ],
             ),
           ),
@@ -755,7 +776,9 @@ class _RescuerMissionSuccessScreenState extends State<RescuerMissionSuccessScree
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isCompleted ? FontWeight.w600 : FontWeight.normal,
-                color: isCompleted ? const Color(0xFF1C100D) : const Color(0xFF999999),
+                color: isCompleted
+                    ? const Color(0xFF1C100D)
+                    : const Color(0xFF999999),
               ),
             ),
           ),

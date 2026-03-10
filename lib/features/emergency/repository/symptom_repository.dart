@@ -13,10 +13,10 @@ class SymptomRepository {
 
   SymptomRepository(this._httpService);
 
-  /// Get all symptom configurations
+  /// Get all symptom configurations (grouped for UI)
   Future<SymptomConfigResponse> getSymptomConfigs() async {
     try {
-      final response = await _httpService.get('/api/symptom-configs');
+      final response = await _httpService.get('/api/symptom-configs/grouped-for-ui');
       return SymptomConfigResponse.fromJson(response.data);
     } catch (e) {
       return SymptomConfigResponse(
@@ -33,12 +33,14 @@ class SymptomRepository {
   Future<SymptomTrackingResponse> updateSymptomsTracking({
     required String incidentId,
     required List<int> symptomIdList,
+    required int timeSinceBiteMinutes,
   }) async {
     try {
       final response = await _httpService.put(
         '/api/incidents/$incidentId/symptoms-tracking',
         data: {
           'symptomIdList': symptomIdList,
+          'timeSinceBiteMinutes': timeSinceBiteMinutes,
         },
       );
       return SymptomTrackingResponse.fromJson(response.data);

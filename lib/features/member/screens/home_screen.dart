@@ -13,6 +13,7 @@ import '../../emergency/repository/incident_repository.dart';
 import '../../emergency/models/sos_incident_request.dart';
 import '../../emergency/models/sos_incident_response.dart';
 import '../../emergency/providers/incident_provider.dart';
+import '../../emergency/providers/mission_hub_provider.dart';
 
 /// Member Home Screen - Entry point with emergency-first design
 /// This is a content-only widget, Scaffold is provided by MainScaffold
@@ -356,15 +357,32 @@ Future<void> _navigateToActiveIncident(
     }
 
     if (response.isSuccess && response.data != null) {
-      // Update incident in provider with latest data
+      // Update incident in provider with latest data.
+      // saveActiveIncident auto-clears terminal statuses (Completed / Cancelled / Finished).
       await ref
           .read(activeIncidentProvider.notifier)
           .saveActiveIncident(response.data!);
 
       if (context.mounted) {
+        // If the incident is terminal the provider just cleared itself –
+        // inform the user instead of navigating to a dead screen.
+        final stillActive = ref.read(activeIncidentProvider).hasActiveIncident;
+        if (!stillActive) {
+          _showErrorDialog(
+            context,
+            'Yêu cầu SOS này đã kết thúc (${response.data!.status}). Bạn có thể tạo yêu cầu mới.',
+          );
+          return;
+        }
+
+        final status = ref.read(missionStatusProvider);
         context.pushNamed(
-          'emergency_alert',
-          extra: {'incident': response.data!},
+          'emergency_tracking',
+          extra: {
+            'incidentId': response.data!.id,
+            if (status.hasRescuer) 'missionId': status.missionId!,
+            if (status.hasRescuer) 'rescuerId': status.rescuerId!,
+          },
         );
       }
     } else {
@@ -445,6 +463,10 @@ Future<void> _handleSosActivation(BuildContext context, WidgetRef ref) async {
       if (context.mounted) {
         // Show success dialog and navigate
         _showSosActivatedDialog(context, ref, response.data!);
+
+        // Connect to MissionHub immediately so member receives real-time
+        // notifications when a rescuer accepts the SOS request
+        _connectToMissionHub(context, ref, response.data!);
       }
     } else {
       if (context.mounted) {
@@ -456,6 +478,27 @@ Future<void> _handleSosActivation(BuildContext context, WidgetRef ref) async {
       context.pop(); // Close loading dialog
       _showErrorDialog(context, e.toString().replaceAll('Exception: ', ''));
     }
+  }
+}
+
+/// Connect to MissionHub for real-time mission tracking
+///
+/// Called immediately after SOS incident is created so the member can
+/// receive the [RescuerAccepted] event as soon as a rescuer picks up the job.
+Future<void> _connectToMissionHub(
+  BuildContext context,
+  WidgetRef ref,
+  IncidentData incident,
+) async {
+  try {
+    debugPrint('🔌 Connecting to MissionHub for incident: ${incident.id}');
+    await ref
+        .read(missionHubConnectionProvider.notifier)
+        .connectForIncident(incident.id);
+    debugPrint('✅ MissionHub connected from home screen');
+  } catch (e) {
+    // Non-fatal – the emergency_alert_screen will also attempt to connect
+    debugPrint('⚠️ MissionHub connect failed from home screen: $e');
   }
 }
 
@@ -529,76 +572,106 @@ void _showSosActivatedDialog(
   showDialog(
     context: context,
     barrierDismissible: false,
-    builder: (dialogContext) => CustomDialog(
-      icon: Icons.emergency,
-      iconBackgroundColor: const Color(0xFFFFEBEE),
-      iconColor: const Color(0xFFDC3545),
-      title: 'SOS Đã Kích Hoạt!',
-      description: 'Đang gửi cảnh báo khẩn cấp và tìm kiếm hỗ trợ gần bạn...',
-      extraContent: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8F8F6),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildStatusItem(
-                Icons.location_on,
-                'Đang xác định vị trí của bạn',
-              ),
-              const SizedBox(height: 8),
-              _buildStatusItem(
-                Icons.local_hospital,
-                'Đang tìm kiếm cứu hộ gần nhất',
-              ),
-              const SizedBox(height: 8),
-              _buildStatusItem(
-                Icons.contact_phone,
-                'Đang thông báo cho liên hệ khẩn cấp',
-              ),
-            ],
-          ),
-        ),
-      ],
-      actions: [
-        DialogAction(
-          label: 'HỦY SOS',
-          onPressed: () {
-            if (Navigator.of(dialogContext).canPop()) {
-              Navigator.of(dialogContext).pop();
-            }
-          },
-          isOutlined: true,
-          textColor: const Color(0xFFDC3545),
-          borderColor: const Color(0xFFDC3545),
-        ),
-        DialogAction(
-          label: 'XEM CHI TIẾT',
-          onPressed: () async {
-            // Close dialog first
-            if (Navigator.of(dialogContext).canPop()) {
-              Navigator.of(dialogContext).pop();
-            }
+    builder: (dialogContext) => Consumer(
+      builder: (_, consumerRef, __) {
+        // Auto-dismiss dialog and navigate directly to tracking if rescuer
+        // accepts WHILE this dialog is still on screen (very fast rescuer).
+        consumerRef.listen<MissionStatus>(missionStatusProvider, (prev, next) {
+          if (next.hasRescuer && !(prev?.hasRescuer ?? false)) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (Navigator.of(dialogContext).canPop()) {
+                Navigator.of(dialogContext).pop();
+              }
+              if (context.mounted) {
+                context.pushNamed(
+                  'emergency_tracking',
+                  extra: {
+                    'incidentId': incident.id,
+                    'missionId': next.missionId!,
+                    'rescuerId': next.rescuerId!,
+                  },
+                );
+              }
+            });
+          }
+        });
 
-            // Small delay to ensure dialog is closed
-            await Future.delayed(const Duration(milliseconds: 100));
+        return CustomDialog(
+          icon: Icons.emergency,
+          iconBackgroundColor: const Color(0xFFFFEBEE),
+          iconColor: const Color(0xFFDC3545),
+          title: 'SOS Đã Kích Hoạt!',
+          description:
+              'Đang gửi cảnh báo khẩn cấp và tìm kiếm hỗ trợ gần bạn...',
+          extraContent: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8F8F6),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildStatusItem(
+                    Icons.location_on,
+                    'Đang xác định vị trí của bạn',
+                  ),
+                  const SizedBox(height: 8),
+                  _buildStatusItem(
+                    Icons.local_hospital,
+                    'Đang tìm kiếm cứu hộ gần nhất',
+                  ),
+                  const SizedBox(height: 8),
+                  _buildStatusItem(
+                    Icons.contact_phone,
+                    'Đang thông báo cho liên hệ khẩn cấp',
+                  ),
+                ],
+              ),
+            ),
+          ],
+          actions: [
+            DialogAction(
+              label: 'HỦY SOS',
+              onPressed: () {
+                if (Navigator.of(dialogContext).canPop()) {
+                  Navigator.of(dialogContext).pop();
+                }
+              },
+              isOutlined: true,
+              textColor: const Color(0xFFDC3545),
+              borderColor: const Color(0xFFDC3545),
+            ),
+            DialogAction(
+              label: 'XEM CHI TIẾT',
+              onPressed: () async {
+                // Close dialog first
+                if (Navigator.of(dialogContext).canPop()) {
+                  Navigator.of(dialogContext).pop();
+                }
 
-            // Navigate to emergency alert with incident data
-            if (context.mounted) {
-              context.pushNamed(
-                'emergency_alert',
-                extra: {'incident': incident},
-              );
-            }
-          },
-          backgroundColor: const Color(0xFF228B22),
-          icon: Icons.arrow_forward,
-          flex: 2,
-        ),
-      ],
+                await Future.delayed(const Duration(milliseconds: 100));
+
+                if (context.mounted) {
+                  final status = ref.read(missionStatusProvider);
+                  context.pushNamed(
+                    'emergency_tracking',
+                    extra: {
+                      'incidentId': incident.id,
+                      if (status.hasRescuer) 'missionId': status.missionId!,
+                      if (status.hasRescuer) 'rescuerId': status.rescuerId!,
+                    },
+                  );
+                }
+              },
+              backgroundColor: const Color(0xFF228B22),
+              icon: Icons.arrow_forward,
+              flex: 2,
+            ),
+          ],
+        );
+      },
     ),
   );
 }
