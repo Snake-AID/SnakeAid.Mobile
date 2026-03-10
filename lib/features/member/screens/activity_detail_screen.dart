@@ -10,8 +10,10 @@ import '../../snake_catching/repository/snake_species_repository.dart';
 import '../../snake_catching/repository/payos_repository.dart';
 import '../../snake_catching/repository/transaction_repository.dart';
 import '../../snake_catching/repository/wallet_repository.dart';
+import '../../snake_catching/repository/feedback_repository.dart';
 import '../../snake_catching/models/snake_catching_request.dart';
 import '../../snake_catching/models/snake_species.dart';
+import '../../auth/providers/auth_provider.dart';
 import 'package:intl/intl.dart';
 
 /// Activity Detail Screen - Shows detailed information of a snake catching request
@@ -51,6 +53,12 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   WalletInfo? _walletInfo;
   bool _isPayingWithWallet = false;
   bool _isPayingFinalWithWallet = false;
+
+  // Cancel
+  bool _isCancelling = false;
+
+  // Feedback
+  bool _isSubmittingFeedback = false;
 
   // Scroll
   final ScrollController _scrollController = ScrollController();
@@ -187,11 +195,11 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
 
     final speciesRepository = ref.read(snakeSpeciesRepositoryProvider);
 
-    // Get unique species IDs
-    final speciesIds = _request!.details
-        .map((detail) => detail.snakeSpeciesId)
-        .toSet()
-        .toList();
+    // Get unique species IDs from both reported details AND mission details
+    final speciesIds = {
+      ..._request!.details.map((d) => d.snakeSpeciesId),
+      ...(_request!.mission?.missionDetails ?? []).map((d) => d.snakeSpeciesId),
+    }.toList();
 
     for (final speciesId in speciesIds) {
       // Skip if already loaded
@@ -248,7 +256,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           // Transfer if somehow not done yet in this session (e.g. app was in background)
           if (!_hasTransferredToRescuer) {
             _hasTransferredToRescuer = true;
-            ref.read(payosRepositoryProvider).transferToRescuer(widget.requestId);
+            ref.read(payosRepositoryProvider).transferToRescuer(widget.requestId).then((_) {
+              if (mounted) _silentRefresh();
+            });
           }
         }
       }
@@ -296,6 +306,649 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       final wallet = await ref.read(walletRepositoryProvider).getWalletInfo();
       if (mounted) setState(() => _walletInfo = wallet);
     } catch (_) {}
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Feedback
+  // ──────────────────────────────────────────────────────────────────
+  void _showFeedbackSheet() {
+    final request = _request;
+    if (request == null) return;
+    final rescuer = request.assignedRescuer;
+    if (rescuer == null) return;
+
+    int selectedRating = 0;
+    final commentController = TextEditingController();
+
+    // Check if already submitted
+    final currentUser = ref.read(currentUserProvider);
+    final alreadyReviewed = currentUser != null &&
+        request.feedbacks.any((f) =>
+            f.raterId == currentUser.id &&
+            f.targetUserId == rescuer.accountId &&
+            f.referenceId == request.id);
+    if (alreadyReviewed) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          return Padding(
+            padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Handle
+                  Container(
+                    width: 40, height: 4,
+                    decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2)),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Avatar + name
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 26,
+                        backgroundImage: rescuer.avatarUrl != null
+                            ? NetworkImage(rescuer.avatarUrl!)
+                            : null,
+                        backgroundColor: const Color(0xFFFF6B35).withOpacity(0.15),
+                        child: rescuer.avatarUrl == null
+                            ? const Icon(Icons.person, color: Color(0xFFFF6B35))
+                            : null,
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Đánh giá cứu hộ viên',
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF1F1F1F))),
+                            const SizedBox(height: 2),
+                            Text(
+                              rescuer.fullName ?? 'Cứu hộ viên',
+                              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Star row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (i) {
+                      return GestureDetector(
+                        onTap: () => setSheet(() => selectedRating = i + 1),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Icon(
+                            i < selectedRating ? Icons.star_rounded : Icons.star_border_rounded,
+                            size: 40,
+                            color: i < selectedRating
+                                ? const Color(0xFFFFB300)
+                                : Colors.grey[300],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+
+                  if (selectedRating > 0) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      ['', 'Rất tệ', 'Tệ', 'Bình thường', 'Tốt', 'Tuyệt vời!'][selectedRating],
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: selectedRating >= 4
+                              ? const Color(0xFF228B22)
+                              : selectedRating == 3
+                                  ? Colors.orange
+                                  : const Color(0xFFDC3545)),
+                    ),
+                  ],
+
+                  const SizedBox(height: 16),
+
+                  // Comment field
+                  TextField(
+                    controller: commentController,
+                    maxLines: 3,
+                    maxLength: 300,
+                    decoration: InputDecoration(
+                      hintText: 'Chia sẻ trải nghiệm của bạn (không bắt buộc)...',
+                      hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
+                      filled: true,
+                      fillColor: const Color(0xFFF6F8F6),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.all(14),
+                      counterStyle: TextStyle(fontSize: 11, color: Colors.grey[400]),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: Text('Để sau',
+                              style: TextStyle(color: Colors.grey[600])),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton(
+                          onPressed: selectedRating == 0 || _isSubmittingFeedback
+                              ? null
+                              : () async {
+                                  Navigator.pop(ctx);
+                                  await _submitFeedback(
+                                    targetUserId: rescuer.accountId,
+                                    targetUserRole: 'Rescuer',
+                                    rating: selectedRating,
+                                    comments: commentController.text.trim(),
+                                  );
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF228B22),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            disabledBackgroundColor: Colors.grey[200],
+                          ),
+                          child: _isSubmittingFeedback
+                              ? const SizedBox(
+                                  width: 18, height: 18,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white))
+                              : const Text('Gửi đánh giá',
+                                  style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _submitFeedback({
+    required String targetUserId,
+    required String targetUserRole,
+    required int rating,
+    required String comments,
+  }) async {
+    if (_request == null) return;
+    setState(() => _isSubmittingFeedback = true);
+    try {
+      await ref.read(feedbackRepositoryProvider).submitFeedback(
+            FeedbackRequest(
+              targetUserId: targetUserId,
+              referenceId: _request!.id,
+              type: 'Catching',
+              rating: rating,
+              comments: comments.isEmpty ? null : comments,
+              targetUserRole: targetUserRole,
+            ),
+          );
+      if (!mounted) return;
+      setState(() => _isSubmittingFeedback = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white, size: 18),
+              SizedBox(width: 8),
+              Text('Cảm ơn bạn đã đánh giá!'),
+            ],
+          ),
+          backgroundColor: const Color(0xFF228B22),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      _silentRefresh();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmittingFeedback = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: const Color(0xFFDC3545),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    }
+  }
+
+  Widget _buildFeedbackCard(SnakeCatchingRequestData request) {
+    final currentUser = ref.read(currentUserProvider);
+    final rescuer = request.assignedRescuer;
+    if (rescuer == null) return const SizedBox.shrink();
+
+    // Check if current member already left a feedback for this rescuer
+    final existing = currentUser != null
+        ? request.feedbacks
+            .where((f) =>
+                f.raterId == currentUser.id &&
+                f.targetUserId == rescuer.accountId &&
+                f.referenceId == request.id)
+            .firstOrNull
+        : null;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 3)),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFB300).withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.star_rounded,
+                      color: Color(0xFFFFB300), size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Đánh giá dịch vụ',
+                          style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1F1F1F))),
+                      Text(
+                        rescuer.fullName ?? 'Cứu hộ viên',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 14),
+
+            if (existing != null) ...[
+              // ── Show submitted feedback ──
+              Row(
+                children: List.generate(5, (i) => Icon(
+                  i < existing.rating ? Icons.star_rounded : Icons.star_border_rounded,
+                  size: 22,
+                  color: i < existing.rating ? const Color(0xFFFFB300) : Colors.grey[300],
+                )),
+              ),
+              if (existing.comments != null && existing.comments!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '"${existing.comments!}"',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.grey[700]),
+                ),
+              ],
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.check_circle_outline, size: 14, color: const Color(0xFF228B22)),
+                  const SizedBox(width: 5),
+                  Text('Đã gửi đánh giá',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: const Color(0xFF228B22),
+                          fontWeight: FontWeight.w500)),
+                ],
+              ),
+            ] else ...[
+              // ── Prompt to leave feedback ──
+              Text(
+                'Chia sẻ trải nghiệm của bạn với cứu hộ viên này.',
+                style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _showFeedbackSheet,
+                  icon: const Icon(Icons.rate_review_outlined, size: 18),
+                  label: const Text('Đánh giá ngay'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF228B22),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Cancel Request
+  // ──────────────────────────────────────────────────────────────────
+  void _showCancelSheet() {
+    const reasons = [
+      'Không cần hỗ trợ nữa',
+      'Đã tự xử lý được',
+      'Chọn nhầm địa chỉ / thông tin sai',
+      'Chờ quá lâu, không có cứu hộ viên',
+      'Thay đổi kế hoạch',
+      'Lý do khác',
+    ];
+    String? selectedReason;
+    final otherController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(ctx).padding.bottom + 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Handle
+                Center(
+                  child: Container(
+                    width: 40, height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Title
+                Row(
+                  children: [
+                    Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDC3545).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.cancel_outlined, color: Color(0xFFDC3545), size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Hủy Đơn',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1F1F1F)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Vui lòng cho chúng tôi biết lý do bạn muốn hủy đơn.',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 16),
+                // Reason options
+                ...reasons.map((r) => GestureDetector(
+                  onTap: () => setSheetState(() => selectedReason = r),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: selectedReason == r
+                          ? const Color(0xFFDC3545).withOpacity(0.07)
+                          : const Color(0xFFF8F8F8),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: selectedReason == r
+                            ? const Color(0xFFDC3545)
+                            : Colors.transparent,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selectedReason == r
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                          size: 18,
+                          color: selectedReason == r
+                              ? const Color(0xFFDC3545)
+                              : Colors.grey[400],
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          r,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: selectedReason == r
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                            color: selectedReason == r
+                                ? const Color(0xFFDC3545)
+                                : const Color(0xFF333333),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )),
+                // Free-text field when "Lý do khác" is selected
+                if (selectedReason == 'Lý do khác') ...[  
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: otherController,
+                    autofocus: true,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      hintText: 'Nhập lý do của bạn...',
+                      hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+                      filled: true,
+                      fillColor: const Color(0xFFF8F8F8),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFFDDDDDD)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFFDDDDDD)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFFDC3545), width: 1.5),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    onChanged: (_) => setSheetState(() {}),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                const SizedBox(height: 8),
+                // Warning note for Assigned status
+                if (_request?.status == 'Assigned')
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3CD),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFFE082)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded, color: Color(0xFFFF8F00), size: 16),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Cứu hộ viên đã được phân công. Việc hủy lúc này có thể ảnh hưởng đến uy tín của bạn.',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF7B5800)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                // Confirm button
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: selectedReason == null
+                        ? null
+                        : selectedReason == 'Lý do khác' && otherController.text.trim().isEmpty
+                            ? null
+                            : () {
+                                final reason = selectedReason == 'Lý do khác'
+                                    ? otherController.text.trim()
+                                    : selectedReason!;
+                                Navigator.pop(ctx);
+                                _executeCancelRequest(reason);
+                              },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFDC3545),
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.grey[200],
+                      disabledForegroundColor: Colors.grey[400],
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text(
+                      'XÁC NHẬN HỦY ĐƠN',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _executeCancelRequest(String reason) async {
+    setState(() => _isCancelling = true);
+    try {
+      await ref.read(snakeCatchingRepositoryProvider).cancelRequest(widget.requestId, reason);
+      if (!mounted) return;
+      setState(() => _isCancelling = false);
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64, height: 64,
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.cancel, color: Colors.grey, size: 36),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Đơn đã được hủy',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1F1F1F)),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Yêu cầu của bạn đã được hủy thành công.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  context.pop(); // back to activity list
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF228B22),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                ),
+                child: const Text('Về Danh Sách', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isCancelling = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e.toString().replaceAll('Exception: ', '')),
+        backgroundColor: const Color(0xFFDC3545),
+      ));
+    }
   }
 
   String _formatCurrencyVnd(double amount) {
@@ -366,6 +1019,11 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         amount: finalAmount,
         method: 'Ví SnakeAidPay',
       );
+      // Prompt feedback right after payment
+      if (mounted) {
+        await Future.delayed(const Duration(milliseconds: 300));
+        _showFeedbackSheet();
+      }
       _loadWallet();
       if (!_hasTransferredToRescuer) {
         _hasTransferredToRescuer = true;
@@ -617,7 +1275,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   Widget _buildDetailView() {
     final request = _request!;
     final dateFormat = DateFormat('dd/MM/yyyy, HH:mm');
-    final statusColor = _getStatusColor(request.status);
+    final effectiveStatus = _getEffectiveStatus(request);
+    final statusColor = _getStatusColor(effectiveStatus);
 
     return SingleChildScrollView(
       controller: _scrollController,
@@ -637,7 +1296,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                _getStatusIcon(request.status),
+                _getStatusIcon(effectiveStatus),
                 size: 60,
                 color: statusColor,
               ),
@@ -648,7 +1307,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           
           Center(
             child: Text(
-              _getStatusText(request.status),
+              _getStatusText(effectiveStatus),
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
@@ -656,8 +1315,38 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
               ),
             ),
           ),
+
+          // Sub-status label when mission is En_Route or Arrived
+          if (effectiveStatus == 'en_route' || effectiveStatus == 'arrived') ...[          
+            const SizedBox(height: 6),
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: statusColor.withOpacity(0.3)),
+                ),
+                child: Text(
+                  effectiveStatus == 'en_route'
+                  ? 'Tài xế đang trên đường đến'
+                  : 'Tài xế đã đến nơi',                  
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: statusColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ],
           
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
+
+          // ── Status Progress Stepper ───────────────────────────────
+          _buildStatusStepper(effectiveStatus, request.status),
+
+          const SizedBox(height: 24),
 
           // Summary Card
           Container(
@@ -754,9 +1443,11 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                         const SizedBox(height: 12),
                         _buildInfoRow(
                           Icons.person,
-                          'Trạng thái',
-                          'Đã được phân công',
-                          valueColor: const Color(0xFF228B22),
+                          'Trạng thái nhiệm vụ',
+                          request.mission != null
+                              ? _getStatusText(_getEffectiveStatus(request))
+                              : 'Đã được phân công',
+                          valueColor: _getStatusColor(_getEffectiveStatus(request)),
                         ),
                         if (request.assignedAt != null) ...[
                           const SizedBox(height: 8),
@@ -801,28 +1492,63 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
 
           // Species Section — caught snakes when Finished/Paid/Completed; reported snakes otherwise
           if ((request.status == 'Finished' || request.status == 'Paid' ||
-               request.status == 'Completed') && request.details.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'Rắn Đã Bắt Được (${request.details.length})',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF333333),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: request.details.map((detail) => _buildSpeciesChip(detail)).toList(),
-              ),
-            ),
+               request.status == 'Completed')) ...[
+            Builder(builder: (_) {
+              final missionDetails = request.mission?.missionDetails ?? [];
+              // Prefer missionDetails (rescuer-confirmed catches); fall back to request.details
+              if (missionDetails.isNotEmpty) {
+                final int total = missionDetails.fold(0, (s, d) => s + d.quantity);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 24),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'Rắn Đã Bắt Được ($total)',
+                        style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF333333),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Wrap(
+                        spacing: 8, runSpacing: 8,
+                        children: missionDetails.map(_buildMissionSpeciesChip).toList(),
+                      ),
+                    ),
+                  ],
+                );
+              } else if (request.details.isNotEmpty) {
+                final int total = request.details.fold(0, (s, d) => s + d.quantity);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 24),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'Rắn Đã Bắt Được ($total)',
+                        style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF333333),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Wrap(
+                        spacing: 8, runSpacing: 8,
+                        children: request.details.map((d) => _buildSpeciesChip(d)).toList(),
+                      ),
+                    ),
+                  ],
+                );
+              }
+              return const SizedBox.shrink();
+            }),
           ] else if (request.details.isNotEmpty) ...[
             const SizedBox(height: 24),
             Padding(
@@ -931,6 +1657,14 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
             ),
           ],
 
+          const SizedBox(height: 24),
+
+          // ── Feedback card (Paid / Completed) ─────────────────────
+          if (request.status == 'Paid' ||
+              request.status == 'Completed' ||
+              request.status == 'Finished')
+            _buildFeedbackCard(request),
+
           const SizedBox(height: 32),
         ],
       ),
@@ -947,6 +1681,12 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         _finalTransaction == null;
     final bool isAnyLoading = _isCreatingPayment || _isCreatingFinalPayment ||
         _isPayingWithWallet || _isPayingFinalWithWallet;
+
+    // Cancel is allowed: Pending (any time) or Assigned only when mission is still Preparing
+    final bool canCancel = !_isCancelling &&
+        (request.status == 'Pending' ||
+            (request.status == 'Assigned' &&
+                (request.mission == null || request.mission!.status == 'Preparing')));
 
     return Container(
       padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
@@ -993,21 +1733,47 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
             ),
             const SizedBox(height: 10),
           ],
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () => context.pop(),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF228B22),
-                side: const BorderSide(color: Color(0xFF228B22)),
-                padding: const EdgeInsets.symmetric(vertical: 13),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          Row(
+            children: [
+              // Cancel button (small, left)
+              if (canCancel) ...[  
+                SizedBox(
+                  height: 46,
+                  child: OutlinedButton.icon(
+                    onPressed: _isCancelling ? null : _showCancelSheet,
+                    icon: _isCancelling
+                        ? const SizedBox(width: 14, height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFDC3545)))
+                        : const Icon(Icons.cancel_outlined, size: 18),
+                    label: const Text('Hủy đơn', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFDC3545),
+                      side: const BorderSide(color: Color(0xFFDC3545)),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
+              Expanded(
+                child: SizedBox(
+                  height: 46,
+                  child: OutlinedButton(
+                    onPressed: () => context.pop(),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF228B22),
+                      side: const BorderSide(color: Color(0xFF228B22)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text(
+                      'Quay Lại',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
               ),
-              child: const Text(
-                'Quay Lại',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-              ),
-            ),
+            ],
           ),
         ],
       ),
@@ -1021,6 +1787,17 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     // Refresh wallet before opening
     _loadWallet();
 
+    // Compute final-payment amount the same way the UI card does:
+    // prefer actualCost, fall back to baseFee + snakeFee + envFee
+    double _finalAmount() {
+      final m = _request!.mission;
+      if (m?.actualCost != null && m!.actualCost! > 0) return m.actualCost!.toDouble();
+      final base  = m?.price ?? 0;
+      final snake = (m?.missionDetails ?? []).fold<double>(0, (s, d) => s + d.price);
+      final env   = m?.catchingEnvironment?.price ?? 0;
+      return (base + snake + env).toDouble();
+    }
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1029,7 +1806,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         isFinalPayment: isFinalPayment,
         walletInfo: _walletInfo,
         amount: isFinalPayment
-            ? (_request!.mission?.actualCost ?? 0).toDouble()
+            ? _finalAmount()
             : (_request!.estimatedPrice ?? _request!.mission?.estimatedCost ?? 0).toDouble(),
         onPayOS: () {
           Navigator.pop(ctx);
@@ -1586,7 +2363,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       if (request.mission?.catchingEnvironment != null) ...[  
                         const SizedBox(height: 6),
                         _buildPayRow(
-                          'Phí môi trường (${request.mission!.catchingEnvironment!.name}):',
+                          'Phụ phí khu vực (${request.mission!.catchingEnvironment!.name}):',
                           _formatCurrency(request.mission!.catchingEnvironment!.price),
                           icon: Icons.home_work_outlined,
                         ),
@@ -1853,7 +2630,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 if (envFee > 0) ...[
                   const SizedBox(height: 8),
                   _buildPayRow(
-                    'Phí môi trường${envName != null ? ' ($envName)' : ''}:',
+                    'Phụ phí khu vực${envName != null ? ' ($envName)' : ''}:',
                     _formatCurrency(envFee),
                     icon: Icons.home_work_outlined,
                   ),
@@ -2136,12 +2913,123 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     );
   }
 
-  Widget _buildSpeciesChip(SnakeSpeciesDetail detail) {
+  Widget _buildMissionSpeciesChip(MissionDetailItem md) {
+    final speciesDetail = _speciesDetailsMap[md.snakeSpeciesId];
+    final isLoading = _loadingSpeciesIds.contains(md.snakeSpeciesId);
+    return InkWell(
+      onTap: speciesDetail != null ? () => _showSpeciesDetailModal(speciesDetail, md.quantity) : null,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE0E0E0)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (speciesDetail?.imageUrl != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  speciesDetail!.imageUrl!,
+                  width: 80, height: 80, fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _buildImagePlaceholder(),
+                  loadingBuilder: (_, child, progress) =>
+                      progress == null ? child : _buildImagePlaceholder(),
+                ),
+              )
+            else if (isLoading)
+              _buildImagePlaceholder()
+            else
+              Container(
+                width: 80, height: 80,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF9800).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.pest_control, color: Color(0xFFFF9800), size: 40),
+              ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          md.snakeSpeciesName,
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+                          maxLines: 2, overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (speciesDetail?.isVenomous == true) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('ĐỘC',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red)),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  if (speciesDetail?.scientificName.isNotEmpty == true)
+                    Text(
+                      speciesDetail!.scientificName,
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600], fontStyle: FontStyle.italic),
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                    ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      if (speciesDetail != null) ...[
+                        _buildRiskLevelBadge(speciesDetail.riskLevel),
+                        const SizedBox(width: 8),
+                      ],
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF228B22).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'SL: ${md.quantity}',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF228B22)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (speciesDetail != null) ...[
+                    const SizedBox(height: 8),
+                    Text('Nhấn để xem chi tiết',
+                        style: TextStyle(fontSize: 11, color: Colors.grey[500], fontStyle: FontStyle.italic)),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSpeciesChip(SnakeSpeciesDetail detail, {int? quantityOverride}) {
     final speciesDetail = _speciesDetailsMap[detail.snakeSpeciesId];
     final isLoading = _loadingSpeciesIds.contains(detail.snakeSpeciesId);
+    final int displayQty = quantityOverride ?? detail.quantity;
 
     return InkWell(
-      onTap: speciesDetail != null ? () => _showSpeciesDetailModal(speciesDetail, detail.quantity) : null,
+      onTap: speciesDetail != null ? () => _showSpeciesDetailModal(speciesDetail, displayQty) : null,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(12),
@@ -2260,7 +3148,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          'SL: ${detail.quantity}',
+                          'SL: $displayQty',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -2750,6 +3638,239 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     );
   }
 
+  // ──────────────────────────────────────────────────────────────────
+  // Status Progress Stepper
+  // ──────────────────────────────────────────────────────────────────
+  Widget _buildStatusStepper(String effectiveStatus, String requestStatus) {
+    // Steps in order (using effective status keys)
+    const steps = [
+      ('pending',   Icons.schedule,          'Chờ\nduyệt'),
+      ('assigned',  Icons.assignment_ind,    'Phân\ncông'),
+      ('deposited', Icons.payments_rounded,  'Đặt\ncọc'),
+      ('en_route',  Icons.directions_car,    'Đang\nđến'),
+      ('arrived',   Icons.location_on,       'Đến\nnơi'),
+      ('finished',  Icons.payments_outlined, 'Thanh\ntoán'),
+      ('completed', Icons.check_circle,      'Hoàn\nthành'),
+    ];
+
+    // Determine effective index
+    final activeKey = effectiveStatus.toLowerCase();
+    // Map cancelled/expired/paid/dispute to nearest visible step
+    final displayKey = {
+      'paid': 'completed',
+      'dispute': 'finished',
+    }[activeKey] ?? activeKey;
+
+    final activeIndex = steps.indexWhere((s) => s.$1 == displayKey);
+    // If not found (e.g. cancelled/expired), skip drawing stepper
+    if (activeIndex < 0 && requestStatus.toLowerCase() != 'cancelled' && requestStatus.toLowerCase() != 'expired') {
+      return const SizedBox.shrink();
+    }
+    if (requestStatus.toLowerCase() == 'cancelled' || requestStatus.toLowerCase() == 'expired') {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.grey.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.withOpacity(0.3)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.cancel, color: Colors.grey[500], size: 18),
+              const SizedBox(width: 8),
+              Text(
+                requestStatus.toLowerCase() == 'cancelled' ? 'Yêu cầu đã bị hủy' : 'Yêu cầu đã hết hạn',
+                style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final activeColor = _getStatusColor(steps[activeIndex].$1);
+    final activeLabel = steps[activeIndex].$3.replaceAll('\n', ' ');
+    final activeIcon  = steps[activeIndex].$2;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Active step badge ─────────────────────────────────
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: activeColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Bước ${activeIndex + 1}/${steps.length}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: activeColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(activeIcon, size: 14, color: activeColor),
+                const SizedBox(width: 4),
+                Text(
+                  activeLabel,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: activeColor,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 14),
+
+            // ── Stepper: each step is Expanded so layout is uniform ─
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: List.generate(steps.length, (idx) {
+                final step     = steps[idx];
+                final isDone   = idx < activeIndex;
+                final isActive = idx == activeIndex;
+                final isFirst  = idx == 0;
+                final isLast   = idx == steps.length - 1;
+                final color    = _getStatusColor(step.$1);
+
+                // Left connector color: based on whether THIS step is done/active
+                final leftLineDone  = isDone || isActive;
+                // Right connector color: based on whether NEXT step is reached
+                final rightLineDone = idx < activeIndex;
+
+                return Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Circle row with connectors on each side
+                      Row(
+                        children: [
+                          // Left connector (invisible for first step)
+                          Expanded(
+                            child: Container(
+                              height: 2.5,
+                              color: isFirst
+                                  ? Colors.transparent
+                                  : (leftLineDone
+                                      ? _getStatusColor(steps[idx - 1].$1)
+                                      : Colors.grey[200]),
+                            ),
+                          ),
+                          // Circle
+                          Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isActive
+                                  ? color
+                                  : isDone
+                                      ? color
+                                      : Colors.grey[100],
+                              border: Border.all(
+                                color: isActive || isDone ? color : Colors.grey[300]!,
+                                width: 1.5,
+                              ),
+                              boxShadow: isActive
+                                  ? [
+                                      BoxShadow(
+                                        color: color.withOpacity(0.4),
+                                        blurRadius: 7,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Center(
+                              child: isDone
+                                  ? const Icon(Icons.check_rounded,
+                                      size: 13, color: Colors.white)
+                                  : isActive
+                                      ? Icon(step.$2,
+                                          size: 13, color: Colors.white)
+                                      : Icon(step.$2,
+                                          size: 12, color: Colors.grey[400]),
+                            ),
+                          ),
+                          // Right connector (invisible for last step)
+                          Expanded(
+                            child: Container(
+                              height: 2.5,
+                              color: isLast
+                                  ? Colors.transparent
+                                  : (rightLineDone
+                                      ? color
+                                      : Colors.grey[200]),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      // Label — explicit newlines keep each word on its own line
+                      SizedBox(
+                        height: 30,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 1),
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: Text(
+                              step.$3,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.clip,
+                              style: TextStyle(
+                                fontSize: 8.5,
+                                height: 1.35,
+                                fontWeight:
+                                    isActive ? FontWeight.bold : FontWeight.normal,
+                                color: isActive
+                                    ? color
+                                    : isDone
+                                        ? Colors.grey[600]
+                                        : Colors.grey[400],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   String _getPriorityText(String priority) {
     switch (priority.toLowerCase()) {
       case 'high':
@@ -2761,14 +3882,36 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     }
   }
 
+  /// Returns a display-level status key that reflects mission sub-statuses
+  /// (En_Route / Arrived) when the request is still in 'Assigned' state.
+  String _getEffectiveStatus(SnakeCatchingRequestData request) {
+    if (request.status == 'Assigned') {
+      // Mission sub-statuses take priority (En_Route / Arrived)
+      if (request.mission != null) {
+        final ms = request.mission!.status.toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+        if (ms == 'en_route' || ms == 'enroute') return 'en_route';
+        if (ms == 'arrived') return 'arrived';
+      }
+      // Deposit paid (regardless of whether mission object is present yet)
+      if (_transaction != null && _transaction!.isDeposited) return 'deposited';
+    }
+    return request.status;
+  }
+
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
-        return const Color(0xFFFFA500);
+        return const Color(0xFFD4A017); // golden amber
       case 'assigned':
         return const Color(0xFF2196F3);
+      case 'deposited':
+        return const Color(0xFF28A745);
+      case 'en_route':
+        return const Color(0xFF1565C0); // deep blue
+      case 'arrived':
+        return const Color(0xFF00BCD4);
       case 'finished':
-        return const Color(0xFFFF6B35);
+        return const Color(0xFFD81B60); // deep pink
       case 'paid':
         return const Color(0xFF17A2B8);
       case 'completed':
@@ -2789,6 +3932,12 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         return Icons.schedule;
       case 'assigned':
         return Icons.assignment_ind;
+      case 'deposited':
+        return Icons.payments_rounded;
+      case 'en_route':
+        return Icons.directions_car;
+      case 'arrived':
+        return Icons.location_on;
       case 'finished':
         return Icons.payments_outlined;
       case 'paid':
@@ -2812,6 +3961,12 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         return 'Chờ Xử Lý';
       case 'assigned':
         return 'Đã Phân Công';
+      case 'deposited':
+        return 'Đã Đặt Cọc';
+      case 'en_route':
+        return 'Đang Trên Đường';
+      case 'arrived':
+        return 'Đã Đến Nơi';
       case 'finished':
         return 'Cần Thanh Toán';
       case 'paid':

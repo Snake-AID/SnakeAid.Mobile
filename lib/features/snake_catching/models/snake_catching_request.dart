@@ -6,6 +6,8 @@ class SnakeCatchingRequest {
   final String? additionalDetails;
   final String? notes;
   final List<SnakeSpeciesItem> snakeSpeciesList;
+  // Media IDs from uploaded photos (optional — attached for AI detection history)
+  final List<String>? mediaIdList;
 
   SnakeCatchingRequest({
     required this.address,
@@ -14,6 +16,7 @@ class SnakeCatchingRequest {
     this.additionalDetails,
     this.notes,
     required this.snakeSpeciesList,
+    this.mediaIdList,
   });
 
   Map<String, dynamic> toJson() {
@@ -24,6 +27,7 @@ class SnakeCatchingRequest {
       if (additionalDetails != null) 'additionalDetails': additionalDetails,
       if (notes != null) 'notes': notes,
       'snakeSpeciesList': snakeSpeciesList.map((e) => e.toJson()).toList(),
+      if (mediaIdList != null && mediaIdList!.isNotEmpty) 'mediaIdList': mediaIdList,
     };
   }
 }
@@ -144,6 +148,47 @@ class AssignedRescuerInfo {
   }
 }
 
+/// Feedback/rating on a snake catching request
+class FeedbackItem {
+  final String id;
+  final String referenceId;
+  final String type;
+  final String raterId;
+  final String targetUserId;
+  final String? targetUserRole;
+  final int rating;
+  final String? comments;
+  final DateTime? createdAt;
+
+  const FeedbackItem({
+    required this.id,
+    required this.referenceId,
+    required this.type,
+    required this.raterId,
+    required this.targetUserId,
+    this.targetUserRole,
+    required this.rating,
+    this.comments,
+    this.createdAt,
+  });
+
+  factory FeedbackItem.fromJson(Map<String, dynamic> json) {
+    return FeedbackItem(
+      id: json['id'] as String? ?? '',
+      referenceId: json['referenceId'] as String? ?? '',
+      type: json['type'] as String? ?? '',
+      raterId: json['raterId'] as String? ?? '',
+      targetUserId: json['targetUserId'] as String? ?? '',
+      targetUserRole: json['targetUserRole'] as String?,
+      rating: json['rating'] as int? ?? 0,
+      comments: json['comments'] as String?,
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'] as String)
+          : null,
+    );
+  }
+}
+
 /// Snake catching request data (the main data object)
 class SnakeCatchingRequestData {
   final String id;
@@ -168,6 +213,7 @@ class SnakeCatchingRequestData {
   final MissionData? mission;
   final List<RequestMedia> media;
   final List<SnakeSpeciesDetail> details;
+  final List<FeedbackItem> feedbacks;
 
   SnakeCatchingRequestData({
     required this.id,
@@ -192,6 +238,7 @@ class SnakeCatchingRequestData {
     this.mission,
     this.media = const [],
     required this.details,
+    this.feedbacks = const [],
   });
 
   factory SnakeCatchingRequestData.fromJson(Map<String, dynamic> json) {
@@ -229,13 +276,19 @@ class SnakeCatchingRequestData {
           : null,
       mission: json['mission'] != null
           ? MissionData.fromJson(json['mission'] as Map<String, dynamic>)
-          : null,
+          : (json['missions'] as List<dynamic>?)?.isNotEmpty == true
+              ? MissionData.fromJson((json['missions'] as List<dynamic>).first as Map<String, dynamic>)
+              : null,
       media: (json['media'] as List<dynamic>?)
               ?.map((e) => RequestMedia.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
       details: (json['details'] as List<dynamic>?)
               ?.map((e) => SnakeSpeciesDetail.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      feedbacks: (json['feedbacks'] as List<dynamic>?)
+              ?.map((e) => FeedbackItem.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
     );

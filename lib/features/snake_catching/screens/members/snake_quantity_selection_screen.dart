@@ -53,7 +53,7 @@ class _SnakeQuantitySelectionScreenState
                 children: [
                   // Heading
                   const Text(
-                    'Số lượng rắn bạn thấy:',
+                    'Bạn muốn báo cáo gì?',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w800,
@@ -63,7 +63,7 @@ class _SnakeQuantitySelectionScreenState
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Thông tin này giúp chúng tôi chuẩn bị dụng cụ phù hợp.',
+                    'Chọn loại báo cáo phù hợp để chúng tôi chuẩn bị hỗ trợ tốt nhất.',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey[600],
@@ -74,8 +74,8 @@ class _SnakeQuantitySelectionScreenState
                   // Selection Cards
                   _buildSelectionCard(
                     quantity: 'single',
-                    title: '1 con rắn',
-                    description: 'Chụp ảnh rõ nét từ khoảng cách an toàn.',
+                    title: '1 loài rắn',
+                    description: 'Bạn đã thấy 1 loài rắn, có thể nhiều cá thể.',
                     icon: Icons.pets,
                     accentColor: const Color(0xFF228B22),
                     isSelected: _selectedQuantity == 'single',
@@ -83,8 +83,8 @@ class _SnakeQuantitySelectionScreenState
                   const SizedBox(height: 16),
                   _buildSelectionCard(
                     quantity: 'few',
-                    title: '2-5 con rắn',
-                    description: 'Quan sát hướng di chuyển của chúng.',
+                    title: '2-5 loài rắn',
+                    description: 'Bạn rắn nhiều loài khác nhau, quan sát hướng di chuyển.',
                     icon: Icons.pie_chart,
                     accentColor: const Color(0xFFFFA726),
                     isSelected: _selectedQuantity == 'few',
@@ -92,9 +92,8 @@ class _SnakeQuantitySelectionScreenState
                   const SizedBox(height: 16),
                   _buildSelectionCard(
                     quantity: 'many',
-                    title: 'Nhiều con / Ổ rắn',
-                    description:
-                        'Rời khỏi khu vực ngay lập tức và gọi hỗ trợ.',
+                    title: 'Ổ rắn',
+                    description: 'Phát hiện ổ rắn hoặc nhiều rắn tập trung. Rời khu vực ngay lập tức!',
                     icon: Icons.warning,
                     accentColor: const Color(0xFFDC3545),
                     isSelected: _selectedQuantity == 'many',
