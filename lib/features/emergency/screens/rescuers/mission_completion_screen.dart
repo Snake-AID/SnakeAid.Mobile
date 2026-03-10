@@ -8,6 +8,7 @@ import '../../repository/media_repository.dart';
 import '../../providers/mission_detail_provider.dart';
 import '../../providers/mission_hub_provider.dart';
 import '../../providers/active_mission_provider.dart';
+import '../../providers/rescuer_emergency_provider.dart';
 import '../../../rescuer/providers/tracking_provider.dart';
 
 class MissionCompletionScreen extends ConsumerStatefulWidget {
@@ -173,17 +174,27 @@ class _MissionCompletionScreenState
         await ref.read(activeMissionProvider.notifier).clearActiveMission();
         debugPrint('✅ Active mission cleared after completion');
 
-        // Restart idle tracking so this rescuer is discoverable for new missions
+        // 🔄 RECONNECT to RescuerHub (resume receiving new rescue requests)
+        debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        debugPrint('🔄 Reconnecting to RescuerHub...');
+        debugPrint('   Reason: Mission completed, ready for new requests');
         try {
           final prefs = await SharedPreferences.getInstance();
           final rescuerId = prefs.getString('user_id');
           if (rescuerId != null) {
+            // Restart idle tracking so this rescuer is discoverable for new missions
             await ref.read(locationManagerProvider).startTracking(rescuerId);
             debugPrint('✅ Restarted idle tracking after mission completion');
+
+            // Reconnect to RescuerHub to receive new rescue requests
+            await ref.read(rescueModeProvider.notifier).startRescueMode(rescuerId);
+            debugPrint('✅ Reconnected to RescuerHub successfully');
           }
         } catch (e) {
-          debugPrint('⚠️ Failed to restart idle tracking: $e');
+          debugPrint('⚠️ Failed to reconnect RescuerHub: $e');
+          // Not critical - rescuer can manually toggle rescue mode
         }
+        debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
         // Success! Navigate to success screen
         context.go('/rescuer/mission-success');

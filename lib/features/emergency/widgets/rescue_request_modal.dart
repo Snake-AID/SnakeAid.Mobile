@@ -359,6 +359,19 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
           ),
         );
 
+        // 🔌 DISCONNECT from RescuerHub (stop receiving new rescue requests)
+        debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        debugPrint('🔌 Disconnecting from RescuerHub...');
+        debugPrint('   Reason: Mission accepted, switching to MissionHub');
+        try {
+          await ref.read(rescueModeProvider.notifier).stopRescueMode();
+          debugPrint('✅ Disconnected from RescuerHub successfully');
+        } catch (e) {
+          debugPrint('❌ Failed to disconnect RescuerHub: $e');
+          // Continue anyway - not critical
+        }
+        debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
         // Save mission to active_mission_provider for persistence
         if (response.missionId != null && response.incidentId != null) {
           final basicMission = BasicRescueMissionResponse(

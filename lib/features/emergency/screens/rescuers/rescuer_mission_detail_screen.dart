@@ -13,6 +13,7 @@ import '../../models/detailed_incident_response.dart';
 import '../../models/route_navigation_data.dart';
 import '../../providers/mission_detail_provider.dart';
 import '../../providers/active_mission_provider.dart';
+import '../../providers/rescuer_emergency_provider.dart';
 import '../../widgets/snake_risk_badges.dart';
 import '../../../../core/utils/distance_utils.dart';
 import '../../../../core/providers/openroute_provider.dart';

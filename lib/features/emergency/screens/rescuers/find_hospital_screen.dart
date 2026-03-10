@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import '../../providers/hospital_provider.dart';
+import '../../repository/rescue_mission_repository.dart';
+import '../../models/hospital_response.dart';
+import '../../../../core/providers/openroute_provider.dart';
 
-class FindHospitalScreen extends StatefulWidget {
+class FindHospitalScreen extends ConsumerStatefulWidget {
   final String missionId;
   final String incidentId;
 
@@ -13,92 +20,26 @@ class FindHospitalScreen extends StatefulWidget {
   });
 
   @override
-  State<FindHospitalScreen> createState() => _FindHospitalScreenState();
+  ConsumerState<FindHospitalScreen> createState() => _FindHospitalScreenState();
 }
 
-class _FindHospitalScreenState extends State<FindHospitalScreen> {
-  int _selectedFilter = 0;
+class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
+  final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
 
-  final List<String> _filters = [
-    'Đang mở cửa',
-    '24/7',
-    'Có huyết thanh',
-    'Gần nhất',
-  ];
-
-  final List<Map<String, dynamic>> _hospitals = [
-    {
-      'name': 'Bệnh viện Chợ Rẫy',
-      'distance': '2.3 km',
-      'duration': '8 phút lái xe',
-      'latitude': 10.7545,
-      'longitude': 106.6650,
-      'features': [
-        {
-          'icon': Icons.check_circle,
-          'text': 'Có huyết thanh King Cobra',
-          'color': Color(0xFF28A745),
-        },
-        {
-          'icon': Icons.check_circle,
-          'text': 'Cấp cứu 24/7',
-          'color': Color(0xFF28A745),
-        },
-      ],
-      'rating': 4.8,
-      'reviews': 1234,
-      'phone': '0283822254',
-    },
-    {
-      'name': 'Bệnh viện Quận 10',
-      'distance': '5.1 km',
-      'duration': '15 phút lái xe',
-      'latitude': 10.7720,
-      'longitude': 106.6677,
-      'features': [
-        {
-          'icon': Icons.check_circle,
-          'text': 'Nhiều loại huyết thanh',
-          'color': Color(0xFF28A745),
-        },
-        {
-          'icon': Icons.warning,
-          'text': 'Đóng cửa lúc 22:00',
-          'color': Color(0xFFFFC107),
-        },
-      ],
-      'rating': 4.5,
-      'reviews': 856,
-      'phone': '0283865731',
-    },
-    {
-      'name': 'Bệnh viện Nguyễn Tri Phương',
-      'distance': '6.8 km',
-      'duration': '18 phút lái xe',
-      'latitude': 10.7589,
-      'longitude': 106.6744,
-      'features': [
-        {
-          'icon': Icons.check_circle,
-          'text': 'Có huyết thanh đa dạng',
-          'color': Color(0xFF28A745),
-        },
-        {
-          'icon': Icons.check_circle,
-          'text': 'Cấp cứu 24/7',
-          'color': Color(0xFF28A745),
-        },
-      ],
-      'rating': 4.6,
-      'reviews': 567,
-      'phone': '0283850222',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // Load hospitals on init
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(hospitalProvider.notifier).getCurrentLocation();
+    });
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _mapController.dispose();
     super.dispose();
   }
 
@@ -134,7 +75,259 @@ class _FindHospitalScreenState extends State<FindHospitalScreen> {
     }
   }
 
+  /// Select hospital and report transfer to backend
+  Future<void> _selectAndReportHospital(HospitalResponse hospital) async {
+    try {
+      // Check if we have current location
+      final hospitalState = ref.read(hospitalProvider);
+      if (!hospitalState.hasLocation) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Không thể lấy vị trí hiện tại'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Show loading
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: Color(0xFFFF8800)),
+                SizedBox(height: 16),
+                Text(
+                  'Đang tính khoảng cách...',
+                  style: TextStyle(color: Colors.white, fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      // Get actual route distance from OpenRouteService
+      final openRoute = ref.read(openRouteServiceProvider);
+      final currentPos = hospitalState.currentPosition!;
+
+      final routeData = await openRoute.getRoute(
+        start: LatLng(currentPos.latitude, currentPos.longitude),
+        end: LatLng(hospital.latitude, hospital.longitude),
+      );
+
+      final actualDistanceKm = routeData.distanceKm;
+      debugPrint(
+        '📏 Route distance: ${actualDistanceKm.toStringAsFixed(2)} km',
+      );
+      debugPrint(
+        '   (Straight-line was: ${hospital.distanceKm.toStringAsFixed(2)} km)',
+      );
+
+      // Call API to report hospital transfer with actual route distance
+      final repository = ref.read(rescueMissionRepositoryProvider);
+      final pricingResponse = await repository.reportTranferToHospital(
+        missionId: widget.missionId,
+        hospitalId: hospital.id,
+        distanceToHospitalKm: actualDistanceKm,
+        note: null,
+      );
+
+      // Save to provider
+      ref
+          .read(hospitalProvider.notifier)
+          .setSelectedHospitalPricing(pricingResponse);
+
+      // Close loading
+      if (mounted) Navigator.pop(context);
+
+      // Show success and pricing info
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (dialogContext) => Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF28A745).withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_circle,
+                      color: Color(0xFF28A745),
+                      size: 36,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Đã chọn bệnh viện',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1C100D),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    pricingResponse.hospitalName,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF666666),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8F7F5),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildPricingRow(
+                          'Phí cứu hộ',
+                          pricingResponse.baseMissionPrice,
+                        ),
+                        const Divider(height: 16),
+                        _buildPricingRow(
+                          'Phí chuyển viện',
+                          pricingResponse.hospitalTransferPrice,
+                          subtitle:
+                              '${pricingResponse.distanceKm.toStringAsFixed(1)} km × ${pricingResponse.pricePerKm.toStringAsFixed(0)}đ/km',
+                        ),
+                        const Divider(height: 16),
+                        _buildPricingRow(
+                          'Tổng cộng',
+                          pricingResponse.totalPrice,
+                          isBold: true,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(dialogContext);
+                        // Open Google Maps
+                        _openGoogleMaps(
+                          hospital.latitude,
+                          hospital.longitude,
+                          hospital.name,
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF8800),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Bắt đầu chỉ đường',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading if open
+      if (mounted) Navigator.pop(context);
+
+      // Show error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildPricingRow(
+    String label,
+    double amount, {
+    String? subtitle,
+    bool isBold = false,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: isBold ? 16 : 14,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+                color: const Color(0xFF1C100D),
+              ),
+            ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(fontSize: 12, color: Color(0xFF999999)),
+              ),
+            ],
+          ],
+        ),
+        Text(
+          '${amount.toStringAsFixed(0)}đ',
+          style: TextStyle(
+            fontSize: isBold ? 18 : 15,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+            color: isBold ? const Color(0xFFFF8800) : const Color(0xFF1C100D),
+          ),
+        ),
+      ],
+    );
+  }
+
   void _showCompletionDialog() {
+    final hospitalState = ref.read(hospitalProvider);
+    final pricing = hospitalState.selectedHospitalPricing;
+
+    if (!hospitalState.hasSelectedHospital || pricing == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng chọn bệnh viện trước'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (dialogContext) => Dialog(
@@ -167,10 +360,10 @@ class _FindHospitalScreenState extends State<FindHospitalScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Bệnh nhân đã được đưa đến bệnh viện an toàn. Xác nhận hoàn thành nhiệm vụ?',
+              Text(
+                'Bệnh nhân đang được đưa đến ${pricing.hospitalName}. Xác nhận hoàn thành nhiệm vụ?',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
                   color: Color(0xFF666666),
                   height: 1.5,
@@ -206,8 +399,9 @@ class _FindHospitalScreenState extends State<FindHospitalScreen> {
                           extra: {
                             'missionId': widget.missionId,
                             'needHospital': true,
-                            'hospitalName':
-                                'Selected Hospital', // TODO: Pass actual selected hospital
+                            'hospitalName': pricing.hospitalName,
+                            'hospitalId': pricing.hospitalId,
+                            'totalPrice': pricing.totalPrice,
                           },
                         );
                       },
@@ -328,7 +522,9 @@ class _FindHospitalScreenState extends State<FindHospitalScreen> {
                     const SizedBox(width: 12),
                     GestureDetector(
                       onTap: () {
-                        // TODO: Use current location
+                        ref
+                            .read(hospitalProvider.notifier)
+                            .getCurrentLocation();
                       },
                       child: const Text(
                         'Dùng vị trí của tôi',
@@ -346,18 +542,55 @@ class _FindHospitalScreenState extends State<FindHospitalScreen> {
           ),
 
           // Map View
-          Container(
-            height: MediaQuery.of(context).size.height * 0.35,
-            color: const Color(0xFFE5E5E5),
-            child: Stack(
+          _buildMapView(),
+
+          // Hospital List
+          _buildHospitalList(),
+
+          // Bottom Action Bar
+          _buildBottomActionBar(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMapView() {
+    final hospitalState = ref.watch(hospitalProvider);
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.35,
+      color: const Color(0xFFE5E5E5),
+      child: Stack(
+        children: [
+          // Map
+          if (hospitalState.hasLocation)
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: LatLng(
+                  hospitalState.currentPosition!.latitude,
+                  hospitalState.currentPosition!.longitude,
+                ),
+                initialZoom: 13.0,
+                minZoom: 10.0,
+                maxZoom: 18.0,
+              ),
               children: [
-                // Map placeholder with markers
-                Center(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Current location indicator
-                      Container(
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.snakeaid.mobile',
+                ),
+                MarkerLayer(
+                  markers: [
+                    // Current location marker
+                    Marker(
+                      point: LatLng(
+                        hospitalState.currentPosition!.latitude,
+                        hospitalState.currentPosition!.longitude,
+                      ),
+                      width: 40,
+                      height: 40,
+                      child: Container(
                         width: 16,
                         height: 16,
                         decoration: BoxDecoration(
@@ -366,274 +599,232 @@ class _FindHospitalScreenState extends State<FindHospitalScreen> {
                           border: Border.all(color: Colors.white, width: 3),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
+                              color: Colors.black.withOpacity(0.3),
                               blurRadius: 8,
                             ),
                           ],
                         ),
                       ),
-                      // Radius circles
-                      Container(
-                        width: 160,
-                        height: 160,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: const Color(0xFF007AFF).withOpacity(0.3),
-                            width: 2,
-                          ),
+                    ),
+                    // Hospital markers
+                    ...hospitalState.hospitals.map(
+                      (hospital) => Marker(
+                        point: LatLng(hospital.latitude, hospital.longitude),
+                        width: 40,
+                        height: 40,
+                        child: const Icon(
+                          Icons.local_hospital,
+                          color: Color(0xFFDC3545),
+                          size: 40,
                         ),
                       ),
-                      Container(
-                        width: 280,
-                        height: 280,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: const Color(0xFF007AFF).withOpacity(0.15),
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Hospital markers
-                Positioned(
-                  top: MediaQuery.of(context).size.height * 0.07,
-                  left: MediaQuery.of(context).size.width * 0.25,
-                  child: _buildMapMarker('1'),
-                ),
-                Positioned(
-                  top: MediaQuery.of(context).size.height * 0.10,
-                  right: MediaQuery.of(context).size.width * 0.15,
-                  child: _buildMapMarker('2'),
-                ),
-                Positioned(
-                  bottom: MediaQuery.of(context).size.height * 0.09,
-                  left: MediaQuery.of(context).size.width * 0.18,
-                  child: _buildMapMarker('3'),
-                ),
-                // Zoom controls
-                Positioned(
-                  bottom: 16,
-                  right: 16,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                        ),
-                      ],
                     ),
-                    child: Column(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.add, size: 20),
-                          onPressed: () {},
-                          color: const Color(0xFF1C100D),
-                        ),
-                        Container(
-                          height: 1,
-                          width: 32,
-                          color: Colors.grey.withOpacity(0.2),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.remove, size: 20),
-                          onPressed: () {},
-                          color: const Color(0xFF1C100D),
-                        ),
-                      ],
-                    ),
-                  ),
+                  ],
                 ),
               ],
-            ),
-          ),
-
-          // Filter Chips
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: List.generate(_filters.length, (index) {
-                  final isSelected = _selectedFilter == index;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: GestureDetector(
-                      onTap: () => setState(() => _selectedFilter = index),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? const Color(0xFFFF8800)
-                              : const Color(0xFFF0F0F0),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: isSelected
-                                ? const Color(0xFFFF8800)
-                                : Colors.grey.withOpacity(0.2),
-                            width: 1,
-                          ),
-                        ),
-                        child: Text(
-                          _filters[index],
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: isSelected
-                                ? Colors.white
-                                : const Color(0xFF666666),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ),
-            ),
-          ),
-
-          // Hospital List
-          Expanded(
-            child: Container(
-              color: const Color(0xFFF8F7F5),
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: _hospitals.length,
-                itemBuilder: (context, index) {
-                  final hospital = _hospitals[index];
-                  return _buildHospitalCard(hospital, index == 0);
-                },
-              ),
-            ),
-          ),
-
-          // Bottom Action Bar
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0F8FF),
-              border: Border(
-                top: BorderSide(
-                  color: const Color(0xFF007AFF).withOpacity(0.3),
-                  width: 2,
-                ),
-              ),
-            ),
-            child: SafeArea(
-              top: false,
+            )
+          else
+            Center(
               child: Column(
-                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Row(
+                  if (hospitalState.isLoadingLocation)
+                    const CircularProgressIndicator(color: Color(0xFFFF8800))
+                  else if (hospitalState.error != null)
+                    Column(
                       children: [
-                        Text('💡', style: TextStyle(fontSize: 16)),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Mẹo: Gọi trước để xác nhận có huyết thanh.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF1C100D),
-                            ),
+                        const Icon(
+                          Icons.location_off,
+                          size: 48,
+                          color: Color(0xFF999999),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          hospitalState.error!,
+                          style: const TextStyle(
+                            color: Color(0xFF666666),
+                            fontSize: 14,
                           ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () {
+                            ref
+                                .read(hospitalProvider.notifier)
+                                .getCurrentLocation();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFF8800),
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Thử lại'),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 54,
-                    child: ElevatedButton(
-                      onPressed: _showCompletionDialog,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFF8800),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'HOÀN THÀNH HỖ TRỢ',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
-          ),
+          // Loading overlay
+          if (hospitalState.isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.3),
+              child: const Center(
+                child: CircularProgressIndicator(color: Color(0xFFFF8800)),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildMapMarker(String number) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: const Color(0xFFDC3545),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8),
-            ],
-          ),
-          child: Center(
-            child: Text(
-              number,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+  Widget _buildHospitalList() {
+    final hospitalState = ref.watch(hospitalProvider);
+
+    return Expanded(
+      child: Container(
+        color: const Color(0xFFF8F7F5),
+        child: hospitalState.isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: Color(0xFFFF8800)),
+              )
+            : hospitalState.error != null
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        size: 64,
+                        color: Color(0xFF999999),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        hospitalState.error!,
+                        style: const TextStyle(
+                          color: Color(0xFF666666),
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () {
+                          ref.read(hospitalProvider.notifier).refresh();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF8800),
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Thử lại'),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : hospitalState.hasHospitals
+            ? ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: hospitalState.hospitals.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == hospitalState.hospitals.length) {
+                    // Info card at the end
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF3E0),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFFFF8800).withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.info_outline,
+                            color: Color(0xFFFF8800),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Danh sách các bệnh viện gần bạn. Kéo xuống để làm mới.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[800],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final hospital = hospitalState.hospitals[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: _buildHospitalCard(hospital, index == 0),
+                  );
+                },
+              )
+            : const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.location_searching,
+                        size: 64,
+                        color: Color(0xFF999999),
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Đang tìm bệnh viện gần bạn...',
+                        style: TextStyle(
+                          color: Color(0xFF666666),
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
-        ),
-        CustomPaint(size: const Size(8, 6), painter: _MarkerArrowPainter()),
-      ],
+      ),
     );
   }
 
-  Widget _buildHospitalCard(Map<String, dynamic> hospital, bool isHighlighted) {
+  Widget _buildHospitalCard(HospitalResponse hospital, bool isHighlighted) {
+    final hospitalState = ref.watch(hospitalProvider);
+    final isSelected =
+        hospitalState.hasSelectedHospital &&
+        hospitalState.selectedHospitalPricing!.hospitalId == hospital.id;
+    final isAnotherSelected =
+        hospitalState.hasSelectedHospital &&
+        hospitalState.selectedHospitalPricing!.hospitalId != hospital.id;
+
+    // Calculate estimated duration (rough estimate: 30 km/h average)
+    final durationMinutes = (hospital.distanceKm * 2).round();
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: isHighlighted
+        border: isSelected
+            ? Border.all(color: const Color(0xFF28A745), width: 2)
+            : (isHighlighted && !isAnotherSelected)
             ? Border.all(color: const Color(0xFFFF8800), width: 2)
             : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isHighlighted ? 0.1 : 0.05),
-            blurRadius: isHighlighted ? 12 : 8,
+            color: Colors.black.withOpacity(
+              isSelected ? 0.12 : (isHighlighted ? 0.1 : 0.05),
+            ),
+            blurRadius: isSelected ? 12 : (isHighlighted ? 12 : 8),
             offset: const Offset(0, 2),
           ),
         ],
@@ -645,13 +836,50 @@ class _FindHospitalScreenState extends State<FindHospitalScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(
-                  hospital['name'],
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1C100D),
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      hospital.name,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1C100D),
+                      ),
+                    ),
+                    if (isSelected) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF28A745).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              size: 14,
+                              color: Color(0xFF28A745),
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'Đã chọn',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF28A745),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               Container(
@@ -664,7 +892,7 @@ class _FindHospitalScreenState extends State<FindHospitalScreen> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  hospital['distance'],
+                  '${hospital.distanceKm.toStringAsFixed(1)} km',
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
@@ -676,66 +904,69 @@ class _FindHospitalScreenState extends State<FindHospitalScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            hospital['duration'],
+            '~$durationMinutes phút lái xe',
             style: const TextStyle(fontSize: 13, color: Color(0xFF999999)),
           ),
           const SizedBox(height: 12),
-          ...List.generate(hospital['features'].length, (index) {
-            final feature = hospital['features'][index];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                children: [
-                  Icon(feature['icon'], size: 16, color: feature['color']),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      feature['text'],
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF1C100D),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-          const SizedBox(height: 12),
           Row(
             children: [
-              const Icon(Icons.star, size: 16, color: Color(0xFFFFC107)),
-              const SizedBox(width: 4),
-              Text(
-                hospital['rating'].toString(),
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1C100D),
+              const Icon(Icons.location_on, size: 16, color: Color(0xFF666666)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  hospital.address,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF1C100D),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '(${hospital['reviews']} đánh giá)',
-                style: const TextStyle(fontSize: 13, color: Color(0xFF999999)),
               ),
             ],
           ),
+          if (hospital.contactNumber != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.phone, size: 16, color: Color(0xFF666666)),
+                const SizedBox(width: 8),
+                Text(
+                  hospital.contactNumber!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF1C100D),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () => _openGoogleMaps(
-                    hospital['latitude'],
-                    hospital['longitude'],
-                    hospital['name'],
+                  onPressed: isAnotherSelected
+                      ? null
+                      : isSelected
+                      ? () => _openGoogleMaps(
+                          hospital.latitude,
+                          hospital.longitude,
+                          hospital.name,
+                        )
+                      : () => _selectAndReportHospital(hospital),
+                  icon: Icon(
+                    isSelected ? Icons.directions : Icons.check,
+                    size: 18,
                   ),
-                  icon: const Icon(Icons.directions, size: 18),
-                  label: const Text('Chỉ đường'),
+                  label: Text(isSelected ? 'Chỉ đường' : 'Chọn bệnh viện'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF8800),
-                    foregroundColor: Colors.white,
+                    backgroundColor: isAnotherSelected
+                        ? Colors.grey.shade300
+                        : (isSelected
+                              ? const Color(0xFFFF8800)
+                              : const Color(0xFF28A745)),
+                    foregroundColor: isAnotherSelected
+                        ? Colors.grey.shade500
+                        : Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
@@ -744,48 +975,187 @@ class _FindHospitalScreenState extends State<FindHospitalScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => _makePhoneCall(hospital['phone']),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFFF8800),
-                    side: const BorderSide(color: Color(0xFFFF8800), width: 2),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              if (hospital.contactNumber != null) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => _makePhoneCall(hospital.contactNumber!),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFFF8800),
+                      side: const BorderSide(
+                        color: Color(0xFFFF8800),
+                        width: 2,
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Gọi BV',
+                      style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
-                  child: const Text(
-                    'Gọi BV',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ],
       ),
     );
   }
-}
 
-class _MarkerArrowPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFFDC3545)
-      ..style = PaintingStyle.fill;
+  Widget _buildBottomActionBar() {
+    final hospitalState = ref.watch(hospitalProvider);
+    final hasSelected = hospitalState.hasSelectedHospital;
+    final pricing = hospitalState.selectedHospitalPricing;
 
-    final path = Path()
-      ..moveTo(size.width / 2, size.height)
-      ..lineTo(0, 0)
-      ..lineTo(size.width, 0)
-      ..close();
-
-    canvas.drawPath(path, paint);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: hasSelected ? const Color(0xFFF0FFF4) : const Color(0xFFF0F8FF),
+        border: Border(
+          top: BorderSide(
+            color: hasSelected
+                ? const Color(0xFF28A745).withOpacity(0.3)
+                : const Color(0xFF007AFF).withOpacity(0.3),
+            width: 2,
+          ),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (hasSelected && pricing != null) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.check_circle,
+                          color: Color(0xFF28A745),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            pricing.hospitalName,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1C100D),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Tổng chi phí:',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF666666),
+                          ),
+                        ),
+                        Text(
+                          '${pricing.totalPrice.toStringAsFixed(0)}đ',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFFF8800),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Phí cứu hộ: ${pricing.baseMissionPrice.toStringAsFixed(0)}đ + '
+                      'Phí chuyển viện: ${pricing.hospitalTransferPrice.toStringAsFixed(0)}đ',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF999999),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ] else ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  children: [
+                    Text('💡', style: TextStyle(fontSize: 16)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Mẹo: Gọi trước để xác nhận có huyết thanh.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF1C100D),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: ElevatedButton(
+                onPressed: hasSelected ? _showCompletionDialog : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: hasSelected
+                      ? const Color(0xFFFF8800)
+                      : Colors.grey.shade300,
+                  foregroundColor: hasSelected
+                      ? Colors.white
+                      : Colors.grey.shade500,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  hasSelected
+                      ? 'HOÀN THÀNH HỖ TRỢ'
+                      : 'CHỌN BỆNH VIỆN ĐỂ TIẾP TỤC',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

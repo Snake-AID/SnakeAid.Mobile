@@ -26,7 +26,6 @@ import 'package:snakeaid_mobile/features/emergency/screens/members/snake_selecti
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_identification_questions_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_filtered_results_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_confirmation_screen.dart';
-import 'package:snakeaid_mobile/features/emergency/screens/members/generic_first_aid_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/first_aid_steps_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/models/sos_incident_response.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/symptom_report_screen.dart';
@@ -61,8 +60,6 @@ import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_feedback_screen
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_id_documents_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_mission_detail_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_navigation_screen.dart';
-import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_arrived_screen.dart'
-    as rescuer_screens;
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_support_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/find_hospital_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/mission_completion_screen.dart';
@@ -407,11 +404,6 @@ final router = GoRouter(
       },
     ),
     GoRoute(
-      path: '/rescuer/arrived',
-      name: 'rescuer_arrived',
-      builder: (context, state) => const rescuer_screens.RescuerArrivedScreen(),
-    ),
-    GoRoute(
       path: '/rescuer/support',
       name: 'rescuer_support',
       builder: (context, state) {
@@ -511,11 +503,6 @@ final router = GoRouter(
           matchedFeaturesCount: data['matchedFeaturesCount'] as int,
         );
       },
-    ),
-    GoRoute(
-      path: '/generic-first-aid',
-      name: 'generic_first_aid',
-      builder: (context, state) => const GenericFirstAidScreen(),
     ),
     GoRoute(
       path: '/first-aid-steps',
