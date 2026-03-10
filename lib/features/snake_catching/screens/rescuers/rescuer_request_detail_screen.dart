@@ -387,7 +387,9 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
       ),
       
       // Sticky Footer Actions
-      bottomSheet: _buildStickyFooter(),
+      bottomSheet: (_requestData != null && _requestData!.status != 'Pending')
+          ? null
+          : _buildStickyFooter(),
     );
   }
 
@@ -1451,6 +1453,10 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
   }
 
   Widget _buildStickyFooter() {
+    // Only show accept button for Pending requests
+    if (_requestData != null && _requestData!.status != 'Pending') {
+      return const SizedBox.shrink();
+    }
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(

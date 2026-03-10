@@ -195,11 +195,11 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
 
     final speciesRepository = ref.read(snakeSpeciesRepositoryProvider);
 
-    // Get unique species IDs
-    final speciesIds = _request!.details
-        .map((detail) => detail.snakeSpeciesId)
-        .toSet()
-        .toList();
+    // Get unique species IDs from both reported details AND mission details
+    final speciesIds = {
+      ..._request!.details.map((d) => d.snakeSpeciesId),
+      ...(_request!.mission?.missionDetails ?? []).map((d) => d.snakeSpeciesId),
+    }.toList();
 
     for (final speciesId in speciesIds) {
       // Skip if already loaded
@@ -256,7 +256,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           // Transfer if somehow not done yet in this session (e.g. app was in background)
           if (!_hasTransferredToRescuer) {
             _hasTransferredToRescuer = true;
-            ref.read(payosRepositoryProvider).transferToRescuer(widget.requestId);
+            ref.read(payosRepositoryProvider).transferToRescuer(widget.requestId).then((_) {
+              if (mounted) _silentRefresh();
+            });
           }
         }
       }
@@ -1490,45 +1492,62 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
 
           // Species Section — caught snakes when Finished/Paid/Completed; reported snakes otherwise
           if ((request.status == 'Finished' || request.status == 'Paid' ||
-               request.status == 'Completed') && request.details.isNotEmpty) ...[
-            const SizedBox(height: 24),
+               request.status == 'Completed')) ...[
             Builder(builder: (_) {
-              // Build quantity map from actual missionDetails (rescuer-confirmed)
               final missionDetails = request.mission?.missionDetails ?? [];
-              final Map<int, int> missionQtyMap = {
-                for (final md in missionDetails) md.snakeSpeciesId: md.quantity,
-              };
-              final int displayCount = missionDetails.isNotEmpty
-                  ? missionDetails.fold(0, (s, d) => s + d.quantity)
-                  : request.details.fold(0, (s, d) => s + d.quantity);
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      'Rắn Đã Bắt Được ($displayCount)',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF333333),
+              // Prefer missionDetails (rescuer-confirmed catches); fall back to request.details
+              if (missionDetails.isNotEmpty) {
+                final int total = missionDetails.fold(0, (s, d) => s + d.quantity);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 24),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'Rắn Đã Bắt Được ($total)',
+                        style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF333333),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: request.details.map((detail) => _buildSpeciesChip(
-                        detail,
-                        quantityOverride: missionQtyMap[detail.snakeSpeciesId],
-                      )).toList(),
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Wrap(
+                        spacing: 8, runSpacing: 8,
+                        children: missionDetails.map(_buildMissionSpeciesChip).toList(),
+                      ),
                     ),
-                  ),
-                ],
-              );
+                  ],
+                );
+              } else if (request.details.isNotEmpty) {
+                final int total = request.details.fold(0, (s, d) => s + d.quantity);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 24),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'Rắn Đã Bắt Được ($total)',
+                        style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF333333),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Wrap(
+                        spacing: 8, runSpacing: 8,
+                        children: request.details.map((d) => _buildSpeciesChip(d)).toList(),
+                      ),
+                    ),
+                  ],
+                );
+              }
+              return const SizedBox.shrink();
             }),
           ] else if (request.details.isNotEmpty) ...[
             const SizedBox(height: 24),
@@ -2344,7 +2363,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       if (request.mission?.catchingEnvironment != null) ...[  
                         const SizedBox(height: 6),
                         _buildPayRow(
-                          'Phí môi trường (${request.mission!.catchingEnvironment!.name}):',
+                          'Phụ phí khu vực (${request.mission!.catchingEnvironment!.name}):',
                           _formatCurrency(request.mission!.catchingEnvironment!.price),
                           icon: Icons.home_work_outlined,
                         ),
@@ -2611,7 +2630,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 if (envFee > 0) ...[
                   const SizedBox(height: 8),
                   _buildPayRow(
-                    'Phí môi trường${envName != null ? ' ($envName)' : ''}:',
+                    'Phụ phí khu vực${envName != null ? ' ($envName)' : ''}:',
                     _formatCurrency(envFee),
                     icon: Icons.home_work_outlined,
                   ),
@@ -2891,6 +2910,116 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildMissionSpeciesChip(MissionDetailItem md) {
+    final speciesDetail = _speciesDetailsMap[md.snakeSpeciesId];
+    final isLoading = _loadingSpeciesIds.contains(md.snakeSpeciesId);
+    return InkWell(
+      onTap: speciesDetail != null ? () => _showSpeciesDetailModal(speciesDetail, md.quantity) : null,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE0E0E0)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (speciesDetail?.imageUrl != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  speciesDetail!.imageUrl!,
+                  width: 80, height: 80, fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _buildImagePlaceholder(),
+                  loadingBuilder: (_, child, progress) =>
+                      progress == null ? child : _buildImagePlaceholder(),
+                ),
+              )
+            else if (isLoading)
+              _buildImagePlaceholder()
+            else
+              Container(
+                width: 80, height: 80,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF9800).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.pest_control, color: Color(0xFFFF9800), size: 40),
+              ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          md.snakeSpeciesName,
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+                          maxLines: 2, overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (speciesDetail?.isVenomous == true) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('ĐỘC',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red)),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  if (speciesDetail?.scientificName.isNotEmpty == true)
+                    Text(
+                      speciesDetail!.scientificName,
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600], fontStyle: FontStyle.italic),
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                    ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      if (speciesDetail != null) ...[
+                        _buildRiskLevelBadge(speciesDetail.riskLevel),
+                        const SizedBox(width: 8),
+                      ],
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF228B22).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'SL: ${md.quantity}',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF228B22)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (speciesDetail != null) ...[
+                    const SizedBox(height: 8),
+                    Text('Nhấn để xem chi tiết',
+                        style: TextStyle(fontSize: 11, color: Colors.grey[500], fontStyle: FontStyle.italic)),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

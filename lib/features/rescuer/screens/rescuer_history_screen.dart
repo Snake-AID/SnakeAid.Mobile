@@ -1,73 +1,169 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../snake_catching/models/snake_catching_request.dart';
+import '../../snake_catching/repository/snake_catching_repository.dart';
+import '../../snake_catching/screens/rescuers/rescuer_mission_success_screen.dart';
+import '../../snake_catching/screens/rescuers/rescuer_request_detail_screen.dart';
 
-/// Rescuer History Screen - View rescue mission history with filters and statistics
-/// Màn hình lịch sử cứu hộ với bộ lọc và thống kê
-class RescuerHistoryScreen extends StatefulWidget {
+class RescuerHistoryScreen extends ConsumerStatefulWidget {
   const RescuerHistoryScreen({super.key});
 
   @override
-  State<RescuerHistoryScreen> createState() => _RescuerHistoryScreenState();
+  ConsumerState<RescuerHistoryScreen> createState() =>
+      _RescuerHistoryScreenState();
 }
 
-class _RescuerHistoryScreenState extends State<RescuerHistoryScreen> {
+class _RescuerHistoryScreenState extends ConsumerState<RescuerHistoryScreen> {
   int _selectedTabIndex = 0;
+  final List<String> _tabs = ['Tất cả', 'Hoàn thành', 'Đã hủy'];
 
-  final List<String> _tabs = ['Tất cả', 'Hoàn thành', 'Đã hủy', 'Tháng này'];
+  bool _isLoading = false;
+  String? _errorMessage;
+  List<SnakeCatchingRequestData> _allHistory = [];
+  String? _currentRescuerId;
 
-  // Mock data
-  final List<Map<String, dynamic>> _missions = [
-    {
-      'id': '#RSC-2025-1234',
-      'status': 'completed',
-      'date': '15 Thg 12, 2025',
-      'time': '14:30',
-      'snakeName': 'Rắn Hổ Mang',
-      'snakeImage': 'https://via.placeholder.com/60',
-      'location': '123 Nguyễn Huệ, Q.1',
-      'distance': '5.2 km',
-      'duration': '45 phút',
-      'rating': 5.0,
-      'income': '200,000 VNĐ',
-    },
-    {
-      'id': '#RSC-2025-1233',
-      'status': 'completed',
-      'date': '14 Thg 12, 2025',
-      'time': '10:15',
-      'snakeName': 'Rắn Lục',
-      'snakeImage': 'https://via.placeholder.com/60',
-      'location': '456 Lê Lợi, Q.3',
-      'distance': '3.1 km',
-      'duration': '25 phút',
-      'rating': 4.0,
-      'income': '150,000 VNĐ',
-    },
-    {
-      'id': '#RSC-2025-1232',
-      'status': 'cancelled',
-      'date': '13 Thg 12, 2025',
-      'time': '16:45',
-      'snakeName': 'Rắn Ráo',
-      'snakeImage': 'https://via.placeholder.com/60',
-      'location': '789 Trần Hưng Đạo, Q.5',
-      'distance': '7.8 km',
-      'duration': '0 phút',
-      'rating': 0.0,
-      'income': '0 VNĐ',
-    },
-  ];
+  static const _completedStatuses = {
+    'Completed',
+    'Paid',
+    'Finished',
+    'MissionCompleted'
+  };
 
-  List<Map<String, dynamic>> get _filteredMissions {
+  List<SnakeCatchingRequestData> get _filtered {
     switch (_selectedTabIndex) {
-      case 1: // Hoàn thành
-        return _missions.where((m) => m['status'] == 'completed').toList();
-      case 2: // Đã hủy
-        return _missions.where((m) => m['status'] == 'cancelled').toList();
-      case 3: // Tháng này
-        return _missions; // Mock: return all for now
-      default: // Tất cả
-        return _missions;
+      case 1:
+        return _allHistory
+            .where((r) => _completedStatuses.contains(r.status))
+            .toList();
+      case 2:
+        return _allHistory.where((r) => r.status == 'Cancelled').toList();
+      default:
+        return _allHistory;
+    }
+  }
+
+  int get _completedCount =>
+      _allHistory.where((r) => _completedStatuses.contains(r.status)).length;
+
+  double get _successRate =>
+      _allHistory.isEmpty ? 0 : _completedCount / _allHistory.length;
+
+  double get _totalIncome => _allHistory.fold<double>(
+        0,
+        (sum, r) => sum + (r.mission?.actualCost ?? r.estimatedPrice ?? 0),
+      );
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _init());
+  }
+
+  Future<void> _init() async {
+    final prefs = await SharedPreferences.getInstance();
+    _currentRescuerId = prefs.getString('userId') ?? prefs.getString('rescuerId');
+    await _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final repo = ref.read(snakeCatchingRepositoryProvider);
+      final response = await repo.getRequests();
+      if (!mounted) return;
+      if (response.isSuccess) {
+        setState(() {
+          _allHistory = response.data.where((r) {
+            final isHistoryStatus = _completedStatuses.contains(r.status) ||
+                r.status == 'Cancelled';
+            if (!isHistoryStatus) return false;
+            if (_currentRescuerId != null) {
+              return r.assignedRescuerId == _currentRescuerId;
+            }
+            return true;
+          }).toList()
+            ..sort((a, b) => b.requestDate.compareTo(a.requestDate));
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage = response.message;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  String _formatDate(DateTime dt) => DateFormat('dd/MM/yyyy').format(dt);
+  String _formatTime(DateTime dt) => DateFormat('HH:mm').format(dt);
+
+  String _formatCurrency(double amount) {
+    if (amount == 0) return '0 VNĐ';
+    if (amount >= 1000000) {
+      return '${(amount / 1000000).toStringAsFixed(1)}M VNĐ';
+    }
+    return '${NumberFormat('#,###').format(amount.toInt())} VNĐ';
+  }
+
+  String _snakeLabel(SnakeCatchingRequestData r) {
+    final mds = r.mission?.missionDetails ?? [];
+    if (mds.isNotEmpty) {
+      if (mds.length == 1) {
+        return '${mds.first.snakeSpeciesName} ×${mds.first.quantity}';
+      }
+      return '${mds.first.snakeSpeciesName} +${mds.length - 1} loài';
+    }
+    final ds = r.details;
+    if (ds.isNotEmpty) {
+      if (ds.length == 1) {
+        return '${ds.first.snakeSpeciesName} ×${ds.first.quantity}';
+      }
+      return '${ds.first.snakeSpeciesName} +${ds.length - 1} loài';
+    }
+    return 'Không rõ loài rắn';
+  }
+
+  double _rating(SnakeCatchingRequestData r) {
+    if (r.feedbacks.isEmpty) return 0;
+    return r.feedbacks.map((f) => f.rating.toDouble()).reduce((a, b) => a + b) /
+        r.feedbacks.length;
+  }
+
+  double _income(SnakeCatchingRequestData r) =>
+      r.mission?.actualCost ?? r.estimatedPrice ?? 0;
+
+  bool _isCompleted(SnakeCatchingRequestData r) =>
+      _completedStatuses.contains(r.status);
+
+  void _openDetail(SnakeCatchingRequestData r) {
+    final mission = r.mission;
+    if (_isCompleted(r)) {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => RescuerMissionSuccessScreen(
+          requestData: r,
+          missionId: mission?.id ?? r.id,
+        ),
+      ));
+    } else {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => RescuerRequestDetailScreen(
+          requestId: r.id,
+          requestData: r,
+        ),
+      ));
     }
   }
 
@@ -76,17 +172,32 @@ class _RescuerHistoryScreenState extends State<RescuerHistoryScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7F5),
       appBar: _buildAppBar(),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildStatsSection(),
-            _buildTabsSection(),
-            ..._filteredMissions.map((mission) => _buildMissionCard(mission)),
-            _buildBottomStatsCard(),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFFFF8800)))
+          : _errorMessage != null
+              ? _buildError()
+              : RefreshIndicator(
+                  color: const Color(0xFFFF8800),
+                  onRefresh: _loadHistory,
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(child: _buildStatsSection()),
+                      SliverToBoxAdapter(child: _buildTabsSection()),
+                      if (_filtered.isEmpty)
+                        SliverFillRemaining(
+                            hasScrollBody: false, child: _buildEmpty())
+                      else
+                        SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (_, i) => _buildCard(_filtered[i]),
+                            childCount: _filtered.length,
+                          ),
+                        ),
+                      const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                    ],
+                  ),
+                ),
     );
   }
 
@@ -109,71 +220,56 @@ class _RescuerHistoryScreenState extends State<RescuerHistoryScreen> {
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.tune, color: Color(0xFF1D150C)),
-          onPressed: () {
-            // Show filter dialog
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Bộ lọc - Đang phát triển')),
-            );
-          },
+          icon: const Icon(Icons.refresh, color: Color(0xFF1D150C)),
+          onPressed: _loadHistory,
+          tooltip: 'Làm mới',
         ),
       ],
     );
   }
 
   Widget _buildStatsSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
         child: Row(
           children: [
-            _buildStatItem('87', 'Tổng số', const Color(0xFF1D150C)),
-            Container(width: 1, height: 60, color: const Color(0xFFE5E5E5)),
-            _buildStatItem('95%', 'Thành công', const Color(0xFF10B981)),
-            Container(width: 1, height: 60, color: const Color(0xFFE5E5E5)),
-            _buildStatItem('52,8M', 'Tổng thu', const Color(0xFF10B981)),
+            _statCell(_allHistory.length.toString(), 'Tổng số',
+                const Color(0xFF1D150C)),
+            Container(
+                width: 1, height: 60, color: const Color(0xFFE5E5E5)),
+            _statCell('${(_successRate * 100).toStringAsFixed(0)}%',
+                'Thành công', const Color(0xFF10B981)),
+            Container(
+                width: 1, height: 60, color: const Color(0xFFE5E5E5)),
+            _statCell(_formatCurrency(_totalIncome), 'Tổng thu',
+                const Color(0xFF10B981)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatItem(String value, String label, Color color) {
+  Widget _statCell(String value, String label, Color color) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-        ),
+        color: Colors.white,
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
+            Text(value,
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: color)),
             const SizedBox(height: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF999999),
-              ),
-            ),
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF999999))),
           ],
         ),
       ),
@@ -181,31 +277,26 @@ class _RescuerHistoryScreenState extends State<RescuerHistoryScreen> {
   }
 
   Widget _buildTabsSection() {
+    final labels = ['Tất cả', 'Hoàn thành', 'Đã hủy'];
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(top: 12, bottom: 8),
       decoration: const BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: Color(0xFFE5E5E5), width: 1),
-        ),
+            bottom: BorderSide(color: Color(0xFFE5E5E5), width: 1)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: List.generate(_tabs.length, (index) {
-          final isSelected = _selectedTabIndex == index;
+        children: List.generate(labels.length, (i) {
+          final selected = _selectedTabIndex == i;
           return GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedTabIndex = index;
-              });
-            },
+            onTap: () => setState(() => _selectedTabIndex = i),
             child: Container(
               margin: const EdgeInsets.only(right: 24),
               padding: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
                 border: Border(
                   bottom: BorderSide(
-                    color: isSelected
+                    color: selected
                         ? const Color(0xFFFF8800)
                         : Colors.transparent,
                     width: 2,
@@ -213,11 +304,12 @@ class _RescuerHistoryScreenState extends State<RescuerHistoryScreen> {
                 ),
               ),
               child: Text(
-                _tabs[index],
+                labels[i],
                 style: TextStyle(
                   fontSize: 14,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected
+                  fontWeight:
+                      selected ? FontWeight.bold : FontWeight.w500,
+                  color: selected
                       ? const Color(0xFF1D150C)
                       : const Color(0xFF999999),
                 ),
@@ -229,296 +321,242 @@ class _RescuerHistoryScreenState extends State<RescuerHistoryScreen> {
     );
   }
 
-  Widget _buildMissionCard(Map<String, dynamic> mission) {
-    final isCompleted = mission['status'] == 'completed';
-    final isCancelled = mission['status'] == 'cancelled';
+  Widget _buildCard(SnakeCatchingRequestData r) {
+    final completed = _isCompleted(r);
+    final cancelled = r.status == 'Cancelled';
+    final rating = _rating(r);
+    final income = _income(r);
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header: ID and Status
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  mission['id'],
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF999999),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isCompleted
-                        ? const Color(0xFF10B981).withOpacity(0.1)
-                        : isCancelled
-                            ? const Color(0xFFEF4444).withOpacity(0.1)
-                            : const Color(0xFFF59E0B).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    isCompleted
-                        ? 'HOÀN THÀNH'
-                        : isCancelled
-                            ? 'ĐÃ HỦY'
-                            : 'ĐANG XỬ LÝ',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: isCompleted
-                          ? const Color(0xFF10B981)
-                          : isCancelled
-                              ? const Color(0xFFEF4444)
-                              : const Color(0xFFF59E0B),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Date and Time
-            Row(
-              children: [
-                const Icon(
-                  Icons.schedule,
-                  size: 16,
-                  color: Color(0xFF999999),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '${mission['date']} - ${mission['time']}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1D150C),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Snake Info
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    color: const Color(0xFFE5E5E5),
-                    image: DecorationImage(
-                      image: NetworkImage(mission['snakeImage']),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        mission['snakeName'],
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1D150C),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.location_on,
-                            size: 14,
-                            color: Color(0xFF999999),
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              mission['location'],
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF999999),
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${mission['distance']} • ${mission['duration']}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF999999),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Rating and Income
-            if (isCompleted)
+    return GestureDetector(
+      onTap: () => _openDetail(r),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      ...List.generate(5, (index) {
-                        return Icon(
-                          Icons.star,
-                          size: 16,
-                          color: index < mission['rating']
-                              ? const Color(0xFFFFC107)
-                              : const Color(0xFFE5E5E5),
-                        );
-                      }),
-                      const SizedBox(width: 4),
-                      Text(
-                        mission['rating'].toStringAsFixed(1),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF1D150C),
-                        ),
-                      ),
-                    ],
-                  ),
                   Text(
-                    mission['income'],
+                    '#${r.id.length >= 8 ? r.id.substring(0, 8).toUpperCase() : r.id.toUpperCase()}',
                     style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF10B981),
-                    ),
+                        fontSize: 11,
+                        color: Color(0xFF999999),
+                        fontFamily: 'monospace'),
                   ),
+                  _statusBadge(r.status),
                 ],
               ),
-
-            // View Detail Button
-            if (isCompleted || isCancelled)
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {
-                    context.pushNamed('rescuer_history_detail', extra: mission);
-                  },
-                  child: const Text(
-                    'Xem Chi Tiết',
-                    style: TextStyle(
+              const SizedBox(height: 8),
+              Row(children: [
+                const Icon(Icons.schedule,
+                    size: 13, color: Color(0xFF999999)),
+                const SizedBox(width: 5),
+                Text(
+                  '${_formatDate(r.requestDate)}  ${_formatTime(r.requestDate)}',
+                  style: const TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF2563EB),
-                    ),
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1D150C)),
+                ),
+              ]),
+              const SizedBox(height: 5),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Icon(Icons.location_on,
+                    size: 13, color: Color(0xFF999999)),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(r.address,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF666666)),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis),
+                ),
+              ]),
+              const SizedBox(height: 5),
+              Row(children: [
+                const Icon(Icons.pest_control,
+                    size: 13, color: Color(0xFF999999)),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(_snakeLabel(r),
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF1D150C)),
+                      overflow: TextOverflow.ellipsis),
+                ),
+                if (r.distanceKm != null) ...[
+                  const SizedBox(width: 8),
+                  Text('${r.distanceKm!.toStringAsFixed(1)} km',
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF999999))),
+                ],
+              ]),
+              if (cancelled && r.cancellationReason != null) ...[
+                const SizedBox(height: 5),
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Icon(Icons.info_outline,
+                      size: 13, color: Color(0xFFEF4444)),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text('Lý do: ${r.cancellationReason}',
+                        style: const TextStyle(
+                            fontSize: 11, color: Color(0xFFEF4444)),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                ]),
+              ],
+              if (completed) ...[
+                const SizedBox(height: 10),
+                const Divider(height: 1, color: Color(0xFFF0F0F0)),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(children: [
+                      ...List.generate(
+                          5,
+                          (i) => Icon(Icons.star,
+                              size: 14,
+                              color: i < rating.round()
+                                  ? const Color(0xFFFFC107)
+                                  : const Color(0xFFE5E5E5))),
+                      const SizedBox(width: 4),
+                      Text(
+                        rating > 0 ? rating.toStringAsFixed(1) : '—',
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF1D150C)),
+                      ),
+                    ]),
+                    Row(children: [
+                      const Icon(Icons.monetization_on,
+                          size: 14, color: Color(0xFF10B981)),
+                      const SizedBox(width: 3),
+                      Text(_formatCurrency(income),
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF10B981))),
+                    ]),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                height: 38,
+                child: ElevatedButton.icon(
+                  onPressed: () => _openDetail(r),
+                  icon: const Icon(Icons.visibility, size: 15),
+                  label: const Text('Xem Chi Tiết',
+                      style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: completed
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFF6B7280),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _statusBadge(String status) {
+    final completed = _completedStatuses.contains(status);
+    final cancelled = status == 'Cancelled';
+    final bg = completed
+        ? const Color(0xFF10B981).withOpacity(0.1)
+        : cancelled
+            ? const Color(0xFFEF4444).withOpacity(0.1)
+            : const Color(0xFFF59E0B).withOpacity(0.1);
+    final fg = completed
+        ? const Color(0xFF10B981)
+        : cancelled
+            ? const Color(0xFFEF4444)
+            : const Color(0xFFF59E0B);
+    final label = completed
+        ? 'HOÀN THÀNH'
+        : cancelled
+            ? 'ĐÃ HỦY'
+            : status.toUpperCase();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
+      child: Text(label,
+          style: TextStyle(
+              fontSize: 10, fontWeight: FontWeight.bold, color: fg)),
+    );
+  }
+
+  Widget _buildEmpty() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.history_toggle_off,
+              size: 64, color: Colors.grey.shade300),
+          const SizedBox(height: 12),
+          Text('Chưa có lịch sử',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey.shade500)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline,
+                size: 48, color: Color(0xFFEF4444)),
+            const SizedBox(height: 12),
+            Text(_errorMessage ?? 'Đã xảy ra lỗi',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Color(0xFF666666))),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _loadHistory,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Thử lại'),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF8800),
+                  foregroundColor: Colors.white),
+            ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildBottomStatsCard() {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          _buildStatRow(
-            Icons.star,
-            'Đánh giá TB:',
-            '4.8/5.0',
-          ),
-          const SizedBox(height: 16),
-          _buildStatRow(
-            Icons.pest_control,
-            'Loài hay gặp:',
-            'Rắn Hổ Mang',
-          ),
-          const SizedBox(height: 16),
-          _buildStatRow(
-            Icons.history,
-            'Giờ cao điểm:',
-            '14h-18h',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: const Color(0xFFFF8800).withOpacity(0.2),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            icon,
-            color: const Color(0xFFFF8800),
-            size: 20,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: RichText(
-            text: TextSpan(
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF1D150C),
-              ),
-              children: [
-                TextSpan(
-                  text: label,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                ),
-                const TextSpan(text: ' '),
-                TextSpan(
-                  text: value,
-                  style: const TextStyle(fontWeight: FontWeight.normal),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

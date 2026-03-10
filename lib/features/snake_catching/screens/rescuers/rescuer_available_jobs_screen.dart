@@ -8,6 +8,7 @@ import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_mission_success_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_request_detail_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_tracking_screen.dart';
+import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_history_screen.dart';
 import '../../models/snake_catching_request.dart';
 import '../../models/snake_species.dart';
 import '../../repository/snake_catching_repository.dart';
@@ -250,7 +251,7 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
   /// Fetch mission status for all active requests (re-fetches each refresh so status stays fresh)
   Future<void> _loadMissionStatusForAssigned() async {
     final repo = ref.read(snakeCatchingRepositoryProvider);
-    const activeStatuses = {'Assigned', 'Finished', 'Paid', 'Completed', 'Dispute'};
+    const activeStatuses = {'Assigned', 'Finished', 'Dispute'};
     final assignedRequests = _allRequests
         .where((r) => activeStatuses.contains(r.status))
         .toList();
@@ -424,9 +425,8 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
           break;
       }
     } else if (statusFilter == 'Accepted') {
-      // "Đơn đã nhận": filter from _allRequests by assignedRescuerId
-      // (works once BE adds assignedRescuerId to the list endpoint)
-      const activeStatuses = {'Assigned', 'Finished', 'Paid', 'Dispute', 'Completed'};
+      // "Đơn đã nhận": active orders only — Cancelled/Completed/Paid go to History
+      const activeStatuses = {'Assigned', 'Finished', 'Dispute'};
       filtered = filtered.where((request) =>
         activeStatuses.contains(request.status) &&
         request.assignedRescuerId != null &&
@@ -667,6 +667,17 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
               color: Color(0xFF1A1A1A),
             ),
           ),
+          const SizedBox(width: 8),
+          TextButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const RescuerHistoryScreen()),
+            ),
+            icon: const Icon(Icons.history_rounded, size: 16, color: Color(0xFF666666)),
+            label: const Text('Lịch sử',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF666666))),
+            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
+          ),
           const Spacer(),
           
           // Online Status Toggle - Compact
@@ -708,16 +719,6 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
                 ),
               ],
             ),
-          ),
-          
-          // Menu Icon
-          IconButton(
-            icon: const Icon(Icons.more_vert, color: Color(0xFF666666), size: 20),
-            onPressed: () {
-              // TODO: Show menu
-            },
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
           ),
         ],
       ),
@@ -1012,6 +1013,7 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
       case 'completed':
         return const Color(0xFF28A745);
       case 'dispute':
+      case 'disputed':
         return const Color(0xFFDC3545);
       case 'cancelled':
       case 'expired':
@@ -1042,6 +1044,7 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
       case 'completed':
         return 'Hoàn thành';
       case 'dispute':
+      case 'disputed':
         return 'Tranh chấp';
       case 'cancelled':
         return 'Đã hủy';
@@ -1053,7 +1056,15 @@ class _RescuerAvailableJobsScreenState extends ConsumerState<RescuerAvailableJob
   }
 
   String _resolveDisplayStatus(SnakeCatchingRequestData request) {
-    // Prefer cached mission data (fetched via detail API, since list API omits mission)
+    // Terminal request statuses always win — mission status is stale at this point.
+    // Flow: Assigned → (mission: EnRoute → Arrived) → Finished → Paid → Completed
+    const requestTerminalStatuses = {'Finished', 'Paid', 'Completed', 'Cancelled', 'Dispute'};
+    if (requestTerminalStatuses.contains(request.status)) {
+      return request.status;
+    }
+
+    // For in-flight requests (Assigned), prefer mission status so we show
+    // EnRoute / Arrived / MissionCompleted granularity.
     final cachedMission = _missionCache[request.id];
     if (cachedMission != null && cachedMission.status.isNotEmpty) {
       return cachedMission.status;

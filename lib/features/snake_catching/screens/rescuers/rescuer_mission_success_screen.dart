@@ -302,7 +302,7 @@ class _RescuerMissionSuccessScreenState
           if (_envFee > 0) ...[
             const SizedBox(height: 8),
             _buildFeeRow(
-              'Phí môi trường${_envName != null ? ' ($_envName)' : ''}:',
+              'Phụ phí khu vực${_envName != null ? ' ($_envName)' : ''}:',
               '+ ${_formatCurrency(_envFee.toInt())} VNĐ',
               valueColor: const Color(0xFF28A745),
             ),
@@ -358,7 +358,7 @@ class _RescuerMissionSuccessScreenState
           if (_envFee > 0) ...[
             const SizedBox(height: 8),
             _buildFeeRow(
-              'Phí môi trường${_envName != null ? ' ($_envName)' : ''}:',
+              'Phụ phí khu vực${_envName != null ? ' ($_envName)' : ''}:',
               '${_formatCurrency(_envFee.toInt())} VNĐ',
             ),
           ],
