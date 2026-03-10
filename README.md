@@ -7,7 +7,7 @@ This repository includes a minimal [codemagic.yaml](codemagic.yaml) for MVP buil
 Current CI direction:
 
 - Android: build a debug APK that can be downloaded from CodeMagic artifacts and installed directly on an Android device
-- iOS: compile-only check with `--no-codesign` to verify the project still builds after changes
+- iOS: build an unsigned IPA with `--no-codesign` for sideloading or TrollStore-style workflows
 
 ### Required CodeMagic Variables
 
@@ -48,12 +48,14 @@ flutter build ios --release --no-codesign
 Artifact output on CodeMagic:
 
 - `build/ios/iphoneos/*.app`
+- `build/ios/unsigned_ipa/*.ipa`
 
 Important:
 
-- This is only a compile check
-- The generated `.app` is not directly installable on a real iPhone
-- It is useful for verifying that Flutter, CocoaPods, and native iOS project settings are valid in CI
+- The generated `.ipa` is unsigned
+- The generated `.app` is still useful as a raw build artifact
+- This workflow does not use Apple signing
+- Installation still depends on the sideload method you choose later
 
 ### iOS Strategy Without Paid Apple Developer Account
 
@@ -68,8 +70,8 @@ Practical options:
 Practical conclusion:
 
 - Android is the primary installable artifact in CI today
-- iOS CI is currently used to catch native build breakage early
-- If real iPhone installation becomes necessary later, decide separately between `TrollStore`-style device-specific distribution and free Apple ID sideloading
+- iOS CI now produces an unsigned IPA artifact
+- If real iPhone installation is needed, use that IPA with the sideload path you choose, such as `TrollStore`, `AltStore`, `SideStore`, or `Sideloadly`
 
 ### After Commit / Push
 
@@ -78,7 +80,7 @@ To keep builds running smoothly on CodeMagic:
 1. Push the branch that CodeMagic is configured to build
 2. Ensure `BASE_URL` exists in CodeMagic environment variables
 3. Trigger the `android_debug` workflow for an installable Android artifact
-4. Trigger the `ios_release` workflow for iOS compile verification
+4. Trigger the `ios_release` workflow for an unsigned iOS IPA artifact
 
 If Android fails again with missing `.env`, the first thing to check is whether the CodeMagic environment variables are present for that workflow.
 

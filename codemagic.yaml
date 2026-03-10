@@ -19,7 +19,7 @@ workflows:
       - build/app/outputs/flutter-apk/*.apk
 
   ios_release:
-    name: iOS Compile Check
+    name: iOS Unsigned IPA
     max_build_duration: 60
     environment:
       flutter: stable
@@ -38,7 +38,25 @@ workflows:
         script: |
           cd ios
           pod install
-      - name: Compile iOS without codesign
+      - name: Build iOS without codesign
         script: flutter build ios --release --no-codesign
+      - name: Package unsigned IPA
+        script: |
+          APP_PATH="$CM_BUILD_DIR/build/ios/iphoneos/Runner.app"
+          PAYLOAD_DIR="$CM_BUILD_DIR/build/ios/unsigned_ipa/Payload"
+          IPA_PATH="$CM_BUILD_DIR/build/ios/unsigned_ipa/SnakeAid-Mobile-unsigned.ipa"
+
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Runner.app not found at $APP_PATH"
+            exit 1
+          fi
+
+          rm -rf "$CM_BUILD_DIR/build/ios/unsigned_ipa"
+          mkdir -p "$PAYLOAD_DIR"
+          cp -R "$APP_PATH" "$PAYLOAD_DIR/Runner.app"
+
+          cd "$CM_BUILD_DIR/build/ios/unsigned_ipa"
+          zip -r "SnakeAid-Mobile-unsigned.ipa" Payload
     artifacts:
       - build/ios/iphoneos/*.app
+      - build/ios/unsigned_ipa/*.ipa
