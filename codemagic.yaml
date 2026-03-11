@@ -11,6 +11,14 @@ workflows:
           BASE_URL=$BASE_URL
           API_TIMEOUT=${API_TIMEOUT:-30000}
           EOF
+      - name: Restore Google Services config
+        script: |
+          if [ -z "$GOOGLE_SERVICES_JSON_BASE64" ]; then
+            echo "GOOGLE_SERVICES_JSON_BASE64 is not set"
+            exit 1
+          fi
+
+          printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > "$CM_BUILD_DIR/android/app/google-services.json"
       - name: Get Flutter packages
         script: flutter pub get
       - name: Build Android APK

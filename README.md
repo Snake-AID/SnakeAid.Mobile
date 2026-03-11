@@ -16,6 +16,28 @@ Only these environment variables are currently generated into `.env` during CI:
 - `BASE_URL`
 - `API_TIMEOUT` (optional, defaults to `30000`)
 
+### Android Firebase Requirement
+
+The Android workflow also requires Firebase configuration because the project applies the Google Services Gradle plugin.
+
+CodeMagic must provide:
+
+- `GOOGLE_SERVICES_JSON_BASE64`
+
+This secret should contain the Base64-encoded contents of:
+
+- `android/app/google-services.json`
+
+On Windows PowerShell, you can generate it with:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("android/app/google-services.json"))
+```
+
+Then add the resulting string as a secure environment variable in CodeMagic.
+
+Without this value, Android builds will fail at `:app:processDebugGoogleServices` because `google-services.json` is not committed to the repository.
+
 ### Android Output
 
 The Android workflow builds:
