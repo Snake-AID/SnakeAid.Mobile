@@ -1,20 +1,36 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class RescuerMissionSuccessScreen extends StatefulWidget {
+import '../../providers/mission_detail_provider.dart';
+
+class RescuerMissionSuccessScreen extends ConsumerStatefulWidget {
   const RescuerMissionSuccessScreen({super.key});
 
   @override
-  State<RescuerMissionSuccessScreen> createState() =>
+  ConsumerState<RescuerMissionSuccessScreen> createState() =>
       _RescuerMissionSuccessScreenState();
 }
 
 class _RescuerMissionSuccessScreenState
-    extends State<RescuerMissionSuccessScreen> {
+    extends ConsumerState<RescuerMissionSuccessScreen> {
   bool _isAvailable = true;
+
+  String _formatCurrency(double? value) {
+    if (value == null) return '-';
+    final formatted = value
+        .toStringAsFixed(0)
+        .replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]}.',
+        );
+    return '$formattedđ';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final missionState = ref.watch(missionDetailProvider);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7F5),
       body: Column(
@@ -139,39 +155,16 @@ class _RescuerMissionSuccessScreenState
                         const SizedBox(height: 20),
                         Row(
                           children: [
+                            // Use mission detail values rather than mock data
                             Expanded(
                               child: Column(
                                 children: [
-                                  const Text(
-                                    '9',
-                                    style: TextStyle(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF1C100D),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
                                   Text(
-                                    'Nhiệm vụ',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              width: 1,
-                              height: 40,
-                              color: Colors.grey[300],
-                            ),
-                            Expanded(
-                              child: Column(
-                                children: [
-                                  const Text(
-                                    '2h 15m',
-                                    style: TextStyle(
+                                    missionState
+                                            .mission
+                                            ?.formattedElapsedTime ??
+                                        '-',
+                                    style: const TextStyle(
                                       fontSize: 28,
                                       fontWeight: FontWeight.bold,
                                       color: Color(0xFF1C100D),
@@ -196,12 +189,18 @@ class _RescuerMissionSuccessScreenState
                             Expanded(
                               child: Column(
                                 children: [
-                                  const Text(
-                                    '1.2M',
+                                  Text(
+                                    _formatCurrency(
+                                      missionState.mission?.actualCost,
+                                    ),
                                     style: TextStyle(
                                       fontSize: 28,
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF28A745),
+                                      color:
+                                          missionState.mission?.actualCost !=
+                                              null
+                                          ? const Color(0xFF28A745)
+                                          : Colors.grey[600],
                                     ),
                                   ),
                                   const SizedBox(height: 4),
