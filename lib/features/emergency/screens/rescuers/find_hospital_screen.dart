@@ -27,6 +27,16 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
 
+  // controller that allows programmatic expansion/collapse of the bottom sheet
+  final DraggableScrollableController _draggableSheetController =
+      DraggableScrollableController();
+
+  // map from hospital id to the GlobalKey of its card in the sheet
+  final Map<int, GlobalKey> _hospitalKeys = {};
+
+  // currently highlighted/tapped marker id (or selected hospital id)
+  int? _highlightedHospitalId;
+
   @override
   void initState() {
     super.initState();
@@ -78,6 +88,10 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
   /// Select hospital and report transfer to backend
   Future<void> _selectAndReportHospital(HospitalResponse hospital) async {
     try {
+      // highlight marker for selected hospital
+      setState(() {
+        _highlightedHospitalId = hospital.id;
+      });
       // Check if we have current location
       final hospitalState = ref.read(hospitalProvider);
       if (!hospitalState.hasLocation) {
@@ -541,11 +555,18 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
             ),
           ),
 
-          // Map View
-          _buildMapView(),
+          // Map + Bottom Sheet Container
+          Expanded(
+            child: Stack(
+              children: [
+                // map should take full space
+                _buildMapView(),
 
-          // Hospital List
-          _buildHospitalList(),
+                // draggable hospital list
+                _buildHospitalSheet(),
+              ],
+            ),
+          ),
 
           // Bottom Action Bar
           _buildBottomActionBar(),
@@ -557,88 +578,186 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
   Widget _buildMapView() {
     final hospitalState = ref.watch(hospitalProvider);
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.35,
-      color: const Color(0xFFE5E5E5),
-      child: Stack(
-        children: [
-          // Map
-          if (hospitalState.hasLocation)
-            FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: LatLng(
-                  hospitalState.currentPosition!.latitude,
-                  hospitalState.currentPosition!.longitude,
+    // map is intended to fill whatever space is given by its parent (Stack/Expanded)
+    return Positioned.fill(
+      child: Container(
+        color: const Color(0xFFE5E5E5),
+        child: Stack(
+          children: [
+            // Map
+            if (hospitalState.hasLocation)
+              FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  initialCenter: LatLng(
+                    hospitalState.currentPosition!.latitude,
+                    hospitalState.currentPosition!.longitude,
+                  ),
+                  initialZoom: 13.0,
+                  minZoom: 10.0,
+                  maxZoom: 18.0,
                 ),
-                initialZoom: 13.0,
-                minZoom: 10.0,
-                maxZoom: 18.0,
-              ),
-              children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.snakeaid.mobile',
-                ),
-                MarkerLayer(
-                  markers: [
-                    // Current location marker
-                    Marker(
-                      point: LatLng(
-                        hospitalState.currentPosition!.latitude,
-                        hospitalState.currentPosition!.longitude,
-                      ),
-                      width: 40,
-                      height: 40,
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF007AFF),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.3),
-                              blurRadius: 8,
-                            ),
-                          ],
+                children: [
+                  TileLayer(
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.snakeaid.mobile',
+                  ),
+                  MarkerLayer(
+                    markers: [
+                      // Current location marker
+                      Marker(
+                        point: LatLng(
+                          hospitalState.currentPosition!.latitude,
+                          hospitalState.currentPosition!.longitude,
                         ),
-                      ),
-                    ),
-                    // Hospital markers
-                    ...hospitalState.hospitals.map(
-                      (hospital) => Marker(
-                        point: LatLng(hospital.latitude, hospital.longitude),
                         width: 40,
                         height: 40,
-                        child: const Icon(
-                          Icons.local_hospital,
-                          color: Color(0xFFDC3545),
-                          size: 40,
+                        child: Container(
+                          width: 16,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF007AFF),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
+                      // Hospital markers
+                      ...hospitalState.hospitals.map((hospital) {
+                        final isHighlighted =
+                            hospital.id == _highlightedHospitalId ||
+                            (hospitalState.hasSelectedHospital &&
+                                hospitalState
+                                        .selectedHospitalPricing
+                                        ?.hospitalId ==
+                                    hospital.id);
+
+                        return Marker(
+                          point: LatLng(hospital.latitude, hospital.longitude),
+                          width: isHighlighted ? 48 : 40,
+                          height: isHighlighted ? 48 : 40,
+                          child: GestureDetector(
+                            onTap: () => _onHospitalMarkerTap(hospital),
+                            child: Icon(
+                              Icons.local_hospital,
+                              color: isHighlighted
+                                  ? const Color(0xFF007AFF)
+                                  : const Color(0xFFDC3545),
+                              size: isHighlighted ? 48 : 40,
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ],
+              )
+            else
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (hospitalState.isLoadingLocation)
+                      const CircularProgressIndicator(color: Color(0xFFFF8800))
+                    else if (hospitalState.error != null)
+                      Column(
+                        children: [
+                          const Icon(
+                            Icons.location_off,
+                            size: 48,
+                            color: Color(0xFF999999),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            hospitalState.error!,
+                            style: const TextStyle(
+                              color: Color(0xFF666666),
+                              fontSize: 14,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () {
+                              ref
+                                  .read(hospitalProvider.notifier)
+                                  .getCurrentLocation();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFF8800),
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Thử lại'),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
-              ],
-            )
-          else
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (hospitalState.isLoadingLocation)
-                    const CircularProgressIndicator(color: Color(0xFFFF8800))
-                  else if (hospitalState.error != null)
-                    Column(
+              ),
+            // Loading overlay
+            if (hospitalState.isLoading)
+              Container(
+                color: Colors.black.withOpacity(0.3),
+                child: const Center(
+                  child: CircularProgressIndicator(color: Color(0xFFFF8800)),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// A draggable bottom sheet containing the hospital list.
+  Widget _buildHospitalSheet() {
+    final hospitalState = ref.watch(hospitalProvider);
+
+    return DraggableScrollableSheet(
+      controller: _draggableSheetController,
+      initialChildSize: 0.35,
+      minChildSize: 0.15,
+      maxChildSize: 0.9,
+      builder: (context, scrollController) {
+        // keep a reference to the passed controller (used when scrolling to an item)
+        // not strictly needed for ensureVisible, but useful if we want to programmatically
+        // adjust offset in future
+        // ignore: unnecessary_null_comparison
+        if (scrollController != null && _hospitalKeys.isEmpty) {
+          // nothing for now
+        }
+
+        return Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8F7F5),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10),
+            ],
+          ),
+          child: hospitalState.isLoading
+              ? const Center(
+                  child: CircularProgressIndicator(color: Color(0xFFFF8800)),
+                )
+              : hospitalState.error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Icon(
-                          Icons.location_off,
-                          size: 48,
+                          Icons.error_outline,
+                          size: 64,
                           color: Color(0xFF999999),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16),
                         Text(
                           hospitalState.error!,
                           style: const TextStyle(
@@ -650,9 +769,7 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
                         const SizedBox(height: 16),
                         ElevatedButton(
                           onPressed: () {
-                            ref
-                                .read(hospitalProvider.notifier)
-                                .getCurrentLocation();
+                            ref.read(hospitalProvider.notifier).refresh();
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFFF8800),
@@ -662,139 +779,113 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
                         ),
                       ],
                     ),
-                ],
-              ),
-            ),
-          // Loading overlay
-          if (hospitalState.isLoading)
-            Container(
-              color: Colors.black.withOpacity(0.3),
-              child: const Center(
-                child: CircularProgressIndicator(color: Color(0xFFFF8800)),
-              ),
-            ),
-        ],
-      ),
+                  ),
+                )
+              : hospitalState.hasHospitals
+              ? ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: hospitalState.hospitals.length + 1,
+                  itemBuilder: (context, index) {
+                    if (index == hospitalState.hospitals.length) {
+                      return Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF3E0),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFFF8800).withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.info_outline,
+                              color: Color(0xFFFF8800),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Danh sách các bệnh viện gần bạn. Kéo xuống để làm mới.',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey[800],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    final hospital = hospitalState.hospitals[index];
+                    final key = _hospitalKeys.putIfAbsent(
+                      hospital.id,
+                      () => GlobalKey(),
+                    );
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: KeyedSubtree(
+                        key: key,
+                        child: _buildHospitalCard(hospital, index == 0),
+                      ),
+                    );
+                  },
+                )
+              : const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.location_searching,
+                          size: 64,
+                          color: Color(0xFF999999),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'Đang tìm bệnh viện gần bạn...',
+                          style: TextStyle(
+                            color: Color(0xFF666666),
+                            fontSize: 14,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+        );
+      },
     );
   }
 
-  Widget _buildHospitalList() {
-    final hospitalState = ref.watch(hospitalProvider);
+  // called when tapping on a hospital marker in the map
+  void _onHospitalMarkerTap(HospitalResponse hospital) {
+    setState(() {
+      _highlightedHospitalId = hospital.id;
+    });
 
-    return Expanded(
-      child: Container(
-        color: const Color(0xFFF8F7F5),
-        child: hospitalState.isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFFFF8800)),
-              )
-            : hospitalState.error != null
-            ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        size: 64,
-                        color: Color(0xFF999999),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        hospitalState.error!,
-                        style: const TextStyle(
-                          color: Color(0xFF666666),
-                          fontSize: 14,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () {
-                          ref.read(hospitalProvider.notifier).refresh();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFF8800),
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text('Thử lại'),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            : hospitalState.hasHospitals
-            ? ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: hospitalState.hospitals.length + 1,
-                itemBuilder: (context, index) {
-                  if (index == hospitalState.hospitals.length) {
-                    // Info card at the end
-                    return Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF3E0),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: const Color(0xFFFF8800).withOpacity(0.3),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.info_outline,
-                            color: Color(0xFFFF8800),
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Danh sách các bệnh viện gần bạn. Kéo xuống để làm mới.',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey[800],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  final hospital = hospitalState.hospitals[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: _buildHospitalCard(hospital, index == 0),
-                  );
-                },
-              )
-            : const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.location_searching,
-                        size: 64,
-                        color: Color(0xFF999999),
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        'Đang tìm bệnh viện gần bạn...',
-                        style: TextStyle(
-                          color: Color(0xFF666666),
-                          fontSize: 14,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-      ),
+    // ensure sheet is visible and scroll to item
+    _draggableSheetController.animateTo(
+      0.5,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
     );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final key = _hospitalKeys[hospital.id];
+      if (key?.currentContext != null) {
+        Scrollable.ensureVisible(
+          key!.currentContext!,
+          duration: const Duration(milliseconds: 300),
+          alignment: 0.1,
+        );
+      }
+    });
   }
 
   Widget _buildHospitalCard(HospitalResponse hospital, bool isHighlighted) {
