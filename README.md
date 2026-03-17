@@ -1,5 +1,111 @@
 # SnakeAid.Mobile
 
+## CodeMagic CI/CD
+
+This repository includes a minimal [codemagic.yaml](codemagic.yaml) for MVP builds.
+
+Current CI direction:
+
+- Android: build a debug APK that can be downloaded from CodeMagic artifacts and installed directly on an Android device
+- iOS: build an unsigned IPA with `--no-codesign` for sideloading or TrollStore-style workflows
+
+### Required CodeMagic Variables
+
+Only these environment variables are currently generated into `.env` during CI:
+
+- `BASE_URL`
+- `API_TIMEOUT` (optional, defaults to `30000`)
+
+### Android Firebase Requirement
+
+The Android workflow also requires Firebase configuration because the project applies the Google Services Gradle plugin.
+
+CodeMagic must provide:
+
+- `GOOGLE_SERVICES_JSON_BASE64`
+
+This secret should contain the Base64-encoded contents of:
+
+- `android/app/google-services.json`
+
+On Windows PowerShell, you can generate it with:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("android/app/google-services.json"))
+```
+
+Then add the resulting string as a secure environment variable in CodeMagic.
+
+Without this value, Android builds will fail at `:app:processDebugGoogleServices` because `google-services.json` is not committed to the repository.
+
+### Android Output
+
+The Android workflow builds:
+
+```bash
+flutter build apk --debug
+```
+
+Artifact output on CodeMagic:
+
+- `build/app/outputs/flutter-apk/*.apk`
+
+How to install:
+
+1. Open the CodeMagic build
+2. Go to `Artifacts`
+3. Download the generated `.apk`
+4. Copy it to an Android device
+5. Enable installation from unknown sources if needed
+6. Open the APK and install
+
+### iOS Output
+
+The iOS workflow currently runs:
+
+```bash
+flutter build ios --release --no-codesign
+```
+
+Artifact output on CodeMagic:
+
+- `build/ios/iphoneos/*.app`
+- `build/ios/unsigned_ipa/*.ipa`
+
+Important:
+
+- The generated `.ipa` is unsigned
+- The generated `.app` is still useful as a raw build artifact
+- This workflow does not use Apple signing
+- Installation still depends on the sideload method you choose later
+
+### iOS Strategy Without Paid Apple Developer Account
+
+The current goal is to avoid the Apple Developer Program cost while still keeping an iOS path for MVP testing.
+
+Practical options:
+
+- `TrollStore`: only works on supported iOS versions and devices
+- `AltStore`, `SideStore`, or `Sideloadly`: usually require a free Apple ID and periodic refresh
+- `Xcode Personal Team`: works for personal testing, but still depends on an Apple account and is not a clean CI distribution path
+
+Practical conclusion:
+
+- Android is the primary installable artifact in CI today
+- iOS CI now produces an unsigned IPA artifact
+- If real iPhone installation is needed, use that IPA with the sideload path you choose, such as `TrollStore`, `AltStore`, `SideStore`, or `Sideloadly`
+
+### After Commit / Push
+
+To keep builds running smoothly on CodeMagic:
+
+1. Push the branch that CodeMagic is configured to build
+2. Ensure `BASE_URL` exists in CodeMagic environment variables
+3. Trigger the `android_debug` workflow for an installable Android artifact
+4. Trigger the `ios_release` workflow for an unsigned iOS IPA artifact
+
+If Android fails again with missing `.env`, the first thing to check is whether the CodeMagic environment variables are present for that workflow.
+
 > ## 🚨 Local Development Connection Issue
 >
 > If you are running the backend locally (`http://<your-ip>:8080`) but the Mobile App (Real device) throws **Connection Timeout** or **SocketException**, your Windows Firewall is likely blocking incoming connections to port 8080.

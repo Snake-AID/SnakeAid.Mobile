@@ -1,0 +1,70 @@
+workflows:
+  android_debug:
+    name: Android Debug
+    max_build_duration: 60
+    environment:
+      flutter: stable
+    scripts:
+      - name: Create .env from CodeMagic variables
+        script: |
+          cat > "$CM_BUILD_DIR/.env" <<EOF
+          BASE_URL=$BASE_URL
+          API_TIMEOUT=${API_TIMEOUT:-30000}
+          EOF
+      - name: Restore Google Services config
+        script: |
+          if [ -z "$GOOGLE_SERVICES_JSON_BASE64" ]; then
+            echo "GOOGLE_SERVICES_JSON_BASE64 is not set"
+            exit 1
+          fi
+
+          printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > "$CM_BUILD_DIR/android/app/google-services.json"
+      - name: Get Flutter packages
+        script: flutter pub get
+      - name: Build Android APK
+        script: flutter build apk --debug
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
+
+  ios_release:
+    name: iOS Unsigned IPA
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Create .env from CodeMagic variables
+        script: |
+          cat > "$CM_BUILD_DIR/.env" <<EOF
+          BASE_URL=$BASE_URL
+          API_TIMEOUT=${API_TIMEOUT:-30000}
+          EOF
+      - name: Get Flutter packages
+        script: flutter pub get
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios
+          pod install
+      - name: Build iOS without codesign
+        script: flutter build ios --release --no-codesign
+      - name: Package unsigned IPA
+        script: |
+          APP_PATH="$CM_BUILD_DIR/build/ios/iphoneos/Runner.app"
+          PAYLOAD_DIR="$CM_BUILD_DIR/build/ios/unsigned_ipa/Payload"
+          IPA_PATH="$CM_BUILD_DIR/build/ios/unsigned_ipa/SnakeAid-Mobile-unsigned.ipa"
+
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Runner.app not found at $APP_PATH"
+            exit 1
+          fi
+
+          rm -rf "$CM_BUILD_DIR/build/ios/unsigned_ipa"
+          mkdir -p "$PAYLOAD_DIR"
+          cp -R "$APP_PATH" "$PAYLOAD_DIR/Runner.app"
+
+          cd "$CM_BUILD_DIR/build/ios/unsigned_ipa"
+          zip -r "SnakeAid-Mobile-unsigned.ipa" Payload
+    artifacts:
+      - build/ios/iphoneos/*.app
+      - build/ios/unsigned_ipa/*.ipa
