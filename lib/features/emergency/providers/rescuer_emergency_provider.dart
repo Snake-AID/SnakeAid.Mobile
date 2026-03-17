@@ -142,6 +142,7 @@ class RescueModeNotifier extends StateNotifier<RescueModeState> {
 
 /// Provider for RescuerSignalRService singleton
 final rescuerSignalRServiceProvider = Provider<RescuerSignalRService>((ref) {
+  final baseUrl = ref.watch(baseUrlProvider);
   return RescuerSignalRService(baseUrl: baseUrl);
 });
 

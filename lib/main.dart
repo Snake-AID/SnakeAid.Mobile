@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:snakeaid_mobile/core/services/notification_service.dart';
+import 'core/config/base_url_config.dart';
+import 'core/handlers/deep_link_handler.dart';
 import 'app/router.dart';
-import 'app/theme.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -27,11 +29,26 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   }
 }
 
+/// Global instance of DeepLinkHandler for access in providers
+DeepLinkHandler? _deepLinkHandler;
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Load environment variables
   await dotenv.load(fileName: ".env");
+
+  // Initialize SharedPreferences
+  final prefs = await SharedPreferences.getInstance();
+
+  // Create BaseUrlConfig with SharedPreferences
+  final baseUrlConfig = createBaseUrlConfig(prefs);
+
+  // Create DeepLinkHandler
+  _deepLinkHandler = DeepLinkHandler(baseUrlConfig);
+
+  // Initialize deep link handler
+  await _deepLinkHandler!.initialize();
 
   // // Initialize Firebase
   // await Firebase.initializeApp();
@@ -51,7 +68,12 @@ void main() async {
   // final fcmService = FCMService();
   // await fcmService.initialize();
 
-  runApp(const ProviderScope(child: MyApp()));
+  runApp(
+    ProviderScope(
+      overrides: [baseUrlConfigProvider.overrideWithValue(baseUrlConfig)],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends ConsumerWidget {

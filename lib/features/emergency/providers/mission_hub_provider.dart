@@ -7,6 +7,7 @@ import '../../../core/providers/http_provider.dart';
 
 // ── Singleton service provider ─────────────────────────────────────────────────
 final missionHubServiceProvider = Provider<MissionHubService>((ref) {
+  final baseUrl = ref.watch(baseUrlProvider);
   final service = MissionHubService(baseUrl: baseUrl);
   ref.onDispose(() => service.dispose());
   return service;
