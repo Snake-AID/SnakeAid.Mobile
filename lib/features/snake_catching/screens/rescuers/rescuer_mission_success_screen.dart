@@ -149,8 +149,6 @@ class _RescuerMissionSuccessScreenState
                             const SizedBox(height: 24),
                             _buildPaymentStatusBadge(),
                             const SizedBox(height: 24),
-                            _buildRescuerEarningsCard(),
-                            const SizedBox(height: 16),
                             _buildCustomerPaymentCard(),
                             const SizedBox(height: 16),
                             _buildMissionSummaryCard(),
@@ -247,71 +245,6 @@ class _RescuerMissionSuccessScreenState
               color: isPaid ? const Color(0xFF28A745) : const Color(0xFFFD7E14),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRescuerEarningsCard() {
-    return _buildCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Thu nhập của bạn',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF343A40))),
-          const SizedBox(height: 20),
-          Center(
-            child: Column(
-              children: [
-                const Text('Bạn sẽ nhận:',
-                    style: TextStyle(fontSize: 14, color: Color(0xFF6C757D))),
-                const SizedBox(height: 6),
-                Text(
-                  '${_formatCurrency(_rescuerTotal.toInt())} VNĐ',
-                  style: const TextStyle(
-                      fontSize: 34, fontWeight: FontWeight.bold,
-                      color: Color(0xFF28A745), letterSpacing: -1),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 28, color: Color(0xFFE2E8F0)),
-          _buildFeeRow('Phí dịch vụ cơ bản:', '${_formatCurrency(_baseFee.toInt())} VNĐ'),
-          const SizedBox(height: 8),
-          _buildFeeRow('  Nền tảng giữ lại (40%):', '− ${_formatCurrency(_platformFee.toInt())} VNĐ',
-              valueColor: const Color(0xFFDC3545)),
-          const SizedBox(height: 8),
-          _buildFeeRow(
-            '  Phần của bạn (60%):',
-            '+ ${_formatCurrency(_rescuerBaseShare.toInt())} VNĐ',
-            valueColor: const Color(0xFF28A745),
-          ),
-          if (_snakeFee > 0) ...[
-            const SizedBox(height: 8),
-            _buildFeeRow('Phí bắt rắn:', '+ ${_formatCurrency(_snakeFee.toInt())} VNĐ',
-                valueColor: const Color(0xFF28A745)),
-            // per-species breakdown
-            ...(_mission?.missionDetails ?? []).map((d) => Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: _buildFeeRow(
-                    '  ${d.snakeSpeciesName} × ${d.quantity}:',
-                    '${_formatCurrency(d.price.toInt())} VNĐ',
-                  ),
-                )),
-          ],
-          if (_envFee > 0) ...[
-            const SizedBox(height: 8),
-            _buildFeeRow(
-              'Phụ phí khu vực${_envName != null ? ' ($_envName)' : ''}:',
-              '+ ${_formatCurrency(_envFee.toInt())} VNĐ',
-              valueColor: const Color(0xFF28A745),
-            ),
-          ],
-          if (_travelFee > 0) ...[
-            const SizedBox(height: 8),
-            _buildFeeRow('Phí di chuyển:', '+ ${_formatCurrency(_travelFee.toInt())} VNĐ',
-                valueColor: const Color(0xFF28A745)),
-          ],
         ],
       ),
     );

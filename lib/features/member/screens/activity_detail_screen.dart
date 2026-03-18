@@ -107,20 +107,6 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
 
         if (isSuccess && !isCancelled) {
           _checkPaymentStatus();
-          // If currently Finished = this was a final payment callback → transfer after short delay
-          if (_request?.status == 'Finished' && !_hasTransferredToRescuer) {
-            _hasTransferredToRescuer = true;
-            Future.delayed(const Duration(seconds: 3), () {
-              if (!mounted) return;
-              final payosRepo = ref.read(payosRepositoryProvider);
-              payosRepo.transferToRescuer(widget.requestId).then((_) {
-                if (mounted) {
-                  setState(() => _finalTransaction = _finalTransaction); // trigger rebuild
-                  _silentRefresh();
-                }
-              });
-            });
-          }
           _checkFinalPaymentStatus();
         } else if (isCancelled) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -168,8 +154,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         // Load species details for each species in the request
         _loadSpeciesDetails();
 
-        // If Assigned, check payment status and scroll to payment card
-        if (_request!.status == 'Assigned') {
+        // If deposit status, check payment status and scroll to payment card
+        const depositStatuses = {'Pending', 'Confirmed', 'Assigned'};
+        if (depositStatuses.contains(_request!.status)) {
           _checkPaymentStatus(scrollIfUnpaid: true);
         } else if (_request!.status == 'Finished') {
           _checkFinalPaymentStatus(scrollIfUnpaid: true);
@@ -244,22 +231,16 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         // Load any new species details
         _loadSpeciesDetails();
 
-        // If newly Assigned, check payment
-        if (_request!.status == 'Assigned' && !_isCheckingPayment) {
+        // If newly in deposit status, check payment
+        const depositStatuses = {'Pending', 'Confirmed', 'Assigned'};
+        if (depositStatuses.contains(_request!.status) && !_isCheckingPayment) {
           _checkPaymentStatus();
         } else if (_request!.status == 'Finished' && !_isCreatingFinalPayment) {
           _checkFinalPaymentStatus(silent: true);
-        } else if (_request!.status == 'Paid' || _request!.status == 'Completed') {
-          // Request already moved to Paid — cancel all timers and mark UI as paid
+        } else if (_request!.status == 'Completed') {
+          // Request already moved to Completed — cancel all timers
           _finalPaymentTimer?.cancel();
           _paymentTimer?.cancel();
-          // Transfer if somehow not done yet in this session (e.g. app was in background)
-          if (!_hasTransferredToRescuer) {
-            _hasTransferredToRescuer = true;
-            ref.read(payosRepositoryProvider).transferToRescuer(widget.requestId).then((_) {
-              if (mounted) _silentRefresh();
-            });
-          }
         }
       }
     } catch (e) {
@@ -287,7 +268,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       if (tx == null || !tx.isDeposited) {
         _paymentTimer?.cancel();
         _paymentTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-          if (_request?.status == 'Assigned') {
+          const depositStatuses = {'Pending', 'Confirmed', 'Assigned'};
+          if (depositStatuses.contains(_request?.status)) {
             _checkPaymentStatus(silent: true);
           } else {
             _paymentTimer?.cancel();
@@ -926,7 +908,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
               child: ElevatedButton(
                 onPressed: () {
                   Navigator.pop(ctx);
-                  context.pop(); // back to activity list
+                  context.go('/member-home');
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF228B22),
@@ -1027,9 +1009,6 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       _loadWallet();
       if (!_hasTransferredToRescuer) {
         _hasTransferredToRescuer = true;
-        ref.read(payosRepositoryProvider).transferToRescuer(widget.requestId).then((_) {
-          if (mounted) _silentRefresh();
-        });
       }
       _checkFinalPaymentStatus();
     } catch (e) {
@@ -1086,8 +1065,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       final tx = await repo.getTransactionByRequestId(widget.requestId);
       if (!mounted) return;
 
-      // Consider paid if: explicit CatchingPayment tx, OR request already moved to Paid/Completed
-      final requestIsPaid = (_request?.status == 'Paid' || _request?.status == 'Completed');
+      // Consider paid if: explicit CatchingPayment tx, OR request already moved to Completed
+      final requestIsPaid = (_request?.status == 'Completed');
       final txIsFinalPayment = (tx?.isCatchingPayment == true);
 
       setState(() {
@@ -1107,15 +1086,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           }
         });
       } else if (requestIsPaid || (txIsFinalPayment && _finalTransaction!.isPaid)) {
-        // Payment confirmed — transfer to rescuer (once)
+        // Payment confirmed
         _finalPaymentTimer?.cancel();
-        if (!_hasTransferredToRescuer) {
-          _hasTransferredToRescuer = true;
-          final payosRepo = ref.read(payosRepositoryProvider);
-          payosRepo.transferToRescuer(widget.requestId).then((_) {
-            if (mounted) _silentRefresh();
-          });
-        }
+        _hasTransferredToRescuer = true; // mark so no re-transfer logic fires
       } else {
         // Transaction exists but not confirmed yet — poll every 3s
         _finalPaymentTimer?.cancel();
@@ -1178,7 +1151,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => context.pop(),
+          onPressed: () => context.go('/member-home'),
         ),
         centerTitle: true,
       ),
@@ -1675,7 +1648,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   // Sticky Footer
   // ──────────────────────────────────────────────────────────────────
   Widget _buildStickyFooter(SnakeCatchingRequestData request) {
-    final bool needPayment = request.status == 'Assigned' &&
+    // Deposit payment is allowed at Pending, Confirmed, Assigned statuses
+    const depositStatuses = {'Pending', 'Confirmed', 'Assigned'};
+    final bool needPayment = depositStatuses.contains(request.status) &&
         (_transaction == null || !_transaction!.isDeposited);
     final bool needFinalPayment = request.status == 'Finished' &&
         _finalTransaction == null;
@@ -1760,7 +1735,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 child: SizedBox(
                   height: 46,
                   child: OutlinedButton(
-                    onPressed: () => context.pop(),
+                    onPressed: () => context.go('/member-home'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF228B22),
                       side: const BorderSide(color: Color(0xFF228B22)),
@@ -3645,6 +3620,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     // Steps in order (using effective status keys)
     const steps = [
       ('pending',   Icons.schedule,          'Chờ\nduyệt'),
+      ('confirmed', Icons.check_circle_outline, 'Đã\nduyệt'),
       ('assigned',  Icons.assignment_ind,    'Phân\ncông'),
       ('deposited', Icons.payments_rounded,  'Đặt\ncọc'),
       ('en_route',  Icons.directions_car,    'Đang\nđến'),
@@ -3904,6 +3880,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         return const Color(0xFFD4A017); // golden amber
       case 'assigned':
         return const Color(0xFF2196F3);
+      case 'confirmed':
+        return const Color(0xFF28A745);
       case 'deposited':
         return const Color(0xFF28A745);
       case 'en_route':
@@ -3942,6 +3920,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         return Icons.payments_outlined;
       case 'paid':
         return Icons.payments;
+      case 'confirmed':
+        return Icons.check_circle_outline;
       case 'completed':
         return Icons.check_circle;
       case 'dispute':

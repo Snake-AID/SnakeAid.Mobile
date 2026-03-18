@@ -199,6 +199,22 @@ final requestCancelledStreamProvider = StreamProvider<String>((ref) {
   });
 });
 
+/// Stream provider for SnakeCatchingRequestAssigned events
+final snakeCatchingRequestAssignedStreamProvider =
+    StreamProvider<Map<String, dynamic>>((ref) {
+  final signalRService = ref.watch(rescuerSignalRServiceProvider);
+  debugPrint(
+    '🔗 snakeCatchingRequestAssignedStreamProvider: Watching stream...',
+  );
+
+  return signalRService.snakeCatchingRequestAssignedStream.map((data) {
+    debugPrint(
+      '🎯 Stream Provider: SnakeCatchingRequestAssigned! id=${data['id']}',
+    );
+    return data;
+  });
+});
+
 /// Current active rescue request state
 class ActiveRescueRequestState {
   final RescueRequest? request;

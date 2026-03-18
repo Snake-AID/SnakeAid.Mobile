@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../snake_catching/models/snake_catching_request.dart';
 import '../../snake_catching/repository/snake_catching_repository.dart';
 import '../../snake_catching/screens/rescuers/rescuer_mission_success_screen.dart';
-import '../../snake_catching/screens/rescuers/rescuer_request_detail_screen.dart';
+import '../../snake_catching/screens/rescuers/rescuer_accept_request_screen.dart';
 
 class RescuerHistoryScreen extends ConsumerStatefulWidget {
   const RescuerHistoryScreen({super.key});
@@ -110,8 +110,10 @@ class _RescuerHistoryScreenState extends ConsumerState<RescuerHistoryScreen> {
   String _formatDate(DateTime dt) => DateFormat('dd/MM/yyyy').format(dt);
   String _formatTime(DateTime dt) => DateFormat('HH:mm').format(dt);
 
-  String _formatCurrency(double amount) {
+  String _formatCurrency(double? amount) {
+    if (amount == null) return '--';
     if (amount == 0) return '0 VNĐ';
+    
     if (amount >= 1000000) {
       return '${(amount / 1000000).toStringAsFixed(1)}M VNĐ';
     }
@@ -159,8 +161,7 @@ class _RescuerHistoryScreenState extends ConsumerState<RescuerHistoryScreen> {
       ));
     } else {
       Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => RescuerRequestDetailScreen(
-          requestId: r.id,
+        builder: (_) => RescuerAcceptRequestScreen(
           requestData: r,
         ),
       ));
@@ -325,7 +326,7 @@ class _RescuerHistoryScreenState extends ConsumerState<RescuerHistoryScreen> {
     final completed = _isCompleted(r);
     final cancelled = r.status == 'Cancelled';
     final rating = _rating(r);
-    final income = _income(r);
+    final income = r.mission?.actualCost ?? r.estimatedPrice ?? 0;
 
     return GestureDetector(
       onTap: () => _openDetail(r),

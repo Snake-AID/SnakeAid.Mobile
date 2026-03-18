@@ -3,10 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_accept_request_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_en_route_screen.dart';
+import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_accept_request_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_mission_success_screen.dart';
-import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_request_detail_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_tracking_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_history_screen.dart';
 import '../../models/snake_catching_request.dart';
@@ -54,9 +53,9 @@ class _RescuerAvailableJobsScreenState
     super.initState();
     _initialize();
     // Auto-refresh every 10 seconds
-    // _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-    //   _silentRefresh();
-    // });
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      _silentRefresh();
+    });
   }
 
   @override
@@ -404,59 +403,36 @@ class _RescuerAvailableJobsScreenState
     }
   }
 
+  bool _isMyRequest(SnakeCatchingRequestData request) {
+    if (_currentRescuerId == null) return false;
+    // assignedRescuerId from API = Rescuer entity UUID (≠ account UUID)
+    // assignedRescuer.accountId  = account/auth UUID (= user_id in SharedPrefs)
+    return request.assignedRescuerId == _currentRescuerId ||
+        request.assignedRescuer?.accountId == _currentRescuerId;
+  }
+
   List<SnakeCatchingRequestData> _getFilteredRequests({String? statusFilter}) {
     List<SnakeCatchingRequestData> filtered = List.from(_allRequests);
 
-    // Filter by status (tab)
-    if (statusFilter == 'Pending') {
-      // "Đơn có thể nhận": only Pending orders (not yet assigned)
-      filtered = filtered
-          .where((request) => request.status == 'Pending')
-          .toList();
-
-      // Filter out requests with invalid coordinates
-      filtered = filtered
-          .where((request) => _isValidCoordinate(request.locationCoordinates))
-          .toList();
-
-      // Filter by distance for Pending tab
-      double maxDistance = _selectedDistance == '10km'
-          ? 10.0
-          : _selectedDistance == '20km'
-          ? 20.0
-          : 30.0;
-
-      if (_currentPosition != null) {
-        filtered = filtered.where((request) {
-          final distance = _calculateDistance(request.locationCoordinates);
-          return distance <= maxDistance;
-        }).toList();
-      }
-
-      // Sort
-      switch (_selectedFilter) {
-        case 'Gần nhất':
-          if (_currentPosition != null) {
-            filtered.sort((a, b) {
-              final distanceA = _calculateDistance(a.locationCoordinates);
-              final distanceB = _calculateDistance(b.locationCoordinates);
-              return distanceA.compareTo(distanceB);
-            });
-          }
-          break;
-        case 'Mới nhất':
-          filtered.sort((a, b) => b.requestDate.compareTo(a.requestDate));
-          break;
-      }
-    } else if (statusFilter == 'Accepted') {
-      // "Đơn đã nhận": active orders only — Cancelled/Completed/Paid go to History
+    if (statusFilter == 'Assigned') {
+      // "Đơn được assign": active in-progress orders for this rescuer
       const activeStatuses = {'Assigned', 'Finished', 'Dispute'};
       filtered = filtered
           .where(
             (request) =>
                 activeStatuses.contains(request.status) &&
-                request.assignedRescuerId != null &&
-                request.assignedRescuerId == _currentRescuerId,
+                _isMyRequest(request),
+          )
+          .toList();
+      filtered.sort((a, b) => b.requestDate.compareTo(a.requestDate));
+    } else if (statusFilter == 'History') {
+      // "Lịch sử": terminal requests — NOT Completed, NOT Paid
+      const historyStatuses = {'Cancelled', 'Expired'};
+      filtered = filtered
+          .where(
+            (request) =>
+                historyStatuses.contains(request.status) &&
+                _isMyRequest(request),
           )
           .toList();
       filtered.sort((a, b) => b.requestDate.compareTo(a.requestDate));
@@ -471,39 +447,16 @@ class _RescuerAvailableJobsScreenState
     final rescueModeState = ref.watch(rescueModeProvider);
     _isOnline = rescueModeState.isActive && rescueModeState.isConnected;
 
-    return DefaultTabController(
-      length: 2,
-      child: Container(
-        color: const Color(0xFFFFFBF5),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Header
-              _buildHeader(),
-
-              // Tabs
-              _buildTabBar(),
-
-              // Filter Sort Options
-              _buildFilterSortRow(),
-
-              // Job List with TabBarView
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    _buildAvailableJobsContent(
-                      statusFilter: 'Pending',
-                      isOnline: _isOnline,
-                    ),
-                    _buildAvailableJobsContent(
-                      statusFilter: 'Accepted',
-                      isOnline: true,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+    return Container(
+      color: const Color(0xFFFFFBF5),
+      child: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(),
+            Expanded(
+              child: _buildAvailableJobsContent(statusFilter: 'Assigned'),
+            ),
+          ],
         ),
       ),
     );
@@ -524,8 +477,8 @@ class _RescuerAvailableJobsScreenState
           fontWeight: FontWeight.w600,
         ),
         tabs: const [
-          Tab(text: 'Đơn có thể nhận'),
-          Tab(text: 'Đơn đã nhận'),
+          Tab(text: 'Đơn được assign'),
+          Tab(text: 'Lịch sử'),
         ],
       ),
     );
@@ -533,13 +486,7 @@ class _RescuerAvailableJobsScreenState
 
   Widget _buildAvailableJobsContent({
     required String statusFilter,
-    required bool isOnline,
   }) {
-    // Gate "Đơn có thể nhận" behind online status
-    if (statusFilter == 'Pending' && !isOnline) {
-      return _buildOfflineWall();
-    }
-
     if (_isLoading) {
       return const Center(
         child: CircularProgressIndicator(color: Color(0xFFFF6B35)),
@@ -594,9 +541,9 @@ class _RescuerAvailableJobsScreenState
             Icon(Icons.search_off, size: 80, color: Colors.grey[300]),
             const SizedBox(height: 16),
             Text(
-              statusFilter == 'Pending'
-                  ? 'Không có đơn nào trong khu vực $_selectedDistance'
-                  : 'Bạn chưa nhận đơn nào',
+              statusFilter == 'Assigned'
+                  ? 'Bạn hiện chưa có đơn nào'
+                  : 'Chưa có lịch sử đơn nào',
               style: TextStyle(fontSize: 16, color: Colors.grey[600]),
               textAlign: TextAlign.center,
             ),
@@ -1968,9 +1915,7 @@ class _RescuerAvailableJobsScreenState
                     );
                   } else if (missionStatus == 'Finished' ||
                       missionStatus == 'MissionCompleted' ||
-                      missionStatus == 'Paid' ||
                       missionStatus == 'Completed' ||
-                      request.status == 'Paid' ||
                       request.status == 'Completed' ||
                       request.status == 'Finished') {
                     Navigator.of(context).push(
@@ -1981,21 +1926,13 @@ class _RescuerAvailableJobsScreenState
                         ),
                       ),
                     );
-                  } else if (request.status == 'Assigned') {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            RescuerAcceptRequestScreen(requestData: request),
-                      ),
-                    );
                   } else {
+                    // For Assigned and other statuses, navigate to accept/detail screen
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (context) => RescuerRequestDetailScreen(
-                          requestId: request.id,
+                        builder: (context) => RescuerAcceptRequestScreen(
                           requestData: request,
                         ),
-                        fullscreenDialog: false,
                       ),
                     );
                   }

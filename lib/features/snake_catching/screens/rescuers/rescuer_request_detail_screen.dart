@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_accept_request_screen.dart';
+import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_en_route_screen.dart';
 import '../../models/snake_catching_request.dart';
 import '../../repository/snake_catching_repository.dart';
 import '../../repository/snake_species_repository.dart';
@@ -1453,138 +1453,8 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
   }
 
   Widget _buildStickyFooter() {
-    // Only show accept button for Pending requests
-    if (_requestData != null && _requestData!.status != 'Pending') {
-      return const SizedBox.shrink();
-    }
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Accept Button
-          SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: ElevatedButton(
-              onPressed: () {
-                // TODO: Accept request
-                _showAcceptDialog();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF6B35),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'CHẤP NHẬN YÊU CẦU',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAcceptDialog() {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Xác nhận'),
-        content: const Text('Bạn có chắc chắn muốn chấp nhận yêu cầu này?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext); // Close confirmation dialog
-
-              if (!mounted) return;
-
-              // Capture navigator & messenger before any async gap
-              final navigator = Navigator.of(context);
-              final scaffoldMessenger = ScaffoldMessenger.of(context);
-
-              // Show loading dialog using the screen's context
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (ctx) => const PopScope(
-                  canPop: false,
-                  child: Center(
-                    child: CircularProgressIndicator(color: Color(0xFFFF6B35)),
-                  ),
-                ),
-              );
-
-              try {
-                final lat = _currentPosition?.latitude ?? 0.0;
-                final lng = _currentPosition?.longitude ?? 0.0;
-
-                final repository = ref.read(snakeCatchingRepositoryProvider);
-                final response = await repository.acceptRequest(
-                  _requestData!.id,
-                  lat,
-                  lng,
-                );
-
-                navigator.pop(); // Close loading dialog
-
-                if (response.isSuccess && response.data != null) {
-                  navigator.pushReplacement(
-                    MaterialPageRoute(
-                      builder: (context) => RescuerAcceptRequestScreen(
-                        requestData: response.data!,
-                      ),
-                    ),
-                  );
-                } else {
-                  scaffoldMessenger.showSnackBar(
-                    SnackBar(
-                      content: Text(response.message.isNotEmpty
-                          ? response.message
-                          : 'Không thể chấp nhận yêu cầu. Vui lòng thử lại.'),
-                      backgroundColor: const Color(0xFFDC3545),
-                    ),
-                  );
-                }
-              } catch (e) {
-                navigator.pop(); // Close loading dialog
-                scaffoldMessenger.showSnackBar(
-                  SnackBar(
-                    content: Text(e.toString().replaceFirst('Exception: ', '')),
-                    backgroundColor: const Color(0xFFDC3545),
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF6B35),
-            ),
-            child: const Text('Xác nhận'),
-          ),
-        ],
-      ),
-    );
+    // Rescuers can no longer self-accept. Jobs are assigned by Operator via SignalR.
+    return const SizedBox.shrink();
   }
 
   String _formatCurrency(int value) {
