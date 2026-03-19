@@ -465,6 +465,8 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     switch (status.toLowerCase()) {
       case 'pending':
         return const Color(0xFFFFA500);
+      case 'confirmed':
+        return const Color(0xFF4CAF50);
       case 'assigned':
         return const Color(0xFF2196F3);
       case 'finished':
@@ -487,6 +489,8 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     switch (status.toLowerCase()) {
       case 'pending':
         return 'Chờ Xử Lý';
+      case 'confirmed':
+        return 'Đã Xác Nhận';
       case 'assigned':
         return 'Đã Phân Công';
       case 'finished':

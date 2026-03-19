@@ -47,13 +47,21 @@ class SnakeCatchingRepository {
     }
   }
 
-  /// Get all snake catching requests for current member/rescuer
-  /// GET /api/snakecatching/requests?userId={userId}
-  Future<SnakeCatchingListResponse> getRequests({String? userId}) async {
+  /// Get all snake catching requests
+  /// GET /api/snakecatching/requests
+  /// Supported filters: userId, assignedRescuerId (AND filters, all optional)
+  Future<SnakeCatchingListResponse> getRequests({
+    String? userId,
+    String? assignedRescuerId,
+  }) async {
     try {
+      final params = <String, dynamic>{
+        if (userId != null) 'userId': userId,
+        if (assignedRescuerId != null) 'assignedRescuerId': assignedRescuerId,
+      };
       final response = await _httpService.get(
         '/api/snakecatching/requests',
-        queryParameters: userId != null ? {'userId': userId} : null,
+        queryParameters: params.isNotEmpty ? params : null,
       );
       return SnakeCatchingListResponse.fromJson(response.data);
     } on DioException catch (e) {

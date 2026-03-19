@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_en_route_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_accept_request_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_mission_success_screen.dart';
+import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_result_confirmation_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_tracking_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_history_screen.dart';
 import '../../models/snake_catching_request.dart';
@@ -218,7 +219,9 @@ class _RescuerAvailableJobsScreenState
     });
     try {
       final repository = ref.read(snakeCatchingRepositoryProvider);
-      final response = await repository.getRequests();
+      final response = await repository.getRequests(
+        assignedRescuerId: _currentRescuerId,
+      );
       if (!mounted) return;
       if (response.isSuccess) {
         setState(() {
@@ -247,7 +250,9 @@ class _RescuerAvailableJobsScreenState
     if (!mounted) return;
     try {
       final repository = ref.read(snakeCatchingRepositoryProvider);
-      final response = await repository.getRequests();
+      final response = await repository.getRequests(
+        assignedRescuerId: _currentRescuerId,
+      );
       if (!mounted) return;
       if (response.isSuccess) {
         setState(() {
@@ -403,37 +408,28 @@ class _RescuerAvailableJobsScreenState
     }
   }
 
-  bool _isMyRequest(SnakeCatchingRequestData request) {
-    if (_currentRescuerId == null) return false;
-    // assignedRescuerId from API = Rescuer entity UUID (≠ account UUID)
-    // assignedRescuer.accountId  = account/auth UUID (= user_id in SharedPrefs)
-    return request.assignedRescuerId == _currentRescuerId ||
-        request.assignedRescuer?.accountId == _currentRescuerId;
-  }
-
   List<SnakeCatchingRequestData> _getFilteredRequests({String? statusFilter}) {
+    // API already filters by assignedRescuerId — only status grouping needed here
     List<SnakeCatchingRequestData> filtered = List.from(_allRequests);
 
     if (statusFilter == 'Assigned') {
-      // "Đơn được assign": active in-progress orders for this rescuer
-      const activeStatuses = {'Assigned', 'Finished', 'Dispute'};
+      // Active in-progress orders — explicitly exclude Paid/Completed
+      // (which can appear via mission-cache status on still-Assigned requests)
+      const activeStatuses = {'Assigned', 'Dispute'};
+      const hideStatuses = {'Paid', 'Completed', 'Finished'};
       filtered = filtered
-          .where(
-            (request) =>
-                activeStatuses.contains(request.status) &&
-                _isMyRequest(request),
-          )
+          .where((request) {
+            if (!activeStatuses.contains(request.status)) return false;
+            final resolved = _resolveDisplayStatus(request);
+            return !hideStatuses.contains(resolved);
+          })
           .toList();
       filtered.sort((a, b) => b.requestDate.compareTo(a.requestDate));
     } else if (statusFilter == 'History') {
-      // "Lịch sử": terminal requests — NOT Completed, NOT Paid
-      const historyStatuses = {'Cancelled', 'Expired'};
+      // Terminal requests assigned to this rescuer
+      const historyStatuses = {'Cancelled', 'Expired', 'Completed', 'Finished'};
       filtered = filtered
-          .where(
-            (request) =>
-                historyStatuses.contains(request.status) &&
-                _isMyRequest(request),
-          )
+          .where((request) => historyStatuses.contains(request.status))
           .toList();
       filtered.sort((a, b) => b.requestDate.compareTo(a.requestDate));
     }
@@ -1905,14 +1901,30 @@ class _RescuerAvailableJobsScreenState
                       ),
                     );
                   } else if (missionStatus == 'Arrived' && mission != null) {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => RescuerTrackingScreen(
-                          requestData: request,
-                          missionId: mission.id,
+                    final hasEvidence =
+                        mission.media.any((m) => m.purpose == 'Evidence');
+                    if (hasEvidence) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              RescuerResultConfirmationScreen(
+                            requestData: request,
+                            missionId: mission.id,
+                            capturedPhotos: const [],
+                            notes: '',
+                          ),
                         ),
-                      ),
-                    );
+                      );
+                    } else {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => RescuerTrackingScreen(
+                            requestData: request,
+                            missionId: mission.id,
+                          ),
+                        ),
+                      );
+                    }
                   } else if (missionStatus == 'Finished' ||
                       missionStatus == 'MissionCompleted' ||
                       missionStatus == 'Completed' ||

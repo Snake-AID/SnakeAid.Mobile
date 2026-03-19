@@ -283,7 +283,9 @@ class _RescuerAcceptRequestScreenState
       }
     }
 
-    return Container(
+    return GestureDetector(
+      onLongPress: species != null ? () => _showSnakeDetail(species!, detail) : null,
+      child: Container(
       decoration: BoxDecoration(
         color: const Color(0xFFFAFAFA),
         borderRadius: BorderRadius.circular(10),
@@ -456,6 +458,267 @@ class _RescuerAcceptRequestScreenState
             ),
         ],
       ),
+    ),
+    );
+  }
+
+  ({String badge, Color color}) _dangerInfo(SnakeSpecies? species) {
+    if (species == null) return (badge: 'CHƯA RÕ', color: const Color(0xFF999999));
+    if (!species.isVenomous) return (badge: 'KHÔNG ĐỘC', color: const Color(0xFF28A745));
+    if (species.riskLevel >= 8.0) return (badge: 'CỰC ĐỘC', color: const Color(0xFFDC3545));
+    if (species.riskLevel >= 6.0) return (badge: 'ĐỘC MẠNH', color: const Color(0xFFFF6B35));
+    if (species.riskLevel >= 4.0) return (badge: 'CÓ ĐỘC', color: const Color(0xFFFFA500));
+    return (badge: 'ÍT ĐỘC', color: const Color(0xFFFFC107));
+  }
+
+  void _showSnakeDetail(SnakeSpecies species, SnakeSpeciesDetail detail) {
+    final danger = _dangerInfo(species);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.72,
+        minChildSize: 0.4,
+        maxChildSize: 0.92,
+        expand: false,
+        builder: (ctx, scrollCtrl) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: SingleChildScrollView(
+            controller: scrollCtrl,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  child: SizedBox(
+                    height: 220, width: double.infinity,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Container(
+                          color: const Color(0xFF1A1A2E),
+                          child: species.imageUrl != null
+                              ? Image.network(species.imageUrl!, fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.pest_control, size: 64, color: Colors.white24)))
+                              : const Center(child: Icon(Icons.pest_control, size: 64, color: Colors.white24)),
+                        ),
+                        Positioned(
+                          bottom: 0, left: 0, right: 0,
+                          child: Container(
+                            height: 100,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                                colors: [Colors.black.withValues(alpha: 0.7), Colors.transparent],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 10, left: 0, right: 0,
+                          child: Center(
+                            child: Container(width: 36, height: 4,
+                                decoration: BoxDecoration(color: Colors.white38, borderRadius: BorderRadius.circular(2))),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 14, left: 16,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(color: danger.color, borderRadius: BorderRadius.circular(6)),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.warning_rounded, size: 14, color: Colors.white),
+                                const SizedBox(width: 5),
+                                Text(danger.badge, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 14, right: 16,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(color: const Color(0xFFFF6B35), borderRadius: BorderRadius.circular(6)),
+                            child: Text('x${detail.quantity} con', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(species.commonName,
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
+                      if (detail.snakeSpeciesScientificName.isNotEmpty) ...[  
+                        const SizedBox(height: 4),
+                        Text(detail.snakeSpeciesScientificName,
+                            style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Color(0xFF888888))),
+                      ],
+                      const SizedBox(height: 14),
+                      Wrap(
+                        spacing: 8, runSpacing: 8,
+                        children: [
+                          _detailChip(
+                            icon: species.isVenomous ? Icons.coronavirus : Icons.check_circle_outline,
+                            label: species.isVenomous ? 'Có nọc độc' : 'Không độc',
+                            color: species.isVenomous ? const Color(0xFFDC3545) : const Color(0xFF28A745),
+                          ),
+                          _detailChip(
+                            icon: Icons.bar_chart,
+                            label: 'Cấp độ: ${species.riskLevel.toStringAsFixed(1)}',
+                            color: danger.color,
+                          ),
+                          if (species.primaryVenomType != null)
+                            _detailChip(
+                              icon: Icons.science_outlined,
+                              label: species.primaryVenomType!,
+                              color: const Color(0xFF6C757D),
+                            ),
+                        ],
+                      ),
+                      if (species.description != null && species.description!.isNotEmpty) ...[  
+                        const SizedBox(height: 16),
+                        _sectionTitle('Mô tả'),
+                        const SizedBox(height: 6),
+                        Text(species.description!, style: const TextStyle(fontSize: 13, color: Color(0xFF444444), height: 1.5)),
+                      ],
+                      if (species.identificationSummary != null && species.identificationSummary!.isNotEmpty) ...[  
+                        const SizedBox(height: 16),
+                        _sectionTitle('Nhận dạng'),
+                        const SizedBox(height: 6),
+                        Text(species.identificationSummary!, style: const TextStyle(fontSize: 13, color: Color(0xFF444444), height: 1.5)),
+                      ],
+                      if (species.identification?.physicalTraits.isNotEmpty == true) ...[  
+                        const SizedBox(height: 16),
+                        _sectionTitle('Đặc điểm hình thái'),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8, runSpacing: 6,
+                          children: species.identification!.physicalTraits.map((t) => _traitChip(t)).toList(),
+                        ),
+                      ],
+                      if (species.identification?.behaviors.isNotEmpty == true) ...[  
+                        const SizedBox(height: 16),
+                        _sectionTitle('Hành vi'),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8, runSpacing: 6,
+                          children: species.identification!.behaviors.map((b) => _traitChip(b, color: const Color(0xFF2196F3))).toList(),
+                        ),
+                      ],
+                      if (species.identification?.habitat.isNotEmpty == true) ...[  
+                        const SizedBox(height: 16),
+                        _sectionTitle('Môi trường sống'),
+                        const SizedBox(height: 6),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.forest_outlined, size: 16, color: Color(0xFF28A745)),
+                            const SizedBox(width: 6),
+                            Expanded(child: Text(species.identification!.habitat,
+                                style: const TextStyle(fontSize: 13, color: Color(0xFF444444)))),
+                          ],
+                        ),
+                      ],
+                      if (species.symptomsByTime != null && species.symptomsByTime!.isNotEmpty) ...[  
+                        const SizedBox(height: 16),
+                        _sectionTitle('Triệu chứng khi bị cắn'),
+                        const SizedBox(height: 8),
+                        ...species.symptomsByTime!.map((sym) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: sym.isCritical ? const Color(0xFFFFF3F3) : const Color(0xFFF8F8F8),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: sym.isCritical ? const Color(0xFFFFCDD2) : const Color(0xFFEEEEEE)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(sym.isCritical ? Icons.priority_high : Icons.access_time,
+                                        size: 14, color: sym.isCritical ? const Color(0xFFDC3545) : const Color(0xFF666666)),
+                                    const SizedBox(width: 5),
+                                    Text(sym.timeRange, style: TextStyle(
+                                      fontSize: 12, fontWeight: FontWeight.bold,
+                                      color: sym.isCritical ? const Color(0xFFDC3545) : const Color(0xFF555555),
+                                    )),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                ...sym.signs.map((sign) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 3),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('• ', style: TextStyle(fontSize: 13, color: Color(0xFF888888))),
+                                      Expanded(child: Text(sign, style: const TextStyle(fontSize: 12, color: Color(0xFF444444)))),
+                                    ],
+                                  ),
+                                )),
+                              ],
+                            ),
+                          ),
+                        )),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _detailChip({required IconData icon, required String label, required Color color}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 5),
+          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String title) =>
+      Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E)));
+
+  Widget _traitChip(String label, {Color color = const Color(0xFF555555)}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Text(label, style: TextStyle(fontSize: 11, color: color)),
     );
   }
 

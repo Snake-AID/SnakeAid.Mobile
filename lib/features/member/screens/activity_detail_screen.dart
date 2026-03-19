@@ -1694,7 +1694,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 label: Text(
                   isAnyLoading
                       ? 'Đang xử lý...'
-                      : (needFinalPayment ? 'THANH TOÁN DỊCH VỤ' : 'THANH TOÁN ĐẶT CỌC'),
+                      : (needFinalPayment ? 'THANH TOÁN DỊCH VỤ' : 'THANH TOÁN PHÍ DI CHUYỂN'),
                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(

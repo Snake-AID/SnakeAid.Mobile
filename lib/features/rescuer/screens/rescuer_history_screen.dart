@@ -24,6 +24,7 @@ class _RescuerHistoryScreenState extends ConsumerState<RescuerHistoryScreen> {
   String? _errorMessage;
   List<SnakeCatchingRequestData> _allHistory = [];
   String? _currentRescuerId;
+  final Map<String, SnakeCatchingRequestData> _fullDataCache = {};
 
   static const _completedStatuses = {
     'Completed',
@@ -51,10 +52,8 @@ class _RescuerHistoryScreenState extends ConsumerState<RescuerHistoryScreen> {
   double get _successRate =>
       _allHistory.isEmpty ? 0 : _completedCount / _allHistory.length;
 
-  double get _totalIncome => _allHistory.fold<double>(
-        0,
-        (sum, r) => sum + (r.mission?.actualCost ?? r.estimatedPrice ?? 0),
-      );
+  double get _totalIncome =>
+      _allHistory.fold<double>(0, (sum, r) => sum + _income(r));
 
   @override
   void initState() {
@@ -76,22 +75,21 @@ class _RescuerHistoryScreenState extends ConsumerState<RescuerHistoryScreen> {
     });
     try {
       final repo = ref.read(snakeCatchingRepositoryProvider);
-      final response = await repo.getRequests();
+      final response = await repo.getRequests(
+        assignedRescuerId: _currentRescuerId,
+      );
       if (!mounted) return;
       if (response.isSuccess) {
         setState(() {
           _allHistory = response.data.where((r) {
-            final isHistoryStatus = _completedStatuses.contains(r.status) ||
+            return _completedStatuses.contains(r.status) ||
                 r.status == 'Cancelled';
-            if (!isHistoryStatus) return false;
-            if (_currentRescuerId != null) {
-              return r.assignedRescuerId == _currentRescuerId;
-            }
-            return true;
           }).toList()
             ..sort((a, b) => b.requestDate.compareTo(a.requestDate));
           _isLoading = false;
         });
+        // Enrich income data in background (list endpoint may not include actualCost)
+        _loadFullDetails();
       } else {
         setState(() {
           _errorMessage = response.message;
@@ -144,8 +142,32 @@ class _RescuerHistoryScreenState extends ConsumerState<RescuerHistoryScreen> {
         r.feedbacks.length;
   }
 
-  double _income(SnakeCatchingRequestData r) =>
-      r.mission?.actualCost ?? r.estimatedPrice ?? 0;
+  double _income(SnakeCatchingRequestData r) {
+    final full = _fullDataCache[r.id];
+    final mission = full?.mission ?? r.mission;
+    if (mission?.actualCost != null && mission!.actualCost! > 0) {
+      return mission.actualCost!;
+    }
+    return r.estimatedPrice ?? 0;
+  }
+
+  Future<void> _loadFullDetails() async {
+    if (!mounted) return;
+    _fullDataCache.clear();
+    final repo = ref.read(snakeCatchingRepositoryProvider);
+    final completed =
+        _allHistory.where((r) => _completedStatuses.contains(r.status)).toList();
+    await Future.wait(
+      completed.map((r) async {
+        try {
+          final response = await repo.getRequestById(r.id);
+          if (response.data != null && mounted) {
+            setState(() => _fullDataCache[r.id] = response.data!);
+          }
+        } catch (_) {}
+      }),
+    );
+  }
 
   bool _isCompleted(SnakeCatchingRequestData r) =>
       _completedStatuses.contains(r.status);
@@ -326,7 +348,7 @@ class _RescuerHistoryScreenState extends ConsumerState<RescuerHistoryScreen> {
     final completed = _isCompleted(r);
     final cancelled = r.status == 'Cancelled';
     final rating = _rating(r);
-    final income = r.mission?.actualCost ?? r.estimatedPrice ?? 0;
+    final income = _income(r);
 
     return GestureDetector(
       onTap: () => _openDetail(r),
