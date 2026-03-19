@@ -22,7 +22,6 @@ import 'package:snakeaid_mobile/features/auth/screens/reset_password_screen.dart
 import 'package:snakeaid_mobile/features/auth/screens/password_reset_success_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_alert_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_identification_screen.dart';
-import 'package:snakeaid_mobile/features/emergency/screens/members/snake_identification_result_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_selection_by_location_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_identification_questions_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_filtered_results_screen.dart';
@@ -72,6 +71,7 @@ import 'package:snakeaid_mobile/features/consultation/screens/members/payment_co
 import 'package:snakeaid_mobile/features/consultation/screens/members/video_consultation_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/members/consultation_waiting_room_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/members/consultation_completion_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/emergency_request_waiting_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/experts/expert_waiting_room_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/experts/expert_consultation_detail_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/experts/expert_consultation_completion_screen.dart';
@@ -459,6 +459,21 @@ final router = GoRouter(
           duration: extraData?['duration'],
           price: extraData?['price'],
           timeSlotId: extraData?['timeSlotId'],
+        );
+      },
+    ),
+
+    // Emergency consultation request waiting/tracking
+    GoRoute(
+      path: '/emergency-request-waiting/:requestId',
+      name: 'emergency_request_waiting',
+      builder: (context, state) {
+        final requestId = state.pathParameters['requestId']!;
+        final extraData = state.extra as Map<String, dynamic>?;
+        return EmergencyRequestWaitingScreen(
+          requestId: requestId,
+          expertId: extraData?['expertId'] as String? ?? '',
+          expertName: extraData?['expertName'] as String? ?? 'Chuyên gia',
         );
       },
     ),

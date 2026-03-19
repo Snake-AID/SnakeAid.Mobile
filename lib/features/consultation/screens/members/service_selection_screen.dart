@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../core/providers/http_provider.dart';
+import '../../../../core/services/emergency_consultation_signalr_service.dart';
 import '../../models/expert_detail_model.dart';
 import '../../providers/expert_detail_provider.dart';
 
@@ -16,7 +20,7 @@ String _formatFee(double fee) {
 
 /// Service Selection Screen
 /// Allows users to choose between instant consultation or scheduled appointment
-class ServiceSelectionScreen extends ConsumerWidget {
+class ServiceSelectionScreen extends ConsumerStatefulWidget {
   final String expertId;
 
   const ServiceSelectionScreen({
@@ -25,8 +29,63 @@ class ServiceSelectionScreen extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(expertDetailProvider(expertId));
+  ConsumerState<ServiceSelectionScreen> createState() =>
+      _ServiceSelectionScreenState();
+}
+
+class _ServiceSelectionScreenState extends ConsumerState<ServiceSelectionScreen> {
+  EmergencyConsultationSignalRService? _presenceService;
+  StreamSubscription<Set<String>>? _snapshotSub;
+  StreamSubscription<ExpertPresenceChangedEvent>? _presenceChangedSub;
+  bool? _isExpertOnlineRealtime;
+
+  String get _expertIdNormalized => widget.expertId.toLowerCase();
+
+  bool _isMatchExpertId(String id) => id.toLowerCase() == _expertIdNormalized;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initPresenceRealtime();
+    });
+  }
+
+  Future<void> _initPresenceRealtime() async {
+    try {
+      final baseUrl = ref.read(httpServiceProvider).baseUrl;
+      _presenceService = EmergencyConsultationSignalRService(baseUrl: baseUrl);
+
+      _snapshotSub = _presenceService!.onlineExpertsSnapshotStream.listen((ids) {
+        if (!mounted) return;
+        final isOnline = ids.any(_isMatchExpertId);
+        setState(() => _isExpertOnlineRealtime = isOnline);
+      });
+
+      _presenceChangedSub =
+          _presenceService!.expertPresenceChangedStream.listen((event) {
+        if (!mounted) return;
+        if (!_isMatchExpertId(event.expertId)) return;
+        setState(() => _isExpertOnlineRealtime = event.isOnline);
+      });
+
+      await _presenceService!.connectAsMember();
+    } catch (e) {
+      debugPrint('Khong the ket noi presence SignalR cho member: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _snapshotSub?.cancel();
+    _presenceChangedSub?.cancel();
+    _presenceService?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(expertDetailProvider(widget.expertId));
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -61,7 +120,12 @@ class ServiceSelectionScreen extends ConsumerWidget {
                       const SizedBox(height: 16),
 
                       // Instant Consultation Card
-                      _buildInstantConsultationCard(context, state.expert!, theme),
+                      _buildInstantConsultationCard(
+                        context,
+                        state.expert!,
+                        theme,
+                        _isExpertOnlineRealtime ?? state.expert!.isOnline,
+                      ),
                       const SizedBox(height: 16),
 
                       // Scheduled Consultation Card
@@ -146,8 +210,12 @@ class ServiceSelectionScreen extends ConsumerWidget {
   }
 
   /// Build instant consultation card
-  Widget _buildInstantConsultationCard(BuildContext context, ExpertDetailModel expert, ThemeData theme) {
-    final isOnline = expert.isOnline;
+  Widget _buildInstantConsultationCard(
+    BuildContext context,
+    ExpertDetailModel expert,
+    ThemeData theme,
+    bool isOnline,
+  ) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(

@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/providers/http_provider.dart';
+import '../../../core/services/emergency_consultation_signalr_service.dart';
 import 'expert_profile_screen.dart';
 import '../../consultation/repository/consultation_repository.dart';
 import '../../consultation/models/consultation_booking_response.dart';
@@ -37,13 +39,24 @@ _ExpertConsultation _bookingToExpertConsultation(ConsultationBookingResponse b) 
   return _ExpertConsultation(
     id: b.consultationId ?? b.id,
     patientName: b.userName ?? 'Bệnh nhân',
+    patientPhone: '',
     consultationType:
         b.consultationType == 'Instant' ? 'Khẩn Cấp' : 'Đặt Lịch',
     snakeSuspect: 'Chưa xác định',
+    hasSnakeImage: false,
     scheduledTime: scheduled,
     status: status,
     feeCost: b.feeCost,
+    rating: b.rating,
+    durationSeconds: b.slotEndTime != null && b.slotStartTime != null
+        ? b.slotEndTime!.difference(b.slotStartTime!).inSeconds
+        : null,
+    durationMinutes: b.slotEndTime != null && b.slotStartTime != null
+        ? b.slotEndTime!.difference(b.slotStartTime!).inMinutes
+        : 45,
+    consultationMethod: 'video',
     problemDescription: b.problemDescription,
+    questions: null,
   );
 }
 
@@ -175,20 +188,26 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
   late final Animation<double> _pulseAnimation;
 
   // Instant consultation request popup
-  bool _showInstantRequest = true;
+  bool _showInstantRequest = false;
   bool _isInstantMinimized = true;
-  int _countdownSeconds = 120;
+  int _countdownSeconds = 0;
+  DateTime? _countdownExpiresAtUtc;
   Timer? _countdownTimer;
+  bool _isHandlingInstantAction = false;
 
-  static const _mockInstant = (
-    patientName: 'Nguyễn Văn A',
-    consultationType: 'Khẩn Cấp',
-    durationMinutes: 45,
-    consultationMethod: 'video',
-    feeCost: 750000,
-    snakeSuspect: 'Rắn Hổ Mang',
-    id: 'instant-01',
-  );
+  EmergencyConsultationSignalRService? _emergencyInboxService;
+  StreamSubscription<EmergencyConsultationRequestEvent>? _emergencyRequestSub;
+
+  EmergencyConsultationRequestEvent? _activeEmergencyRequest;
+
+  String get _instantPatientName =>
+      _activeEmergencyRequest?.requesterName ?? 'Người dùng';
+  String get _instantConsultationType => 'Khẩn Cấp';
+  int get _instantDurationMinutes => 30;
+  String get _instantConsultationMethod => 'video';
+  int get _instantFeeCost => _activeEmergencyRequest?.feeCost ?? 0;
+  String get _instantSnakeSuspect =>
+      _activeEmergencyRequest?.snakeSuspect ?? 'Chưa rõ loài rắn';
 
   @override
   void initState() {
@@ -203,7 +222,7 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
     );
     
     _pulseController.repeat(reverse: true);
-    _startCountdown();
+    // Handled globally at app root so popup can appear on every expert screen.
     
     // Reload data mỗi khi vào màn hình
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -218,35 +237,188 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
     }
   }
 
+  Future<void> _initEmergencyInboxRealtime() async {
+    try {
+      final baseUrl = ref.read(httpServiceProvider).baseUrl;
+      _emergencyInboxService =
+          EmergencyConsultationSignalRService(baseUrl: baseUrl);
+
+      _emergencyRequestSub = _emergencyInboxService!.requestStream.listen(
+        (event) {
+          if (!mounted) return;
+
+          final expiresAtUtc = event.expiresAt?.toUtc();
+          if (expiresAtUtc == null) {
+            debugPrint('EmergencyConsultationRequest thiếu expiresAt: ${event.requestId}');
+            return;
+          }
+
+          final remainingSeconds =
+              expiresAtUtc.difference(DateTime.now().toUtc()).inSeconds;
+          if (remainingSeconds <= 0) {
+            setState(() {
+              _showInstantRequest = false;
+              _activeEmergencyRequest = null;
+              _countdownExpiresAtUtc = null;
+              _countdownSeconds = 0;
+            });
+            return;
+          }
+
+          setState(() {
+            _activeEmergencyRequest = event;
+            _showInstantRequest = true;
+            _isInstantMinimized = true;
+            _countdownExpiresAtUtc = expiresAtUtc;
+            _countdownSeconds = remainingSeconds;
+          });
+          _startCountdown();
+        },
+      );
+
+      await _emergencyInboxService!.connectAsExpert();
+    } catch (e) {
+      debugPrint('Không thể kết nối emergency inbox realtime: $e');
+    }
+  }
+
+  bool _syncCountdownFromExpiresAt() {
+    final expiresAtUtc = _countdownExpiresAtUtc;
+    if (expiresAtUtc == null) {
+      _countdownSeconds = 0;
+      return false;
+    }
+
+    final sec = expiresAtUtc.difference(DateTime.now().toUtc()).inSeconds;
+    if (sec <= 0) {
+      _countdownSeconds = 0;
+      return false;
+    }
+
+    _countdownSeconds = sec;
+    return true;
+  }
+
   void _startCountdown() {
+    final hasRemaining = _syncCountdownFromExpiresAt();
+    if (!hasRemaining) {
+      setState(() {
+        _showInstantRequest = false;
+        _activeEmergencyRequest = null;
+      });
+      return;
+    }
+
     _countdownTimer?.cancel();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      if (_countdownSeconds <= 1) {
+      final stillValid = _syncCountdownFromExpiresAt();
+      if (!stillValid) {
         _countdownTimer?.cancel();
-        setState(() => _showInstantRequest = false);
+        setState(() {
+          _showInstantRequest = false;
+          _activeEmergencyRequest = null;
+          _countdownExpiresAtUtc = null;
+        });
       } else {
-        setState(() => _countdownSeconds--);
+        setState(() {});
       }
     });
   }
 
-  void _acceptInstant() {
-    _countdownTimer?.cancel();
-    setState(() => _showInstantRequest = false);
-    context.push(
-      '/expert-video-waiting/${_mockInstant.id}',
-      extra: {
-        'patientName': _mockInstant.patientName,
-        'consultationType': _mockInstant.consultationType,
-        'feeCost': _mockInstant.feeCost,
-      },
-    );
+  String get _countdownLabel =>
+      '${(_countdownSeconds ~/ 60).toString().padLeft(2, '0')}:${(_countdownSeconds % 60).toString().padLeft(2, '0')}';
+
+  Future<void> _acceptInstant() async {
+    final requestId = _activeEmergencyRequest?.requestId;
+    if (requestId == null || requestId.isEmpty) return;
+    if (_isHandlingInstantAction) return;
+
+    setState(() => _isHandlingInstantAction = true);
+
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      final accepted = await repo.acceptEmergencyRequest(requestId);
+
+      _countdownTimer?.cancel();
+      if (!mounted) return;
+
+      setState(() {
+        _showInstantRequest = false;
+        _activeEmergencyRequest = null;
+        _countdownExpiresAtUtc = null;
+        _countdownSeconds = 0;
+        _isHandlingInstantAction = false;
+      });
+
+      final consultationId = accepted.consultationId;
+      if (consultationId == null || consultationId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Chấp nhận thành công nhưng chưa có consultationId'),
+          ),
+        );
+        return;
+      }
+
+      context.push(
+        '/expert-video-waiting/$consultationId',
+        extra: {
+          'patientName': _instantPatientName,
+          'consultationType': _instantConsultationType,
+          'feeCost': _instantFeeCost,
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isHandlingInstantAction = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Không thể chấp nhận: ${e.toString().replaceFirst('Exception: ', '')}',
+          ),
+        ),
+      );
+    }
   }
 
-  void _declineInstant() {
-    _countdownTimer?.cancel();
-    setState(() => _showInstantRequest = false);
+  Future<void> _declineInstant() async {
+    final requestId = _activeEmergencyRequest?.requestId;
+    if (requestId == null || requestId.isEmpty) return;
+    if (_isHandlingInstantAction) return;
+
+    setState(() => _isHandlingInstantAction = true);
+
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      await repo.rejectEmergencyRequest(requestId);
+
+      _countdownTimer?.cancel();
+      if (!mounted) return;
+
+      setState(() {
+        _showInstantRequest = false;
+        _activeEmergencyRequest = null;
+        _countdownExpiresAtUtc = null;
+        _countdownSeconds = 0;
+        _isHandlingInstantAction = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isHandlingInstantAction = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Không thể từ chối: ${e.toString().replaceFirst('Exception: ', '')}',
+          ),
+        ),
+      );
+    }
+  }
+
+  String _formatInstantFeeK(int feeCost) {
+    final k = feeCost ~/ 1000;
+    return '${k.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}K VNĐ';
   }
 
   void _openDetailFromHome(BuildContext context, _ExpertConsultation c) {
@@ -271,6 +443,8 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
   @override
   void dispose() {
     _countdownTimer?.cancel();
+    _emergencyRequestSub?.cancel();
+    _emergencyInboxService?.dispose();
     _pulseController.dispose();
     super.dispose();
   }
@@ -487,11 +661,11 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 const Text(
-                                  'Người Dùng',
+                                  'Yêu Cầu Mới',
                                   style: TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.w600),
                                 ),
                                 Text(
-                                  'Cần Tư Vấn Ngay  ${(_countdownSeconds ~/ 60).toString().padLeft(2, '0')}:${(_countdownSeconds % 60).toString().padLeft(2, '0')}',
+                                  'Cần Tư Vấn Ngay  $_countdownLabel',
                                   style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 0.3),
                                 ),
                               ],
@@ -563,7 +737,7 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
                                       const Icon(Icons.timer, size: 16, color: Color(0xFFD97706)),
                                       const SizedBox(width: 6),
                                       Text(
-                                        'Tự từ chối sau ${(_countdownSeconds ~/ 60).toString().padLeft(2, '0')}:${(_countdownSeconds % 60).toString().padLeft(2, '0')}',
+                                        'Tự từ chối sau $_countdownLabel',
                                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFD97706)),
                                       ),
                                     ],
@@ -601,13 +775,13 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text(_mockInstant.patientName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF160D1B))),
+                                            Text(_instantPatientName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF160D1B))),
                                             const SizedBox(height: 4),
                                             Text(
-                                              'Tư vấn ${_mockInstant.durationMinutes} phút · ${_mockInstant.consultationMethod == 'video' ? 'Video Call' : 'Nhắn Tin'}',
+                                              'Tư vấn $_instantDurationMinutes phút · ${_instantConsultationMethod == 'video' ? 'Video Call' : 'Nhắn Tin'}',
                                               style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
                                             ),
-                                            Text(_mockInstant.snakeSuspect, style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+                                            Text(_instantSnakeSuspect, style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
                                           ],
                                         ),
                                       ),
@@ -632,7 +806,7 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
                                         children: [
                                           const Text('Phí tư vấn', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF160D1B))),
                                           Text(
-                                            '${(_mockInstant.feeCost ~/ 1000).toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}K VNĐ',
+                                            _formatInstantFeeK(_instantFeeCost),
                                             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF160D1B)),
                                           ),
                                         ],
@@ -670,7 +844,7 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
                                             ],
                                           ),
                                           Text(
-                                            '${((_mockInstant.feeCost * 0.9) ~/ 1000).toString()}K VNĐ',
+                                            _formatInstantFeeK((_instantFeeCost * 0.9).toInt()),
                                             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
                                           ),
                                         ],
@@ -691,7 +865,7 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
                                   width: double.infinity,
                                   height: 52,
                                   child: ElevatedButton(
-                                    onPressed: _acceptInstant,
+                                    onPressed: _isHandlingInstantAction ? null : _acceptInstant,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF6C47C2),
                                       foregroundColor: Colors.white,
@@ -699,7 +873,16 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
                                       elevation: 4,
                                       shadowColor: const Color(0xFF6C47C2).withOpacity(0.4),
                                     ),
-                                    child: const Text('Bắt Đầu Ngay', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                                    child: _isHandlingInstantAction
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : const Text('Bắt Đầu Ngay', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                                   ),
                                 ),
                                 const SizedBox(height: 10),
@@ -718,7 +901,7 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
                                 ),
                                 const SizedBox(height: 8),
                                 TextButton(
-                                  onPressed: _declineInstant,
+                                  onPressed: _isHandlingInstantAction ? null : _declineInstant,
                                   child: const Text('Từ Chối', style: TextStyle(fontSize: 13, color: Color(0xFF999999))),
                                 ),
                               ],
@@ -1361,10 +1544,8 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
   static const Color _purple = Color(0xFF6C47C2);
 
   List<_ExpertConsultation> _consultations = [];
-  bool _isLoadingConsultations = false;
 
   List<_ExpertConsultation> _consultationsForDay(DateTime day) {
-    final now = DateTime.now();
     return _consultations.where((c) {
       final d = c.scheduledTime;
       if (!(d.year == day.year && d.month == day.month && d.day == day.day)) {
@@ -1423,18 +1604,17 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
 
   Future<void> _loadConsultations() async {
     if (!mounted) return;
-    setState(() => _isLoadingConsultations = true);
+    setState(() {});
     try {
       final repo = ref.read(consultationRepositoryProvider);
       final bookings = await repo.getExpertBookings();
       if (!mounted) return;
       setState(() {
         _consultations = bookings.map(_bookingToExpertConsultation).toList();
-        _isLoadingConsultations = false;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _isLoadingConsultations = false);
+      setState(() {});
     }
   }
 
@@ -1749,7 +1929,6 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
   }
 
   Widget _buildScheduleCard(BuildContext context, _ExpertConsultation c) {
-    final now = DateTime.now().toUtc().add(const Duration(hours: 7));
     final isWaiting = c.status == _ExpertConsultationStatus.waiting;
     // Cho phép expert vào video call bất cứ lúc nào (không cần chờ đến giờ)
     final canStart = c.status == _ExpertConsultationStatus.waiting ||

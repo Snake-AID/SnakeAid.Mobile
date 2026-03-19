@@ -4,10 +4,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:snakeaid_mobile/core/services/notification_service.dart';
-import 'package:snakeaid_mobile/features/shared/screens/location_tracker_screen.dart';
-import 'package:snakeaid_mobile/features/shared/screens/signalr_test_screen.dart';
-import 'core/services/background_notification_service.dart';
-import 'core/services/fcm_service.dart';
+import 'package:snakeaid_mobile/features/auth/providers/auth_provider.dart';
+import 'package:snakeaid_mobile/features/consultation/widgets/expert_global_emergency_popup_listener.dart';
 import 'app/router.dart';
 import 'app/theme.dart';
 
@@ -63,6 +61,8 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isExpert = ref.watch(isExpertProvider);
+
     return MaterialApp.router(
       title: 'SnakeAid Mobile',
       debugShowCheckedModeBanner: false,
@@ -74,6 +74,14 @@ class MyApp extends ConsumerWidget {
 
       // Use go_router configuration
       routerConfig: router,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            if (child != null) child,
+            if (isExpert) const ExpertGlobalEmergencyPopupListener(),
+          ],
+        );
+      },
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/expert_detail_provider.dart';
 import '../../providers/consultation_bookings_provider.dart';
 import '../../repository/consultation_repository.dart';
@@ -61,11 +62,27 @@ class PaymentConfirmationScreen extends ConsumerStatefulWidget {
 
 class _PaymentConfirmationScreenState
     extends ConsumerState<PaymentConfirmationScreen> {
+  static const String _instantRequestCachePrefix =
+      'last_emergency_request_for_expert_';
+
   PaymentMethod _selectedPaymentMethod = PaymentMethod.payos;
   bool _agreedToTerms = false;
   bool _isPaymentLoading = false;
   double? _walletBalance;
   bool _isLoadingWallet = true;
+
+  Future<void> _cacheLastEmergencyRequestId(String requestId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      '$_instantRequestCachePrefix${widget.expertId}',
+      requestId,
+    );
+  }
+
+  Future<String?> _getCachedEmergencyRequestId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('$_instantRequestCachePrefix${widget.expertId}');
+  }
 
   @override
   void initState() {
@@ -94,6 +111,92 @@ class _PaymentConfirmationScreenState
   }
 
   Future<void> _handlePayment() async {
+    if (widget.consultationType == 'instant') {
+      if (_selectedPaymentMethod == PaymentMethod.snakeaidPay) {
+        final confirmed = await _showWalletPaymentDialog();
+        if (confirmed != true) return;
+      }
+
+      setState(() => _isPaymentLoading = true);
+      String? requestId;
+
+      try {
+        final repo = ref.read(consultationRepositoryProvider);
+        final req = await repo.createEmergencyRequest(expertId: widget.expertId);
+        requestId = req.requestId;
+        await _cacheLastEmergencyRequestId(requestId);
+      } catch (e) {
+        if (!mounted) return;
+
+        final raw = e.toString().toLowerCase();
+        final isActiveRequestConflict =
+            raw.contains('active emergency request already exists') ||
+            raw.contains('already exists for this expert') ||
+            raw.contains('conflict');
+
+        if (isActiveRequestConflict) {
+          requestId = await _getCachedEmergencyRequestId();
+          if (!mounted) return;
+        }
+
+        if (requestId == null || requestId.isEmpty) {
+          setState(() => _isPaymentLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                isActiveRequestConflict
+                    ? 'Bạn đã có yêu cầu tư vấn ngay đang chờ chuyên gia. Vui lòng vào lại màn chờ.'
+                    : e.toString().replaceFirst('Exception: ', ''),
+              ),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          return;
+        }
+      }
+
+      final paymentMethod = _selectedPaymentMethod == PaymentMethod.snakeaidPay
+          ? 'WalletBalance'
+          : 'PayOS';
+      final resolvedRequestId = requestId;
+      if (resolvedRequestId.isEmpty) {
+        if (mounted) {
+          setState(() => _isPaymentLoading = false);
+        }
+        return;
+      }
+
+      try {
+        final repo = ref.read(consultationRepositoryProvider);
+        await repo.payEmergencyRequest(
+          resolvedRequestId,
+          paymentMethod: paymentMethod,
+        );
+
+        if (!mounted) return;
+        setState(() => _isPaymentLoading = false);
+        context.go(
+          '/emergency-request-waiting/$resolvedRequestId',
+          extra: {
+            'expertId': widget.expertId,
+            'expertName': widget.expertName ?? 'Chuyên gia',
+          },
+        );
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _isPaymentLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
     if (widget.bookingId == null || widget.bookingId!.isEmpty) {
       context.go('/consultation-home');
       return;
@@ -131,7 +234,7 @@ class _PaymentConfirmationScreenState
   /// Show wallet payment confirmation dialog
   Future<bool?> _showWalletPaymentDialog() async {
     final priceAmount = _getPriceAmount();
-    final price = int.parse(priceAmount);
+    final price = int.tryParse(priceAmount) ?? 0;
     final theme = Theme.of(context);
     
     return showDialog<bool>(
@@ -364,6 +467,9 @@ class _PaymentConfirmationScreenState
     if (widget.price != null) {
       // Extract number from price string like "200,000 VNĐ"
       final priceStr = widget.price!.replaceAll(RegExp(r'[^\d]'), '');
+      if (priceStr.isEmpty) {
+        return '0';
+      }
       return priceStr;
     }
     return '150000';
@@ -823,9 +929,6 @@ class _PaymentConfirmationScreenState
 
   /// Build payment methods section
   Widget _buildPaymentMethods(ThemeData theme) {
-    final priceAmount = _getPriceAmount();
-    final price = int.parse(priceAmount);
-    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

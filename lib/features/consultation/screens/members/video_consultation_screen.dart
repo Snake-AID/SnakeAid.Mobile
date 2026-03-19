@@ -1,11 +1,13 @@
-import 'dart:async';
 import 'dart:io';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:snakeaid_mobile/core/services/consultation_chat_signalr_service.dart';
 import '../../repository/consultation_repository.dart';
 
 /// Video consultation screen powered by LiveKit.
@@ -70,6 +72,34 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
   // ── Notes ──────────────────────────────────────────────────────────────────
   final TextEditingController _notesController = TextEditingController();
 
+  // ── In-room chat (SignalR) ────────────────────────────────────────────────
+  ConsultationChatSignalRService? _chatService;
+  StreamSubscription<ConsultationChatMessage>? _chatSub;
+  final ValueNotifier<List<ConsultationChatMessage>> _chatMessagesNotifier =
+      ValueNotifier<List<ConsultationChatMessage>>([]);
+  bool _isChatConnected = false;
+
+  void _appendChatMessage(ConsultationChatMessage msg) {
+    final messages = _chatMessagesNotifier.value;
+
+    final hasSameId = msg.id.isNotEmpty &&
+        messages.any((m) => m.id.isNotEmpty && m.id == msg.id);
+    if (hasSameId) return;
+
+    // Deduplicate optimistic self message when server echoes back shortly after.
+    final hasRecentSelfEcho = msg.isMine &&
+        messages.any(
+          (m) =>
+              m.isMine == msg.isMine &&
+              m.content == msg.content &&
+              m.attachmentUrl == msg.attachmentUrl &&
+              (m.sentAt.difference(msg.sentAt).inSeconds).abs() <= 8,
+        );
+    if (hasRecentSelfEcho) return;
+
+    _chatMessagesNotifier.value = [...messages, msg];
+  }
+
   // ── Computed helpers ───────────────────────────────────────────────────────
 
   /// Local video track (null when camera off or not yet published)
@@ -113,6 +143,7 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
     _room.addListener(_onRoomChanged);
     
     _connectToRoom();
+    _initChatRealtime();
 
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _secondsElapsed++);
@@ -202,8 +233,85 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
     _room.removeListener(_onRoomChanged);
     _room.disconnect();
     _room.dispose();
+    _chatSub?.cancel();
+    _chatService?.dispose();
+    _chatMessagesNotifier.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
+  }
+
+  Future<void> _initChatRealtime() async {
+    try {
+      final baseUrl = ref.read(consultationRepositoryProvider).httpService.baseUrl;
+      _chatService = ConsultationChatSignalRService(baseUrl: baseUrl);
+
+      _appendChatMessage(
+        ConsultationChatMessage(
+          id: 'local-welcome',
+          senderId: '',
+          senderName: widget.expertName,
+          content: 'Xin chào! Bạn có thể nhắn tin trong phòng tư vấn.',
+          sentAt: DateTime.now(),
+          isMine: false,
+        ),
+      );
+
+      _chatSub = _chatService!.messageStream.listen((msg) {
+        if (!mounted) return;
+        setState(() {
+          _appendChatMessage(msg);
+        });
+      });
+
+      await _chatService!.connect(widget.consultationId);
+      if (!mounted) return;
+      setState(() => _isChatConnected = true);
+    } catch (e) {
+      debugPrint('Chat realtime not connected: $e');
+      if (!mounted) return;
+      setState(() => _isChatConnected = false);
+    }
+  }
+
+  Future<void> _handleSendChatText(String text) async {
+    final content = text.trim();
+    if (content.isEmpty) return;
+
+    try {
+      await _chatService?.sendMessage(content: content);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Không gửi được tin nhắn: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleSendChatImage(String filePath, String caption) async {
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      debugPrint('🖼️ Uploading chat image from: $filePath');
+      final secureUrl = await repo.uploadChatImage(filePath);
+      final outgoingContent =
+          caption.trim().isEmpty ? '[image]' : caption.trim();
+      debugPrint('🖼️ Sending image message, url: $secureUrl');
+
+      await _chatService?.sendMessage(
+        content: outgoingContent,
+        attachmentUrl: secureUrl,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Không gửi được ảnh chat: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   String get _formattedTime {
@@ -301,8 +409,14 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
         expand: false,
         initialChildSize: 0.65,
         maxChildSize: 0.9,
-        builder: (ctx, controller) =>
-            _ChatPanel(expertName: widget.expertName, scrollController: controller),
+        builder: (ctx, controller) => _ChatPanel(
+          expertName: widget.expertName,
+          scrollController: controller,
+          messagesListenable: _chatMessagesNotifier,
+          isConnected: _isChatConnected,
+          onSendText: _handleSendChatText,
+          onSendImage: _handleSendChatImage,
+        ),
       ),
     );
   }
@@ -816,29 +930,21 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
 // ═══════════════════════════════════════════════════════════════════════════
 // Chat panel — StatefulWidget để quản lý messages & image picker
 // ═══════════════════════════════════════════════════════════════════════════
-
-class _ChatMessage {
-  final String sender;
-  final String text;
-  final bool isExpert;
-  final String time;
-  final File? image; // null = text message
-  const _ChatMessage({
-    required this.sender,
-    required this.text,
-    required this.isExpert,
-    required this.time,
-    this.image,
-  });
-}
-
 class _ChatPanel extends StatefulWidget {
   final String expertName;
   final ScrollController scrollController;
+  final ValueListenable<List<ConsultationChatMessage>> messagesListenable;
+  final bool isConnected;
+  final Future<void> Function(String text) onSendText;
+  final Future<void> Function(String filePath, String caption) onSendImage;
 
   const _ChatPanel({
     required this.expertName,
     required this.scrollController,
+    required this.messagesListenable,
+    required this.isConnected,
+    required this.onSendText,
+    required this.onSendImage,
   });
 
   @override
@@ -848,44 +954,7 @@ class _ChatPanel extends StatefulWidget {
 class _ChatPanelState extends State<_ChatPanel> {
   final TextEditingController _msgController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
-  final List<_ChatMessage> _messages = [
-    _ChatMessage(
-      sender: '',
-      text: '',
-      isExpert: true,
-      time: '12:30',
-    ),
-    _ChatMessage(
-      sender: 'Bạn',
-      text: 'Vết cắn ở cổ tay phải, có 2 dấu răng, đang sưng nhẹ',
-      isExpert: false,
-      time: '12:31',
-    ),
-    _ChatMessage(
-      sender: '',
-      text: 'Bạn có nhớ màu sắc và hoa văn của con rắn không?',
-      isExpert: true,
-      time: '12:32',
-    ),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    // Set first message sender after init to avoid const issue
-    _messages[0] = _ChatMessage(
-      sender: widget.expertName,
-      text: 'Xin chào! Tôi đã xem thông tin của bạn. Bạn có thể mô tả vết cắn không?',
-      isExpert: true,
-      time: '12:30',
-    );
-    _messages[2] = _ChatMessage(
-      sender: widget.expertName,
-      text: 'Bạn có nhớ màu sắc và hoa văn của con rắn không?',
-      isExpert: true,
-      time: '12:32',
-    );
-  }
+  String? _pendingImagePath;
 
   @override
   void dispose() {
@@ -893,23 +962,23 @@ class _ChatPanelState extends State<_ChatPanel> {
     super.dispose();
   }
 
-  String get _nowTime {
-    final now = DateTime.now();
-    return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-  }
-
-  void _sendText() {
+  Future<void> _sendMessage() async {
     final text = _msgController.text.trim();
-    if (text.isEmpty) return;
-    setState(() {
-      _messages.add(_ChatMessage(
-        sender: 'Bạn',
-        text: text,
-        isExpert: false,
-        time: _nowTime,
-      ));
-    });
+    final pendingImagePath = _pendingImagePath;
+
+    if ((pendingImagePath == null || pendingImagePath.isEmpty) && text.isEmpty) {
+      return;
+    }
+
+    if (pendingImagePath != null && pendingImagePath.isNotEmpty) {
+      await widget.onSendImage(pendingImagePath, text);
+      _pendingImagePath = null;
+    } else {
+      await widget.onSendText(text);
+    }
+
     _msgController.clear();
+    if (mounted) setState(() {});
     _scrollToBottom();
   }
 
@@ -921,16 +990,10 @@ class _ChatPanelState extends State<_ChatPanel> {
         maxWidth: 1080,
       );
       if (file == null) return;
+      if (!mounted) return;
       setState(() {
-        _messages.add(_ChatMessage(
-          sender: 'Bạn',
-          text: '',
-          isExpert: false,
-          time: _nowTime,
-          image: File(file.path),
-        ));
+        _pendingImagePath = file.path;
       });
-      _scrollToBottom();
     } catch (_) {
       // permission denied or camera unavailable — silently ignore
     }
@@ -1052,15 +1115,35 @@ class _ChatPanelState extends State<_ChatPanel> {
           ),
         ),
 
+        if (!widget.isConnected)
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Text(
+              'Chat realtime chưa kết nối. Tin nhắn có thể không gửi được.',
+              style: TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ),
+
         const Divider(color: Colors.white12, height: 1),
 
         // Messages
         Expanded(
-          child: ListView.builder(
-            controller: widget.scrollController,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            itemCount: _messages.length,
-            itemBuilder: (ctx, i) => _buildBubble(_messages[i]),
+          child: ValueListenableBuilder<List<ConsultationChatMessage>>(
+            valueListenable: widget.messagesListenable,
+            builder: (_, messages, __) {
+              return ListView.builder(
+                controller: widget.scrollController,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                itemCount: messages.length,
+                itemBuilder: (ctx, i) => _buildBubble(messages[i]),
+              );
+            },
           ),
         ),
 
@@ -1076,59 +1159,107 @@ class _ChatPanelState extends State<_ChatPanel> {
             color: Colors.white.withOpacity(0.05),
             border: Border(top: BorderSide(color: Colors.white.withOpacity(0.08))),
           ),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Attach button
-              GestureDetector(
-                onTap: _showAttachMenu,
-                child: Container(
-                  width: 40,
-                  height: 40,
+              if (_pendingImagePath != null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.08),
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.add, color: Colors.white70, size: 22),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          File(_pendingImagePath!),
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Ảnh đã chọn. Bấm gửi để gửi ảnh.',
+                          style: TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() => _pendingImagePath = null);
+                        },
+                        child: const Icon(
+                          Icons.close,
+                          color: Colors.white70,
+                          size: 20,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-
-              // Text field
-              Expanded(
-                child: TextField(
-                  controller: _msgController,
-                  style: const TextStyle(color: Colors.white),
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => _sendText(),
-                  decoration: InputDecoration(
-                    hintText: 'Nhắn tin...',
-                    hintStyle:
-                        TextStyle(color: Colors.white.withOpacity(0.4)),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.08),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
+              Row(
+                children: [
+                  // Attach button
+                  GestureDetector(
+                    onTap: _showAttachMenu,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.08),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.add, color: Colors.white70, size: 22),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
                   ),
-                ),
-              ),
-              const SizedBox(width: 8),
 
-              // Send button
-              GestureDetector(
-                onTap: _sendText,
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF228B22),
-                    shape: BoxShape.circle,
+                  const SizedBox(width: 8),
+
+                  // Text field
+                  Expanded(
+                    child: TextField(
+                      controller: _msgController,
+                      style: const TextStyle(color: Colors.white),
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _sendMessage(),
+                      decoration: InputDecoration(
+                        hintText: _pendingImagePath != null
+                            ? 'Thêm chú thích (tuỳ chọn)...'
+                            : 'Nhắn tin...',
+                        hintStyle:
+                            TextStyle(color: Colors.white.withOpacity(0.4)),
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.08),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                      ),
+                    ),
                   ),
-                  child: const Icon(Icons.send, color: Colors.white, size: 18),
-                ),
+
+                  const SizedBox(width: 8),
+
+                  // Send button
+                  GestureDetector(
+                    onTap: _sendMessage,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF228B22),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.send, color: Colors.white, size: 18),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1137,8 +1268,8 @@ class _ChatPanelState extends State<_ChatPanel> {
     );
   }
 
-  Widget _buildBubble(_ChatMessage msg) {
-    final isMe = !msg.isExpert;
+  Widget _buildBubble(ConsultationChatMessage msg) {
+    final isMe = msg.isMine;
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
@@ -1146,21 +1277,21 @@ class _ChatPanelState extends State<_ChatPanel> {
             isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           Text(
-            '${msg.sender} · ${msg.time}',
+            '${isMe ? 'Bạn' : msg.senderName} · ${_formatTime(msg.sentAt)}',
             style: TextStyle(
               fontSize: 11,
               color: Colors.white.withOpacity(0.45),
             ),
           ),
           const SizedBox(height: 4),
-          if (msg.image != null)
+          if (msg.attachmentUrl != null && msg.attachmentUrl!.isNotEmpty)
             // Image bubble
             GestureDetector(
-              onTap: () => _openImagePreview(msg.image!),
+              onTap: () => _openImagePreview(msg.attachmentUrl!),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(14),
-                child: Image.file(
-                  msg.image!,
+                child: Image.network(
+                  msg.attachmentUrl!,
                   width: 200,
                   height: 200,
                   fit: BoxFit.cover,
@@ -1182,7 +1313,7 @@ class _ChatPanelState extends State<_ChatPanel> {
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
-                msg.text,
+                msg.content,
                 style: const TextStyle(color: Colors.white, fontSize: 14),
               ),
             ),
@@ -1191,7 +1322,13 @@ class _ChatPanelState extends State<_ChatPanel> {
     );
   }
 
-  void _openImagePreview(File image) {
+  String _formatTime(DateTime dt) {
+    final h = dt.hour.toString().padLeft(2, '0');
+    final m = dt.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  void _openImagePreview(String imageUrl) {
     showDialog(
       context: context,
       builder: (_) => Dialog(
@@ -1200,7 +1337,7 @@ class _ChatPanelState extends State<_ChatPanel> {
         child: Stack(
           children: [
             InteractiveViewer(
-              child: Image.file(image, fit: BoxFit.contain),
+              child: Image.network(imageUrl, fit: BoxFit.contain),
             ),
             Positioned(
               top: 40,

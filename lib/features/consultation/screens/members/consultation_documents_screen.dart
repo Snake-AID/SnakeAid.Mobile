@@ -126,6 +126,27 @@ class _ConsultationDocumentsScreenState
       return;
     }
 
+    // Instant consultation flow: proceed to payment first.
+    // Emergency request will be created only after payment confirmation.
+    if (widget.consultationType == 'instant') {
+      final expertState = ref.read(expertDetailProvider(widget.expertId));
+      final expertName = expertState.expert?.displayName ?? 'Chuyên gia';
+
+      context.push(
+        '/payment-confirmation/${widget.expertId}',
+        extra: {
+          'consultationType': 'instant',
+          'price': widget.price,
+          'hasDocuments': true,
+          'uploadedImagesCount': _uploadedImages.length,
+          'problemDescription': _problemController.text.trim(),
+          'questions': _questionsController.text.trim(),
+          'expertName': expertName,
+        },
+      );
+      return;
+    }
+
     // If we have a real timeSlotId, call the createBooking API
     if (widget.timeSlotId != null && widget.timeSlotId!.isNotEmpty) {
       setState(() => _isSubmitting = true);

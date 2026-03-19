@@ -900,8 +900,8 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
         label = 'Chờ thanh toán';
         break;
       case ConsultationStatus.completed:
-        bgColor = const Color(0xFF6B7280).withOpacity(0.12);
-        textColor = const Color(0xFF6B7280);
+        bgColor = const Color(0xFF228B22).withOpacity(0.12);
+        textColor = const Color(0xFF228B22);
         label = 'Hoàn thành';
         break;
       case ConsultationStatus.cancelled:

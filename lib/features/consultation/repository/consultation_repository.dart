@@ -10,6 +10,7 @@ import '../models/expert_detail_model.dart';
 import '../models/review_model.dart';
 import '../models/availability_model.dart';
 import '../models/consultation_booking_response.dart';
+import '../models/emergency_consultation_request.dart';
 
 /// Provider for ConsultationRepository
 final consultationRepositoryProvider = Provider<ConsultationRepository>((ref) {
@@ -417,6 +418,143 @@ class ConsultationRepository {
   }
 
   // ---------------------------------------------------------------------------
+  // Emergency consultation methods
+  // ---------------------------------------------------------------------------
+
+  /// Create an emergency consultation request for a specific expert.
+  ///
+  /// API: `POST /api/consultations/emergency-requests`
+  Future<EmergencyConsultationRequest> createEmergencyRequest({
+    required String expertId,
+  }) async {
+    debugPrint('🚨 Creating emergency consultation request for expert: $expertId');
+
+    final response = await httpService.post(
+      '/api/consultations/emergency-requests',
+      data: {'expertId': expertId},
+    );
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] == true && body['data'] != null) {
+      return EmergencyConsultationRequest.fromJson(
+        body['data'] as Map<String, dynamic>,
+      );
+    }
+
+    throw Exception(body['message'] ?? 'Không thể tạo yêu cầu tư vấn ngay');
+  }
+
+  /// Expert accepts an emergency consultation request.
+  ///
+  /// API: `POST /api/consultations/emergency-requests/{requestId}/accept`
+  Future<EmergencyConsultationRequest> acceptEmergencyRequest(
+      String requestId) async {
+    final response = await httpService.post(
+      '/api/consultations/emergency-requests/$requestId/accept',
+    );
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] == true && body['data'] != null) {
+      return EmergencyConsultationRequest.fromJson(
+        body['data'] as Map<String, dynamic>,
+      );
+    }
+
+    throw Exception(body['message'] ?? 'Không thể chấp nhận yêu cầu tư vấn ngay');
+  }
+
+  /// Expert rejects an emergency consultation request.
+  ///
+  /// API: `POST /api/consultations/emergency-requests/{requestId}/reject`
+  Future<EmergencyConsultationRequest> rejectEmergencyRequest(
+      String requestId) async {
+    final response = await httpService.post(
+      '/api/consultations/emergency-requests/$requestId/reject',
+    );
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] == true && body['data'] != null) {
+      return EmergencyConsultationRequest.fromJson(
+        body['data'] as Map<String, dynamic>,
+      );
+    }
+
+    throw Exception(body['message'] ?? 'Không thể từ chối yêu cầu tư vấn ngay');
+  }
+
+  // ---------------------------------------------------------------------------
+  // In-room chat utility methods
+  // ---------------------------------------------------------------------------
+
+  /// Upload an image for chat message attachments.
+  ///
+  /// API: `POST /api/media/upload-image` with `domain=chat-media`
+  /// Returns secure image URL.
+  Future<String> uploadChatImage(String filePath) async {
+    final fileName = filePath.split(RegExp(r'[\\/]')).last;
+    Future<Response<dynamic>> sendUpload({required bool uppercaseKeys}) async {
+      final formData = FormData.fromMap({
+        uppercaseKeys ? 'File' : 'file':
+            await MultipartFile.fromFile(filePath, filename: fileName),
+        uppercaseKeys ? 'Domain' : 'domain': 'chat-media',
+      });
+
+      return httpService.post(
+        '/api/media/upload-image',
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
+      );
+    }
+
+    Response<dynamic> response;
+    try {
+      response = await sendUpload(uppercaseKeys: true);
+    } catch (e) {
+      debugPrint('⚠️ Upload chat image with File/Domain failed, retrying file/domain: $e');
+      response = await sendUpload(uppercaseKeys: false);
+    }
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] == true && body['data'] != null) {
+      final data = body['data'];
+      if (data is Map<String, dynamic>) {
+        final secureUrl = (data['secureUrl'] ??
+                data['SecureUrl'] ??
+                data['url'] ??
+                data['Url'])
+            ?.toString();
+        if (secureUrl != null && secureUrl.isNotEmpty) {
+          debugPrint('✅ Chat image uploaded: $secureUrl');
+          return secureUrl;
+        }
+      }
+    }
+
+    throw Exception(body['message'] ?? 'Không thể upload ảnh chat');
+  }
+
+  /// Search snake species by keyword for in-room expert assistance.
+  ///
+  /// API: `GET /api/v1/snakes/search?q={query}`
+  Future<List<Map<String, dynamic>>> searchSnakeSpecies(String query) async {
+    if (query.trim().isEmpty) return [];
+
+    final response = await httpService.get(
+      '/api/v1/snakes/search',
+      queryParameters: {'q': query.trim()},
+    );
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] == true && body['data'] is List) {
+      return (body['data'] as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .toList();
+    }
+
+    return [];
+  }
+
+  // ---------------------------------------------------------------------------
   // Video call methods
   // ---------------------------------------------------------------------------
 
@@ -626,6 +764,35 @@ class ConsultationRepository {
         throw Exception('Số dư ví không đủ để thanh toán');
       }
       throw Exception(msg.isNotEmpty ? msg : 'Không thể thanh toán');
+    }
+  }
+
+  /// Pay for an emergency consultation request.
+  ///
+  /// API: `POST /api/consultations/emergency-requests/{requestId}/payments`
+  ///
+  /// This moves request status from `PendingPayment` to `PendingExpertResponse`.
+  Future<void> payEmergencyRequest(
+    String requestId, {
+    String paymentMethod = 'WalletBalance',
+  }) async {
+    debugPrint('💳 Paying emergency request: $requestId');
+
+    final response = await httpService.post(
+      '/api/consultations/emergency-requests/$requestId/payments',
+      data: {'paymentMethod': paymentMethod},
+    );
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] != true) {
+      final statusCode = body['status_code'] as int? ?? 0;
+      final msg = (body['message'] as String?) ?? '';
+      if (statusCode == 409 &&
+          (msg.toLowerCase().contains('balance') ||
+              msg.toLowerCase().contains('wallet'))) {
+        throw Exception('Số dư ví không đủ để thanh toán');
+      }
+      throw Exception(msg.isNotEmpty ? msg : 'Không thể thanh toán tư vấn ngay');
     }
   }
 
