@@ -175,11 +175,8 @@ class BriefIncidentForMission {
   @JsonKey(name: 'assignedAt')
   final DateTime? assignedAt;
 
-  @JsonKey(name: 'currentSessionNumber')
-  final int currentSessionNumber;
-
-  @JsonKey(name: 'currentRadiusKm')
-  final int currentRadiusKm;
+  @JsonKey(name: 'address')
+  final String? address;
 
   // Backend returns 'identifiedSnake' not 'identified_snake_species'
   @JsonKey(name: 'identifiedSnake')
@@ -200,8 +197,7 @@ class BriefIncidentForMission {
     this.severityLevel,
     this.incidentOccurredAt,
     this.assignedAt,
-    required this.currentSessionNumber,
-    required this.currentRadiusKm,
+    this.address,
     this.identifiedSnakeSpecies,
     this.identificationContext,
     required this.media,
@@ -214,8 +210,6 @@ class BriefIncidentForMission {
 
   // Computed properties
   IncidentStatus get incidentStatus => IncidentStatus.fromString(status);
-
-  String get formattedRadius => '${currentRadiusKm}km';
 
   String getSeverityText() {
     if (severityLevel == null) return 'Chưa xác định';

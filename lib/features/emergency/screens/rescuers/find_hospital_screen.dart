@@ -149,7 +149,6 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
       final pricingResponse = await repository.reportTranferToHospital(
         missionId: widget.missionId,
         hospitalId: hospital.id,
-        distanceToHospitalKm: actualDistanceKm,
         note: null,
       );
 
@@ -214,23 +213,31 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildPricingRow(
-                          'Phí cứu hộ',
-                          pricingResponse.baseMissionPrice,
+                        Text(
+                          'Yêu cầu chuyển viện đã được ghi nhận.',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1C100D),
+                          ),
                         ),
-                        const Divider(height: 16),
-                        _buildPricingRow(
-                          'Phí chuyển viện',
-                          pricingResponse.hospitalTransferPrice,
-                          subtitle:
-                              '${pricingResponse.distanceKm.toStringAsFixed(1)} km × ${pricingResponse.pricePerKm.toStringAsFixed(0)}đ/km',
+                        const SizedBox(height: 8),
+                        Text(
+                          'Cập nhật: ${pricingResponse.updatedAt.toLocal()}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF666666),
+                          ),
                         ),
-                        const Divider(height: 16),
-                        _buildPricingRow(
-                          'Tổng cộng',
-                          pricingResponse.totalPrice,
-                          isBold: true,
+                        const SizedBox(height: 4),
+                        Text(
+                          'Cần nhập viện: ${pricingResponse.requiresHospitalization ? 'Có' : 'Không'}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF666666),
+                          ),
                         ),
                       ],
                     ),
@@ -415,7 +422,6 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
                             'needHospital': true,
                             'hospitalName': pricing.hospitalName,
                             'hospitalId': pricing.hospitalId,
-                            'totalPrice': pricing.totalPrice,
                           },
                         );
                       },
@@ -1161,26 +1167,25 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'Tổng chi phí:',
+                          'Cần nhập viện:',
                           style: TextStyle(
                             fontSize: 14,
                             color: Color(0xFF666666),
                           ),
                         ),
                         Text(
-                          '${pricing.totalPrice.toStringAsFixed(0)}đ',
+                          pricing.requiresHospitalization ? 'Có' : 'Không',
                           style: const TextStyle(
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFFFF8800),
+                            color: Color(0xFF28A745),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Phí cứu hộ: ${pricing.baseMissionPrice.toStringAsFixed(0)}đ + '
-                      'Phí chuyển viện: ${pricing.hospitalTransferPrice.toStringAsFixed(0)}đ',
+                      'Cập nhật: ${pricing.updatedAt.toLocal()}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF999999),

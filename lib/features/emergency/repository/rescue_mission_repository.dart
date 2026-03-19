@@ -242,22 +242,19 @@ class RescueMissionRepository {
   Future<HospitalTransferPricingResponse> reportTranferToHospital({
     required String missionId,
     required int hospitalId,
-    required double distanceToHospitalKm,
     String? note,
   }) async {
     try {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       debugPrint('🏥 Reporting transfer to hospital: $missionId');
       debugPrint('   Hospital ID: $hospitalId');
-      debugPrint('   Distance: $distanceToHospitalKm km');
       if (note != null) {
         debugPrint('   Note: $note');
       }
 
       final request = ReportTranferHospitalRequest(
         hospitalId: hospitalId,
-        distanceToHospitalKm: distanceToHospitalKm,
-        note: note,
+        notes: note,
       );
 
       final response = await httpService.patch(
@@ -278,9 +275,9 @@ class RescueMissionRepository {
       debugPrint('✅ Hospital transfer reported');
       debugPrint('   Hospital: ${pricingResponse.data!.hospitalName}');
       debugPrint(
-        '   Transfer price: ${pricingResponse.data!.hospitalTransferPrice}',
+        '   Requires hospitalization: ${pricingResponse.data!.requiresHospitalization}',
       );
-      debugPrint('   Total price: ${pricingResponse.data!.totalPrice}');
+      debugPrint('   Updated at: ${pricingResponse.data!.updatedAt}');
 
       return pricingResponse.data!;
     } on DioException catch (e) {
