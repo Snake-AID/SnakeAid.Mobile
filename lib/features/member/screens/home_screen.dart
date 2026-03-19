@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
@@ -439,13 +440,22 @@ Future<void> _handleSosActivation(BuildContext context, WidgetRef ref) async {
       return;
     }
 
-    // 2. Create SOS incident request
+    // 2. Reverse geocode to get address string (OpenStreetMap Nominatim)
+    final address = await _reverseGeocodeAddress(
+      position.latitude,
+      position.longitude,
+    );
+
+    debugPrint('📍 Reverse geocoded address: ${address ?? 'Không có'}');
+
+    // 3. Create SOS incident request
     final request = SosIncidentRequest(
       lng: position.longitude,
       lat: position.latitude,
+      address: address,
     );
 
-    // 3. Call API to create SOS incident
+    // 4. Call API to create SOS incident
     final repository = ref.read(incidentRepositoryProvider);
     final response = await repository.createSosIncident(request);
 
@@ -539,6 +549,51 @@ Future<Position?> _getCurrentLocation() async {
     return position;
   } catch (e) {
     debugPrint('❌ Error getting location: $e');
+    return null;
+  }
+}
+
+/// Reverse geocode coordinates to human-readable address using OSM Nominatim
+Future<String?> _reverseGeocodeAddress(double lat, double lng) async {
+  try {
+    final dio = Dio();
+    final response = await dio.get(
+      'https://nominatim.openstreetmap.org/reverse',
+      queryParameters: {
+        'format': 'json',
+        'lat': lat.toString(),
+        'lon': lng.toString(),
+        'addressdetails': '1',
+        'accept-language': 'vi',
+      },
+      options: Options(
+        headers: {'User-Agent': 'SnakeAid Mobile App'},
+        connectTimeout: Duration(milliseconds: 7000),
+        sendTimeout: Duration(milliseconds: 7000),
+        receiveTimeout: Duration(milliseconds: 7000),
+      ),
+    );
+
+    if (response.statusCode == 200 && response.data != null) {
+      final displayName = response.data['display_name'] as String?;
+      if (displayName != null && displayName.isNotEmpty) {
+        return displayName;
+      }
+    }
+    return null;
+  } on DioException catch (e) {
+    if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.sendTimeout ||
+        e.type == DioExceptionType.receiveTimeout) {
+      debugPrint(
+        '⏱️ OSM reverse geocode timed out (7s). Returning null address',
+      );
+    } else {
+      debugPrint('❌ Failed to reverse geocode: $e');
+    }
+    return null;
+  } catch (e) {
+    debugPrint('❌ Failed to reverse geocode: $e');
     return null;
   }
 }

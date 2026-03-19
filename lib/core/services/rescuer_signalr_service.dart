@@ -150,6 +150,54 @@ class RescuerSignalRService {
   /// Register all event handlers from hub
   void _registerEventHandlers() {
     // 🚨 NEW RESCUE REQUEST (URGENT!)
+    // Note: Backend now sends "DispatchRequested" for operator dispatch flow.
+    // We still treat it as a rescue request in the UI.
+    _hubConnection!.on('DispatchRequested', (arguments) {
+      try {
+        debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        debugPrint('🚨 DISPATCH REQUEST RECEIVED!');
+
+        if (arguments == null || arguments.isEmpty) {
+          debugPrint('⚠️ Empty arguments received');
+          return;
+        }
+
+        final data = arguments[0] as Map<String, dynamic>;
+        debugPrint('📋 Dispatch payload: $data');
+
+        // Map dispatch payload to existing RescueRequest model used by the UI
+        final dispatchedAt = data['dispatchedAt'] != null
+            ? DateTime.parse(data['dispatchedAt'] as String).toUtc()
+            : DateTime.now().toUtc();
+        final request = RescueRequest(
+          requestId: data['requestId'] as String,
+          sessionId: data['operatorId'] as String? ?? '',
+          incidentId: data['incidentId'] as String,
+          // Dispatch requests do not include radius; default to 10km for UI.
+          radiusKm: 10.0,
+          requestSentAt: dispatchedAt,
+          expiredAt: dispatchedAt.add(const Duration(seconds: 60)),
+        );
+
+        // 🔍 UTC TIME VALIDATION
+        debugPrint('✅ Parsed dispatch request: ${request.requestId}');
+        debugPrint('⏰ Expires in: ${request.remainingSeconds}s');
+        debugPrint(
+          '🌐 DispatchedAt (UTC): ${dispatchedAt.toIso8601String()}',
+        );
+        debugPrint(
+          '🕒 Current time (UTC): ${DateTime.now().toUtc().toIso8601String()}',
+        );
+
+        // Broadcast to listeners
+        _newRequestController.add(request);
+      } catch (e, stackTrace) {
+        debugPrint('❌ Error parsing DispatchRequested event: $e');
+        debugPrint('Stack trace: $stackTrace');
+      }
+    });
+
+    // ── Legacy: NEW RESCUE REQUEST (pre-dispatch flow)
     _hubConnection!.on('NewRescueRequest', (arguments) {
       try {
         debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -390,7 +438,7 @@ class RescuerSignalRService {
   ) async {
     try {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      debugPrint('✅ Accepting rescue request...');
+      debugPrint('✅ Accepting dispatch request...');
       debugPrint('📋 Request ID: $requestId');
       debugPrint('👤 Rescuer ID: $rescuerId');
 
@@ -408,13 +456,13 @@ class RescuerSignalRService {
       debugPrint('📝 Created completer for request: $requestId');
 
       try {
-        // Invoke AcceptRequest method on hub (no return value expected)
+        // Invoke AcceptDispatchRequest method on hub (no return value expected)
         await _hubConnection!.invoke(
-          'AcceptRequest',
-          args: <Object>[requestId, rescuerId],
+          'AcceptDispatchRequest',
+          args: <Object>[requestId],
         );
 
-        debugPrint('✅ AcceptRequest invoked, waiting for response event...');
+        debugPrint('✅ AcceptDispatchRequest invoked, waiting for response event...');
 
         // Wait for RequestAccepted or RequestError event (20 second timeout)
         final response = await completer.future.timeout(
@@ -463,6 +511,51 @@ class RescuerSignalRService {
       return AcceptRequestResponse(
         isSuccess: false,
         message: 'Không thể nhận nhiệm vụ. Vui lòng thử lại.',
+        error: e.toString(),
+        requestId: requestId,
+      );
+    }
+  }
+
+  /// Decline a dispatch request
+  ///
+  /// Backend method signature: `DeclineDispatchRequest(string requestId, string reason)`
+  Future<AcceptRequestResponse> declineDispatchRequest(
+    String requestId,
+    String reason,
+  ) async {
+    try {
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint('❌ Declining dispatch request...');
+      debugPrint('📋 Request ID: $requestId');
+      debugPrint('💬 Reason: $reason');
+
+      if (_hubConnection == null || !isConnected) {
+        return AcceptRequestResponse(
+          isSuccess: false,
+          message: 'Not connected to server',
+          error: 'SignalR connection not established',
+          requestId: requestId,
+        );
+      }
+
+      await _hubConnection!.invoke(
+        'DeclineDispatchRequest',
+        args: <Object>[requestId, reason],
+      );
+
+      return AcceptRequestResponse(
+        isSuccess: true,
+        message: 'Declined',
+        requestId: requestId,
+      );
+    } catch (e, stackTrace) {
+      debugPrint('❌ Failed to decline request: $e');
+      debugPrint('Stack trace: $stackTrace');
+
+      return AcceptRequestResponse(
+        isSuccess: false,
+        message: 'Failed to decline request',
         error: e.toString(),
         requestId: requestId,
       );

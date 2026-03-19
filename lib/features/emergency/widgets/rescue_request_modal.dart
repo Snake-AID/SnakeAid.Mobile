@@ -123,11 +123,18 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
           _isLoadingIncident = false;
         });
 
-        // Fetch address from coordinates
-        _fetchLocationAddress(
-          _incident!.locationCoordinates.latitude,
-          _incident!.locationCoordinates.longitude,
-        );
+        // Use API address if provided, otherwise fallback to reverse geocode
+        if (_incident?.address != null && _incident!.address!.isNotEmpty) {
+          setState(() {
+            _locationAddress = _incident!.address;
+            _isLoadingAddress = false;
+          });
+        } else {
+          _fetchLocationAddress(
+            _incident!.locationCoordinates.latitude,
+            _incident!.locationCoordinates.longitude,
+          );
+        }
       } else {
         setState(() {
           _errorMessage = 'Không thể tải thông tin sự cố';
@@ -265,8 +272,21 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
     }
   }
 
-  void _onTimeout() {
+  Future<void> _onTimeout() async {
     _stopAlarmSound();
+
+    // Notify backend that dispatch request was not accepted in time.
+    try {
+      await ref
+          .read(rescuerSignalRServiceProvider)
+          .declineDispatchRequest(widget.request.requestId, 'TIMEOUT');
+    } catch (e) {
+      debugPrint('❌ Failed to send decline request on timeout: $e');
+    }
+
+    // Clear active request state
+    ref.read(activeRescueRequestProvider.notifier).clearRequest();
+
     widget.onDismiss();
   }
 

@@ -38,13 +38,9 @@ class DetailedIncidentResponse {
 class DetailedIncidentData {
   final String id;
   final GeoPointCoordinates locationCoordinates;
+  final String? address;
   final List<ReportSymptom>? symptomsReport;
   final IncidentStatus status;
-
-  // Session info
-  final int currentSessionNumber;
-  final int currentRadiusKm;
-  final DateTime? lastSessionAt;
 
   // Assignment info
   final DateTime? assignedAt;
@@ -53,7 +49,7 @@ class DetailedIncidentData {
   final int severityLevel;
   final DateTime? incidentOccurredAt;
 
-  // Rescue attempts tracking
+  // Rescue attempts tracking (legacy; now handled by dispatch center)
   final int totalRescueAttempts;
   final int failedAttemptsCount;
 
@@ -70,11 +66,9 @@ class DetailedIncidentData {
   DetailedIncidentData({
     required this.id,
     required this.locationCoordinates,
+    this.address,
     this.symptomsReport,
     required this.status,
-    required this.currentSessionNumber,
-    required this.currentRadiusKm,
-    this.lastSessionAt,
     this.assignedAt,
     this.assignedRescuerId,
     this.cancellationReason,
@@ -100,11 +94,6 @@ class DetailedIncidentData {
           ?.map((s) => ReportSymptom.fromJson(s as Map<String, dynamic>))
           .toList(),
       status: IncidentStatus.fromString(json['status'] ?? 'Pending'),
-      currentSessionNumber: json['currentSessionNumber'] ?? 1,
-      currentRadiusKm: json['currentRadiusKm'] ?? 5,
-      lastSessionAt: json['lastSessionAt'] != null
-          ? DateTime.parse(json['lastSessionAt'])
-          : null,
       assignedAt: json['assignedAt'] != null
           ? DateTime.parse(json['assignedAt'])
           : null,
@@ -114,6 +103,7 @@ class DetailedIncidentData {
       incidentOccurredAt: json['incidentOccurredAt'] != null
           ? DateTime.parse(json['incidentOccurredAt'])
           : null,
+      address: json['address'],
       totalRescueAttempts: json['totalRescueAttempts'] ?? 0,
       failedAttemptsCount: json['failedAttemptsCount'] ?? 0,
       user: BriefMemberProfile.fromJson(json['user'] ?? {}),
@@ -142,11 +132,9 @@ class DetailedIncidentData {
   Map<String, dynamic> toJson() => {
     'id': id,
     'locationCoordinates': locationCoordinates.toJson(),
+    'address': address,
     'symptomsReport': symptomsReport?.map((s) => s.toJson()).toList(),
     'status': status.value,
-    'currentSessionNumber': currentSessionNumber,
-    'currentRadiusKm': currentRadiusKm,
-    'lastSessionAt': lastSessionAt?.toIso8601String(),
     'assignedAt': assignedAt?.toIso8601String(),
     'assignedRescuerId': assignedRescuerId,
     'cancellationReason': cancellationReason,

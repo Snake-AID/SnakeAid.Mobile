@@ -82,8 +82,7 @@ BriefIncidentForMission _$BriefIncidentForMissionFromJson(
   assignedAt: json['assignedAt'] == null
       ? null
       : DateTime.parse(json['assignedAt'] as String),
-  currentSessionNumber: (json['currentSessionNumber'] as num).toInt(),
-  currentRadiusKm: (json['currentRadiusKm'] as num).toInt(),
+  address: json['address'] as String?,
   identifiedSnakeSpecies: json['identifiedSnake'] == null
       ? null
       : DetectedSnakeSpecies.fromJson(
@@ -109,8 +108,7 @@ Map<String, dynamic> _$BriefIncidentForMissionToJson(
   'severityLevel': instance.severityLevel,
   'incidentOccurredAt': instance.incidentOccurredAt?.toIso8601String(),
   'assignedAt': instance.assignedAt?.toIso8601String(),
-  'currentSessionNumber': instance.currentSessionNumber,
-  'currentRadiusKm': instance.currentRadiusKm,
+  'address': instance.address,
   'identifiedSnake': instance.identifiedSnakeSpecies?.toJson(),
   'identificationContext': instance.identificationContext?.toJson(),
   'media': instance.media.map((e) => e.toJson()).toList(),

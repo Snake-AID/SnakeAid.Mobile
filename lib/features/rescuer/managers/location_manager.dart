@@ -115,6 +115,35 @@ class LocationManager {
     debugPrint("LocationManager started tracking for user: $userId");
   }
 
+  /// Restore idle tracking after the app resumes from background.
+  Future<void> resumeTracking(String userId) async {
+    // If we already have an active stream, just clear any throttling so the
+    // next location update is sent immediately.
+    if (_positionStreamSubscription != null) {
+      _isThrottled = false;
+      _throttleTimer?.cancel();
+      _throttleTimer = null;
+      debugPrint(
+        '✅ [LocationManager] Resumed idle tracking (throttle reset) for user: $userId',
+      );
+
+      // Try to send an immediate location ping so the backend knows we're back.
+      try {
+        final position = await Geolocator.getCurrentPosition();
+        _sendIdleLocation(position);
+      } catch (e) {
+        debugPrint(
+          '⚠️ [LocationManager] Failed to get current position on resume: $e',
+        );
+      }
+
+      return;
+    }
+
+    // No active stream - start tracking anew.
+    await startTracking(userId);
+  }
+
   void _handleNewPosition(String userId, Position position) {
     if (_isThrottled) return;
 
