@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:vibration/vibration.dart';
 import 'rescuer_profile_screen.dart';
 import 'rescuer_income_management_screen.dart';
 import '../../emergency/providers/rescuer_emergency_provider.dart';
@@ -11,7 +13,9 @@ import '../../emergency/providers/active_mission_provider.dart';
 import '../../emergency/widgets/rescue_request_modal.dart';
 import '../managers/location_manager.dart';
 import '../providers/tracking_provider.dart';
+import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_accept_request_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_available_jobs_screen.dart';
+import 'package:snakeaid_mobile/features/snake_catching/repository/snake_catching_repository.dart';
 
 /// Rescuer Home Screen - Dashboard for rescue team members
 class RescuerHomeScreen extends ConsumerStatefulWidget {
@@ -23,6 +27,7 @@ class RescuerHomeScreen extends ConsumerStatefulWidget {
 
 class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
   int _selectedIndex = 0;
+  final AudioPlayer _snakeCatchingAudioPlayer = AudioPlayer();
 
   final List<Widget> _screens = [
     const _HomeTab(),
@@ -110,6 +115,19 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
       });
     });
 
+    // Listen for SnakeCatchingRequestAssigned (Operator assigned a catching job to this rescuer)
+    ref.listen<AsyncValue<Map<String, dynamic>>>(
+      snakeCatchingRequestAssignedStreamProvider,
+      (previous, next) {
+        next.whenData((data) {
+          debugPrint(
+            '🐍 [GLOBAL] SnakeCatchingRequestAssigned: id=${data['id']}',
+          );
+          _showSnakeCatchingAssignedModal(data);
+        });
+      },
+    );
+
     // Listen for request cancelled
     ref.listen<AsyncValue<dynamic>>(requestCancelledStreamProvider, (
       previous,
@@ -138,7 +156,10 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
     });
     return Scaffold(
       backgroundColor: const Color(0xFFF8F6F5),
-      body: _screens[_selectedIndex],
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _screens,
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -165,6 +186,363 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _snakeCatchingAudioPlayer.dispose();
+    super.dispose();
+  }
+
+  /// Show modal when a snake catching request is assigned to this rescuer.
+  /// SignalR payload: { id, status, assignedAt, assignedRescuerId,
+  ///                    assignedRescuerName, assignedRescuerPhone }
+  /// Full request details are fetched via API when tapping "Xem chi tiết".
+  void _showSnakeCatchingAssignedModal(Map<String, dynamic> data) {
+    debugPrint('🐍 [GLOBAL] Showing snake catching assigned modal...');
+    debugPrint('📋 SignalR payload: $data');
+    _playSnakeCatchingAlert();
+
+    // Fields actually sent by SignalR
+    final requestId = (data['id'] as String?)?.trim() ?? '';
+    final assignedAtRaw = data['assignedAt'] as String?;
+
+    String? assignedAtText;
+    if (assignedAtRaw != null) {
+      final dt = DateTime.tryParse(assignedAtRaw);
+      if (dt != null) {
+        final local = dt.toLocal();
+        assignedAtText =
+            '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}'
+            ' ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+      }
+    }
+
+    bool isNavigating = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      useRootNavigator: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Gradient Header ──────────────────────────────────────────
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFFFF6B35), Color(0xFFD94010)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 68,
+                    height: 68,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.pest_control_rounded,
+                      color: Colors.white,
+                      size: 38,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Đơn Bắt Rắn Mới',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Điều phối viên vừa phân công cho bạn',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Info Body ────────────────────────────────────────────────
+            Container(
+              constraints: const BoxConstraints(maxHeight: 320),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8F6F5),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          _modalInfoRow(
+                            Icons.assignment_turned_in_rounded,
+                            const Color(0xFF28A745),
+                            'Trạng thái',
+                            'Đã được phân công',
+                          ),
+                          if (assignedAtText != null) ...[
+                            const Divider(height: 16, thickness: 0.5),
+                            _modalInfoRow(
+                              Icons.schedule_rounded,
+                              const Color(0xFF666666),
+                              'Thời gian phân công',
+                              assignedAtText,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF3E0),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: const Color(0xFFFF6B35).withOpacity(0.3),
+                        ),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 16,
+                            color: Color(0xFFFF6B35),
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Nhấn "Xem chi tiết" để xem đầy đủ thông tin đơn bắt rắn.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF666666),
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── Action Buttons ───────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: isNavigating
+                          ? null
+                          : () {
+                              _stopSnakeCatchingAlert();
+                              Navigator.of(ctx).pop();
+                            },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF666666),
+                        side: const BorderSide(color: Color(0xFFDDDDDD)),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text('Để sau'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton(
+                      onPressed: (isNavigating || requestId.isEmpty)
+                          ? null
+                          : () async {
+                              setModalState(() => isNavigating = true);
+                              try {
+                                final repository = ref.read(
+                                  snakeCatchingRepositoryProvider,
+                                );
+                                final response =
+                                    await repository.getRequestById(requestId);
+                                if (!context.mounted) return;
+                                _stopSnakeCatchingAlert();
+                                Navigator.of(ctx).pop();
+                                if (response.isSuccess &&
+                                    response.data != null) {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          RescuerAcceptRequestScreen(
+                                        requestData: response.data!,
+                                      ),
+                                    ),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Không thể tải thông tin đơn. Vui lòng thử lại.',
+                                      ),
+                                      backgroundColor: Color(0xFFDC3545),
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (!context.mounted) return;
+                                setModalState(() => isNavigating = false);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Lỗi: $e'),
+                                    backgroundColor:
+                                        const Color(0xFFDC3545),
+                                  ),
+                                );
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF6B35),
+                        disabledBackgroundColor:
+                            const Color(0xFFFF6B35).withOpacity(0.6),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: isNavigating
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Xem chi tiết',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        ),
+      ),
+    ).then((_) => _stopSnakeCatchingAlert());
+  }
+
+  /// Play loud alert sound + vibrate when a catching job is assigned
+  Future<void> _playSnakeCatchingAlert() async {
+    // Sound — requires assets/sounds/snake_alert.mp3 (see assets/sounds/README.md)
+    try {
+      // Reset player state before playing to avoid stuck state
+      await _snakeCatchingAudioPlayer.stop();
+      await _snakeCatchingAudioPlayer.setVolume(1.0);
+      await _snakeCatchingAudioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _snakeCatchingAudioPlayer.play(
+        AssetSource('sounds/snake_alert.mp3'),
+      );
+    } catch (e) {
+      debugPrint('⚠️ Could not play snake alert sound: $e');
+    }
+    // Vibration
+    try {
+      if (await Vibration.hasVibrator() == true) {
+        Vibration.vibrate(
+          pattern: [0, 500, 150, 500, 150, 700],
+          repeat: 0,
+        );
+      }
+    } catch (e) {
+      debugPrint('⚠️ Could not vibrate: $e');
+    }
+  }
+
+  /// Stop alert sound and vibration
+  void _stopSnakeCatchingAlert() {
+    try {
+      _snakeCatchingAudioPlayer.stop();
+    } catch (_) {}
+    try {
+      Vibration.cancel();
+    } catch (_) {}
+  }
+
+  /// Labeled info row widget used inside the snake catching modal
+  Widget _modalInfoRow(
+    IconData icon,
+    Color iconColor,
+    String label,
+    String value,
+  ) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: iconColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(icon, size: 15, color: iconColor),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF999999),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF333333),
+                  fontWeight: FontWeight.w500,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

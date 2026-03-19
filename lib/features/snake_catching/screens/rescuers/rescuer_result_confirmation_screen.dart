@@ -13,7 +13,8 @@ import 'rescuer_mission_success_screen.dart';
 class _SnakeEntry {
   final SnakeSpecies species;
   final int quantity;
-  const _SnakeEntry({required this.species, required this.quantity});
+  final String detailId; // ID returned by BE after addMissionDetail
+  const _SnakeEntry({required this.species, required this.quantity, required this.detailId});
 }
 
 /// Màn hình xác nhận kết quả sau khi bắt rắn thành công
@@ -53,6 +54,7 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
   final List<_SnakeEntry> _confirmedSnakes = [];
   bool _isConfirmingSnake = false;
   bool _isSubmitting = false;
+  final Set<String> _deletingIds = {}; // detailIds currently being deleted
 
   // Species picker search
   final TextEditingController _speciesSearchController = TextEditingController();
@@ -169,9 +171,13 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
     setState(() => _isConfirmingSnake = true);
     try {
       final repo = ref.read(snakeCatchingRepositoryProvider);
-      await repo.addMissionDetail(widget.missionId, _pendingSpecies!.id, _pendingQuantity);
+      final detailId = await repo.addMissionDetail(widget.missionId, _pendingSpecies!.id, _pendingQuantity);
       setState(() {
-        _confirmedSnakes.add(_SnakeEntry(species: _pendingSpecies!, quantity: _pendingQuantity));
+        _confirmedSnakes.add(_SnakeEntry(
+          species: _pendingSpecies!,
+          quantity: _pendingQuantity,
+          detailId: detailId,
+        ));
         _pendingSpecies = null;
         _pendingQuantity = 1;
       });
@@ -184,6 +190,28 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
       }
     } finally {
       if (mounted) setState(() => _isConfirmingSnake = false);
+    }
+  }
+
+  Future<void> _deleteSnake(String detailId, int index) async {
+    if (_deletingIds.contains(detailId)) return;
+    setState(() => _deletingIds.add(detailId));
+    try {
+      final repo = ref.read(snakeCatchingRepositoryProvider);
+      // If detailId is empty (e.g. API didn’t return it), remove locally only
+      if (detailId.isNotEmpty) {
+        await repo.deleteMissionDetail(detailId);
+      }
+      if (mounted) setState(() => _confirmedSnakes.removeAt(index));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Không thể xóa: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _deletingIds.remove(detailId));
     }
   }
 
@@ -866,11 +894,20 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                         ],
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline,
-                          size: 18, color: Color(0xFFCC3333)),
-                      onPressed: () => setState(() => _confirmedSnakes.removeAt(i)),
-                    ),
+                    _deletingIds.contains(entry.detailId)
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 18, height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Color(0xFFCC3333)),
+                            ),
+                          )
+                        : IconButton(
+                            icon: const Icon(Icons.delete_outline,
+                                size: 18, color: Color(0xFFCC3333)),
+                            onPressed: () => _deleteSnake(entry.detailId, i),
+                          ),
                   ],
                 ),
               );

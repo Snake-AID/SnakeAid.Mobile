@@ -47,7 +47,7 @@ import 'package:snakeaid_mobile/features/expert/screens/expert_specialties_scree
 import 'package:snakeaid_mobile/features/expert/screens/expert_feedback_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_home_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_available_jobs_screen.dart';
-import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_request_detail_screen.dart';
+
 import 'package:snakeaid_mobile/features/snake_catching/screens/members/snake_quantity_selection_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/members/snake_report_detail_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/members/snake_catching_success_screen.dart';
@@ -282,19 +282,7 @@ final router = GoRouter(
       builder: (context, state) => const RescuerAvailableJobsScreen(),
     ),
 
-    // Rescuer Request Detail
-    GoRoute(
-      path: '/rescuer-request-detail/:requestId',
-      name: 'rescuer_request_detail',
-      builder: (context, state) {
-        final requestId = state.pathParameters['requestId']!;
-        final requestData = state.extra as SnakeCatchingRequestData?;
-        return RescuerRequestDetailScreen(
-          requestId: requestId,
-          requestData: requestData,
-        );
-      },
-    ),
+
 
     // === MEMBER SNAKE CATCHING ROUTES ===
     // Snake Quantity Selection

@@ -12,85 +12,93 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
     required this.requestData,
   });
 
+  String _formatCurrency(double value) {
+    final fmt = NumberFormat('#,###', 'vi_VN');
+    return '${fmt.format(value.round())}đ';
+  }
+
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        // Prevent back button, force user to use buttons
-        return false;
-      },
+    return PopScope(
+      canPop: false,
       child: Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
+        backgroundColor: const Color(0xFFF6F8F6),
+        body: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(child: _buildHeroHeader(context)),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  _buildPaymentCallout(context),
+                  const SizedBox(height: 16),
+                  _buildStepsCard(),
+                  const SizedBox(height: 16),
+                  _buildSummaryCard(),
+                  const SizedBox(height: 100),
+                ]),
+              ),
+            ),
+          ],
+        ),
+        bottomNavigationBar: _buildBottomActions(context),
+      ),
+    );
+  }
+
+  // ─── Hero header ──────────────────────────────────────────────────────────
+  Widget _buildHeroHeader(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF1B5E20), Color(0xFF2E7D32), Color(0xFF388E3C)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
           child: Column(
             children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: 40),
-                      
-                      // Success Icon
-                      Center(
-                        child: Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF228B22).withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.check_circle,
-                            size: 80,
-                            color: Color(0xFF228B22),
-                          ),
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 32),
-                      
-                      // Title
-                      const Text(
-                        'Đã Tiếp Nhận Yêu Cầu!',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF228B22),
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 12),
-                      
-                      // Subtitle
-                      Text(
-                        'Đội cứu hộ sẽ xem xét và liên hệ với bạn trong thời gian sớm nhất.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[700],
-                          height: 1.5,
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 40),
-                      
-                      // Summary Card
-                      _buildSummaryCard(),
-                      
-                      const SizedBox(height: 24),
-                      
-                      // Status Info
-                      _buildStatusInfo(),
-                    ],
-                  ),
+              // Animated icon ring
+              Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.15),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
+                ),
+                child: const Icon(Icons.check_circle_rounded, size: 60, color: Colors.white),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Yêu Cầu Đã Được Gửi!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: -0.3,
                 ),
               ),
-              
-              // Bottom Actions
-              _buildBottomActions(context),
+              const SizedBox(height: 8),
+              Text(
+                'Mã đơn: #${requestData.id.substring(0, 8).toUpperCase()}',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.white.withValues(alpha: 0.75),
+                  letterSpacing: 0.5,
+                ),
+              ),
             ],
           ),
         ),
@@ -98,21 +106,380 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
     );
   }
 
+  // ─── Payment call-to-action card ─────────────────────────────────────────
+  Widget _buildPaymentCallout(BuildContext context) {
+    final hasPrice = requestData.estimatedPrice != null && requestData.estimatedPrice! > 0;
+    final hasDistance = requestData.distanceKm != null && requestData.distanceKm! > 0;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.10),
+            blurRadius: 24,
+            spreadRadius: 0,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Top accent bar
+          Container(
+            height: 4,
+            decoration: const BoxDecoration(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              gradient: LinearGradient(
+                colors: [Color(0xFF228B22), Color(0xFF4CAF50)],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E9),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.payments_rounded,
+                            color: Color(0xFF228B22), size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Phí Di Chuyển',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1B5E20),
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Xác nhận đơn để ưu tiên phân công cứu hộ viên',
+                              style: TextStyle(fontSize: 12, color: Color(0xFF757575)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  if (hasPrice || hasDistance) ...[
+                    const SizedBox(height: 16),
+                    const Divider(height: 1, color: Color(0xFFF0F0F0)),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        if (hasDistance) ...[
+                          Expanded(
+                            child: _buildMetricTile(
+                              icon: Icons.route_rounded,
+                              iconColor: const Color(0xFF1976D2),
+                              bgColor: const Color(0xFFE3F2FD),
+                              label: 'Khoảng cách',
+                              value: '${requestData.distanceKm!.toStringAsFixed(1)} km',
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                        ],
+                        if (hasPrice)
+                          Expanded(
+                            child: _buildMetricTile(
+                              icon: Icons.account_balance_wallet_rounded,
+                              iconColor: const Color(0xFF388E3C),
+                              bgColor: const Color(0xFFE8F5E9),
+                              label: 'Phí di chuyển',
+                              value: _formatCurrency(requestData.estimatedPrice!),
+                              valueColor: const Color(0xFF1B5E20),
+                              bold: true,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '* Phí thực tế sẽ được xác nhận sau khi hoàn thành nhiệm vụ',
+                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                    ),
+                  ],
+
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => context.push('/activity-detail/${requestData.id}'),
+                      icon: const Icon(Icons.payments_rounded, size: 20),
+                      label: const Text(
+                        'Thanh Toán Phí Di Chuyển',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF228B22),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+    );
+  }
+
+  Widget _buildMetricTile({
+    required IconData icon,
+    required Color iconColor,
+    required Color bgColor,
+    required String label,
+    required String value,
+    Color? valueColor,
+    bool bold = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: bold ? FontWeight.bold : FontWeight.w600,
+                    color: valueColor ?? const Color(0xFF333333),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Process steps card ──────────────────────────────────────────────────
+  Widget _buildStepsCard() {
+    final steps = [
+      _StepInfo(
+        icon: Icons.send_rounded,
+        label: 'Đã gửi yêu cầu',
+        sub: 'Hệ thống đã tiếp nhận',
+        done: true,
+        active: false,
+      ),
+      _StepInfo(
+        icon: Icons.payments_rounded,
+        label: 'Thanh toán phí di chuyển',
+        sub: 'Xác nhận ưu tiên phân công',
+        done: false,
+        active: true,
+      ),
+      _StepInfo(
+        icon: Icons.support_agent_rounded,
+        label: 'Chờ điều phối xác nhận',
+        sub: 'Kiểm tra & liên hệ khách',
+        done: false,
+        active: false,
+      ),
+      _StepInfo(
+        icon: Icons.person_pin_circle_rounded,
+        label: 'Phân công cứu hộ viên',
+        sub: 'Cứu hộ viên di chuyển đến',
+        done: false,
+        active: false,
+      ),
+      _StepInfo(
+        icon: Icons.task_alt_rounded,
+        label: 'Hoàn thành dịch vụ',
+        sub: 'Thanh toán phần còn lại',
+        done: false,
+        active: false,
+      ),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.linear_scale_rounded, color: Color(0xFF228B22), size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Quy trình xử lý',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1B5E20),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...steps.asMap().entries.map((entry) {
+            final i = entry.key;
+            final step = entry.value;
+            final isLast = i == steps.length - 1;
+            return _buildStepRow(step, isLast);
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepRow(_StepInfo step, bool isLast) {
+    final Color textColor = step.done || step.active
+        ? const Color(0xFF212121)
+        : const Color(0xFF9E9E9E);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Column(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: step.done
+                    ? const Color(0xFF228B22)
+                    : step.active
+                        ? const Color(0xFFE8F5E9)
+                        : const Color(0xFFF5F5F5),
+                border: step.active
+                    ? Border.all(color: const Color(0xFF228B22), width: 2)
+                    : null,
+              ),
+              child: Icon(
+                step.done ? Icons.check_rounded : step.icon,
+                size: 16,
+                color: step.done
+                    ? Colors.white
+                    : step.active
+                        ? const Color(0xFF228B22)
+                        : const Color(0xFFBDBDBD),
+              ),
+            ),
+            if (!isLast)
+              Container(
+                width: 2,
+                height: 36,
+                color: step.done
+                    ? const Color(0xFF228B22).withValues(alpha: 0.3)
+                    : const Color(0xFFE0E0E0),
+              ),
+          ],
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: isLast ? 0 : 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  step.label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: step.active ? FontWeight.bold : FontWeight.w500,
+                    color: textColor,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  step.sub,
+                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                ),
+                if (step.active)
+                  Container(
+                    margin: const EdgeInsets.only(top: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F5E9),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFF228B22).withValues(alpha: 0.4)),
+                    ),
+                    child: const Text(
+                      'Bước hiện tại',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF228B22),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Compact summary card ─────────────────────────────────────────────────
   Widget _buildSummaryCard() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF6F8F6),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE0E0E0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: const BoxDecoration(
-              color: Color(0xFF228B22),
+              color: Color(0xFFF1F8E9),
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(16),
                 topRight: Radius.circular(16),
@@ -120,28 +487,28 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.summarize, color: Colors.white, size: 24),
-                const SizedBox(width: 12),
+                const Icon(Icons.receipt_long_rounded, color: Color(0xFF2E7D32), size: 20),
+                const SizedBox(width: 10),
                 const Expanded(
                   child: Text(
-                    'Tóm Tắt Yêu Cầu',
+                    'Chi Tiết Yêu Cầu',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: Color(0xFF1B5E20),
                     ),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: const Color(0xFF228B22),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     _getStatusText(requestData.status),
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
@@ -198,7 +565,7 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFF9800).withOpacity(0.1),
+                        color: const Color(0xFFFF9800).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Icon(
@@ -248,7 +615,7 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2196F3).withOpacity(0.1),
+                          color: const Color(0xFF2196F3).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
@@ -297,7 +664,7 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFF9800).withOpacity(0.1),
+                          color: const Color(0xFFFF9800).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
@@ -362,7 +729,7 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: const Color(0xFF228B22).withOpacity(0.1),
+            color: const Color(0xFF228B22).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
@@ -437,7 +804,7 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFF228B22).withOpacity(0.1),
+              color: const Color(0xFF228B22).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -454,101 +821,37 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusInfo() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF8E1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFFECB3)),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.info_outline,
-            color: Color(0xFFFF9800),
-            size: 24,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Tiếp theo sẽ như thế nào?',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF333333),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Đội cứu hộ sẽ kiểm tra và phân công người gần nhất đến hỗ trợ bạn. Bạn có thể theo dõi tiến trình trong "Hoạt động" ở trang chủ.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[700],
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildBottomActions(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
+            color: Colors.black.withValues(alpha: 0.07),
+            blurRadius: 12,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
       child: SafeArea(
         top: false,
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              flex: 2,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  // Navigate to home
-                  context.go('/member-home');
-                },
-                icon: const Icon(Icons.home, size: 20),
-                label: const Text('Về Trang Chủ'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF228B22),
-                  side: const BorderSide(color: Color(0xFF228B22), width: 2),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 3,
+            SizedBox(
+              width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  // Navigate to detail
-                  context.push('/activity-detail/${requestData.id}');
-                },
-                icon: const Icon(Icons.visibility, size: 20),
-                label: const Text('Xem Chi Tiết'),
+                onPressed: () => context.push('/activity-detail/${requestData.id}'),
+                icon: const Icon(Icons.payments_rounded, size: 20),
+                label: const Text(
+                  'Thanh Toán Phí Di Chuyển',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF228B22),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -556,6 +859,24 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => context.go('/member-home'),
+                icon: const Icon(Icons.home_outlined, size: 20),
+                label: const Text('Về Trang Chủ'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF228B22),
+                  side: const BorderSide(color: Color(0xFF228B22), width: 1.5),
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -566,12 +887,12 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
     switch (status.toLowerCase()) {
       case 'pending':
         return 'Chờ Xử Lý';
+      case 'confirmed':
+        return 'Đã Xác Nhận';
       case 'assigned':
         return 'Đã Phân Công';
       case 'finished':
         return 'Đã Bắt Xong';
-      case 'paid':
-        return 'Đã Thanh Toán';
       case 'completed':
         return 'Hoàn Thành';
       case 'dispute':
@@ -595,4 +916,20 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
         return const Color(0xFF228B22);
     }
   }
+}
+
+class _StepInfo {
+  final IconData icon;
+  final String label;
+  final String sub;
+  final bool done;
+  final bool active;
+
+  const _StepInfo({
+    required this.icon,
+    required this.label,
+    required this.sub,
+    required this.done,
+    required this.active,
+  });
 }

@@ -47,11 +47,22 @@ class SnakeCatchingRepository {
     }
   }
 
-  /// Get all snake catching requests for current member
+  /// Get all snake catching requests
   /// GET /api/snakecatching/requests
-  Future<SnakeCatchingListResponse> getRequests() async {
+  /// Supported filters: userId, assignedRescuerId (AND filters, all optional)
+  Future<SnakeCatchingListResponse> getRequests({
+    String? userId,
+    String? assignedRescuerId,
+  }) async {
     try {
-      final response = await _httpService.get('/api/snakecatching/requests');
+      final params = <String, dynamic>{
+        if (userId != null) 'userId': userId,
+        if (assignedRescuerId != null) 'assignedRescuerId': assignedRescuerId,
+      };
+      final response = await _httpService.get(
+        '/api/snakecatching/requests',
+        queryParameters: params.isNotEmpty ? params : null,
+      );
       return SnakeCatchingListResponse.fromJson(response.data);
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) {
@@ -203,7 +214,8 @@ class SnakeCatchingRepository {
 
   /// Add a snake detail to a mission (immediately after rescuer confirms a snake)
   /// POST /api/catchingmission/details
-  Future<void> addMissionDetail(String missionId, int snakeSpeciesId, int quantity) async {
+  /// Returns the created mission detail ID.
+  Future<String> addMissionDetail(String missionId, int snakeSpeciesId, int quantity) async {
     try {
       final response = await _httpService.post(
         '/api/catchingmission/details',
@@ -213,12 +225,32 @@ class SnakeCatchingRepository {
           'quantity': quantity,
         },
       );
+      final id = response.data?['data']?['id']?.toString() ?? '';
+      return id;
     } on DioException catch (e) {
       if (e.response?.statusCode == 400) {
         final message = e.response?.data['message'] ?? 'Dữ liệu không hợp lệ';
         throw Exception(message);
       }
       throw Exception('Không thể thêm thông tin rắn. Vui lòng thử lại.');
+    } catch (e) {
+      throw Exception('Lỗi không xác định: $e');
+    }
+  }
+
+  /// Delete a snake detail from a mission
+  /// DELETE /api/catchingmission/details/{id}
+  Future<void> deleteMissionDetail(String detailId) async {
+    try {
+      await _httpService.delete('/api/catchingmission/details/$detailId');
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        throw Exception('Không tìm thấy chi tiết này.');
+      } else if (e.response?.statusCode == 400) {
+        final message = e.response?.data['message'] ?? 'Không thể xóa';
+        throw Exception(message);
+      }
+      throw Exception('Không thể xóa thông tin rắn. Vui lòng thử lại.');
     } catch (e) {
       throw Exception('Lỗi không xác định: $e');
     }

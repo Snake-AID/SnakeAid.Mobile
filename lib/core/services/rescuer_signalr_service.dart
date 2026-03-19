@@ -30,6 +30,8 @@ class RescuerSignalRService {
       StreamController<AcceptRequestResponse>.broadcast();
   final _connectionStateController =
       StreamController<HubConnectionState>.broadcast();
+  final _snakeCatchingRequestAssignedController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   // Completers for pending accept requests (requestId -> Completer)
   final Map<String, Completer<AcceptRequestResponse>> _pendingAccepts = {};
@@ -44,6 +46,8 @@ class RescuerSignalRService {
       _requestAcceptedController.stream;
   Stream<HubConnectionState> get connectionStateStream =>
       _connectionStateController.stream;
+  Stream<Map<String, dynamic>> get snakeCatchingRequestAssignedStream =>
+      _snakeCatchingRequestAssignedController.stream;
 
   // Connection state
   bool get isConnected => _hubConnection?.state == HubConnectionState.Connected;
@@ -377,7 +381,23 @@ class RescuerSignalRService {
       }
     });
 
-    // 📍 LOCATION UPDATED confirmation
+    // � SNAKE CATCHING REQUEST ASSIGNED (rescuer was assigned a new catching job)
+    _hubConnection!.on('SnakeCatchingRequestAssigned', (arguments) {
+      try {
+        debugPrint('🐍 SnakeCatchingRequestAssigned event received');
+
+        if (arguments == null || arguments.isEmpty) return;
+
+        final data = arguments[0] as Map<String, dynamic>;
+        debugPrint('📋 Assigned request data: $data');
+
+        _snakeCatchingRequestAssignedController.add(data);
+      } catch (e) {
+        debugPrint('❌ Error parsing SnakeCatchingRequestAssigned: $e');
+      }
+    });
+
+    // �📍 LOCATION UPDATED confirmation
     _hubConnection!.on('LocationUpdated', (arguments) {
       try {
         if (arguments == null || arguments.isEmpty) return;
@@ -626,5 +646,6 @@ class RescuerSignalRService {
     _requestCancelledController.close();
     _requestAcceptedController.close();
     _connectionStateController.close();
+    _snakeCatchingRequestAssignedController.close();
   }
 }

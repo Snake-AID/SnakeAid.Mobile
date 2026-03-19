@@ -49,8 +49,6 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
   final Map<int, SnakeSpecies> _speciesCache = {};
   bool _speciesLoading = false;
 
-  final DraggableScrollableController _sheetController = DraggableScrollableController();
-
   StreamSubscription<Position>? _positionSub;
   Timer? _routeRefreshTimer;
   late AnimationController _pulseController;
@@ -91,9 +89,18 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
     _positionSub?.cancel();
     _routeRefreshTimer?.cancel();
     _pulseController.dispose();
-    _sheetController.dispose();
     _dio.close(force: true);
     super.dispose();
+  }
+
+  void _navigateBackToJobs() {
+    final nav = Navigator.of(context);
+    if (nav.canPop()) {
+      nav.pop(); // pop RescuerEnRouteScreen
+      if (nav.canPop()) {
+        nav.pop(); // pop RescuerAcceptRequestScreen if it's in the stack
+      }
+    }
   }
 
   Future<void> _initLocation() async {
@@ -268,18 +275,20 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
   @override
   Widget build(BuildContext context) {
     final screenH = MediaQuery.of(context).size.height;
-    return Scaffold(
-      body: Stack(
-        children: [
-          _buildMap(),
-          _buildHeader(),
-          Positioned.fill(child: _buildBottomSheet()),
-          if (_canMarkArrived)
-            ListenableBuilder(
-              listenable: _sheetController,
-              builder: (_, __) => _buildArrivedButton(screenH),
-            ),
-        ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _navigateBackToJobs();
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            _buildMap(),
+            _buildHeader(),
+            Positioned.fill(child: _buildBottomSheet()),
+            if (_canMarkArrived) _buildArrivedButton(screenH),
+          ],
+        ),
       ),
     );
   }
@@ -417,7 +426,7 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                 child: Row(
                   children: [
                     _mapBtn(Icons.arrow_back_ios_new, const Color(0xFF555555), const Color(0xFFF5F5F5),
-                        () => Navigator.pop(context)),
+                        _navigateBackToJobs),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
@@ -487,10 +496,9 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
   }
 
   Widget _buildArrivedButton(double screenH) {
-    final double sheetFrac = _sheetController.isAttached ? _sheetController.size : 0.30;
     return Positioned(
       right: 16,
-      bottom: sheetFrac * screenH + 14,
+      bottom: screenH * 0.30 + 14,
       child: GestureDetector(
         onTap: _confirmArrived,
         child: Container(
@@ -938,7 +946,6 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
 
   Widget _buildBottomSheet() {
     return DraggableScrollableSheet(
-      controller: _sheetController,
       initialChildSize: 0.30,
       minChildSize: 0.12,
       maxChildSize: 0.56,

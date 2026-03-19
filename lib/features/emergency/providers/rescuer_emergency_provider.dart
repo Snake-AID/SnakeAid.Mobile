@@ -142,6 +142,7 @@ class RescueModeNotifier extends StateNotifier<RescueModeState> {
 
 /// Provider for RescuerSignalRService singleton
 final rescuerSignalRServiceProvider = Provider<RescuerSignalRService>((ref) {
+  final baseUrl = ref.watch(baseUrlProvider);
   return RescuerSignalRService(baseUrl: baseUrl);
 });
 
@@ -195,6 +196,22 @@ final requestCancelledStreamProvider = StreamProvider<String>((ref) {
   return signalRService.requestCancelledStream.map((requestId) {
     debugPrint('🎯 Stream Provider: Request cancelled! $requestId');
     return requestId;
+  });
+});
+
+/// Stream provider for SnakeCatchingRequestAssigned events
+final snakeCatchingRequestAssignedStreamProvider =
+    StreamProvider<Map<String, dynamic>>((ref) {
+  final signalRService = ref.watch(rescuerSignalRServiceProvider);
+  debugPrint(
+    '🔗 snakeCatchingRequestAssignedStreamProvider: Watching stream...',
+  );
+
+  return signalRService.snakeCatchingRequestAssignedStream.map((data) {
+    debugPrint(
+      '🎯 Stream Provider: SnakeCatchingRequestAssigned! id=${data['id']}',
+    );
+    return data;
   });
 });
 
