@@ -231,14 +231,49 @@ class _HomeTab extends ConsumerStatefulWidget {
   ConsumerState<_HomeTab> createState() => _HomeTabState();
 }
 
-class _HomeTabState extends ConsumerState<_HomeTab> {
+class _HomeTabState extends ConsumerState<_HomeTab> with WidgetsBindingObserver {
   bool _isOnline = true;
   String? _rescuerId;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadRescuerId();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    if (state == AppLifecycleState.resumed) {
+      _handleAppResumed();
+    }
+  }
+
+  Future<void> _handleAppResumed() async {
+    if (!mounted) return;
+
+    // If rescue mode is active, ensure we are still connected and that idle
+    // location tracking is resumed (throttle resets and/or stream restarts).
+    final rescueModeState = ref.read(rescueModeProvider);
+    if (!rescueModeState.isActive || _rescuerId == null) return;
+
+    debugPrint('🔄 App resumed - checking rescue mode connectivity');
+
+    // Ensure SignalR is connected (will no-op if already connected)
+    if (!rescueModeState.isConnected) {
+      await ref.read(rescueModeProvider.notifier).reconnect();
+    }
+
+    // Ensure idle location tracking is active again.
+    await ref.read(locationManagerProvider).resumeTracking(_rescuerId!);
   }
 
   Future<void> _loadRescuerId() async {

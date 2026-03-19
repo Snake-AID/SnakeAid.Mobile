@@ -265,8 +265,21 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
     }
   }
 
-  void _onTimeout() {
+  Future<void> _onTimeout() async {
     _stopAlarmSound();
+
+    // Notify backend that dispatch request was not accepted in time.
+    try {
+      await ref
+          .read(rescuerSignalRServiceProvider)
+          .declineDispatchRequest(widget.request.requestId, 'TIMEOUT');
+    } catch (e) {
+      debugPrint('❌ Failed to send decline request on timeout: $e');
+    }
+
+    // Clear active request state
+    ref.read(activeRescueRequestProvider.notifier).clearRequest();
+
     widget.onDismiss();
   }
 
