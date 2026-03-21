@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/services/nominatim_service.dart';
 import '../../models/detailed_incident_response.dart';
 import '../../models/snake_identification_response.dart';
 import '../../providers/detailed_incident_provider.dart';
@@ -31,6 +32,11 @@ class MemberIncidentDetailScreen extends ConsumerStatefulWidget {
 
 class _MemberIncidentDetailScreenState
     extends ConsumerState<MemberIncidentDetailScreen> {
+  final _nominatimService = NominatimService();
+  String? _memberIncidentAddress;
+  bool _isLoadingMemberAddress = false;
+  bool _memberIncidentAddressResolved = false;
+
   @override
   void initState() {
     super.initState();
@@ -69,10 +75,38 @@ class _MemberIncidentDetailScreenState
     });
   }
 
+  Future<void> _resolveMemberIncidentAddress(double lat, double lon) async {
+    if (_isLoadingMemberAddress) return;
+
+    setState(() {
+      _isLoadingMemberAddress = true;
+    });
+
+    final address = await _nominatimService.reverseGeocode(lat, lon);
+
+    if (!mounted) return;
+
+    setState(() {
+      _memberIncidentAddress = address;
+      _isLoadingMemberAddress = false;
+      _memberIncidentAddressResolved = true;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final detailedIncidentState = ref.watch(detailedIncidentProvider);
     final incident = detailedIncidentState.incident;
+
+    if (incident != null &&
+        (incident.address == null || incident.address!.isEmpty) &&
+        !_isLoadingMemberAddress &&
+        !_memberIncidentAddressResolved) {
+      _resolveMemberIncidentAddress(
+        incident.locationCoordinates.latitude,
+        incident.locationCoordinates.longitude,
+      );
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7F5),
@@ -412,6 +446,18 @@ class _MemberIncidentDetailScreenState
             'Tọa độ: ${incident.locationCoordinates.latitude.toStringAsFixed(6)}, ${incident.locationCoordinates.longitude.toStringAsFixed(6)}',
             style: TextStyle(fontSize: 14, color: Colors.grey[700]),
           ),
+          const SizedBox(height: 8),
+          if (_isLoadingMemberAddress)
+            const Text(
+              'Đang tải địa chỉ...',
+              style: TextStyle(fontSize: 14, color: Color(0xFF444444)),
+            )
+          else if ((incident.address ?? _memberIncidentAddress) != null &&
+              (incident.address ?? _memberIncidentAddress)!.isNotEmpty)
+            Text(
+              'Địa chỉ: ${incident.address ?? _memberIncidentAddress}',
+              style: const TextStyle(fontSize: 14, color: Color(0xFF444444)),
+            ),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,

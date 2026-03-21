@@ -37,47 +37,23 @@ class HospitalTransferPricingApiResponse {
 /// Contains pricing information and selected hospital details
 @JsonSerializable()
 class HospitalTransferPricingResponse {
-  /// Selected hospital ID
   @JsonKey(name: 'hospitalId')
   final int hospitalId;
 
-  /// Hospital name
   @JsonKey(name: 'hospitalName')
   final String hospitalName;
 
-  /// Distance to hospital (from client navigation/routing API)
-  @JsonKey(name: 'distanceKm')
-  final double distanceKm;
+  @JsonKey(name: 'requiresHospitalization')
+  final bool requiresHospitalization;
 
-  /// Price per kilometer (from system config)
-  @JsonKey(name: 'pricePerKm')
-  final double pricePerKm;
-
-  /// Additional price for hospital transfer
-  @JsonKey(name: 'hospitalTransferPrice')
-  final double hospitalTransferPrice;
-
-  /// Original mission price (rescue service)
-  @JsonKey(name: 'baseMissionPrice')
-  final double baseMissionPrice;
-
-  /// Total price including hospital transfer
-  @JsonKey(name: 'totalPrice')
-  final double totalPrice;
-
-  /// Timestamp when pricing was calculated
-  @JsonKey(name: 'calculatedAt')
-  final DateTime calculatedAt;
+  @JsonKey(name: 'updatedAt')
+  final DateTime updatedAt;
 
   HospitalTransferPricingResponse({
     required this.hospitalId,
     required this.hospitalName,
-    required this.distanceKm,
-    required this.pricePerKm,
-    required this.hospitalTransferPrice,
-    required this.baseMissionPrice,
-    required this.totalPrice,
-    required this.calculatedAt,
+    required this.requiresHospitalization,
+    required this.updatedAt,
   });
 
   factory HospitalTransferPricingResponse.fromJson(Map<String, dynamic> json) =>

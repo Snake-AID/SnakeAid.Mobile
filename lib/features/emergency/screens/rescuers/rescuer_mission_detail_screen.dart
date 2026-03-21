@@ -17,6 +17,7 @@ import '../../providers/rescuer_emergency_provider.dart';
 import '../../widgets/snake_risk_badges.dart';
 import '../../../../core/utils/distance_utils.dart';
 import '../../../../core/providers/openroute_provider.dart';
+import '../../../../core/services/nominatim_service.dart';
 import '../../../../core/services/openroute_service.dart';
 import '../../providers/mission_hub_provider.dart' hide MissionStatus;
 import '../../../rescuer/providers/tracking_provider.dart';
@@ -41,6 +42,11 @@ class _RescuerMissionDetailScreenState
   RouteNavigationData? _routeData; // Route data from OpenRouteService
   String? _routeError;
   final List<StreamSubscription> _missionHubSubscriptions = [];
+
+  // Address fallback support
+  final _nominatimService = NominatimService();
+  String? _incidentAddress;
+  bool _isLoadingIncidentAddress = false;
 
   @override
   void initState() {
@@ -77,6 +83,9 @@ class _RescuerMissionDetailScreenState
             missionId: widget.missionId,
             rescuerLocation: position,
           );
+
+      // Resolve incident address (from API or fallback OSM reverse geocode)
+      await _resolveIncidentAddress();
 
       // Connect to MissionHub for real-time bidirectional GPS
       final mission = ref.read(missionDetailProvider).mission;
@@ -147,6 +156,32 @@ class _RescuerMissionDetailScreenState
               .read(missionDetailProvider.notifier)
               .updateRescuerLocation(position);
         });
+  }
+
+  Future<void> _resolveIncidentAddress() async {
+    final mission = ref.read(missionDetailProvider).mission;
+    if (mission == null) return;
+
+    final addressFromApi = mission.incident.address;
+    if (addressFromApi != null && addressFromApi.isNotEmpty) {
+      setState(() {
+        _incidentAddress = addressFromApi;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoadingIncidentAddress = true;
+    });
+
+    final lat = mission.incident.locationCoordinates.latitude;
+    final lon = mission.incident.locationCoordinates.longitude;
+    final address = await _nominatimService.reverseGeocode(lat, lon);
+
+    setState(() {
+      _incidentAddress = address ?? 'Không xác định';
+      _isLoadingIncidentAddress = false;
+    });
   }
 
   void _setupMissionHubListeners() {
@@ -1014,6 +1049,15 @@ class _RescuerMissionDetailScreenState
             'Tọa độ: ${lat.toStringAsFixed(6)}, ${lon.toStringAsFixed(6)}',
             style: TextStyle(fontSize: 14, color: Colors.grey[600]),
           ),
+          const SizedBox(height: 8),
+          Text(
+            _isLoadingIncidentAddress
+                ? 'Đang tải địa chỉ...'
+                : (_incidentAddress ??
+                      mission.incident.address ??
+                      'Không xác định'),
+            style: const TextStyle(fontSize: 14, color: Color(0xFF444444)),
+          ),
         ],
       ),
     );
@@ -1035,11 +1079,11 @@ class _RescuerMissionDetailScreenState
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _buildDetailRow(
-            'Bán kính tìm kiếm',
-            mission.incident.formattedRadius,
-          ),
-          const Divider(height: 20),
+          if (mission.incident.address != null &&
+              mission.incident.address!.isNotEmpty) ...[
+            _buildDetailRow('Địa chỉ', mission.incident.address!),
+            const Divider(height: 20),
+          ],
           _buildDetailRow(
             'Mức độ nghiêm trọng',
             mission.incident.getSeverityText(),

@@ -174,10 +174,12 @@ class HospitalNotifier extends StateNotifier<HospitalState> {
     state = state.copyWith(clearError: true);
   }
 
-  /// Set selected hospital pricing after successful API call
+  /// Set selected hospital details after successful API call
   void setSelectedHospitalPricing(HospitalTransferPricingResponse pricing) {
     debugPrint('✅ Hospital selected: ${pricing.hospitalName}');
-    debugPrint('   Total price: ${pricing.totalPrice}');
+    debugPrint(
+      '   Requires hospitalization: ${pricing.requiresHospitalization}',
+    );
     state = state.copyWith(selectedHospitalPricing: pricing);
   }
 

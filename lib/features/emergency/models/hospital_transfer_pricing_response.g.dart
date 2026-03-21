@@ -11,12 +11,8 @@ HospitalTransferPricingResponse _$HospitalTransferPricingResponseFromJson(
 ) => HospitalTransferPricingResponse(
   hospitalId: (json['hospitalId'] as num).toInt(),
   hospitalName: json['hospitalName'] as String,
-  distanceKm: (json['distanceKm'] as num).toDouble(),
-  pricePerKm: (json['pricePerKm'] as num).toDouble(),
-  hospitalTransferPrice: (json['hospitalTransferPrice'] as num).toDouble(),
-  baseMissionPrice: (json['baseMissionPrice'] as num).toDouble(),
-  totalPrice: (json['totalPrice'] as num).toDouble(),
-  calculatedAt: DateTime.parse(json['calculatedAt'] as String),
+  requiresHospitalization: json['requiresHospitalization'] as bool,
+  updatedAt: DateTime.parse(json['updatedAt'] as String),
 );
 
 Map<String, dynamic> _$HospitalTransferPricingResponseToJson(
@@ -24,10 +20,6 @@ Map<String, dynamic> _$HospitalTransferPricingResponseToJson(
 ) => <String, dynamic>{
   'hospitalId': instance.hospitalId,
   'hospitalName': instance.hospitalName,
-  'distanceKm': instance.distanceKm,
-  'pricePerKm': instance.pricePerKm,
-  'hospitalTransferPrice': instance.hospitalTransferPrice,
-  'baseMissionPrice': instance.baseMissionPrice,
-  'totalPrice': instance.totalPrice,
-  'calculatedAt': instance.calculatedAt.toIso8601String(),
+  'requiresHospitalization': instance.requiresHospitalization,
+  'updatedAt': instance.updatedAt.toIso8601String(),
 };
