@@ -7,6 +7,8 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:vibration/vibration.dart';
 import 'rescuer_profile_screen.dart';
 import 'rescuer_income_management_screen.dart';
+import 'package:snakeaid_mobile/features/lesson/screens/rescuer_lesson_screen.dart';
+import 'package:snakeaid_mobile/features/lesson/providers/lesson_read_provider.dart';
 import '../../emergency/providers/rescuer_emergency_provider.dart';
 import '../../emergency/providers/mission_hub_provider.dart';
 import '../../emergency/providers/active_mission_provider.dart';
@@ -1543,19 +1545,17 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
   }
 
   Widget _buildQuickAccess() {
+    final hasUnreadLesson = ref.watch(lessonReadProvider).hasUnread;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
         _buildQuickAccessItem(
           icon: Icons.health_and_safety,
-          label: 'Hướng Dẫn\nAn Toàn',
+          label: 'Bài học\nAn Toàn',
           color: const Color(0xFFFF6B35),
+          showBadge: hasUnreadLesson,
           onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Hướng dẫn an toàn - Đang phát triển'),
-              ),
-            );
+            context.pushNamed('rescuer_lessons');
           },
         ),
         _buildQuickAccessItem(
@@ -1593,21 +1593,41 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
     required String label,
     required Color color,
     required VoidCallback onTap,
+    bool showBadge = false,
   }) {
     return InkWell(
       onTap: onTap,
       child: Column(
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: color == const Color(0xFFFF6B35)
-                  ? color.withOpacity(0.2)
-                  : const Color(0xFFF0F0F0),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 28),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: color == const Color(0xFFFF6B35)
+                      ? color.withOpacity(0.2)
+                      : const Color(0xFFF0F0F0),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 28),
+              ),
+              if (showBadge)
+                Positioned(
+                  top: -4,
+                  right: -4,
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF3B30),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 8),
           SizedBox(

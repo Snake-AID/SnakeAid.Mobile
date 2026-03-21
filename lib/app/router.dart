@@ -57,6 +57,7 @@ import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_edit_profile_sc
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_history_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_history_detail_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_income_management_screen.dart';
+import 'package:snakeaid_mobile/features/lesson/screens/rescuer_lesson_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_feedback_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_id_documents_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_mission_detail_screen.dart';
@@ -435,6 +436,11 @@ final router = GoRouter(
       path: '/rescuer/mission-success',
       name: 'rescuer_mission_success',
       builder: (context, state) => const RescuerMissionSuccessScreen(),
+    ),
+    GoRoute(
+      path: '/rescuer-lessons',
+      name: 'rescuer_lessons',
+      builder: (context, state) => const RescuerLessonScreen(),
     ),
 
     // === EMERGENCY ROUTES ===
