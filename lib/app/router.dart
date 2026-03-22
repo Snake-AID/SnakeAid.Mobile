@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:snakeaid_mobile/features/shared/widgets/main_scaffold.dart';
-import 'package:snakeaid_mobile/features/shared/screens/location_tracker_screen.dart';
-import 'package:snakeaid_mobile/features/shared/screens/signalr_test_screen.dart';
 import 'package:snakeaid_mobile/features/auth/screens/splash_screen.dart';
 import 'package:snakeaid_mobile/features/auth/screens/role_selection_screen.dart';
 import 'package:snakeaid_mobile/features/auth/screens/member/member_login_screen.dart';
@@ -32,6 +30,7 @@ import 'package:snakeaid_mobile/features/emergency/screens/members/symptom_repor
 import 'package:snakeaid_mobile/features/emergency/screens/members/severity_assessment_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_tracking_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/member_incident_detail_screen.dart';
+import 'package:snakeaid_mobile/features/member/screens/member_incident_finished_detail_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/rescuer_arrived_screen.dart'
     as member_screens;
 import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_service_completion_screen.dart';
@@ -283,8 +282,6 @@ final router = GoRouter(
       name: 'rescuer_available_jobs',
       builder: (context, state) => const RescuerAvailableJobsScreen(),
     ),
-
-
 
     // === MEMBER SNAKE CATCHING ROUTES ===
     // Snake Quantity Selection
@@ -580,6 +577,15 @@ final router = GoRouter(
       ],
     ),
     GoRoute(
+      path: '/member-incident-finished-detail',
+      name: 'member_incident_finished_detail',
+      builder: (context, state) {
+        final data = state.extra as Map<String, dynamic>?;
+        final incidentId = data?['incidentId'] as String?;
+        return MemberIncidentFinishedDetailScreen(incidentId: incidentId ?? '');
+      },
+    ),
+    GoRoute(
       path: '/member-rescuer-arrived',
       name: 'member_rescuer_arrived',
       builder: (context, state) => const member_screens.RescuerArrivedScreen(),
@@ -603,18 +609,6 @@ final router = GoRouter(
         final thread = state.extra as MessageThread;
         return MessageDetailScreen(thread: thread);
       },
-    ),
-
-    // === SHARED/UTILS ROUTES ===
-    GoRoute(
-      path: '/location-tracker',
-      name: 'location_tracker',
-      builder: (context, state) => const LocationTrackerScreen(),
-    ),
-    GoRoute(
-      path: '/signalr-test',
-      name: 'signalr_test',
-      builder: (context, state) => const SignalRTestScreen(),
     ),
 
     // === VIDEO CALL DEMO ROUTE ===

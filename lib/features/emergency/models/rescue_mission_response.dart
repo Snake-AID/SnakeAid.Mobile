@@ -213,17 +213,17 @@ class BriefIncidentForMission {
 
   String getSeverityText() {
     if (severityLevel == null) return 'Chưa xác định';
-    if (severityLevel! >= 4) return 'Nghiêm trọng';
-    if (severityLevel! >= 3) return 'Cao';
-    if (severityLevel! >= 2) return 'Trung bình';
+    if (severityLevel! >= 70) return 'Nghiêm trọng';
+    if (severityLevel! >= 40) return 'Cao';
+    if (severityLevel! >= 10) return 'Trung bình';
     return 'Thấp';
   }
 
   String getSeverityColorHex() {
     if (severityLevel == null) return '9E9E9E';
-    if (severityLevel! >= 4) return 'D32F2F';
-    if (severityLevel! >= 3) return 'FF9800';
-    if (severityLevel! >= 2) return 'FFC107';
+    if (severityLevel! >= 70) return 'D32F2F';
+    if (severityLevel! >= 40) return 'FF9800';
+    if (severityLevel! >= 10) return 'FFC107';
     return '4CAF50';
   }
 }

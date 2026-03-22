@@ -37,15 +37,26 @@ class ActiveMissionNotifier extends StateNotifier<ActiveMissionState> {
   static const String _activeMissionIdKey = 'active_rescue_mission_id';
 
   /// Mission statuses that mean the mission is over and should NOT be cached.
+  /// Mission statuses that mean the mission is over and should NOT be cached.
+  ///
+  /// Normalize all status comparisons to lower-case to support legacy
+  /// and current status naming (API may return "MissionCompleted", while
+  /// some checks may use "completed" / "missionCompleted").
   static const _terminalStatuses = {
-    'Completed',
-    'Cancelled',
-    'Aborted',
-    'Expired',
-    'Failed',
+    'missioncompleted',
+    'completed',
+    'missionuncompleted',
+    'uncompleted',
+    'missionaborted',
+    'aborted',
+    'cancelled',
+    'expired',
+    'failed',
   };
 
-  static bool _isTerminal(String status) => _terminalStatuses.contains(status);
+  static bool _isTerminal(String status) {
+    return _terminalStatuses.contains(status.trim().toLowerCase());
+  }
 
   ActiveMissionNotifier({required this.missionRepository})
     : super(ActiveMissionState()) {
@@ -81,13 +92,13 @@ class ActiveMissionNotifier extends StateNotifier<ActiveMissionState> {
             final updatedBasicMission = BasicRescueMissionResponse(
               missionId: detailedMission.id,
               incidentId: detailedMission.incident.id,
-              status: detailedMission.missionStatus.name,
+              status: detailedMission.status,
               startedAt: detailedMission.startedAt,
               acceptedAt: detailedMission.createdAt,
             );
             await saveActiveMission(updatedBasicMission);
             debugPrint('✅ Mission verified and updated from server');
-            debugPrint('📋 Status: ${detailedMission.missionStatus.name}');
+            debugPrint('📋 Status: ${detailedMission.status}');
           }
         } catch (e) {
           final errorMsg = e.toString();
@@ -198,7 +209,7 @@ class ActiveMissionNotifier extends StateNotifier<ActiveMissionState> {
       final basicMission = BasicRescueMissionResponse(
         missionId: detailedMission.id,
         incidentId: detailedMission.incident.id,
-        status: detailedMission.missionStatus.name,
+        status: detailedMission.status,
         startedAt: detailedMission.startedAt,
         acceptedAt: detailedMission.createdAt,
       );
@@ -234,7 +245,7 @@ class ActiveMissionNotifier extends StateNotifier<ActiveMissionState> {
       final basicMission = BasicRescueMissionResponse(
         missionId: detailedMission.id,
         incidentId: detailedMission.incident.id,
-        status: detailedMission.missionStatus.name,
+        status: detailedMission.status,
         startedAt: detailedMission.startedAt,
         acceptedAt: detailedMission.createdAt,
       );

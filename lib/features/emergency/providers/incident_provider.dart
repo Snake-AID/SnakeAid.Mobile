@@ -43,7 +43,7 @@ class ActiveIncidentNotifier extends StateNotifier<ActiveIncidentState> {
     'Finished',
     'Expired',
     'NoRescuerFound',
-    'Paid',
+    'FalseAlarm',
     'Disputed',
   };
 
