@@ -745,6 +745,135 @@ class ConsultationRepository {
   // Payment methods
   // ---------------------------------------------------------------------------
 
+  bool _isPayOsMethod(String paymentMethod) {
+    final normalized = paymentMethod.trim().toLowerCase();
+    return normalized == 'payos';
+  }
+
+  List<String> _paymentMethodCandidates(String paymentMethod) {
+    if (!_isPayOsMethod(paymentMethod)) {
+      return [paymentMethod];
+    }
+
+    // Backend environments may deserialize enum casing inconsistently.
+    final ordered = ['PayOs', 'PayOS', 'payos'];
+    final unique = <String>{};
+    final result = <String>[];
+    for (final item in [paymentMethod, ...ordered]) {
+      if (unique.add(item)) {
+        result.add(item);
+      }
+    }
+    return result;
+  }
+
+  bool _shouldRetryPayOsAttempt({
+    required String paymentMethod,
+    int? statusCode,
+    String? message,
+  }) {
+    if (!_isPayOsMethod(paymentMethod)) return false;
+    final msg = (message ?? '').toLowerCase();
+    return (statusCode != null && statusCode >= 500) ||
+        msg.contains('nullreferenceexception') ||
+        msg.contains('object reference not set');
+  }
+
+  Exception _buildPaymentException({
+    required String defaultMessage,
+    int? statusCode,
+    String? message,
+  }) {
+    final msg = (message ?? '').trim();
+    if (statusCode == 409 &&
+        (msg.toLowerCase().contains('balance') ||
+            msg.toLowerCase().contains('wallet'))) {
+      return Exception('Số dư ví không đủ để thanh toán');
+    }
+    if (statusCode != null && statusCode >= 500) {
+      return Exception(
+        'Hệ thống thanh toán đang lỗi phía máy chủ (HTTP $statusCode). Vui lòng thử lại sau hoặc dùng ví SnakeAid tạm thời.',
+      );
+    }
+    return Exception(msg.isNotEmpty ? msg : defaultMessage);
+  }
+
+  Future<ConsultationPaymentResponse> _postConsultationPaymentWithFallback({
+    required String path,
+    required String paymentMethod,
+    required String defaultErrorMessage,
+  }) async {
+    Exception? lastError;
+
+    for (final method in _paymentMethodCandidates(paymentMethod)) {
+      try {
+        debugPrint('💳 Payment attempt: $path, paymentMethod=$method');
+        final response = await httpService.post(
+          path,
+          data: {'paymentMethod': method},
+        );
+
+        final body = response.data as Map<String, dynamic>;
+        if (body['is_success'] == true && body['data'] != null) {
+          return ConsultationPaymentResponse.fromJson(
+            body['data'] as Map<String, dynamic>,
+          );
+        }
+
+        final statusCode = body['status_code'] as int?;
+        final message = body['message']?.toString();
+        debugPrint(
+          '⚠️ Payment API failed: status=$statusCode, method=$method, message=$message',
+        );
+        final retry = _shouldRetryPayOsAttempt(
+          paymentMethod: method,
+          statusCode: statusCode,
+          message: message,
+        );
+
+        lastError = _buildPaymentException(
+          defaultMessage: defaultErrorMessage,
+          statusCode: statusCode,
+          message: message,
+        );
+
+        if (!retry) {
+          throw lastError;
+        }
+      } on DioException catch (e) {
+        final statusCode = e.response?.statusCode;
+        String? message;
+        final data = e.response?.data;
+        if (data is Map<String, dynamic>) {
+          message = data['message']?.toString();
+        } else {
+          message = e.message;
+        }
+        debugPrint(
+          '⚠️ Payment DioException: status=$statusCode, method=$method, message=$message',
+        );
+
+        final retry = _shouldRetryPayOsAttempt(
+          paymentMethod: method,
+          statusCode: statusCode,
+          message: message,
+        );
+
+        lastError = _buildPaymentException(
+          defaultMessage: defaultErrorMessage,
+          statusCode: statusCode,
+          message: message,
+        );
+
+        if (!retry) {
+          throw lastError;
+        }
+      }
+    }
+
+    throw lastError ?? Exception(defaultErrorMessage);
+  }
+
   /// Pay for a scheduled consultation booking.
   ///
   /// API: `POST /api/consultation-bookings/{bookingId}/payments`
@@ -758,28 +887,11 @@ class ConsultationRepository {
   }) async {
     debugPrint('💳 Paying booking: $bookingId');
 
-    final response = await httpService.post(
-      '/api/consultation-bookings/$bookingId/payments',
-      data: {'paymentMethod': paymentMethod},
+    return _postConsultationPaymentWithFallback(
+      path: '/api/consultation-bookings/$bookingId/payments',
+      paymentMethod: paymentMethod,
+      defaultErrorMessage: 'Không thể thanh toán',
     );
-
-    final body = response.data as Map<String, dynamic>;
-    if (body['is_success'] == true && body['data'] != null) {
-      return ConsultationPaymentResponse.fromJson(
-        body['data'] as Map<String, dynamic>,
-      );
-    }
-
-    {
-      final statusCode = body['status_code'] as int? ?? 0;
-      final msg = (body['message'] as String?) ?? '';
-      if (statusCode == 409 &&
-          (msg.toLowerCase().contains('balance') ||
-              msg.toLowerCase().contains('wallet'))) {
-        throw Exception('Số dư ví không đủ để thanh toán');
-      }
-      throw Exception(msg.isNotEmpty ? msg : 'Không thể thanh toán');
-    }
   }
 
   /// Pay for an emergency consultation request.
@@ -793,28 +905,11 @@ class ConsultationRepository {
   }) async {
     debugPrint('💳 Paying emergency request: $requestId');
 
-    final response = await httpService.post(
-      '/api/consultations/emergency-requests/$requestId/payments',
-      data: {'paymentMethod': paymentMethod},
+    return _postConsultationPaymentWithFallback(
+      path: '/api/consultations/emergency-requests/$requestId/payments',
+      paymentMethod: paymentMethod,
+      defaultErrorMessage: 'Không thể thanh toán tư vấn ngay',
     );
-
-    final body = response.data as Map<String, dynamic>;
-    if (body['is_success'] == true && body['data'] != null) {
-      return ConsultationPaymentResponse.fromJson(
-        body['data'] as Map<String, dynamic>,
-      );
-    }
-
-    {
-      final statusCode = body['status_code'] as int? ?? 0;
-      final msg = (body['message'] as String?) ?? '';
-      if (statusCode == 409 &&
-          (msg.toLowerCase().contains('balance') ||
-              msg.toLowerCase().contains('wallet'))) {
-        throw Exception('Số dư ví không đủ để thanh toán');
-      }
-      throw Exception(msg.isNotEmpty ? msg : 'Không thể thanh toán tư vấn ngay');
-    }
   }
 
   /// Manual fallback confirm for consultation PayOS payment.

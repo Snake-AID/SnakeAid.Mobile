@@ -92,6 +92,15 @@ class _PaymentConfirmationScreenState
     _fetchWallet();
   }
 
+  bool get _hasBookingId =>
+      widget.bookingId != null && widget.bookingId!.trim().isNotEmpty;
+
+  bool get _isInstantFlow {
+    if (_hasBookingId) return false;
+    final normalized = (widget.consultationType ?? '').trim().toLowerCase();
+    return normalized == 'instant';
+  }
+
   Future<void> _fetchWallet() async {
     try {
       final repo = ref.read(consultationRepositoryProvider);
@@ -113,7 +122,8 @@ class _PaymentConfirmationScreenState
   }
 
   Future<void> _handlePayment() async {
-    if (widget.consultationType == 'instant') {
+    // Booking flow has priority: when bookingId exists, never call emergency APIs.
+    if (!_hasBookingId && _isInstantFlow) {
       if (_selectedPaymentMethod == PaymentMethod.snakeaidPay) {
         final confirmed = await _showWalletPaymentDialog();
         if (confirmed != true) return;
@@ -160,7 +170,7 @@ class _PaymentConfirmationScreenState
 
       final paymentMethod = _selectedPaymentMethod == PaymentMethod.snakeaidPay
           ? 'WalletBalance'
-          : 'PayOS';
+          : 'PayOs';
       final resolvedRequestId = requestId;
       if (resolvedRequestId.isEmpty) {
         if (mounted) {
@@ -203,7 +213,7 @@ class _PaymentConfirmationScreenState
       return;
     }
 
-    if (widget.bookingId == null || widget.bookingId!.isEmpty) {
+    if (!_hasBookingId) {
       context.go('/consultation-home');
       return;
     }

@@ -28,6 +28,16 @@ class _ExpertGlobalEmergencyPopupListenerState
   bool _isVisible = false;
   bool _isHandlingAction = false;
 
+  bool _shouldShowForStatus(String? status) {
+    if (status == null || status.isEmpty) {
+      // Backward-compatible: some payloads don't include status.
+      return true;
+    }
+    final normalized = status.trim().toLowerCase();
+    // Expert should only see actionable requests after member payment.
+    return normalized == 'pendingexpertresponse';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -43,6 +53,13 @@ class _ExpertGlobalEmergencyPopupListenerState
 
       _requestSub = _service!.requestStream.listen((event) {
         if (!mounted) return;
+
+        if (!_shouldShowForStatus(event.status)) {
+          debugPrint(
+            'Ignore emergency popup because status is not actionable: ${event.status}',
+          );
+          return;
+        }
 
         final expiresAtUtc = event.expiresAt?.toUtc();
         if (expiresAtUtc == null) return;
@@ -178,11 +195,6 @@ class _ExpertGlobalEmergencyPopupListenerState
   String get _countdownLabel =>
       '${(_countdownSeconds ~/ 60).toString().padLeft(2, '0')}:${(_countdownSeconds % 60).toString().padLeft(2, '0')}';
 
-  String _formatFeeK(int amount) {
-    final k = amount ~/ 1000;
-    return '${k.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}K VNĐ';
-  }
-
   @override
   void dispose() {
     _countdownTimer?.cancel();
@@ -198,8 +210,6 @@ class _ExpertGlobalEmergencyPopupListenerState
     }
 
     final req = _activeRequest!;
-    final feeCost = req.feeCost ?? 0;
-    final netAmount = (feeCost * 0.9).toInt();
 
     return Positioned.fill(
       child: IgnorePointer(
@@ -343,101 +353,27 @@ class _ExpertGlobalEmergencyPopupListenerState
                           ),
                           const SizedBox(height: 12),
                           Container(
-                            padding: const EdgeInsets.all(16),
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFECFDF5),
+                              color: const Color(0xFFEEF2FF),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFD1FAE5)),
+                              border: Border.all(color: const Color(0xFFDBEAFE)),
                             ),
-                            child: Column(
+                            child: const Row(
                               children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text(
-                                      'Phí tư vấn',
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF160D1B),
-                                      ),
+                                Icon(Icons.info_outline,
+                                    size: 18, color: Color(0xFF4F46E5)),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Yêu cầu đã được thanh toán từ phía người dùng.',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFF4338CA),
                                     ),
-                                    Text(
-                                      _formatFeeK(feeCost),
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF160D1B),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF10B981),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: const Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.check,
-                                              size: 12, color: Colors.white),
-                                          SizedBox(width: 4),
-                                          Text(
-                                            'Đã thanh toán',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const Divider(color: Color(0xFFD1FAE5), height: 20),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Bạn sẽ nhận',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            color: Color(0xFF047857),
-                                          ),
-                                        ),
-                                        Text(
-                                          '(sau phí nền tảng 10%)',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: Color(0xFF6B7280),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    Text(
-                                      _formatFeeK(netAmount),
-                                      style: const TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF059669),
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               ],
                             ),

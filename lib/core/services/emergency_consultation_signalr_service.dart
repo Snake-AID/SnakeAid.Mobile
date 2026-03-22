@@ -9,6 +9,7 @@ class EmergencyConsultationRequestEvent {
   final String requestId;
   final String requesterId;
   final String expertId;
+  final String? status;
   final DateTime? requestedAt;
   final DateTime? expiresAt;
   final String? requesterName;
@@ -19,6 +20,7 @@ class EmergencyConsultationRequestEvent {
     required this.requestId,
     required this.requesterId,
     required this.expertId,
+    this.status,
     this.requestedAt,
     this.expiresAt,
     this.requesterName,
@@ -31,11 +33,25 @@ class EmergencyConsultationRequestEvent {
     int? parseAmount(dynamic value) {
       if (value is num) return value.toInt();
       if (value == null) return null;
-      return int.tryParse(value.toString());
+      final raw = value.toString().trim();
+      if (raw.isEmpty) return null;
+
+      final asDouble = double.tryParse(raw);
+      if (asDouble != null) return asDouble.toInt();
+
+      final digitsOnly = raw.replaceAll(RegExp(r'[^0-9]'), '');
+      if (digitsOnly.isEmpty) return null;
+      return int.tryParse(digitsOnly);
     }
 
     final payment = json['payment'] is Map
         ? Map<String, dynamic>.from(json['payment'] as Map)
+        : <String, dynamic>{};
+    final paymentInfo = json['paymentInfo'] is Map
+        ? Map<String, dynamic>.from(json['paymentInfo'] as Map)
+        : <String, dynamic>{};
+    final consultationPayment = json['consultationPayment'] is Map
+        ? Map<String, dynamic>.from(json['consultationPayment'] as Map)
         : <String, dynamic>{};
 
     final feeCost = parseAmount(json['feeCost']) ??
@@ -43,12 +59,17 @@ class EmergencyConsultationRequestEvent {
         parseAmount(json['consultationFee']) ??
         parseAmount(json['emergencyConsultationFee']) ??
         parseAmount(payment['amount']) ??
-        parseAmount(payment['feeCost']);
+        parseAmount(payment['feeCost']) ??
+        parseAmount(paymentInfo['amount']) ??
+        parseAmount(paymentInfo['feeCost']) ??
+        parseAmount(consultationPayment['amount']) ??
+        parseAmount(consultationPayment['feeCost']);
 
     return EmergencyConsultationRequestEvent(
       requestId: (json['requestId'] ?? '').toString(),
       requesterId: (json['requesterId'] ?? '').toString(),
       expertId: (json['expertId'] ?? '').toString(),
+      status: json['status']?.toString(),
       requestedAt: json['requestedAt'] != null
           ? DateTime.tryParse(json['requestedAt'].toString())
           : null,
