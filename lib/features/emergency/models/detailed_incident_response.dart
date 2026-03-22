@@ -158,9 +158,9 @@ class DetailedIncidentData {
 
   /// Get severity text in Vietnamese
   String get severityText {
-    if (severityLevel >= 4) return 'Nghiêm trọng';
-    if (severityLevel >= 3) return 'Cao';
-    if (severityLevel >= 2) return 'Trung bình';
+    if (severityLevel >= 70) return 'Nghiêm trọng';
+    if (severityLevel >= 50) return 'Cao';
+    if (severityLevel >= 30) return 'Trung bình';
     return 'Thấp';
   }
 }
@@ -368,8 +368,9 @@ class RescueMission {
   final DateTime? completedAt;
   final String? notes;
   final String? cancellationReason;
-  final double? estimatedCost;
+  final double? costFromCenter;
   final double? actualCost;
+  final double? distanceFromCenterKm;
 
   RescueMission({
     required this.id,
@@ -382,8 +383,9 @@ class RescueMission {
     this.completedAt,
     this.notes,
     this.cancellationReason,
-    this.estimatedCost,
+    this.costFromCenter,
     this.actualCost,
+    this.distanceFromCenterKm,
   });
 
   factory RescueMission.fromJson(Map<String, dynamic> json) {
@@ -404,11 +406,14 @@ class RescueMission {
           : null,
       notes: json['notes'],
       cancellationReason: json['cancellationReason'],
-      estimatedCost: json['estimatedCost'] != null
-          ? (json['estimatedCost'] as num).toDouble()
+      costFromCenter: json['costFromCenter'] != null
+          ? (json['costFromCenter'] as num).toDouble()
           : null,
       actualCost: json['actualCost'] != null
           ? (json['actualCost'] as num).toDouble()
+          : null,
+      distanceFromCenterKm: json['distanceFromCenterKm'] != null
+          ? (json['distanceFromCenterKm'] as num).toDouble()
           : null,
     );
   }
@@ -424,7 +429,8 @@ class RescueMission {
     'completedAt': completedAt?.toIso8601String(),
     'notes': notes,
     'cancellationReason': cancellationReason,
-    'estimatedCost': estimatedCost,
+    'costFromCenter': costFromCenter,
+    'distanceFromCenterKm': distanceFromCenterKm,
     'actualCost': actualCost,
   };
 
@@ -581,11 +587,16 @@ class DetectedSnakeSpecies {
 /// Incident Status
 enum IncidentStatus {
   pending('Pending'),
+  verified('Verified'),
   searching('Searching'),
   assigned('Assigned'),
   inProgress('InProgress'),
   finished('Finished'),
-  cancelled('Cancelled');
+  cancelled('Cancelled'),
+  falseAlarm('FalseAlarm'),
+  noRescuerFound('NoRescuerFound'),
+  disputed('Disputed'),
+  completed('Completed');
 
   final String value;
   const IncidentStatus(this.value);
@@ -601,6 +612,8 @@ enum IncidentStatus {
     switch (this) {
       case IncidentStatus.pending:
         return 'Chờ xử lý';
+      case IncidentStatus.verified:
+        return 'Đã xác nhận';
       case IncidentStatus.searching:
         return 'Đang tìm kiếm cứu hộ';
       case IncidentStatus.assigned:
@@ -608,9 +621,17 @@ enum IncidentStatus {
       case IncidentStatus.inProgress:
         return 'Đang thực hiện';
       case IncidentStatus.finished:
-        return 'Hoàn thành';
+        return 'Hoàn thành cứu hộ';
+      case IncidentStatus.completed:
+        return 'Hoàn thành thanh toán';
       case IncidentStatus.cancelled:
         return 'Đã hủy';
+      case IncidentStatus.falseAlarm:
+        return 'Báo động giả';
+      case IncidentStatus.noRescuerFound:
+        return 'Không tìm được cứu hộ';
+      case IncidentStatus.disputed:
+        return 'Đang tranh chấp';
     }
   }
 }

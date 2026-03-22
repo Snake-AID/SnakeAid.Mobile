@@ -2030,14 +2030,14 @@ class _RescuerMissionDetailScreenState
                 ref.read(missionDetailProvider.notifier).refresh();
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.report_problem, color: Colors.red),
-              title: const Text('Báo cáo sự cố'),
-              onTap: () {
-                Navigator.pop(context);
-                // TODO: Show report issue dialog
-              },
-            ),
+            // ListTile(
+            //   leading: const Icon(Icons.report_problem, color: Colors.red),
+            //   title: const Text('Báo cáo sự cố'),
+            //   onTap: () {
+            //     Navigator.pop(context);
+            //     // TODO: Show report issue dialog
+            //   },
+            // ),
             if (mission.missionStatus == MissionStatus.preparing ||
                 mission.missionStatus == MissionStatus.enRoute)
               ListTile(

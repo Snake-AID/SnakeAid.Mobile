@@ -1,11 +1,73 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:snakeaid_mobile/features/emergency/models/list_incident_response.dart';
 import '../../../core/providers/http_provider.dart';
 import '../../../core/services/http_service.dart';
 import '../models/sos_incident_request.dart';
 import '../models/sos_incident_response.dart';
 import '../models/detailed_incident_response.dart';
+
+/// Response model for snakebite incident payment operations
+class SnakebiteIncidentPaymentResponse {
+  final String snakebiteIncidentId;
+  final String? transactionId;
+  final int? orderCode;
+  final double amount;
+  final String currency;
+  final String status;
+  final String provider;
+  final String? checkoutUrl;
+  final String? paymentLinkId;
+  final DateTime? expiresAt;
+  final String? externalTransactionId;
+  final DateTime? paidAt;
+
+  SnakebiteIncidentPaymentResponse({
+    required this.snakebiteIncidentId,
+    this.transactionId,
+    this.orderCode,
+    required this.amount,
+    required this.currency,
+    required this.status,
+    required this.provider,
+    this.checkoutUrl,
+    this.paymentLinkId,
+    this.expiresAt,
+    this.externalTransactionId,
+    this.paidAt,
+  });
+
+  factory SnakebiteIncidentPaymentResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>? ?? json;
+
+    return SnakebiteIncidentPaymentResponse(
+      snakebiteIncidentId:
+          (data['snakebiteIncidentId'] ?? data['id'] ?? '') as String,
+      transactionId: data['transactionId'] as String?,
+      orderCode: data['orderCode'] is int
+          ? data['orderCode'] as int
+          : (data['orderCode'] is String
+                ? int.tryParse(data['orderCode'] as String)
+                : null),
+      amount: (data['amount'] is num
+          ? (data['amount'] as num).toDouble()
+          : 0.0),
+      currency: data['currency'] as String? ?? 'VND',
+      status: data['status'] as String? ?? '',
+      provider: data['provider'] as String? ?? '',
+      checkoutUrl: data['checkoutUrl'] as String?,
+      paymentLinkId: data['paymentLinkId'] as String?,
+      expiresAt: data['expiresAt'] != null
+          ? DateTime.tryParse(data['expiresAt'] as String)
+          : null,
+      externalTransactionId: data['externalTransactionId'] as String?,
+      paidAt: data['paidAt'] != null
+          ? DateTime.tryParse(data['paidAt'] as String)
+          : null,
+    );
+  }
+}
 
 /// Provider for IncidentRepository
 final incidentRepositoryProvider = Provider<IncidentRepository>((ref) {
@@ -119,6 +181,155 @@ class IncidentRepository {
       debugPrint('❌ Unexpected error parsing detailed incident: $e');
       debugPrint('❌ Stack trace: $stackTrace');
       throw Exception('Không thể tải thông tin chi tiết sự cố');
+    }
+  }
+
+  Future<PagedIncidentListData> getUserIncidentList(
+    String userId, {
+    IncidentStatus? status,
+    int page = 1,
+    int pageSize = 10,
+  }) async {
+    try {
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint(
+        '📋 Getting user incident list: $userId (status=${status?.value}, page=$page, pageSize=$pageSize)',
+      );
+
+      final queryParameters = <String, dynamic>{
+        if (status != null) 'status': status.value,
+        'page': page,
+        'pageSize': pageSize,
+      };
+
+      final response = await httpService.get(
+        '/api/incidents/user/$userId',
+        queryParameters: queryParameters,
+      );
+
+      debugPrint('✅ Get user incident list successful');
+
+      // Map API response with data/meta into typed model
+      final pagedResponse = PagedIncidentListResponse.fromJson(response.data);
+      if (pagedResponse.data != null) {
+        return pagedResponse.data!;
+      }
+
+      // Fallback for older format (data is array)
+      final data = response.data['data'];
+      if (data is List) {
+        final items = data
+            .map((e) => ListIncidentData.fromJson(e as Map<String, dynamic>))
+            .toList();
+        return PagedIncidentListData(
+          items: items,
+          meta: PaginationMeta(
+            page: page,
+            pageSize: pageSize,
+            totalItems: items.length,
+            totalPages: 1,
+          ),
+        );
+      }
+
+      throw Exception('Dữ liệu phản hồi không hợp lệ từ máy chủ');
+    } on DioException catch (e) {
+      debugPrint('❌ Get user incident list failed: ${e.message}');
+      throw _handleError(e);
+    } catch (e, stackTrace) {
+      debugPrint('❌ Unexpected error parsing detailed incident: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
+      throw Exception('Không thể tải danh sách sự cố');
+    }
+  }
+
+  /// Create a PayOS payment link for a snakebite incident
+  /// POST /api/incidents/{incidentId}/payment/payos
+  Future<SnakebiteIncidentPaymentResponse> createSnakebiteIncidentPaymentLink({
+    required String incidentId,
+    required double amount,
+    String? description,
+    String transactionType = 'SnakebiteIncidentPayment',
+  }) async {
+    try {
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint('💳 Creating snakebite incident PayOS payment link');
+      debugPrint('📍 Endpoint: /api/incidents/$incidentId/payment/payos');
+      debugPrint(
+        '📦 incidentId: $incidentId | amount: $amount | type: $transactionType',
+      );
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      final response = await httpService.post(
+        '/api/incidents/$incidentId/payment/payos',
+        data: {
+          'snakebiteIncidentId': incidentId,
+          'amount': amount,
+          'transactionType': transactionType,
+          if (description != null) 'description': description,
+        },
+      );
+
+      debugPrint('✅ PayOS incident payment response: ${response.statusCode}');
+      debugPrint('📥 Data: ${response.data}');
+
+      return SnakebiteIncidentPaymentResponse.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      debugPrint('❌ PayOS incident payment DioException: ${e.message}');
+      debugPrint('📥 Response: ${e.response?.data}');
+      throw _handleError(e);
+    } catch (e, stackTrace) {
+      debugPrint('❌ PayOS incident payment error: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
+      throw Exception(
+        'Không thể tạo đường dẫn thanh toán. Vui lòng thử lại sau.',
+      );
+    }
+  }
+
+  /// Pay a snakebite incident with in-app wallet
+  /// POST /api/incidents/{incidentId}/payment/wallet
+  Future<SnakebiteIncidentPaymentResponse> paySnakebiteIncidentWithWallet({
+    required String incidentId,
+    required double amount,
+    String? description,
+    String transactionType = 'SnakebiteIncidentPayment',
+  }) async {
+    try {
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint('💰 Wallet payment for snakebite incident');
+      debugPrint('📍 Endpoint: /api/incidents/$incidentId/payment/wallet');
+      debugPrint(
+        '📦 incidentId: $incidentId | amount: $amount | type: $transactionType',
+      );
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      final response = await httpService.post(
+        '/api/incidents/$incidentId/payment/wallet',
+        data: {
+          'snakebiteIncidentId': incidentId,
+          'amount': amount,
+          'transactionType': transactionType,
+          if (description != null) 'description': description,
+        },
+      );
+
+      debugPrint('✅ Wallet incident payment response: ${response.statusCode}');
+      debugPrint('📥 Data: ${response.data}');
+
+      return SnakebiteIncidentPaymentResponse.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      debugPrint('❌ Wallet incident payment DioException: ${e.message}');
+      debugPrint('📥 Response: ${e.response?.data}');
+      throw _handleError(e);
+    } catch (e, stackTrace) {
+      debugPrint('❌ Wallet incident payment error: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
+      throw Exception('Không thể thanh toán bằng ví. Vui lòng thử lại sau.');
     }
   }
 

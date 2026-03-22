@@ -1574,16 +1574,16 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
   }
 
   String _getSeverityText(int level) {
-    if (level >= 4) return 'Nghiêm trọng';
-    if (level >= 3) return 'Cao';
-    if (level >= 2) return 'Trung bình';
+    if (level >= 70) return 'Nghiêm trọng';
+    if (level >= 40) return 'Cao';
+    if (level >= 10) return 'Trung bình';
     return 'Thấp';
   }
 
   Color _getSeverityColor(int level) {
-    if (level >= 4) return const Color(0xFFD32F2F);
-    if (level >= 3) return const Color(0xFFFF9800);
-    if (level >= 2) return const Color(0xFFFFC107);
+    if (level >= 70) return const Color(0xFFD32F2F);
+    if (level >= 40) return const Color(0xFFFF9800);
+    if (level >= 10) return const Color(0xFFFFC107);
     return const Color(0xFF4CAF50);
   }
 }
