@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 /// Secondary menu grid (2x3) - Professional design
 class SecondaryMenuGrid extends StatelessWidget {
@@ -41,7 +42,7 @@ class SecondaryMenuGrid extends StatelessWidget {
                 label: 'Cảnh báo\nkhu vực',
                 badge: '3',
                 badgeColor: Color(0xFFDC3545),
-                onTap: () {},
+                onTap: () => context.pushNamed('community_alert_map'),
               ),
               const SizedBox(width: 12),
               _MenuItem(

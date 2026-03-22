@@ -38,6 +38,7 @@ import 'package:snakeaid_mobile/features/member/screens/messages_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/message_detail_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/activity_detail_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/member_history_screen.dart';
+import 'package:snakeaid_mobile/features/community_report/screens/community_alert_map_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_home_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_settings_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_edit_profile_screen.dart';
@@ -56,6 +57,7 @@ import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_edit_profile_sc
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_history_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_history_detail_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_income_management_screen.dart';
+import 'package:snakeaid_mobile/features/lesson/screens/rescuer_lesson_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_feedback_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_id_documents_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_mission_detail_screen.dart';
@@ -326,6 +328,13 @@ final router = GoRouter(
       builder: (context, state) => const MemberHistoryScreen(),
     ),
 
+    // Community Alert Map
+    GoRoute(
+      path: '/community-alert',
+      name: 'community_alert_map',
+      builder: (context, state) => const CommunityAlertMapScreen(),
+    ),
+
     // Rescuer Settings
     GoRoute(
       path: '/rescuer-settings',
@@ -432,6 +441,11 @@ final router = GoRouter(
       path: '/rescuer/mission-success',
       name: 'rescuer_mission_success',
       builder: (context, state) => const RescuerMissionSuccessScreen(),
+    ),
+    GoRoute(
+      path: '/rescuer-lessons',
+      name: 'rescuer_lessons',
+      builder: (context, state) => const RescuerLessonScreen(),
     ),
 
     // === EMERGENCY ROUTES ===

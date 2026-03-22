@@ -222,6 +222,44 @@ class SnakeAiRepository {
 
     return Exception(errorMessage);
   }
+
+  /// Upload image for community report AI snake detection (no incident ID required)
+  ///
+  /// POST /api/media/report?type=CommunityReport&purpose=SnakeIdentification
+  Future<MediaUploadResponse> uploadImageForCommunityDetection({
+    required File imageFile,
+  }) async {
+    try {
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint('📸 Uploading image for community AI detection');
+
+      final fileName = imageFile.path.split('/').last;
+      final formData = FormData.fromMap({
+        'File': await MultipartFile.fromFile(
+          imageFile.path,
+          filename: fileName,
+        ),
+        'ReferenceId': '',
+      });
+
+      final response = await httpService.post(
+        '/api/media/report',
+        data: formData,
+        queryParameters: {
+          'type': MediaReferenceType.communityReport.value,
+          'purpose': MediaPurpose.snakeIdentification.value,
+        },
+      );
+
+      debugPrint('✅ Community image uploaded successfully');
+      debugPrint('✅ Response: ${response.data}');
+
+      return MediaUploadResponse.fromJson(response.data);
+    } on DioException catch (e) {
+      debugPrint('❌ Community upload failed: ${e.message}');
+      throw _handleError(e);
+    }
+  }
 }
 
 /// Provider for Snake AI Repository
