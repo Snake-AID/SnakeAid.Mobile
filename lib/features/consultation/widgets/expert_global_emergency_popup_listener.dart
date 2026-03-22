@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
+import '../../../app/router.dart';
 import '../../../core/providers/http_provider.dart';
 import '../../../core/services/emergency_consultation_signalr_service.dart';
 import '../repository/consultation_repository.dart';
@@ -132,7 +132,7 @@ class _ExpertGlobalEmergencyPopupListenerState
         return;
       }
 
-      context.push(
+      router.push(
         '/expert-video-waiting/$consultationId',
         extra: {
           'patientName': req.requesterName ?? 'Bệnh nhân',
@@ -178,6 +178,11 @@ class _ExpertGlobalEmergencyPopupListenerState
   String get _countdownLabel =>
       '${(_countdownSeconds ~/ 60).toString().padLeft(2, '0')}:${(_countdownSeconds % 60).toString().padLeft(2, '0')}';
 
+  String _formatFeeK(int amount) {
+    final k = amount ~/ 1000;
+    return '${k.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}K VNĐ';
+  }
+
   @override
   void dispose() {
     _countdownTimer?.cancel();
@@ -193,66 +198,302 @@ class _ExpertGlobalEmergencyPopupListenerState
     }
 
     final req = _activeRequest!;
+    final feeCost = req.feeCost ?? 0;
+    final netAmount = (feeCost * 0.9).toInt();
 
     return Positioned.fill(
       child: IgnorePointer(
         ignoring: false,
         child: Material(
-          color: Colors.black54,
+          color: const Color(0xFF160D1B).withOpacity(0.8),
           child: Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Container(
-                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 40,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      'Yêu cầu tư vấn khẩn cấp',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Bệnh nhân: ${req.requesterName ?? 'Bệnh nhân'}',
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Tự từ chối sau $_countdownLabel',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFFD97706),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _isHandlingAction ? null : _reject,
-                            child: const Text('Từ chối'),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: _isHandlingAction ? null : _accept,
-                            child: Text(
-                              _isHandlingAction ? 'Đang xử lý...' : 'Chấp nhận',
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6C47C2).withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.check_circle,
+                              size: 40,
+                              color: Color(0xFF6C47C2),
                             ),
                           ),
-                        ),
-                      ],
-                    )
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Xác Nhận Bắt Đầu Tư Vấn',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF6C47C2),
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF3CD),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.timer,
+                                    size: 16, color: Color(0xFFD97706)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Tự từ chối sau $_countdownLabel',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFD97706),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFAF8FC),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color:
+                                        const Color(0xFF6C47C2).withOpacity(0.1),
+                                    shape: BoxShape.circle,
+                                    border:
+                                        Border.all(color: Colors.grey.shade200),
+                                  ),
+                                  child: const Icon(Icons.person,
+                                      color: Color(0xFF6C47C2)),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        req.requesterName ?? 'Bệnh nhân',
+                                        style: const TextStyle(
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF160D1B),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      const Text(
+                                        'Tư vấn 30 phút · Video Call',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Color(0xFF6B7280),
+                                        ),
+                                      ),
+                                      Text(
+                                        req.snakeSuspect ?? 'Chưa rõ loài rắn',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFF6B7280),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFD1FAE5)),
+                            ),
+                            child: Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'Phí tư vấn',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF160D1B),
+                                      ),
+                                    ),
+                                    Text(
+                                      _formatFeeK(feeCost),
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF160D1B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF10B981),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.check,
+                                              size: 12, color: Colors.white),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'Đã thanh toán',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Divider(color: Color(0xFFD1FAE5), height: 20),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Bạn sẽ nhận',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF047857),
+                                          ),
+                                        ),
+                                        Text(
+                                          '(sau phí nền tảng 10%)',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Color(0xFF6B7280),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Text(
+                                      _formatFeeK(netAmount),
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF059669),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                      child: Column(
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: ElevatedButton(
+                              onPressed: _isHandlingAction ? null : _accept,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF6C47C2),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                elevation: 4,
+                                shadowColor:
+                                    const Color(0xFF6C47C2).withOpacity(0.4),
+                              ),
+                              child: _isHandlingAction
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Bắt Đầu Ngay',
+                                      style: TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: _isHandlingAction ? null : _reject,
+                            child: const Text(
+                              'Từ Chối',
+                              style: TextStyle(
+                                  fontSize: 13, color: Color(0xFF999999)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),

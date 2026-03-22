@@ -327,7 +327,7 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
                         ),
                         const SizedBox(width: 8),
                         const Text(
-                          'Đang chờ bệnh nhân...',
+                          'Đang chờ khách hàng...',
                           style: TextStyle(
                               color: Colors.white70,
                               fontSize: 12,
@@ -462,7 +462,7 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'BỆNH NHÂN',
+                  'Khách hàng',
                   style: TextStyle(
                     fontSize: 10,
                     color: Color(0xFF999999),

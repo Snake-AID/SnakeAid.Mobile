@@ -58,6 +58,7 @@ class ConsultationChatSignalRService {
 
   HubConnection? _hubConnection;
   String? _currentUserId;
+  String? _consultationId;
 
   final _messageController =
       StreamController<ConsultationChatMessage>.broadcast();
@@ -97,9 +98,13 @@ class ConsultationChatSignalRService {
     // Case 1: argument[0] is map or JSON string map
     final direct = _tryParseMap(arguments[0]);
     if (direct != null) {
-      // Some backends wrap chat message inside "data"
-      final nested = _tryParseMap(direct['data']);
-      return nested ?? direct;
+      // Some backends wrap chat message inside one of common envelope keys.
+      final envelopeKeys = ['data', 'message', 'chatMessage', 'payload', 'item'];
+      for (final key in envelopeKeys) {
+        final nested = _tryParseMap(direct[key]);
+        if (nested != null) return nested;
+      }
+      return direct;
     }
 
     // Case 2: argument[0] is string content and rest are scalar fields
@@ -132,6 +137,7 @@ class ConsultationChatSignalRService {
     }
 
     final hubUrl = '$baseUrl/hubs/consultation?consultationId=$consultationId';
+    _consultationId = consultationId;
 
     _hubConnection = HubConnectionBuilder()
         .withUrl(
@@ -161,29 +167,47 @@ class ConsultationChatSignalRService {
     _hubConnection!.onreconnected(({connectionId}) {
       debugPrint('Consultation chat reconnected: $connectionId');
       _connectionStateController.add(HubConnectionState.Connected);
+      unawaited(_ensureJoinedConsultationRoom());
     });
 
     await _hubConnection!.start();
 
-    // Some backend implementations require explicit room join after connect.
-    // Try both common method names without failing the whole connection.
+    await _ensureJoinedConsultationRoom();
+
+    _connectionStateController.add(HubConnectionState.Connected);
+  }
+
+  Future<void> _ensureJoinedConsultationRoom() async {
+    if (!isConnected) return;
+    final consultationId = _consultationId;
+    if (consultationId == null || consultationId.isEmpty) return;
+
+    // Some backend implementations auto-authorize by query param only,
+    // while others require an explicit join call for room group membership.
     try {
       await _hubConnection!.invoke(
         'JoinConsultationRoom',
         args: <Object>[consultationId],
       );
-    } catch (_) {
-      try {
-        await _hubConnection!.invoke(
-          'JoinRoom',
-          args: <Object>[consultationId],
-        );
-      } catch (_) {
-        // Ignore if hub doesn't expose explicit join methods.
-      }
-    }
+      return;
+    } catch (_) {}
 
-    _connectionStateController.add(HubConnectionState.Connected);
+    try {
+      await _hubConnection!.invoke(
+        'JoinRoom',
+        args: <Object>[consultationId],
+      );
+      return;
+    } catch (_) {}
+
+    try {
+      await _hubConnection!.invoke(
+        'JoinConsultation',
+        args: <Object>[consultationId],
+      );
+    } catch (_) {
+      // Ignore if hub doesn't expose explicit join methods.
+    }
   }
 
   void _registerEvents() {
@@ -192,6 +216,10 @@ class ConsultationChatSignalRService {
         if (arguments == null || arguments.isEmpty) return;
         final payload = _normalizeMessagePayload(arguments);
         if (payload == null) return;
+        payload.putIfAbsent('content', () => payload['message'] ?? payload['messageText'] ?? payload['body'] ?? '');
+        payload.putIfAbsent('Content', () => payload['Message'] ?? payload['MessageText'] ?? payload['Body'] ?? '');
+        payload.putIfAbsent('attachmentUrl', () => payload['attachmentURL'] ?? payload['imageUrl'] ?? payload['mediaUrl']);
+        payload.putIfAbsent('senderName', () => payload['senderFullName'] ?? payload['fullName']);
         final msg = ConsultationChatMessage.fromHubPayload(
           payload,
           currentUserId: _currentUserId,
@@ -206,8 +234,17 @@ class ConsultationChatSignalRService {
       }
     }
 
-    // Operation 5 contract: server emits MessageReceived.
-    _hubConnection!.on('MessageReceived', messageHandler);
+    // Register common backend variants for chat message events.
+    const messageEventNames = [
+      'MessageReceived',
+      'ReceiveMessage',
+      'ChatMessageReceived',
+      'ConsultationMessageReceived',
+      'NewMessage',
+    ];
+    for (final eventName in messageEventNames) {
+      _hubConnection!.on(eventName, messageHandler);
+    }
 
     _hubConnection!.on('SignalReceived', (arguments) {
       try {
@@ -272,6 +309,7 @@ class ConsultationChatSignalRService {
       // Ignore disconnect errors.
     }
     _hubConnection = null;
+    _consultationId = null;
   }
 
   Future<void> dispose() async {

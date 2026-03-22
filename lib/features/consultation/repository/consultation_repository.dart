@@ -11,6 +11,7 @@ import '../models/review_model.dart';
 import '../models/availability_model.dart';
 import '../models/consultation_booking_response.dart';
 import '../models/emergency_consultation_request.dart';
+import '../models/consultation_payment_response.dart';
 
 /// Provider for ConsultationRepository
 final consultationRepositoryProvider = Provider<ConsultationRepository>((ref) {
@@ -211,16 +212,21 @@ class ConsultationRepository {
       debugPrint('⚠️ Failed to parse time slots: $e');
     }
 
-    // Parse stats from profile data
-    final avgMinutes = profileData['averageResponseTimeMinutes'] as int?;
-    final avgResponseStr = avgMinutes == null
-        ? '< 5 phút'
-        : '$avgMinutes phút';
+    // Parse stats from profile data (backend may return int/double/string)
+    final avgMinutesRaw = profileData['averageResponseTimeMinutes'];
+    final avgMinutes = avgMinutesRaw is num
+      ? avgMinutesRaw.round()
+      : int.tryParse(avgMinutesRaw?.toString() ?? '');
+    final totalConsultationsRaw = profileData['totalConsultations'];
+    final totalConsultations = totalConsultationsRaw is num
+      ? totalConsultationsRaw.toInt()
+      : int.tryParse(totalConsultationsRaw?.toString() ?? '') ?? 0;
+    final avgResponseStr = avgMinutes == null ? '< 5 phút' : '$avgMinutes phút';
 
     return ExpertDetailModel.fromExpertModel(
       expert,
       experienceList: const [],
-      totalConsultations: (profileData['totalConsultations'] ?? 0) as int,
+      totalConsultations: totalConsultations,
       averageResponseTime: avgResponseStr,
       successRate: ((profileData['successRate'] ?? 0) as num).toDouble(),
       consultationFees: {30: expert.scheduledConsultationFee > 0 ? expert.scheduledConsultationFee : expert.consultationFee},
@@ -746,16 +752,25 @@ class ConsultationRepository {
   /// Throws:
   /// - 409 when booking already paid or not in `PendingPayment`
   /// - 409 when wallet balance is insufficient
-  Future<void> payBooking(String bookingId) async {
+  Future<ConsultationPaymentResponse> payBooking(
+    String bookingId, {
+    String paymentMethod = 'WalletBalance',
+  }) async {
     debugPrint('💳 Paying booking: $bookingId');
 
     final response = await httpService.post(
       '/api/consultation-bookings/$bookingId/payments',
-      data: {'paymentMethod': 'WalletBalance'},
+      data: {'paymentMethod': paymentMethod},
     );
 
     final body = response.data as Map<String, dynamic>;
-    if (body['is_success'] != true) {
+    if (body['is_success'] == true && body['data'] != null) {
+      return ConsultationPaymentResponse.fromJson(
+        body['data'] as Map<String, dynamic>,
+      );
+    }
+
+    {
       final statusCode = body['status_code'] as int? ?? 0;
       final msg = (body['message'] as String?) ?? '';
       if (statusCode == 409 &&
@@ -772,7 +787,7 @@ class ConsultationRepository {
   /// API: `POST /api/consultations/emergency-requests/{requestId}/payments`
   ///
   /// This moves request status from `PendingPayment` to `PendingExpertResponse`.
-  Future<void> payEmergencyRequest(
+  Future<ConsultationPaymentResponse> payEmergencyRequest(
     String requestId, {
     String paymentMethod = 'WalletBalance',
   }) async {
@@ -784,7 +799,13 @@ class ConsultationRepository {
     );
 
     final body = response.data as Map<String, dynamic>;
-    if (body['is_success'] != true) {
+    if (body['is_success'] == true && body['data'] != null) {
+      return ConsultationPaymentResponse.fromJson(
+        body['data'] as Map<String, dynamic>,
+      );
+    }
+
+    {
       final statusCode = body['status_code'] as int? ?? 0;
       final msg = (body['message'] as String?) ?? '';
       if (statusCode == 409 &&
@@ -794,6 +815,27 @@ class ConsultationRepository {
       }
       throw Exception(msg.isNotEmpty ? msg : 'Không thể thanh toán tư vấn ngay');
     }
+  }
+
+  /// Manual fallback confirm for consultation PayOS payment.
+  ///
+  /// API: `POST /api/consultation-payments/confirm-payment`
+  Future<ConsultationPaymentResponse> confirmConsultationPayment(
+    String transactionId,
+  ) async {
+    final response = await httpService.post(
+      '/api/consultation-payments/confirm-payment',
+      data: {'transactionId': transactionId},
+    );
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] == true && body['data'] != null) {
+      return ConsultationPaymentResponse.fromJson(
+        body['data'] as Map<String, dynamic>,
+      );
+    }
+
+    throw Exception(body['message'] ?? 'Không thể xác nhận thanh toán');
   }
 
   // ---------------------------------------------------------------------------

@@ -32,6 +32,7 @@ class _EmergencyRequestWaitingScreenState
   String _status = 'PendingPayment';
   String? _statusMessage;
   bool _isConnecting = true;
+  String? _acceptedConsultationId;
 
   @override
   void initState() {
@@ -50,6 +51,9 @@ class _EmergencyRequestWaitingScreenState
           _status = event.status;
           _statusMessage = _mapStatusToMessage(event.status);
           _isConnecting = false;
+          if (event.consultationId != null && event.consultationId!.isNotEmpty) {
+            _acceptedConsultationId = event.consultationId;
+          }
         });
 
         if (event.status == 'AcceptedByExpert' &&
@@ -214,6 +218,33 @@ class _EmergencyRequestWaitingScreenState
                     ),
                   ],
                 ),
+                if (_acceptedConsultationId != null &&
+                    _acceptedConsultationId!.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            context.go(
+                              '/video-waiting/${_acceptedConsultationId!}',
+                              extra: {
+                                'expertName': widget.expertName,
+                                'expertSpecialty': 'Tư vấn ngay',
+                              },
+                            );
+                          },
+                          icon: const Icon(Icons.video_call, size: 18),
+                          label: const Text('Vào Phòng Chờ Ngay'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primary,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),

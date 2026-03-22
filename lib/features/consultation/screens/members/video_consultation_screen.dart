@@ -78,8 +78,102 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
   final ValueNotifier<List<ConsultationChatMessage>> _chatMessagesNotifier =
       ValueNotifier<List<ConsultationChatMessage>>([]);
   bool _isChatConnected = false;
+  final List<_PendingOutgoingEcho> _pendingOutgoingEchoes = [];
+
+  ConsultationChatMessage _buildOptimisticMessage({
+    required String content,
+    String? attachmentUrl,
+  }) {
+    return ConsultationChatMessage(
+      id: 'local-${DateTime.now().microsecondsSinceEpoch}',
+      senderId: 'me',
+      senderName: 'Bạn',
+      content: content,
+      attachmentUrl: attachmentUrl,
+      sentAt: DateTime.now(),
+      isMine: true,
+    );
+  }
+
+  String _normalizeChatText(String text) => text.trim().toLowerCase();
+
+  String _normalizeAttachmentUrl(String? url) => (url ?? '').trim();
+
+  bool _isPlaceholderImageText(String text) =>
+      _normalizeChatText(text) == '[image]';
+
+  void _markPendingOutgoingEcho({
+    required String content,
+    String? attachmentUrl,
+  }) {
+    _pendingOutgoingEchoes.add(
+      _PendingOutgoingEcho(
+        content: _normalizeChatText(content),
+        attachmentUrl: _normalizeAttachmentUrl(attachmentUrl),
+        createdAt: DateTime.now(),
+      ),
+    );
+
+    // Keep memory bounded and drop stale signatures.
+    final now = DateTime.now();
+    _pendingOutgoingEchoes.removeWhere(
+      (e) => now.difference(e.createdAt).inSeconds > 30,
+    );
+  }
+
+  void _removePendingOutgoingEcho({
+    required String content,
+    String? attachmentUrl,
+  }) {
+    final normalizedContent = _normalizeChatText(content);
+    final normalizedAttachment = _normalizeAttachmentUrl(attachmentUrl);
+    final index = _pendingOutgoingEchoes.indexWhere(
+      (e) =>
+          e.content == normalizedContent &&
+          e.attachmentUrl == normalizedAttachment,
+    );
+    if (index >= 0) {
+      _pendingOutgoingEchoes.removeAt(index);
+    }
+  }
+
+  void _removeMessageById(String id) {
+    final messages = _chatMessagesNotifier.value;
+    final next = messages.where((m) => m.id != id).toList();
+    if (next.length != messages.length) {
+      _chatMessagesNotifier.value = next;
+    }
+  }
+
+  bool _consumePendingOutgoingEcho(ConsultationChatMessage msg) {
+    final normalizedContent = _normalizeChatText(msg.content);
+    final normalizedAttachment = _normalizeAttachmentUrl(msg.attachmentUrl);
+    final now = DateTime.now();
+
+    for (int i = 0; i < _pendingOutgoingEchoes.length; i++) {
+      final pending = _pendingOutgoingEchoes[i];
+      final isExpired = now.difference(pending.createdAt).inSeconds > 30;
+      if (isExpired) continue;
+
+      final sameContent = pending.content == normalizedContent;
+      final sameAttachment = pending.attachmentUrl == normalizedAttachment;
+      if (sameContent && sameAttachment) {
+        _pendingOutgoingEchoes.removeAt(i);
+        return true;
+      }
+    }
+
+    _pendingOutgoingEchoes.removeWhere(
+      (e) => now.difference(e.createdAt).inSeconds > 30,
+    );
+    return false;
+  }
 
   void _appendChatMessage(ConsultationChatMessage msg) {
+    if (!msg.id.startsWith('local-') && _consumePendingOutgoingEcho(msg)) {
+      return;
+    }
+
     final messages = _chatMessagesNotifier.value;
 
     final hasSameId = msg.id.isNotEmpty &&
@@ -277,9 +371,15 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
     final content = text.trim();
     if (content.isEmpty) return;
 
+    final optimistic = _buildOptimisticMessage(content: content);
+    _markPendingOutgoingEcho(content: content);
+    _appendChatMessage(optimistic);
+
     try {
       await _chatService?.sendMessage(content: content);
     } catch (e) {
+      _removePendingOutgoingEcho(content: content);
+      _removeMessageById(optimistic.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -291,19 +391,41 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
   }
 
   Future<void> _handleSendChatImage(String filePath, String caption) async {
+    final outgoingContent =
+        caption.trim().isEmpty ? '[image]' : caption.trim();
+    String? uploadedUrl;
+    String? optimisticId;
+
     try {
       final repo = ref.read(consultationRepositoryProvider);
       debugPrint('🖼️ Uploading chat image from: $filePath');
       final secureUrl = await repo.uploadChatImage(filePath);
-      final outgoingContent =
-          caption.trim().isEmpty ? '[image]' : caption.trim();
+      uploadedUrl = secureUrl;
       debugPrint('🖼️ Sending image message, url: $secureUrl');
+
+      final optimistic = _buildOptimisticMessage(
+        content: outgoingContent,
+        attachmentUrl: secureUrl,
+      );
+      optimisticId = optimistic.id;
+      _markPendingOutgoingEcho(
+        content: outgoingContent,
+        attachmentUrl: secureUrl,
+      );
+      _appendChatMessage(optimistic);
 
       await _chatService?.sendMessage(
         content: outgoingContent,
         attachmentUrl: secureUrl,
       );
     } catch (e) {
+      _removePendingOutgoingEcho(
+        content: outgoingContent,
+        attachmentUrl: uploadedUrl,
+      );
+      if (optimisticId != null) {
+        _removeMessageById(optimisticId);
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -957,7 +1079,29 @@ class _ChatPanelState extends State<_ChatPanel> {
   String? _pendingImagePath;
 
   @override
+  void initState() {
+    super.initState();
+    widget.messagesListenable.addListener(_handleMessagesChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+  }
+
+  @override
+  void didUpdateWidget(covariant _ChatPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.messagesListenable != widget.messagesListenable) {
+      oldWidget.messagesListenable.removeListener(_handleMessagesChanged);
+      widget.messagesListenable.addListener(_handleMessagesChanged);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    }
+  }
+
+  void _handleMessagesChanged() {
+    _scrollToBottom();
+  }
+
+  @override
   void dispose() {
+    widget.messagesListenable.removeListener(_handleMessagesChanged);
     _msgController.dispose();
     super.dispose();
   }
@@ -1270,6 +1414,9 @@ class _ChatPanelState extends State<_ChatPanel> {
 
   Widget _buildBubble(ConsultationChatMessage msg) {
     final isMe = msg.isMine;
+    final hasImage = msg.attachmentUrl != null && msg.attachmentUrl!.isNotEmpty;
+    final showCaption = msg.content.trim().isNotEmpty &&
+        msg.content.trim().toLowerCase() != '[image]';
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
@@ -1284,19 +1431,43 @@ class _ChatPanelState extends State<_ChatPanel> {
             ),
           ),
           const SizedBox(height: 4),
-          if (msg.attachmentUrl != null && msg.attachmentUrl!.isNotEmpty)
-            // Image bubble
-            GestureDetector(
-              onTap: () => _openImagePreview(msg.attachmentUrl!),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Image.network(
-                  msg.attachmentUrl!,
-                  width: 200,
-                  height: 200,
-                  fit: BoxFit.cover,
+          if (hasImage)
+            Column(
+              crossAxisAlignment:
+                  isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                GestureDetector(
+                  onTap: () => _openImagePreview(msg.attachmentUrl!),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.network(
+                      msg.attachmentUrl!,
+                      width: 200,
+                      height: 200,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
                 ),
-              ),
+                if (showCaption)
+                  Container(
+                    margin: const EdgeInsets.only(top: 6),
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.7,
+                    ),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isMe
+                          ? const Color(0xFF228B22).withOpacity(0.7)
+                          : Colors.white.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      msg.content,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                    ),
+                  ),
+              ],
             )
           else
             // Text bubble
@@ -1359,4 +1530,17 @@ class _ChatPanelState extends State<_ChatPanel> {
       ),
     );
   }
+
+}
+
+class _PendingOutgoingEcho {
+  final String content;
+  final String attachmentUrl;
+  final DateTime createdAt;
+
+  const _PendingOutgoingEcho({
+    required this.content,
+    required this.attachmentUrl,
+    required this.createdAt,
+  });
 }

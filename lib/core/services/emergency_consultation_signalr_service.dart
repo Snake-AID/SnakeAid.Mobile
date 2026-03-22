@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,6 +28,23 @@ class EmergencyConsultationRequestEvent {
 
   factory EmergencyConsultationRequestEvent.fromJson(
       Map<String, dynamic> json) {
+    int? parseAmount(dynamic value) {
+      if (value is num) return value.toInt();
+      if (value == null) return null;
+      return int.tryParse(value.toString());
+    }
+
+    final payment = json['payment'] is Map
+        ? Map<String, dynamic>.from(json['payment'] as Map)
+        : <String, dynamic>{};
+
+    final feeCost = parseAmount(json['feeCost']) ??
+        parseAmount(json['amount']) ??
+        parseAmount(json['consultationFee']) ??
+        parseAmount(json['emergencyConsultationFee']) ??
+        parseAmount(payment['amount']) ??
+        parseAmount(payment['feeCost']);
+
     return EmergencyConsultationRequestEvent(
       requestId: (json['requestId'] ?? '').toString(),
       requesterId: (json['requesterId'] ?? '').toString(),
@@ -41,7 +59,7 @@ class EmergencyConsultationRequestEvent {
           (json['requesterName'] ?? json['userName'] ?? json['patientName'])
               ?.toString(),
       snakeSuspect: (json['snakeSuspect'] ?? json['snakeName'])?.toString(),
-      feeCost: (json['feeCost'] as num?)?.toInt(),
+      feeCost: feeCost,
     );
   }
 }
@@ -125,6 +143,23 @@ class EmergencyConsultationSignalRService {
 
   bool get isConnected => _hubConnection?.state == HubConnectionState.Connected;
 
+  Map<String, dynamic>? _tryParseMap(dynamic raw) {
+    if (raw is Map) {
+      return Map<String, dynamic>.from(raw);
+    }
+    if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          return Map<String, dynamic>.from(decoded);
+        }
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
+
   Future<HubConnection> _buildAndStartConnection() async {
     final prefs = await SharedPreferences.getInstance();
     final token =
@@ -150,7 +185,8 @@ class EmergencyConsultationSignalRService {
     conn.on('EmergencyRequestStatusChanged', (arguments) {
       try {
         if (arguments == null || arguments.isEmpty) return;
-        final data = arguments[0] as Map<String, dynamic>;
+        final data = _tryParseMap(arguments[0]);
+        if (data == null) return;
         _statusChangedController.add(
           EmergencyRequestStatusChanged.fromJson(data),
         );
@@ -162,7 +198,8 @@ class EmergencyConsultationSignalRService {
     conn.on('EmergencyConsultationRequest', (arguments) {
       try {
         if (arguments == null || arguments.isEmpty) return;
-        final data = arguments[0] as Map<String, dynamic>;
+        final data = _tryParseMap(arguments[0]);
+        if (data == null) return;
         _requestController.add(
           EmergencyConsultationRequestEvent.fromJson(data),
         );
@@ -174,7 +211,8 @@ class EmergencyConsultationSignalRService {
     conn.on('OnlineExpertsSnapshot', (arguments) {
       try {
         if (arguments == null || arguments.isEmpty) return;
-        final raw = Map<String, dynamic>.from(arguments[0] as Map);
+        final raw = _tryParseMap(arguments[0]);
+        if (raw == null) return;
         final ids = (raw['onlineExpertIds'] as List<dynamic>? ?? const [])
             .map((e) => e.toString())
             .toSet();
@@ -187,7 +225,8 @@ class EmergencyConsultationSignalRService {
     conn.on('ExpertPresenceChanged', (arguments) {
       try {
         if (arguments == null || arguments.isEmpty) return;
-        final raw = Map<String, dynamic>.from(arguments[0] as Map);
+        final raw = _tryParseMap(arguments[0]);
+        if (raw == null) return;
         _expertPresenceChangedController.add(
           ExpertPresenceChangedEvent.fromJson(raw),
         );

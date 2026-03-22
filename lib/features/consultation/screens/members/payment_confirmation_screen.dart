@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../providers/expert_detail_provider.dart';
 import '../../providers/consultation_bookings_provider.dart';
+import '../../models/consultation_payment_response.dart';
 import '../../repository/consultation_repository.dart';
 
 // Primary color constant
@@ -169,10 +171,14 @@ class _PaymentConfirmationScreenState
 
       try {
         final repo = ref.read(consultationRepositoryProvider);
-        await repo.payEmergencyRequest(
+        final payment = await repo.payEmergencyRequest(
           resolvedRequestId,
           paymentMethod: paymentMethod,
         );
+
+        if (_selectedPaymentMethod == PaymentMethod.payos) {
+          await _handlePayOsFlow(repo, payment);
+        }
 
         if (!mounted) return;
         setState(() => _isPaymentLoading = false);
@@ -211,7 +217,16 @@ class _PaymentConfirmationScreenState
     setState(() => _isPaymentLoading = true);
     try {
       final repo = ref.read(consultationRepositoryProvider);
-      await repo.payBooking(widget.bookingId!);
+      final paymentMethod = _selectedPaymentMethod == PaymentMethod.snakeaidPay
+          ? 'WalletBalance'
+          : 'PayOs';
+      final payment = await repo.payBooking(
+        widget.bookingId!,
+        paymentMethod: paymentMethod,
+      );
+      if (_selectedPaymentMethod == PaymentMethod.payos) {
+        await _handlePayOsFlow(repo, payment);
+      }
       ref.invalidate(consultationBookingsProvider);
       if (!mounted) return;
       context.go(
@@ -227,6 +242,69 @@ class _PaymentConfirmationScreenState
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
+      );
+    }
+  }
+
+  Future<void> _handlePayOsFlow(
+    ConsultationRepository repo,
+    ConsultationPaymentResponse payment,
+  ) async {
+    if (payment.isEscrowed) {
+      return;
+    }
+
+    final checkoutUrl = (payment.checkoutUrl ?? '').toString();
+    final transactionId = (payment.transactionId ?? '').toString();
+    if (checkoutUrl.isEmpty) {
+      throw Exception('Thiếu checkoutUrl cho PayOS');
+    }
+
+    final uri = Uri.tryParse(checkoutUrl);
+    if (uri == null) {
+      throw Exception('checkoutUrl không hợp lệ');
+    }
+
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched) {
+      throw Exception('Không thể mở cổng thanh toán PayOS');
+    }
+
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xác nhận thanh toán'),
+        content: const Text(
+          'Sau khi thanh toán xong trên PayOS, bấm "Tôi đã thanh toán" để hệ thống xác nhận giao dịch.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: _primaryColor),
+            child: const Text('Tôi đã thanh toán'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) {
+      throw Exception('Bạn chưa xác nhận hoàn tất thanh toán PayOS');
+    }
+
+    if (transactionId.isEmpty) {
+      throw Exception('Thiếu transactionId để xác nhận thanh toán');
+    }
+
+    final confirmedPayment = await repo.confirmConsultationPayment(transactionId);
+    if (!confirmedPayment.isEscrowed) {
+      throw Exception(
+        'Thanh toán chưa hoàn tất (trạng thái: ${confirmedPayment.status})',
       );
     }
   }

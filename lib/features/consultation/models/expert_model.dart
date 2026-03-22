@@ -43,6 +43,52 @@ class ExpertModel {
     this.updatedAt,
   });
 
+  ExpertModel copyWith({
+    String? id,
+    String? userId,
+    String? fullName,
+    String? avatarUrl,
+    String? academicRank,
+    String? specialty,
+    List<String>? specialties,
+    bool? isVerified,
+    bool? isOnline,
+    double? rating,
+    int? reviewCount,
+    double? consultationFee,
+    double? scheduledConsultationFee,
+    double? emergencyConsultationFee,
+    int? consultationDuration,
+    String? bio,
+    int? yearsOfExperience,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return ExpertModel(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      fullName: fullName ?? this.fullName,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      academicRank: academicRank ?? this.academicRank,
+      specialty: specialty ?? this.specialty,
+      specialties: specialties ?? this.specialties,
+      isVerified: isVerified ?? this.isVerified,
+      isOnline: isOnline ?? this.isOnline,
+      rating: rating ?? this.rating,
+      reviewCount: reviewCount ?? this.reviewCount,
+      consultationFee: consultationFee ?? this.consultationFee,
+      scheduledConsultationFee:
+          scheduledConsultationFee ?? this.scheduledConsultationFee,
+      emergencyConsultationFee:
+          emergencyConsultationFee ?? this.emergencyConsultationFee,
+      consultationDuration: consultationDuration ?? this.consultationDuration,
+      bio: bio ?? this.bio,
+      yearsOfExperience: yearsOfExperience ?? this.yearsOfExperience,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
   /// Create from JSON
   factory ExpertModel.fromJson(Map<String, dynamic> json) {
     // Map tất cả field names có thể có từ backend

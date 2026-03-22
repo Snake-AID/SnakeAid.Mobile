@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:async';
+import '../../../../core/providers/http_provider.dart';
+import '../../../../core/services/emergency_consultation_signalr_service.dart';
 import '../../providers/expert_list_provider.dart';
 import '../../models/expert_model.dart';
 
@@ -16,6 +19,9 @@ class ExpertListScreen extends ConsumerStatefulWidget {
 
 class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
   final TextEditingController _searchController = TextEditingController();
+  EmergencyConsultationSignalRService? _presenceService;
+  StreamSubscription<Set<String>>? _snapshotSub;
+  StreamSubscription<ExpertPresenceChangedEvent>? _presenceChangedSub;
 
   @override
   void initState() {
@@ -23,11 +29,40 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
     // Reload data mỗi khi vào màn hình
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(expertListProvider.notifier).refresh();
+      _initPresenceRealtime();
     });
+  }
+
+  Future<void> _initPresenceRealtime() async {
+    try {
+      final baseUrl = ref.read(httpServiceProvider).baseUrl;
+      _presenceService = EmergencyConsultationSignalRService(baseUrl: baseUrl);
+
+      _snapshotSub = _presenceService!.onlineExpertsSnapshotStream.listen((ids) {
+        if (!mounted) return;
+        ref.read(expertListProvider.notifier).applyOnlineExpertsSnapshot(ids);
+      });
+
+      _presenceChangedSub =
+          _presenceService!.expertPresenceChangedStream.listen((event) {
+        if (!mounted) return;
+        ref.read(expertListProvider.notifier).applyExpertPresenceChanged(
+              expertId: event.expertId,
+              isOnline: event.isOnline,
+            );
+      });
+
+      await _presenceService!.connectAsMember();
+    } catch (e) {
+      debugPrint('Khong the ket noi presence SignalR o expert list: $e');
+    }
   }
 
   @override
   void dispose() {
+    _snapshotSub?.cancel();
+    _presenceChangedSub?.cancel();
+    _presenceService?.dispose();
     _searchController.dispose();
     super.dispose();
   }

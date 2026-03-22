@@ -126,11 +126,13 @@ class ExpertListNotifier extends StateNotifier<ExpertListState> {
         
         debugPrint('✅ Loaded ${experts.length} experts');
 
+        final mergedExperts = _applyRealtimePresenceToExperts(experts);
+
         state = state.copyWith(
-          experts: experts,
-          filteredExperts: _applyFiltersAndSort(experts),
+          experts: mergedExperts,
+          filteredExperts: _applyFiltersAndSort(mergedExperts),
           totalCount: response.data!.totalCount,
-          onlineCount: response.data!.onlineCount,
+          onlineCount: mergedExperts.where((e) => e.isOnline).length,
           isLoading: false,
         );
       } else {
@@ -251,5 +253,67 @@ class ExpertListNotifier extends StateNotifier<ExpertListState> {
   /// Refresh expert list
   Future<void> refresh() async {
     await loadExperts();
+  }
+
+  /// Apply full online snapshot from SignalR (authoritative realtime source).
+  void applyOnlineExpertsSnapshot(Set<String> onlineExpertIds) {
+    final normalized = onlineExpertIds.map((e) => e.toLowerCase()).toSet();
+    final updatedExperts = state.experts
+        .map((expert) => expert.copyWith(
+              isOnline: _isExpertInOnlineSet(expert, normalized),
+            ))
+        .toList();
+
+    state = state.copyWith(
+      experts: updatedExperts,
+      filteredExperts: _applyFiltersAndSort(updatedExperts),
+      onlineCount: updatedExperts.where((e) => e.isOnline).length,
+    );
+  }
+
+  /// Apply a single presence delta event from SignalR.
+  void applyExpertPresenceChanged({
+    required String expertId,
+    required bool isOnline,
+  }) {
+    final normalizedId = expertId.toLowerCase();
+    final updatedExperts = state.experts
+        .map((expert) {
+          final match = expert.id.toLowerCase() == normalizedId ||
+              expert.userId.toLowerCase() == normalizedId;
+          return match ? expert.copyWith(isOnline: isOnline) : expert;
+        })
+        .toList();
+
+    state = state.copyWith(
+      experts: updatedExperts,
+      filteredExperts: _applyFiltersAndSort(updatedExperts),
+      onlineCount: updatedExperts.where((e) => e.isOnline).length,
+    );
+  }
+
+  List<ExpertModel> _applyRealtimePresenceToExperts(List<ExpertModel> experts) {
+    if (state.experts.isEmpty) {
+      return experts;
+    }
+
+    // Keep realtime online flags already known in-memory when reloading list.
+    final knownOnlineById = <String, bool>{
+      for (final e in state.experts) e.id.toLowerCase(): e.isOnline,
+      for (final e in state.experts) e.userId.toLowerCase(): e.isOnline,
+    };
+
+    return experts
+        .map((expert) => expert.copyWith(
+              isOnline: knownOnlineById[expert.id.toLowerCase()] ??
+                  knownOnlineById[expert.userId.toLowerCase()] ??
+                  expert.isOnline,
+            ))
+        .toList();
+  }
+
+  bool _isExpertInOnlineSet(ExpertModel expert, Set<String> onlineIds) {
+    return onlineIds.contains(expert.id.toLowerCase()) ||
+        onlineIds.contains(expert.userId.toLowerCase());
   }
 }
