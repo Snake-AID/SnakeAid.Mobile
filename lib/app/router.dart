@@ -39,6 +39,7 @@ import 'package:snakeaid_mobile/features/member/screens/messages_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/message_detail_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/activity_detail_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/member_history_screen.dart';
+import 'package:snakeaid_mobile/features/community_report/screens/community_alert_map_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_home_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_settings_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_edit_profile_screen.dart';
@@ -328,6 +329,13 @@ final router = GoRouter(
       path: '/member-history',
       name: 'member_history',
       builder: (context, state) => const MemberHistoryScreen(),
+    ),
+
+    // Community Alert Map
+    GoRoute(
+      path: '/community-alert',
+      name: 'community_alert_map',
+      builder: (context, state) => const CommunityAlertMapScreen(),
     ),
 
     // Rescuer Settings
