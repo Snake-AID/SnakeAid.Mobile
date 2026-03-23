@@ -7,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:snakeaid_mobile/core/services/notification_service.dart';
 import 'core/config/base_url_config.dart';
 import 'core/handlers/deep_link_handler.dart';
+import 'package:snakeaid_mobile/features/auth/providers/auth_provider.dart';
+import 'package:snakeaid_mobile/features/consultation/widgets/expert_global_emergency_popup_listener.dart';
 import 'app/router.dart';
 
 @pragma('vm:entry-point')
@@ -81,6 +83,8 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isExpert = ref.watch(isExpertProvider);
+
     return MaterialApp.router(
       title: 'SnakeAid Mobile',
       debugShowCheckedModeBanner: false,
@@ -92,6 +96,14 @@ class MyApp extends ConsumerWidget {
 
       // Use go_router configuration
       routerConfig: router,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            if (child != null) child,
+            if (isExpert) const ExpertGlobalEmergencyPopupListener(),
+          ],
+        );
+      },
     );
   }
 }

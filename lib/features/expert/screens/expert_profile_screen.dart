@@ -3,7 +3,8 @@ import 'package:go_router/go_router.dart';
 
 /// Expert Profile Screen - Personal information and statistics for expert
 class ExpertProfileScreen extends StatefulWidget {
-  const ExpertProfileScreen({super.key});
+  final VoidCallback? onGoToHistory;
+  const ExpertProfileScreen({super.key, this.onGoToHistory});
 
   @override
   State<ExpertProfileScreen> createState() => _ExpertProfileScreenState();
@@ -111,7 +112,11 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
                       _buildMenuItem(
                         icon: Icons.history_edu,
                         title: 'Lịch Sử Tư Vấn',
-                        onTap: () {},
+                        onTap: () {
+                          if (widget.onGoToHistory != null) {
+                            widget.onGoToHistory!();
+                          }
+                        },
                       ),
                       const SizedBox(height: 12),
                       _buildMenuItem(
@@ -141,6 +146,14 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
                         title: 'Chuyên Môn & Lĩnh Vực',
                         onTap: () {
                           context.pushNamed('expert_specialties');
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildMenuItem(
+                        icon: Icons.calendar_month,
+                        title: 'Cài Đặt Lịch Làm Việc',
+                        onTap: () {
+                          context.push('/expert-working-hours');
                         },
                       ),
                       const SizedBox(height: 12),

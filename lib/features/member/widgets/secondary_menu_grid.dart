@@ -17,7 +17,7 @@ class SecondaryMenuGrid extends StatelessWidget {
                 icon: Icons.support_agent,
                 label: 'Tư vấn\nchuyên gia',
                 hasStatusDot: true,
-                onTap: () {},
+                onTap: () => context.push('/consultation-home'),
               ),
               const SizedBox(width: 12),
               _MenuItem(

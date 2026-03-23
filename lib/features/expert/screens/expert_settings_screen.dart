@@ -1,7 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../auth/repository/auth_repository.dart';
+import '../../consultation/repository/consultation_repository.dart';
 
 /// Expert Settings Screen
 class ExpertSettingsScreen extends ConsumerStatefulWidget {
@@ -12,27 +15,6 @@ class ExpertSettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
-  // Schedule toggles
-  final Map<String, bool> _scheduleEnabled = {
-    'Thứ 2': true,
-    'Thứ 3': true,
-    'Thứ 4': true,
-    'Thứ 5': false,
-    'Thứ 6': true,
-    'Thứ 7': false,
-    'Chủ Nhật': false,
-  };
-
-  final Map<String, String> _scheduleTimes = {
-    'Thứ 2': '8:00 - 17:00',
-    'Thứ 3': '8:00 - 17:00',
-    'Thứ 4': '9:00 - 18:00',
-    'Thứ 5': '',
-    'Thứ 6': '8:00 - 12:00',
-    'Thứ 7': '',
-    'Chủ Nhật': '',
-  };
-
   // Notification toggles
   bool _notifyNewConsultation = true;
   bool _notifySOS = true;
@@ -48,6 +30,177 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
 
   // Data toggles
   bool _offlineSync = true;
+
+  // Consultation fee
+  double _consultationFee = 300000;
+  bool _isSavingFee = false;
+
+  // Biography
+  String _biography = '';
+  bool _isSavingBio = false;
+
+  // Profile loading
+  bool _isLoadingProfile = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadExpertProfile());
+  }
+
+  Future<void> _loadExpertProfile() async {
+    final user = ref.read(currentUserProvider);
+    if (user == null) {
+      if (mounted) setState(() => _isLoadingProfile = false);
+      return;
+    }
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      final expert = await repo.getExpertDetail(user.id);
+      if (mounted) {
+        setState(() {
+          _biography = expert.bio ?? '';
+          _consultationFee = expert.consultationFee > 0 ? expert.consultationFee : 300000;
+          _isLoadingProfile = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingProfile = false);
+    }
+  }
+
+  Future<void> _saveBiography(String bio) async {
+    setState(() => _isSavingBio = true);
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      await repo.updateExpertSettings(biography: bio);
+      if (mounted) {
+        setState(() => _biography = bio);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã cập nhật giới thiệu')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSavingBio = false);
+    }
+  }
+
+  void _showEditBioDialog() {
+    final controller = TextEditingController(text: _biography);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Giới thiệu bản thân',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2D2D2D)),
+        ),
+        content: TextField(
+          controller: controller,
+          maxLines: 5,
+          maxLength: 500,
+          decoration: const InputDecoration(
+            hintText: 'Mô tả kinh nghiệm, chuyên môn của bạn...',
+            border: OutlineInputBorder(),
+            alignLabelWithHint: true,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Hủy', style: TextStyle(color: Color(0xFF888888))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6C47C2),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              final text = controller.text.trim();
+              Navigator.of(ctx).pop();
+              _saveBiography(text);
+            },
+            child: const Text('Lưu'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveConsultationFee(double fee) async {
+    setState(() => _isSavingFee = true);
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      await repo.updateExpertSettings(consultationFee: fee);
+      if (mounted) {
+        setState(() => _consultationFee = fee);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã cập nhật phí tư vấn')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSavingFee = false);
+    }
+  }
+
+  void _showEditFeeDialog() {
+    final controller = TextEditingController(
+      text: _consultationFee.toStringAsFixed(0),
+    );
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Phí tư vấn đặt lịch',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2D2D2D)),
+        ),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: const InputDecoration(
+            suffixText: 'VNĐ',
+            hintText: 'Nhập phí tư vấn',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Hủy', style: TextStyle(color: Color(0xFF888888))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6C47C2),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              final value = double.tryParse(controller.text);
+              if (value == null || value <= 0) return;
+              Navigator.of(ctx).pop();
+              _saveConsultationFee(value);
+            },
+            child: const Text('Lưu'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,33 +262,65 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
               ],
             ),
 
-            // SECTION 2: Work Schedule
-            _buildSectionHeader(
-              'Lịch Làm Việc',
-              subtitle: 'Đặt thời gian sẵn sàng nhận tư vấn đặt lịch',
-            ),
+            // SECTION 2: Profile
+            _buildSectionHeader('Hồ Sơ Tư Vấn'),
             _buildCard(
               children: [
-                ..._scheduleEnabled.keys.map((day) {
-                  final isLast = day == 'Chủ Nhật';
-                  return Column(
-                    children: [
-                      _buildScheduleRow(day),
-                      if (!isLast) const Divider(height: 1),
-                    ],
-                  );
-                }),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-              child: Text(
-                'Thời gian theo múi giờ ICT (GMT+7)',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
+                InkWell(
+                  onTap: _showEditBioDialog,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Giới thiệu',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF2D2D2D),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              _isLoadingProfile
+                                  ? const SizedBox(
+                                      height: 14,
+                                      width: 14,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  : _isSavingBio
+                                  ? const Text(
+                                      'Đang lưu...',
+                                      style: TextStyle(fontSize: 13, color: Colors.grey),
+                                    )
+                                  : Text(
+                                      _biography.isEmpty
+                                          ? 'Chưa có giới thiệu — nhấn để thêm'
+                                          : _biography,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: _biography.isEmpty
+                                            ? Colors.grey
+                                            : const Color(0xFF555555),
+                                        height: 1.5,
+                                      ),
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(Icons.edit, color: Colors.grey[400], size: 20),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
 
             // SECTION 3: Consultation Fees
@@ -144,9 +329,14 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
               children: [
                 _buildFeeRow(
                   title: 'Tư vấn đặt lịch (Patient)',
-                  subtitle: 'Bạn nhận: 270,000 VNĐ (90%)',
-                  amount: '300,000 VNĐ',
+                  subtitle: 'Bạn nhận: ${((_consultationFee * 0.9)).toStringAsFixed(0)} VNĐ (90%)',
+                  amount: _isLoadingProfile
+                      ? '...'
+                      : _isSavingFee
+                          ? 'Đang lưu...'
+                          : '${_consultationFee.toStringAsFixed(0)} VNĐ',
                   editable: true,
+                  onEdit: _showEditFeeDialog,
                 ),
                 const Divider(height: 1),
                 _buildFeeRow(
@@ -632,100 +822,61 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
     );
   }
 
-  Widget _buildScheduleRow(String day) {
-    final enabled = _scheduleEnabled[day] ?? false;
-    final time = _scheduleTimes[day] ?? '';
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              day,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF2D2D2D),
-              ),
-            ),
-          ),
-          if (enabled && time.isNotEmpty) ...[
-            Text(
-              time,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF6C47C2),
-              ),
-            ),
-            const SizedBox(width: 12),
-          ],
-          Switch(
-            value: enabled,
-            onChanged: (value) {
-              setState(() {
-                _scheduleEnabled[day] = value;
-              });
-            },
-            activeThumbColor: const Color(0xFF6C47C2),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildFeeRow({
     required String title,
     required String subtitle,
     required String amount,
     bool editable = false,
     bool info = false,
+    VoidCallback? onEdit,
   }) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D2D2D),
+    return InkWell(
+      onTap: editable ? onEdit : null,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2D2D2D),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            amount,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF6C47C2),
+            const SizedBox(width: 12),
+            Text(
+              amount,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF6C47C2),
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Icon(
-            editable ? Icons.edit : Icons.info,
-            color: Colors.grey[400],
-            size: 20,
-          ),
-        ],
+            const SizedBox(width: 8),
+            Icon(
+              editable ? Icons.edit : Icons.info,
+              color: Colors.grey[400],
+              size: 20,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1025,3 +1176,4 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
     );
   }
 }
+

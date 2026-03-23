@@ -45,6 +45,7 @@ import 'package:snakeaid_mobile/features/expert/screens/expert_edit_profile_scre
 import 'package:snakeaid_mobile/features/expert/screens/expert_id_documents_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_specialties_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_feedback_screen.dart';
+import 'package:snakeaid_mobile/features/expert/screens/expert_working_hours_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_home_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_available_jobs_screen.dart';
 
@@ -68,6 +69,20 @@ import 'package:snakeaid_mobile/features/emergency/screens/rescuers/mission_comp
 import 'package:snakeaid_mobile/features/emergency/screens/rescuers/rescuer_mission_success_screen.dart';
 import 'package:snakeaid_mobile/features/video_call/screens/demo_video_call_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/models/route_navigation_data.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/consultation_home_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/expert_list_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/expert_profile_detail_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/service_selection_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/consultation_documents_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/consultation_time_selection_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/payment_confirmation_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/video_consultation_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/consultation_waiting_room_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/consultation_completion_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/emergency_request_waiting_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/experts/expert_waiting_room_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/experts/expert_consultation_detail_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/experts/expert_consultation_completion_screen.dart';
 
 /// App routing configuration using go_router
 final router = GoRouter(
@@ -141,7 +156,11 @@ final router = GoRouter(
     GoRoute(
       path: '/expert-home',
       name: 'expert_home',
-      builder: (context, state) => const ExpertHomeScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final initialTab = (extra?['initialTab'] as int?) ?? 0;
+        return ExpertHomeScreen(initialTab: initialTab);
+      },
     ),
 
     // === EXPERT APP ROUTES ===
@@ -267,6 +286,230 @@ final router = GoRouter(
       path: '/member-home',
       name: 'member_home',
       builder: (context, state) => const MainScaffold(initialIndex: 0),
+    ),
+
+    // === CONSULTATION ROUTES ===
+    // Consultation Home
+    GoRoute(
+      path: '/consultation-home',
+      name: 'consultation_home',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final highlightedId = extra?['newConsultationId'] as String?;
+        return ConsultationHomeScreen(highlightedId: highlightedId);
+      },
+    ),
+
+    // Waiting Room (before & after video call)
+    GoRoute(
+      path: '/video-waiting/:consultationId',
+      name: 'video_waiting',
+      builder: (context, state) {
+        final id = state.pathParameters['consultationId']!;
+        final extra = state.extra as Map<String, dynamic>?;
+        return ConsultationWaitingRoomScreen(
+          consultationId: id,
+          expertName: extra?['expertName'] as String? ?? 'Chuyên Gia',
+          expertSpecialty: extra?['expertSpecialty'] as String? ?? '',
+          showCompleteButton:
+              extra?['showCompleteButton'] as bool? ?? false,
+          durationSeconds: extra?['durationSeconds'] as int? ?? 0,
+          initialMicOn: extra?['initialMicOn'] as bool? ?? true,
+          initialCameraOn: extra?['initialCameraOn'] as bool? ?? true,
+        );
+      },
+    ),
+
+    // Video Consultation
+    GoRoute(
+      path: '/video-consultation/:consultationId',
+      name: 'video_consultation',
+      builder: (context, state) {
+        final id = state.pathParameters['consultationId']!;
+        final extra = state.extra as Map<String, dynamic>?;
+        final expertName = extra?['expertName'] as String? ?? 'Chuyên Gia';
+        final expertSpecialty = extra?['expertSpecialty'] as String? ?? '';
+        final initialMicOn = extra?['initialMicOn'] as bool? ?? true;
+        final initialCameraOn = extra?['initialCameraOn'] as bool? ?? true;
+        final afterCallRoute = extra?['afterCallRoute'] as String?;
+        return VideoConsultationScreen(
+          consultationId: id,
+          expertName: expertName,
+          expertSpecialty: expertSpecialty,
+          initialMicOn: initialMicOn,
+          initialCameraOn: initialCameraOn,
+          afterCallRoute: afterCallRoute,
+          livekitToken: extra?['livekitToken'] as String? ?? '',
+          wsUrl: extra?['wsUrl'] as String? ?? '',
+        );
+      },
+    ),
+
+    // Expert Waiting Room (for experts before/after video call)
+    GoRoute(
+      path: '/expert-video-waiting/:consultationId',
+      name: 'expert_video_waiting',
+      builder: (context, state) {
+        final id = state.pathParameters['consultationId']!;
+        final extra = state.extra as Map<String, dynamic>?;
+        // Accept both initial keys (patientName/consultationType from consultation card)
+        // and return-trip keys (expertName/expertSpecialty from VideoConsultationScreen)
+        final patientName = (extra?['patientName'] ?? extra?['expertName'])
+            as String? ?? 'Bệnh Nhân';
+        final consultationType = (extra?['consultationType'] ?? extra?['expertSpecialty'])
+            as String? ?? 'Tư Vấn';
+        return ExpertWaitingRoomScreen(
+          consultationId: id,
+          patientName: patientName,
+          consultationType: consultationType,
+          showCompleteButton:
+              extra?['showCompleteButton'] as bool? ?? false,
+          durationSeconds: extra?['durationSeconds'] as int? ?? 0,
+          feeCost: extra?['feeCost'] as int? ?? 0,
+          initialMicOn: extra?['initialMicOn'] as bool? ?? true,
+          initialCameraOn: extra?['initialCameraOn'] as bool? ?? true,
+        );
+      },
+    ),
+
+    // Expert Consultation Completion
+    GoRoute(
+      path: '/expert-consultation-complete',
+      name: 'expert_consultation_complete',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>? ?? {};
+        return ExpertConsultationCompletionScreen(data: extra);
+      },
+    ),
+
+    // Expert Working Hours
+    GoRoute(
+      path: '/expert-working-hours',
+      name: 'expert_working_hours',
+      builder: (context, state) => const ExpertWorkingHoursScreen(),
+    ),
+
+    // Expert Consultation Detail
+    GoRoute(
+      path: '/expert-consultation-detail',
+      name: 'expert_consultation_detail',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>? ?? {};
+        return ExpertConsultationDetailScreen(data: extra);
+      },
+    ),
+
+    // Consultation Completion & Rating
+    GoRoute(
+      path: '/consultation-complete',
+      name: 'consultation_complete',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return ConsultationCompletionScreen(
+          expertName: extra?['expertName'] as String? ?? 'Chuyên Gia',
+          expertSpecialty: extra?['expertSpecialty'] as String? ?? '',
+          durationSeconds: extra?['durationSeconds'] as int? ?? 0,
+          consultationId: extra?['consultationId'] as String? ?? '',
+        );
+      },
+    ),
+    
+    // Expert List
+    GoRoute(
+      path: '/expert-list',
+      name: 'expert_list',
+      builder: (context, state) => const ExpertListScreen(),
+    ),
+    
+    // Expert Profile Detail
+    GoRoute(
+      path: '/expert-detail/:expertId',
+      name: 'expert_detail',
+      builder: (context, state) {
+        final expertId = state.pathParameters['expertId']!;
+        return ExpertProfileDetailScreen(expertId: expertId);
+      },
+    ),
+    
+    // Service Selection
+    GoRoute(
+      path: '/service-selection/:expertId',
+      name: 'service_selection',
+      builder: (context, state) {
+        final expertId = state.pathParameters['expertId']!;
+        return ServiceSelectionScreen(expertId: expertId);
+      },
+    ),
+    
+    // Consultation Time Selection (for scheduled consultation)
+    GoRoute(
+      path: '/consultation-time-selection/:expertId',
+      name: 'consultation_time_selection',
+      builder: (context, state) {
+        final expertId = state.pathParameters['expertId']!;
+        return ConsultationTimeSelectionScreen(expertId: expertId);
+      },
+    ),
+    
+    // Consultation Documents Upload
+    GoRoute(
+      path: '/consultation-documents/:expertId',
+      name: 'consultation_documents',
+      builder: (context, state) {
+        final expertId = state.pathParameters['expertId']!;
+        final extraData = state.extra as Map<String, dynamic>?;
+        
+        return ConsultationDocumentsScreen(
+          expertId: expertId,
+          consultationType: extraData?['consultationType'],
+          selectedDate: extraData?['selectedDate'],
+          selectedTime: extraData?['selectedTime'],
+          duration: extraData?['duration'],
+          price: extraData?['price'],
+          timeSlotId: extraData?['timeSlotId'],
+        );
+      },
+    ),
+
+    // Emergency consultation request waiting/tracking
+    GoRoute(
+      path: '/emergency-request-waiting/:requestId',
+      name: 'emergency_request_waiting',
+      builder: (context, state) {
+        final requestId = state.pathParameters['requestId']!;
+        final extraData = state.extra as Map<String, dynamic>?;
+        return EmergencyRequestWaitingScreen(
+          requestId: requestId,
+          expertId: extraData?['expertId'] as String? ?? '',
+          expertName: extraData?['expertName'] as String? ?? 'Chuyên gia',
+        );
+      },
+    ),
+    
+    // Payment Confirmation
+    GoRoute(
+      path: '/payment-confirmation/:expertId',
+      name: 'payment_confirmation',
+      builder: (context, state) {
+        final expertId = state.pathParameters['expertId']!;
+        final extraData = state.extra as Map<String, dynamic>?;
+        
+        return PaymentConfirmationScreen(
+          expertId: expertId,
+          consultationType: extraData?['consultationType'],
+          selectedDate: extraData?['selectedDate'],
+          selectedTime: extraData?['selectedTime'],
+          duration: extraData?['duration'],
+          price: extraData?['price'],
+          hasDocuments: extraData?['hasDocuments'] ?? false,
+          uploadedImagesCount: extraData?['uploadedImagesCount'] ?? 0,
+          problemDescription: extraData?['problemDescription'],
+          questions: extraData?['questions'],
+          bookingId: extraData?['bookingId'] as String?,
+          consultationId: extraData?['consultationId'] as String?,
+          expertName: extraData?['expertName'] as String?,
+        );
+      },
     ),
 
     // === RESCUER APP ROUTES ===
