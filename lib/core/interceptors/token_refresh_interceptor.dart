@@ -47,9 +47,18 @@ class TokenRefreshInterceptor extends Interceptor {
     if (_isPublicEndpoint(options.path)) return handler.next(options);
 
     final token = await _getAccessToken();
-    if (token != null) {
-      options.headers['Authorization'] = 'Bearer $token';
+    if (token == null) {
+      debugPrint('🚨 No access token — forcing logout (${options.path})');
+      await onForceLogout();
+      return handler.reject(
+        DioException(
+          requestOptions: options,
+          type: DioExceptionType.cancel,
+          message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+        ),
+      );
     }
+    options.headers['Authorization'] = 'Bearer $token';
     return handler.next(options);
   }
 

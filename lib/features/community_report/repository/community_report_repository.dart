@@ -14,8 +14,16 @@ class CommunityReportRepository {
     if (data is List) {
       return data.whereType<Map<String, dynamic>>().map(CommunityReport.fromJson).toList();
     }
-    if (data is Map<String, dynamic> && data['data'] is List) {
-      return (data['data'] as List).whereType<Map<String, dynamic>>().map(CommunityReport.fromJson).toList();
+    if (data is Map<String, dynamic>) {
+      // Try common paginated-response wrapper keys
+      for (final key in ['data', 'items', 'reports', 'result', 'results']) {
+        if (data[key] is List) {
+          return (data[key] as List)
+              .whereType<Map<String, dynamic>>()
+              .map(CommunityReport.fromJson)
+              .toList();
+        }
+      }
     }
     return [];
   }
@@ -42,9 +50,18 @@ class CommunityReportRepository {
 
   // ── Community Reports ──────────────────────────────────────────────────────
 
-  Future<List<CommunityReport>> getReports() async {
+  Future<List<CommunityReport>> getReports({
+    int pageSize = 1000,
+    int page = 1,
+  }) async {
     try {
-      final res = await _http.get('/api/community-reports');
+      final res = await _http.get(
+        '/api/community-reports',
+        queryParameters: {
+          'pageSize': pageSize,
+          'page': page,
+        },
+      );
       return _parseReportList(res.data);
     } catch (e) {
       throw Exception('Không thể tải danh sách cảnh báo: $e');

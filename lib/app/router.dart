@@ -434,6 +434,7 @@ final router = GoRouter(
         final extra = state.extra as Map<String, dynamic>?;
         return MissionCompletionScreen(
           missionId: extra?['missionId'] as String? ?? '',
+          incidentId: extra?['incidentId'] as String? ?? '',
         );
       },
     ),

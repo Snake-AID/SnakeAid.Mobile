@@ -485,7 +485,13 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
     if (_isMinimized) {
       return _buildMinimizedBubble();
     }
-    return _buildFullModal();
+    return DefaultTextStyle.merge(
+      style: const TextStyle(
+        decoration: TextDecoration.none,
+        fontFamily: 'Roboto',
+      ),
+      child: _buildFullModal(),
+    );
   }
 
   Widget _buildMinimizedBubble() {
@@ -588,157 +594,264 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
 
   Widget _buildFullModal() {
     return Container(
-      color: Colors.black54,
+      color: const Color(0xFFF5F6FA),
       child: SafeArea(
-        child: Container(
-          margin: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
+        child: Column(
+          children: [
+            _buildModalHeader(),
+            Expanded(
+              child: _isLoadingIncident
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFFD32F2F),
+                      ),
+                    )
+                  : _errorMessage != null
+                  ? _buildErrorDisplay()
+                  : _buildIncidentDetails(),
+            ),
+            _buildAcceptFooter(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModalHeader() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFC62828), Color(0xFFE53935)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+      child: Column(
+        children: [
+          // ─── Title row ──────────────────────────────────────────
+          Row(
             children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFD32F2F),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
+              ScaleTransition(
+                scale: _pulseAnimation,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.emergency,
+                    color: Colors.white,
+                    size: 22,
                   ),
                 ),
-                child: Row(
-                  children: [
-                    ScaleTransition(
-                      scale: _pulseAnimation,
-                      child: const Icon(
-                        Icons.emergency,
-                        color: Colors.white,
-                        size: 32,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'YÊU CẦU CỨU HỘ KHẨN CẤP',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.minimize, color: Colors.white),
-                      onPressed: _toggleMinimize,
-                      tooltip: 'Thu nhỏ',
-                    ),
-                  ],
-                ),
               ),
-
-              // Countdown
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                color: const Color(0xFFFFF3E0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.timer, color: Color(0xFFFF6B35)),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Còn $_remainingSeconds giây',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFFFF6B35),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Content
-              Expanded(
-                child: _isLoadingIncident
-                    ? const Center(child: CircularProgressIndicator())
-                    : _errorMessage != null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.error_outline,
-                                size: 64,
-                                color: Colors.red,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _errorMessage!,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 16),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    : _buildIncidentDetails(),
-              ),
-
-              // Action Buttons
-              Padding(
-                padding: const EdgeInsets.all(16),
+              const SizedBox(width: 12),
+              const Expanded(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        onPressed: _isAccepting || _incident == null
-                            ? null
-                            : _onAccept,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF4CAF50),
-                          disabledBackgroundColor: const Color(
-                            0xFF4CAF50,
-                          ).withOpacity(0.5),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: _isAccepting
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.check_circle, size: 24),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'NHẬN NHIỆM VỤ',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                    Text(
+                      'YÊU CẦU CỨU HỘ',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
                       ),
                     ),
+                    Text(
+                      'Khẩn cấp · Cần phản hồi ngay',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
                   ],
+                ),
+              ),
+              GestureDetector(
+                onTap: _toggleMinimize,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.white30),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.minimize, color: Colors.white70, size: 14),
+                      SizedBox(width: 4),
+                      Text(
+                        'X',
+                        style: TextStyle(color: Colors.white70, fontSize: 11),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 18),
+          // ─── Countdown ──────────────────────────────────────────
+          AnimatedBuilder(
+            animation: _pulseController,
+            builder: (context, _) {
+              final urgency = _remainingSeconds < 15;
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 70,
+                    height: 70,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CircularProgressIndicator(
+                          value: (_remainingSeconds / 60).clamp(0.0, 1.0),
+                          strokeWidth: 5,
+                          backgroundColor: Colors.white.withOpacity(0.25),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            urgency ? Colors.yellow : Colors.white,
+                          ),
+                        ),
+                        Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '$_remainingSeconds',
+                                style: TextStyle(
+                                  color:
+                                      urgency ? Colors.yellow : Colors.white,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const Text(
+                                'giây',
+                                style: TextStyle(
+                                  color: Colors.white60,
+                                  fontSize: 9,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 20),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        urgency ? '⚠️ Sắp hết thời gian!' : 'Thời gian phản hồi',
+                        style: TextStyle(
+                          color: urgency ? Colors.yellow : Colors.white,
+                          fontSize: 14,
+                          fontWeight:
+                              urgency ? FontWeight.bold : FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        urgency ? 'Quyết định ngay!' : 'Hãy quyết định nhanh',
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAcceptFooter() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+      child: SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: ElevatedButton(
+          onPressed: _isAccepting || _incident == null ? null : _onAccept,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF2E7D32),
+            disabledBackgroundColor:
+                const Color(0xFF2E7D32).withOpacity(0.4),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            elevation: 0,
+          ),
+          child: _isAccepting
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2.5,
+                  ),
+                )
+              : const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.check_circle_outline,
+                      size: 22,
+                      color: Colors.white,
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      'NHẬN NHIỆM VỤ',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorDisplay() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              size: 58,
+              color: Color(0xFFD32F2F),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 15),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: _fetchIncidentDetails,
+              child: const Text('Thử lại'),
+            ),
+          ],
         ),
       ),
     );
@@ -752,153 +865,246 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
     final latLng = LatLng(lat, lon);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Mission price (always show)
+          // ─── Quick stat chips ────────────────────────────────────
+          _buildQuickStatsRow(),
+          const SizedBox(height: 14),
+
+          // ─── Price ───────────────────────────────────────────────
           _buildMissionPriceCard(),
+          const SizedBox(height: 12),
 
-          if (_distanceKm != null) ...[
-            const SizedBox(height: 12),
-            _buildDistanceCard(),
-          ],
-          const SizedBox(height: 16),
-
-          // Victim info
+          // ─── Victim ──────────────────────────────────────────────
           _buildVictimInfoCard(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          // Emergency contacts (always show)
+          // ─── Emergency contacts ──────────────────────────────────
           _buildEmergencyContactsCard(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          // Map section
-          Container(
-            height: 200,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: latLng,
-                initialZoom: 15.0,
-                minZoom: 10.0,
-                maxZoom: 18.0,
-                interactionOptions: const InteractionOptions(
-                  flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-                ),
-              ),
-              children: [
-                // Maptile
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.snakeaid.mobile',
-                  maxZoom: 19,
-                  tileBuilder: (context, tileWidget, tile) {
-                    // Add subtle attribution watermark
-                    return DecoratedBox(
-                      decoration: const BoxDecoration(),
-                      child: tileWidget,
-                    );
-                  },
-                ),
-
-                // Emergency location marker
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: latLng,
-                      width: 40,
-                      height: 40,
-                      alignment: Alignment.topCenter,
-                      child: const Icon(
-                        Icons.location_pin,
-                        size: 40,
-                        color: Color(0xFFD32F2F),
-                        shadows: [
-                          Shadow(
-                            blurRadius: 4,
-                            color: Colors.black38,
-                            offset: Offset(0, 2),
+          // ─── Map ─────────────────────────────────────────────────
+          _buildSectionCard(
+            icon: Icons.map_outlined,
+            iconColor: const Color(0xFF2196F3),
+            title: 'Bản đồ vị trí',
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                height: 180,
+                child: FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: latLng,
+                    initialZoom: 15.0,
+                    minZoom: 10.0,
+                    maxZoom: 18.0,
+                    interactionOptions: const InteractionOptions(
+                      flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                    ),
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.snakeaid.mobile',
+                      maxZoom: 19,
+                    ),
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: latLng,
+                          width: 40,
+                          height: 40,
+                          alignment: Alignment.topCenter,
+                          child: const Icon(
+                            Icons.location_pin,
+                            size: 40,
+                            color: Color(0xFFD32F2F),
+                            shadows: [
+                              Shadow(
+                                blurRadius: 4,
+                                color: Colors.black38,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
+                      ],
+                    ),
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 2,
+                        ),
+                        color: Colors.white70,
+                        child: const Text(
+                          '© OpenStreetMap',
+                          style: TextStyle(
+                            fontSize: 8,
+                            color: Colors.black54,
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
 
-                Align(
-                  alignment: Alignment.bottomRight,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.7),
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(4),
-                      ),
-                    ),
-                    child: const Text(
-                      '© OpenStreetMap',
-                      style: TextStyle(fontSize: 8, color: Colors.black54),
-                    ),
+          // ─── Address ─────────────────────────────────────────────
+          _buildSectionCard(
+            icon: Icons.place_outlined,
+            iconColor: const Color(0xFF4CAF50),
+            title: 'Địa điểm',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _isLoadingAddress
+                      ? 'Đang tải địa chỉ...'
+                      : (_locationAddress ?? 'Không xác định'),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1F2937),
                   ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Tọa độ: ${lat.toStringAsFixed(6)}, ${lon.toStringAsFixed(6)}',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-
-          // Address card
-          _buildInfoCard(
-            icon: Icons.place,
-            title: 'Địa điểm',
-            value: _isLoadingAddress
-                ? 'Đang tải địa chỉ...'
-                : (_locationAddress ?? 'Không xác định'),
-            subtitle:
-                'Tọa độ: ${lat.toStringAsFixed(6)}, ${lon.toStringAsFixed(6)}',
-            color: const Color(0xFF4CAF50),
-          ),
           const SizedBox(height: 12),
 
-          _buildInfoCard(
-            icon: Icons.radio_button_checked,
-            title: 'Bán kính tìm kiếm',
-            value: widget.request.formattedRadius,
-            color: const Color(0xFF2196F3),
-          ),
-          const SizedBox(height: 12),
-
-          _buildInfoCard(
-            icon: Icons.medical_services,
-            title: 'Mức độ nghiêm trọng',
-            value: _getSeverityText(_incident!.severityLevel),
-            color: _getSeverityColor(_incident!.severityLevel),
-          ),
-          const SizedBox(height: 12),
-
-          // Symptoms (always show, even if empty)
-          const Text(
-            'Triệu chứng:',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
+          // ─── Symptoms ────────────────────────────────────────────
           _buildSymptomsCard(),
           const SizedBox(height: 12),
 
-          // Snake detection results (always show)
+          // ─── Snake image & detection ─────────────────────────────
           _buildSnakeDetectionCard(),
           const SizedBox(height: 12),
 
-          // Incident occurred time (always show)
+          // ─── Incident time ───────────────────────────────────────
           _buildIncidentTimeCard(),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickStatsRow() {
+    final severityText = _getSeverityText(_incident!.severityLevel);
+    final severityColor = _getSeverityColor(_incident!.severityLevel);
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _buildStatChip(
+          icon: Icons.medical_services_outlined,
+          label: severityText,
+          color: severityColor,
+        ),
+        _buildStatChip(
+          icon: Icons.radio_button_checked,
+          label: widget.request.formattedRadius,
+          color: const Color(0xFF2196F3),
+        ),
+        if (_distanceKm != null)
+          _buildStatChip(
+            icon: Icons.navigation_outlined,
+            label: DistanceUtils.formatDistance(_distanceKm!),
+            color: const Color(0xFF9C27B0),
+          ),
+        if (_etaMinutes != null)
+          _buildStatChip(
+            icon: Icons.access_time_outlined,
+            label: 'ETA: ${DistanceUtils.formatETA(_etaMinutes!)}',
+            color: const Color(0xFFFF9800),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildStatChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionCard({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required Widget child,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 15, color: iconColor),
+              const SizedBox(width: 7),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF6B7280),
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          child,
         ],
       ),
     );
@@ -913,68 +1119,54 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
       decoration: BoxDecoration(
         gradient: hasPrice
             ? const LinearGradient(
-                colors: [Color(0xFF4CAF50), Color(0xFF2E7D32)],
+                colors: [Color(0xFF2E7D32), Color(0xFF388E3C)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               )
             : LinearGradient(
-                colors: [Colors.grey[300]!, Colors.grey[400]!],
+                colors: [Colors.grey[400]!, Colors.grey[500]!],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: hasPrice
-            ? [
-                BoxShadow(
-                  color: const Color(0xFF4CAF50).withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : null,
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               hasPrice ? Icons.attach_money : Icons.info_outline,
               color: Colors.white,
-              size: 28,
+              size: 26,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
                   'Phí dịch vụ',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   hasPrice ? mission.formattedPrice : 'Chưa xác định',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 24,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
                   ),
                 ),
                 if (!hasPrice)
                   const Text(
                     'Sẽ được tính sau khi hoàn thành',
                     style: TextStyle(
-                      color: Colors.white70,
+                      color: Colors.white60,
                       fontSize: 11,
                       fontStyle: FontStyle.italic,
                     ),
@@ -987,54 +1179,31 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
     );
   }
 
-  Widget _buildDistanceCard() {
-    if (_distanceKm == null || _etaMinutes == null) return const SizedBox();
-
-    final colorStr = DistanceUtils.getDistanceColorHex(_distanceKm!);
-    final color = Color(int.parse('0xFF$colorStr'));
-
-    return _buildInfoCard(
-      icon: Icons.navigation,
-      title: 'Khoảng cách & ETA',
-      value: DistanceUtils.formatDistance(_distanceKm!),
-      subtitle: 'Thời gian dự kiến: ${DistanceUtils.formatETA(_etaMinutes!)}',
-      color: color,
-    );
-  }
-
   Widget _buildVictimInfoCard() {
     final user = _incident!.user;
     final account = user.account;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
+    return _buildSectionCard(
+      icon: Icons.person_outline,
+      iconColor: const Color(0xFF1565C0),
+      title: 'Thông tin nạn nhân',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '👤 Thông tin nạn nhân',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
           Row(
             children: [
-              // Avatar
               CircleAvatar(
-                radius: 28,
+                radius: 24,
                 backgroundColor: const Color(0xFF4CAF50),
                 backgroundImage: account?.avatarUrl != null
                     ? NetworkImage(account!.avatarUrl!)
                     : null,
                 child: account?.avatarUrl == null
                     ? Text(
-                        account?.fullName?.substring(0, 1).toUpperCase() ?? 'U',
+                        account?.fullName?.substring(0, 1).toUpperCase() ??
+                            'U',
                         style: const TextStyle(
-                          fontSize: 20,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
@@ -1049,20 +1218,25 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
                     Text(
                       account?.fullName ?? 'Không rõ',
                       style: const TextStyle(
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.w600,
+                        color: Color(0xFF1F2937),
                       ),
                     ),
                     const SizedBox(height: 4),
                     if (user.ratingCount > 0)
                       Row(
                         children: [
-                          const Icon(Icons.star, size: 14, color: Colors.amber),
+                          const Icon(
+                            Icons.star,
+                            size: 13,
+                            color: Colors.amber,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             '${user.rating.toStringAsFixed(1)} (${user.ratingCount} đánh giá)',
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 12,
                               color: Colors.grey[600],
                             ),
                           ),
@@ -1071,36 +1245,37 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
                     else
                       Text(
                         'Người dùng mới',
-                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[500],
+                        ),
                       ),
                   ],
                 ),
               ),
             ],
           ),
-          // Underlying disease warning
           if (user.hasUnderlyingDisease) ...[
             const SizedBox(height: 12),
             Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.withOpacity(0.5)),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 8,
               ),
-              child: Row(
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.withOpacity(0.4)),
+              ),
+              child: const Row(
                 children: [
-                  const Icon(
-                    Icons.warning_amber,
-                    color: Colors.orange,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  const Expanded(
+                  Icon(Icons.warning_amber, color: Colors.orange, size: 16),
+                  SizedBox(width: 8),
+                  Expanded(
                     child: Text(
-                      '⚠️ Nạn nhân có bệnh nền - cần thận trọng',
+                      'Nạn nhân có bệnh nền - cần thận trọng',
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: Colors.orange,
                       ),
@@ -1116,98 +1291,90 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
   }
 
   Widget _buildEmergencyContactsCard() {
-    // Filter out null, empty, or whitespace-only contacts
     final contacts = _incident!.user.emergencyContacts
         .where((c) => c.trim().isNotEmpty)
         .toList();
-
     final hasContacts = contacts.isNotEmpty;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: hasContacts ? const Color(0xFFFFF3E0) : Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: hasContacts
-              ? const Color(0xFFFF9800).withOpacity(0.3)
-              : Colors.grey[300]!,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.phone_in_talk,
-                color: hasContacts ? const Color(0xFFFF6B35) : Colors.grey[600],
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Liên hệ khẩn cấp',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: hasContacts
-                      ? const Color(0xFFE65100)
-                      : Colors.grey[700],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          if (hasContacts)
-            ...contacts.asMap().entries.map((entry) {
-              final index = entry.key;
-              final phone = entry.value;
-              return Column(
-                children: [
-                  if (index > 0) const Divider(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          phone,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
+    return _buildSectionCard(
+      icon: Icons.phone_outlined,
+      iconColor: const Color(0xFFFF6B35),
+      title: 'Liên hệ khẩn cấp',
+      child: hasContacts
+          ? Column(
+              children: contacts.asMap().entries.map((entry) {
+                final index = entry.key;
+                final phone = entry.value;
+                return Column(
+                  children: [
+                    if (index > 0)
+                      Divider(height: 16, color: Colors.grey[200]),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            phone,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF1F2937),
+                            ),
                           ),
                         ),
-                      ),
-                      IconButton(
-                        onPressed: () => _makePhoneCall(phone),
-                        icon: const Icon(Icons.phone, color: Color(0xFF4CAF50)),
-                        tooltip: 'Gọi',
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                    ],
-                  ),
-                ],
-              );
-            }).toList()
-          else
-            Row(
+                        GestureDetector(
+                          onTap: () => _makePhoneCall(phone),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4CAF50).withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.phone,
+                                  size: 14,
+                                  color: Color(0xFF2E7D32),
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Gọi',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF2E7D32),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              }).toList(),
+            )
+          : Row(
               children: [
-                Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+                Icon(Icons.info_outline, size: 15, color: Colors.grey[500]),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Người dùng chưa cung cấp số liên hệ khẩn cấp',
                     style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
+                      fontSize: 13,
+                      color: Colors.grey[500],
                       fontStyle: FontStyle.italic,
                     ),
                   ),
                 ),
               ],
             ),
-        ],
-      ),
     );
   }
 
@@ -1216,29 +1383,34 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
         _incident!.symptomsReport != null &&
         _incident!.symptomsReport!.isNotEmpty;
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: hasSymptoms ? const Color(0xFFFFF3E0) : Colors.grey[100],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: hasSymptoms
-              ? const Color(0xFFFF9800).withOpacity(0.3)
-              : Colors.grey[300]!,
-        ),
-      ),
+    return _buildSectionCard(
+      icon: Icons.medical_information_outlined,
+      iconColor: const Color(0xFFE65100),
+      title: 'Triệu chứng',
       child: hasSymptoms
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          ? Wrap(
+              spacing: 8,
+              runSpacing: 6,
               children: _incident!.symptomsReport!
                   .map(
-                    (symptom) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
+                    (symptom) => Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF3E0),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(0xFFFF9800).withOpacity(0.4),
+                        ),
+                      ),
                       child: Text(
-                        '• ${symptom.symptomName}',
+                        symptom.symptomName,
                         style: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 12,
                           color: Color(0xFFE65100),
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
@@ -1247,16 +1419,14 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
             )
           : Row(
               children: [
-                Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+                Icon(Icons.info_outline, size: 14, color: Colors.grey[500]),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Người dùng chưa cung cấp thông tin',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                      fontStyle: FontStyle.italic,
-                    ),
+                Text(
+                  'Người dùng chưa cung cấp thông tin',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey[500],
+                    fontStyle: FontStyle.italic,
                   ),
                 ),
               ],
@@ -1266,86 +1436,62 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
 
   Widget _buildSnakeDetectionCard() {
     final media = _incident!.media;
-    final hasMedia = media.isNotEmpty && media.first.mediaUrl.trim().isNotEmpty;
-
+    final hasMedia =
+        media.isNotEmpty && media.first.mediaUrl.trim().isNotEmpty;
     final firstMedia = hasMedia ? media.first : null;
     final hasAI = firstMedia?.detectedSpecies.isNotEmpty ?? false;
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
+    return _buildSectionCard(
+      icon: Icons.image_search_outlined,
+      iconColor: const Color(0xFF4CAF50),
+      title: 'Hình ảnh & nhận diện',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            children: [
-              Icon(Icons.image, color: Color(0xFF4CAF50), size: 18),
-              SizedBox(width: 8),
-              Text(
-                '🐍 Hình ảnh & nhận diện',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // Show image or placeholder
           hasMedia
               ? ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                   child: Stack(
                     children: [
                       Image.network(
                         firstMedia!.mediaUrl,
-                        height: 150,
+                        height: 160,
                         width: double.infinity,
                         fit: BoxFit.cover,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
                           return Container(
-                            height: 150,
-                            color: Colors.grey[200],
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                value:
-                                    loadingProgress.expectedTotalBytes != null
-                                    ? loadingProgress.cumulativeBytesLoaded /
-                                          loadingProgress.expectedTotalBytes!
-                                    : null,
-                              ),
-                            ),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            height: 150,
-                            color: Colors.grey[200],
+                            height: 160,
+                            color: Colors.grey[100],
                             child: const Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.broken_image,
-                                    size: 48,
-                                    color: Colors.grey,
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    'Không thể tải ảnh',
-                                    style: TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              child: CircularProgressIndicator(),
                             ),
                           );
                         },
+                        errorBuilder: (context, error, _) => Container(
+                          height: 160,
+                          color: Colors.grey[100],
+                          child: const Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.broken_image,
+                                  size: 40,
+                                  color: Colors.grey,
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  'Không thể tải ảnh',
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                       if (hasAI)
                         Positioned(
@@ -1353,8 +1499,8 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
                           left: 0,
                           right: 0,
                           child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
+                            padding: const EdgeInsets.all(10),
+                            decoration: const BoxDecoration(
                               gradient: LinearGradient(
                                 begin: Alignment.bottomCenter,
                                 end: Alignment.topCenter,
@@ -1387,27 +1533,27 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
                   ),
                 )
               : Container(
-                  height: 150,
+                  height: 140,
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[300]!),
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey[200]!),
                   ),
                   child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          Icons.image_not_supported,
-                          size: 48,
+                          Icons.image_not_supported_outlined,
+                          size: 40,
                           color: Colors.grey[400],
                         ),
                         const SizedBox(height: 8),
                         Text(
                           'Người dùng chưa cung cấp hình ảnh',
                           style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[600],
+                            fontSize: 12,
+                            color: Colors.grey[500],
                             fontStyle: FontStyle.italic,
                           ),
                         ),
@@ -1416,21 +1562,20 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
                           'AI chưa thể nhận diện loài rắn',
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.grey[500],
+                            color: Colors.grey[400],
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
-          if (hasMedia && media.length > 1)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                '+${media.length - 1} ảnh khác',
-                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-              ),
+          if (hasMedia && media.length > 1) ...[
+            const SizedBox(height: 6),
+            Text(
+              '+${media.length - 1} ảnh khác',
+              style: TextStyle(fontSize: 11, color: Colors.grey[500]),
             ),
+          ],
         ],
       ),
     );
@@ -1439,94 +1584,58 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
   Widget _buildIncidentTimeCard() {
     final occurredAt = _incident!.incidentOccurredAt;
 
-    if (occurredAt != null) {
-      final elapsed = DateTime.now().difference(occurredAt);
-      final minutes = elapsed.inMinutes;
-
-      String timeText;
-      Color timeColor;
-
-      if (minutes < 60) {
-        timeText = '$minutes phút trước';
-        timeColor = minutes > 30
-            ? const Color(0xFFD32F2F)
-            : const Color(0xFFFF9800);
-      } else {
-        final hours = minutes ~/ 60;
-        final remainingMinutes = minutes % 60;
-        timeText = '$hours giờ ${remainingMinutes} phút trước';
-        timeColor = const Color(0xFFD32F2F);
-      }
-
-      return _buildInfoCard(
-        icon: Icons.access_time,
-        title: 'Thời gian xảy ra',
-        value: timeText,
-        subtitle: occurredAt.toString().substring(0, 16),
-        color: timeColor,
-      );
-    } else {
-      // Show placeholder when time not available
-      return _buildInfoCard(
+    if (occurredAt == null) {
+      return _buildSectionCard(
         icon: Icons.access_time_outlined,
+        iconColor: Colors.grey,
         title: 'Thời gian xảy ra',
-        value: 'Không xác định',
-        subtitle: 'Vừa mới được báo cáo',
-        color: Colors.grey,
+        child: Text(
+          'Không xác định',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[600],
+          ),
+        ),
       );
     }
-  }
 
-  Widget _buildInfoCard({
-    required IconData icon,
-    required String title,
-    required String value,
-    String? subtitle,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Row(
+    final elapsed = DateTime.now().difference(occurredAt);
+    final minutes = elapsed.inMinutes;
+    final String timeText;
+    final Color timeColor;
+
+    if (minutes < 60) {
+      timeText = '$minutes phút trước';
+      timeColor = minutes > 30
+          ? const Color(0xFFD32F2F)
+          : const Color(0xFFFF9800);
+    } else {
+      final hours = minutes ~/ 60;
+      final remaining = minutes % 60;
+      timeText = '$hours giờ $remaining phút trước';
+      timeColor = const Color(0xFFD32F2F);
+    }
+
+    return _buildSectionCard(
+      icon: Icons.access_time_outlined,
+      iconColor: timeColor,
+      title: 'Thời gian xảy ra',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
+          Text(
+            timeText,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: timeColor,
             ),
-            child: Icon(icon, color: color, size: 24),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-                  ),
-                ],
-              ],
-            ),
+          const SizedBox(height: 3),
+          Text(
+            occurredAt.toString().substring(0, 16),
+            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
           ),
         ],
       ),

@@ -4,10 +4,15 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/hospital_provider.dart';
 import '../../repository/rescue_mission_repository.dart';
 import '../../models/hospital_response.dart';
 import '../../../../core/providers/openroute_provider.dart';
+import '../../providers/mission_hub_provider.dart';
+import '../../providers/active_mission_provider.dart';
+import '../../providers/rescuer_emergency_provider.dart';
+import '../../../rescuer/providers/tracking_provider.dart';
 
 class FindHospitalScreen extends ConsumerStatefulWidget {
   final String missionId;
@@ -294,6 +299,55 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
     }
   }
 
+  Future<void> _performCompletion() async {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF28A745)),
+      ),
+    );
+
+    try {
+      final repository = ref.read(rescueMissionRepositoryProvider);
+      await repository.completeMission(
+        missionId: widget.missionId,
+        evidenceMediaIds: [],
+      );
+
+      if (!mounted) return;
+      ref.read(locationManagerProvider).stopMissionTracking();
+      await ref.read(missionHubConnectionProvider.notifier).disconnect();
+      await ref.read(activeMissionProvider.notifier).clearActiveMission();
+
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final rescuerId = prefs.getString('user_id');
+        if (rescuerId != null) {
+          await ref.read(locationManagerProvider).startTracking(rescuerId);
+          await ref.read(rescueModeProvider.notifier).startRescueMode(rescuerId);
+        }
+      } catch (_) {}
+
+      if (!mounted) return;
+      Navigator.pop(context);
+      context.go(
+        '/member-incident-finished-detail',
+        extra: {'incidentId': widget.incidentId},
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   Widget _buildPricingRow(
     String label,
     double amount, {
@@ -415,15 +469,7 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.pop(dialogContext);
-                        context.push(
-                          '/rescuer/mission-completion',
-                          extra: {
-                            'missionId': widget.missionId,
-                            'needHospital': true,
-                            'hospitalName': pricing.hospitalName,
-                            'hospitalId': pricing.hospitalId,
-                          },
-                        );
+                        _performCompletion();
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF28A745),

@@ -13,8 +13,13 @@ import '../../../rescuer/providers/tracking_provider.dart';
 
 class MissionCompletionScreen extends ConsumerStatefulWidget {
   final String missionId;
+  final String incidentId;
 
-  const MissionCompletionScreen({super.key, required this.missionId});
+  const MissionCompletionScreen({
+    super.key,
+    required this.missionId,
+    required this.incidentId,
+  });
 
   @override
   ConsumerState<MissionCompletionScreen> createState() =>
@@ -196,8 +201,11 @@ class _MissionCompletionScreenState
         }
         debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-        // Success! Navigate to success screen
-        context.go('/rescuer/mission-success');
+        // Success! Navigate to incident finished detail
+        context.go(
+          '/member-incident-finished-detail',
+          extra: {'incidentId': widget.incidentId},
+        );
       } else {
         // Show error
         final error = ref.read(missionDetailProvider).error;

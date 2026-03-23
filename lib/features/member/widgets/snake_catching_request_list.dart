@@ -139,6 +139,7 @@ class _SnakeCatchingRequestListState
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
+      color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () => context.push('/activity-detail/${request.id}'),

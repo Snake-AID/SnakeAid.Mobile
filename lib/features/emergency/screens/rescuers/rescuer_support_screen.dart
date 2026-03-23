@@ -2,8 +2,14 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/first_aid_recommendation_response.dart';
 import '../../repository/snake_ai_repository.dart';
+import '../../repository/rescue_mission_repository.dart';
+import '../../providers/mission_hub_provider.dart';
+import '../../providers/active_mission_provider.dart';
+import '../../providers/rescuer_emergency_provider.dart';
+import '../../../rescuer/providers/tracking_provider.dart';
 
 class RescuerSupportScreen extends ConsumerStatefulWidget {
   final String missionId;
@@ -389,6 +395,55 @@ class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
     );
   }
 
+  Future<void> _performCompletion() async {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF28A745)),
+      ),
+    );
+
+    try {
+      final repository = ref.read(rescueMissionRepositoryProvider);
+      await repository.completeMission(
+        missionId: widget.missionId,
+        evidenceMediaIds: [],
+      );
+
+      if (!mounted) return;
+      ref.read(locationManagerProvider).stopMissionTracking();
+      await ref.read(missionHubConnectionProvider.notifier).disconnect();
+      await ref.read(activeMissionProvider.notifier).clearActiveMission();
+
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final rescuerId = prefs.getString('user_id');
+        if (rescuerId != null) {
+          await ref.read(locationManagerProvider).startTracking(rescuerId);
+          await ref.read(rescueModeProvider.notifier).startRescueMode(rescuerId);
+        }
+      } catch (_) {}
+
+      if (!mounted) return;
+      Navigator.pop(context);
+      context.go(
+        '/member-incident-finished-detail',
+        extra: {'incidentId': widget.incidentId},
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   void _showCompletionConfirmation({required bool needHospital}) {
     showDialog(
       context: context,
@@ -414,13 +469,7 @@ class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(dialogContext);
-              context.push(
-                '/rescuer/mission-completion',
-                extra: {
-                  'missionId': widget.missionId,
-                  'needHospital': needHospital,
-                },
-              );
+              _performCompletion();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF28A745),
