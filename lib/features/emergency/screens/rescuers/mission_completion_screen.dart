@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
 import '../../repository/media_repository.dart';
 import '../../providers/mission_detail_provider.dart';
@@ -62,6 +63,38 @@ class _MissionCompletionScreenState
           backgroundColor: Colors.red,
         ),
       );
+      return;
+    }
+
+    // Request camera permission
+    final status = await Permission.camera.request();
+    
+    if (status.isDenied) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cần quyền truy cập camera để chụp ảnh'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+    
+    if (status.isPermanentlyDenied) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Vui lòng bật quyền camera trong Cài đặt'),
+            backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Cài đặt',
+              textColor: Colors.white,
+              onPressed: () => openAppSettings(),
+            ),
+          ),
+        );
+      }
       return;
     }
 
@@ -201,11 +234,9 @@ class _MissionCompletionScreenState
         }
         debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-        // Success! Navigate to incident finished detail
-        context.go(
-          '/member-incident-finished-detail',
-          extra: {'incidentId': widget.incidentId},
-        );
+        // Success! Navigate to rescuer mission success screen
+        if (!mounted) return;
+        context.go('/rescuer/mission-success');
       } else {
         // Show error
         final error = ref.read(missionDetailProvider).error;
@@ -398,6 +429,9 @@ class _MissionCompletionScreenState
 
   @override
   Widget build(BuildContext context) {
+    final missionState = ref.watch(missionDetailProvider);
+    final mission = missionState.mission;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7F5),
       body: Column(
@@ -533,21 +567,21 @@ class _MissionCompletionScreenState
                             children: [
                               _buildCleanInfoRow(
                                 label: 'Thời gian',
-                                value: '25 phút',
+                                value: mission?.formattedElapsedTime ?? '-',
                                 valueColor: const Color(0xFFFF8800),
                                 icon: Icons.access_time_rounded,
                               ),
                               const SizedBox(height: 14),
                               _buildCleanInfoRow(
                                 label: 'Bệnh nhân',
-                                value: 'Nguyễn Văn A',
+                                value: mission?.user.account?.fullName ?? '-',
                                 valueColor: const Color(0xFF1C100D),
                                 icon: Icons.person_outline_rounded,
                               ),
                               const SizedBox(height: 14),
                               _buildCleanInfoRow(
                                 label: 'Địa điểm',
-                                value: '123 Nguyễn Huệ, Q.1',
+                                value: mission?.incident.address ?? '-',
                                 valueColor: const Color(0xFF1C100D),
                                 icon: Icons.location_on_outlined,
                               ),
@@ -579,36 +613,39 @@ class _MissionCompletionScreenState
                                   Column(
                                     crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
-                                      const Text(
-                                        'Rắn hổ mang chúa',
-                                        style: TextStyle(
+                                      Text(
+                                        mission?.incident.identifiedSnakeSpecies?.commonName ?? '-',
+                                        style: const TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
                                           color: Color(0xFF1C100D),
                                         ),
                                       ),
                                       const SizedBox(height: 4),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFDC3545),
-                                          borderRadius: BorderRadius.circular(
-                                            6,
+                                      if (mission?.incident.identifiedSnakeSpecies?.riskLevel != null)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: _getRiskLevelColor(
+                                              mission!.incident.identifiedSnakeSpecies!.riskLevel,
+                                            ),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            _getRiskLevelText(
+                                              mission.incident.identifiedSnakeSpecies!.riskLevel,
+                                            ),
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                              letterSpacing: 0.5,
+                                            ),
                                           ),
                                         ),
-                                        child: const Text(
-                                          'CỰC ĐỘC',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                            letterSpacing: 0.5,
-                                          ),
-                                        ),
-                                      ),
                                     ],
                                   ),
                                 ],
@@ -951,9 +988,9 @@ class _MissionCompletionScreenState
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
-                                  const Text(
-                                    '300,000 VNĐ',
-                                    style: TextStyle(
+                                  Text(
+                                    mission?.formattedPrice ?? '-',
+                                    style: const TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.bold,
                                       color: Color(0xFFFF8800),
@@ -988,9 +1025,9 @@ class _MissionCompletionScreenState
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
-                                  const Text(
-                                    '25 phút',
-                                    style: TextStyle(
+                                  Text(
+                                    mission?.formattedElapsedTime ?? '-',
+                                    style: const TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.bold,
                                       color: Color(0xFF1C100D),
@@ -1236,5 +1273,25 @@ class _MissionCompletionScreenState
         ),
       ],
     );
+  }
+
+  Color _getRiskLevelColor(int riskLevel) {
+    if (riskLevel >= 70) {
+      return const Color(0xFFDC3545); // High risk - red
+    } else if (riskLevel >= 40) {
+      return const Color(0xFFFF8800); // Medium risk - orange
+    } else {
+      return const Color(0xFF28A745); // Low risk - green
+    }
+  }
+
+  String _getRiskLevelText(int riskLevel) {
+    if (riskLevel >= 70) {
+      return 'CỰC ĐỘC';
+    } else if (riskLevel >= 40) {
+      return 'TRUNG BÌNH';
+    } else {
+      return 'THẤP';
+    }
   }
 }

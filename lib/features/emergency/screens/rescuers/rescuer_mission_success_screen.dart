@@ -251,21 +251,27 @@ class _RescuerMissionSuccessScreenState
                         const SizedBox(height: 16),
                         _buildDetailRow(
                           'Mã nhiệm vụ:',
-                          '#RES-2025120501',
+                          missionState.mission?.id ?? '-',
                           true,
                         ),
                         const SizedBox(height: 12),
                         _buildDetailRow(
                           'Thời gian:',
-                          '05/12/2025 - 15:30',
+                          missionState.mission?.completedAt != null
+                              ? '${missionState.mission!.completedAt!.day.toString().padLeft(2, '0')}/${missionState.mission!.completedAt!.month.toString().padLeft(2, '0')}/${missionState.mission!.completedAt!.year} - ${missionState.mission!.completedAt!.hour.toString().padLeft(2, '0')}:${missionState.mission!.completedAt!.minute.toString().padLeft(2, '0')}'
+                              : '-',
                           false,
                         ),
                         const SizedBox(height: 12),
-                        _buildDetailRow('Thời lượng:', '25 phút', false),
+                        _buildDetailRow(
+                          'Thời lượng:',
+                          missionState.mission?.formattedElapsedTime ?? '-',
+                          false,
+                        ),
                         const SizedBox(height: 12),
                         _buildDetailRow(
                           'Thu nhập:',
-                          '300,000 VNĐ',
+                          missionState.mission?.formattedPrice ?? '-',
                           false,
                           isHighlighted: true,
                         ),

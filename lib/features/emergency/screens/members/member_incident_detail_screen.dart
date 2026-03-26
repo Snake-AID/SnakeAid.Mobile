@@ -6,6 +6,8 @@ import '../../models/detailed_incident_response.dart';
 import '../../models/snake_identification_response.dart';
 import '../../providers/detailed_incident_provider.dart';
 import '../../providers/incident_provider.dart';
+import '../../providers/active_mission_provider.dart';
+import '../../providers/mission_hub_provider.dart' as mission_hub;
 import '../../widgets/snake_risk_badges.dart';
 
 /// Member Incident Detail Screen
@@ -73,6 +75,222 @@ class _MemberIncidentDetailScreenState
       // Otherwise, load from API (will use smart caching)
       ref.read(detailedIncidentProvider.notifier).loadIfStale(incidentId);
     });
+  }
+
+  bool _canCancelIncident(IncidentStatus status, {RescueMission? mission}) {
+    final missionStatus = ref.watch(mission_hub.missionStatusProvider);
+
+    if (missionStatus.missionStarted ||
+        missionStatus.rescuerArrived ||
+        missionStatus.missionCompleted ||
+        missionStatus.missionCancelled ||
+        missionStatus.sessionExpired) {
+      return false;
+    }
+
+    if (status == IncidentStatus.pending || status == IncidentStatus.verified) {
+      return true;
+    }
+
+    if (status == IncidentStatus.assigned) {
+      if (mission != null) {
+        return mission.status == MissionStatus.preparing;
+      }
+      final activeMission = ref.watch(activeMissionProvider).mission;
+      if (activeMission == null) {
+        return true;
+      }
+      return activeMission.status.toLowerCase().trim() == 'preparing';
+    }
+
+    return false;
+  }
+
+  Future<void> _cancelIncident() async {
+    final incident = ref.read(activeIncidentProvider).incident;
+    if (incident == null) return;
+
+    final reason = await _showCancelReasonDialog(context);
+    if (reason == null || reason.isEmpty) {
+      return;
+    }
+
+    try {
+      await ref
+          .read(activeIncidentProvider.notifier)
+          .cancelActiveIncident(reason);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('🚫 Yêu cầu SOS đã được hủy.')),
+      );
+      if (!mounted) return;
+      context.goNamed('member_home');
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('❌ Hủy SOS thất bại: ${e.toString()}')),
+      );
+    }
+  }
+
+  Future<String?> _showCancelReasonDialog(BuildContext context) async {
+    String? selectedReason;
+
+    final reasons = <Map<String, String>>[
+      {'value': 'location_unreachable', 'label': 'Không thể đến vị trí'},
+      {'value': 'resolved_by_self', 'label': 'Đã tự xử lý xong'},
+      {'value': 'not_needed', 'label': 'Không cần cứu hộ nữa'},
+      {'value': 'wrong_location', 'label': 'Nhập sai địa điểm'},
+      {'value': 'other', 'label': 'Lý do khác'},
+    ];
+
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: const [
+                  Icon(Icons.cancel, color: Color(0xFFDC3545), size: 24),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Chọn lý do hủy SOS',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Vui lòng chọn lý do hủy để cải thiện dịch vụ.'),
+                  const SizedBox(height: 12),
+                  ...reasons.map(
+                    (reason) => _buildReasonOption(
+                      reason['label']!,
+                      reason['value']!,
+                      selectedReason,
+                      (value) => setState(() => selectedReason = value),
+                    ),
+                  ),
+                  if (selectedReason == 'other') ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      onChanged: (value) {
+                        selectedReason = value.trim().isEmpty
+                            ? 'other'
+                            : value.trim();
+                      },
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'Ghi chú lý do',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(null),
+                  child: const Text(
+                    'Hủy',
+                    style: TextStyle(color: Color(0xFF999999)),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (selectedReason == null || selectedReason!.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Vui lòng chọn lý do hủy.'),
+                          backgroundColor: Color(0xFFDC3545),
+                        ),
+                      );
+                      return;
+                    }
+                    Navigator.of(dialogContext).pop(selectedReason);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF6B35),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Xác nhận hủy'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    return result;
+  }
+
+  Widget _buildReasonOption(
+    String label,
+    String value,
+    String? selectedReason,
+    Function(String) onSelect,
+  ) {
+    final isSelected = selectedReason == value;
+    return InkWell(
+      onTap: () => onSelect(value),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFFFF8800).withOpacity(0.15)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFFFF8800)
+                : const Color(0xFFE5E5E5),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected
+                      ? const Color(0xFFFF8800)
+                      : const Color(0xFFCCCCCC),
+                  width: 2,
+                ),
+                color: isSelected ? const Color(0xFFFF8800) : Colors.white,
+              ),
+              child: isSelected
+                  ? const Icon(Icons.check, size: 14, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _resolveMemberIncidentAddress(double lat, double lon) async {
@@ -279,6 +497,37 @@ class _MemberIncidentDetailScreenState
                       _buildMediaDetectionCard(incident.media),
                     ],
 
+                    const SizedBox(height: 14),
+                    Builder(
+                      builder: (context) {
+                        final canCancel = _canCancelIncident(
+                          incident.status,
+                          mission: incident.activeMission,
+                        );
+                        return SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: canCancel ? _cancelIncident : null,
+                            icon: const Icon(Icons.cancel, color: Colors.white),
+                            label: Text(
+                              canCancel ? 'Hủy yêu cầu SOS' : 'Không thể hủy',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: canCancel
+                                  ? const Color(0xFFD32F2F)
+                                  : Colors.grey,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                     const SizedBox(height: 80), // Space for FAB
                   ],
                 ),

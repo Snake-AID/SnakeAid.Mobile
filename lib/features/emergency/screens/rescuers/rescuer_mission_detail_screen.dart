@@ -184,6 +184,8 @@ class _RescuerMissionDetailScreenState
     });
   }
 
+  bool _missionEnded = false;
+
   void _setupMissionHubListeners() {
     final svc = ref.read(missionHubServiceProvider);
 
@@ -196,6 +198,60 @@ class _RescuerMissionDetailScreenState
         // Could update a state variable here if you want to show member location on preview map
       }),
     );
+
+    // Listen for backend mission cancellation event
+    _missionHubSubscriptions.add(
+      svc.missionCancelledStream.listen((reason) async {
+        debugPrint(
+          '❌ [RescuerDetail] MissionCancelled event received: $reason',
+        );
+        await _handleMissionTermination('Nhiệm vụ đã bị hủy bởi nạn nhân.');
+      }),
+    );
+  }
+
+  Future<void> _handleMissionTermination(
+    String message, {
+    bool restartIdle = true,
+  }) async {
+    if (_missionEnded) return;
+    _missionEnded = true;
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.orange),
+      );
+    }
+
+    // Stop mission tracking + disconnect mission hub and clear active state
+    ref.read(locationManagerProvider).stopMissionTracking();
+    await ref.read(missionHubConnectionProvider.notifier).disconnect();
+    await ref.read(activeMissionProvider.notifier).clearActiveMission();
+    debugPrint('✅ Active mission cleared after mission termination');
+
+    if (restartIdle) {
+      // Restart idle tracking and rescue mode so rescuer can receive new requests
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final rescuerId = prefs.getString('user_id');
+        if (rescuerId != null) {
+          await ref.read(locationManagerProvider).startTracking(rescuerId);
+          await ref
+              .read(rescueModeProvider.notifier)
+              .startRescueMode(rescuerId);
+          debugPrint('✅ Reconnected rescue mode after mission termination');
+        }
+      } catch (e) {
+        debugPrint('⚠️ Failed to reconnect rescue mode after termination: $e');
+      }
+    } else {
+      debugPrint('ℹ️ Mission terminated without restarting idle mode');
+    }
+
+    // Give user time to read toast
+    await Future.delayed(const Duration(seconds: 1));
+    if (!mounted) return;
+    context.goNamed('rescuer_home');
   }
 
   void _startElapsedTimer() {
@@ -218,6 +274,7 @@ class _RescuerMissionDetailScreenState
   Widget build(BuildContext context) {
     final state = ref.watch(missionDetailProvider);
 
+    // Show loading while fetching data
     if (state.isLoading) {
       return Scaffold(
         backgroundColor: const Color(0xFFF8F7F5),
@@ -227,6 +284,7 @@ class _RescuerMissionDetailScreenState
       );
     }
 
+    // Show error if loading failed
     if (state.error != null && state.error!.isNotEmpty) {
       return Scaffold(
         backgroundColor: const Color(0xFFF8F7F5),
@@ -268,6 +326,8 @@ class _RescuerMissionDetailScreenState
     }
 
     final mission = state.mission;
+    
+    // Only show "not found" if loading is complete and mission is still null
     if (mission == null) {
       return Scaffold(
         backgroundColor: const Color(0xFFF8F7F5),
@@ -278,7 +338,52 @@ class _RescuerMissionDetailScreenState
           ),
           title: const Text('Nhiệm vụ cứu hộ'),
         ),
-        body: const Center(child: Text('Không tìm thấy nhiệm vụ')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.search_off,
+                  size: 64,
+                  color: Color(0xFF999999),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Không tìm thấy nhiệm vụ',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Nhiệm vụ có thể đã bị hủy hoặc không tồn tại',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () => context.goNamed('rescuer_home'),
+                  icon: const Icon(Icons.home),
+                  label: const Text('Về trang chủ'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF8800),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
     }
 
@@ -2304,44 +2409,10 @@ class _RescuerMissionDetailScreenState
                 if (!mounted) return;
 
                 if (success) {
-                  // Clean up: stop mission GPS and disconnect MissionHub
-                  // so the rescuer can receive new SOS requests immediately.
-                  ref.read(locationManagerProvider).stopMissionTracking();
-                  await ref
-                      .read(missionHubConnectionProvider.notifier)
-                      .disconnect();
-
-                  // Clear active mission from provider and local storage
-                  await ref
-                      .read(activeMissionProvider.notifier)
-                      .clearActiveMission();
-                  debugPrint('✅ Active mission cleared after abort');
-
-                  // Restart idle tracking so this rescuer is discoverable for new missions
-                  try {
-                    final prefs = await SharedPreferences.getInstance();
-                    final rescuerId = prefs.getString('user_id');
-                    if (rescuerId != null) {
-                      await ref
-                          .read(locationManagerProvider)
-                          .startTracking(rescuerId);
-                      debugPrint(
-                        '✅ Restarted idle tracking after mission abort',
-                      );
-                    }
-                  } catch (e) {
-                    debugPrint('⚠️ Failed to restart idle tracking: $e');
-                  }
-
-                  if (!mounted) return;
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('✅ Đã hủy nhiệm vụ'),
-                      backgroundColor: Colors.green,
-                    ),
+                  await _handleMissionTermination(
+                    '✅ Đã hủy nhiệm vụ, đang chuyển về màn hình chính...',
+                    restartIdle: false,
                   );
-                  context.pop(); // Go back to previous screen
                 } else {
                   final error = ref.read(missionDetailProvider).error;
                   ScaffoldMessenger.of(context).showSnackBar(

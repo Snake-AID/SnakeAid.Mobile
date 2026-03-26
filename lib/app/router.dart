@@ -18,7 +18,6 @@ import 'package:snakeaid_mobile/features/auth/screens/forgot_password_screen.dar
 import 'package:snakeaid_mobile/features/auth/screens/forgot_password_otp_screen.dart';
 import 'package:snakeaid_mobile/features/auth/screens/reset_password_screen.dart';
 import 'package:snakeaid_mobile/features/auth/screens/password_reset_success_screen.dart';
-import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_alert_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_identification_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_selection_by_location_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_identification_questions_screen.dart';
@@ -311,8 +310,7 @@ final router = GoRouter(
           consultationId: id,
           expertName: extra?['expertName'] as String? ?? 'Chuyên Gia',
           expertSpecialty: extra?['expertSpecialty'] as String? ?? '',
-          showCompleteButton:
-              extra?['showCompleteButton'] as bool? ?? false,
+          showCompleteButton: extra?['showCompleteButton'] as bool? ?? false,
           durationSeconds: extra?['durationSeconds'] as int? ?? 0,
           initialMicOn: extra?['initialMicOn'] as bool? ?? true,
           initialCameraOn: extra?['initialCameraOn'] as bool? ?? true,
@@ -354,16 +352,18 @@ final router = GoRouter(
         final extra = state.extra as Map<String, dynamic>?;
         // Accept both initial keys (patientName/consultationType from consultation card)
         // and return-trip keys (expertName/expertSpecialty from VideoConsultationScreen)
-        final patientName = (extra?['patientName'] ?? extra?['expertName'])
-            as String? ?? 'Bệnh Nhân';
-        final consultationType = (extra?['consultationType'] ?? extra?['expertSpecialty'])
-            as String? ?? 'Tư Vấn';
+        final patientName =
+            (extra?['patientName'] ?? extra?['expertName']) as String? ??
+            'Bệnh Nhân';
+        final consultationType =
+            (extra?['consultationType'] ?? extra?['expertSpecialty'])
+                as String? ??
+            'Tư Vấn';
         return ExpertWaitingRoomScreen(
           consultationId: id,
           patientName: patientName,
           consultationType: consultationType,
-          showCompleteButton:
-              extra?['showCompleteButton'] as bool? ?? false,
+          showCompleteButton: extra?['showCompleteButton'] as bool? ?? false,
           durationSeconds: extra?['durationSeconds'] as int? ?? 0,
           feeCost: extra?['feeCost'] as int? ?? 0,
           initialMicOn: extra?['initialMicOn'] as bool? ?? true,
@@ -413,14 +413,14 @@ final router = GoRouter(
         );
       },
     ),
-    
+
     // Expert List
     GoRoute(
       path: '/expert-list',
       name: 'expert_list',
       builder: (context, state) => const ExpertListScreen(),
     ),
-    
+
     // Expert Profile Detail
     GoRoute(
       path: '/expert-detail/:expertId',
@@ -430,7 +430,7 @@ final router = GoRouter(
         return ExpertProfileDetailScreen(expertId: expertId);
       },
     ),
-    
+
     // Service Selection
     GoRoute(
       path: '/service-selection/:expertId',
@@ -440,7 +440,7 @@ final router = GoRouter(
         return ServiceSelectionScreen(expertId: expertId);
       },
     ),
-    
+
     // Consultation Time Selection (for scheduled consultation)
     GoRoute(
       path: '/consultation-time-selection/:expertId',
@@ -450,7 +450,7 @@ final router = GoRouter(
         return ConsultationTimeSelectionScreen(expertId: expertId);
       },
     ),
-    
+
     // Consultation Documents Upload
     GoRoute(
       path: '/consultation-documents/:expertId',
@@ -458,7 +458,7 @@ final router = GoRouter(
       builder: (context, state) {
         final expertId = state.pathParameters['expertId']!;
         final extraData = state.extra as Map<String, dynamic>?;
-        
+
         return ConsultationDocumentsScreen(
           expertId: expertId,
           consultationType: extraData?['consultationType'],
@@ -485,7 +485,7 @@ final router = GoRouter(
         );
       },
     ),
-    
+
     // Payment Confirmation
     GoRoute(
       path: '/payment-confirmation/:expertId',
@@ -493,7 +493,7 @@ final router = GoRouter(
       builder: (context, state) {
         final expertId = state.pathParameters['expertId']!;
         final extraData = state.extra as Map<String, dynamic>?;
-        
+
         return PaymentConfirmationScreen(
           expertId: expertId,
           consultationType: extraData?['consultationType'],
@@ -694,16 +694,6 @@ final router = GoRouter(
 
     // === EMERGENCY ROUTES ===
     GoRoute(
-      path: '/emergency-alert',
-      name: 'emergency_alert',
-      builder: (context, state) {
-        final extra = state.extra as Map<String, dynamic>?;
-        return EmergencyAlertScreen(
-          incident: extra?['incident'] as IncidentData?,
-        );
-      },
-    ),
-    GoRoute(
       path: '/snake-identification',
       name: 'snake_identification',
       builder: (context, state) {
@@ -832,7 +822,12 @@ final router = GoRouter(
     GoRoute(
       path: '/member-rescuer-arrived',
       name: 'member_rescuer_arrived',
-      builder: (context, state) => const member_screens.RescuerArrivedScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return member_screens.RescuerArrivedScreen(
+          incidentId: extra?['incidentId'] as String?,
+        );
+      },
     ),
     GoRoute(
       path: '/emergency-completion',

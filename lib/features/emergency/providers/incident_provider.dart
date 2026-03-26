@@ -66,6 +66,9 @@ class ActiveIncidentNotifier extends StateNotifier<ActiveIncidentState> {
 
         debugPrint('📋 Found cached incident: ${incident.id}');
 
+        // Show cached incident immediately before server verification to avoid UI blinking
+        state = state.copyWith(incident: incident);
+
         // Verify incident still exists on server
         try {
           final response = await incidentRepository.getIncident(incident.id);
@@ -98,18 +101,11 @@ class ActiveIncidentNotifier extends StateNotifier<ActiveIncidentState> {
             // Incident was deleted - clear local storage
             debugPrint('🗑️ Incident deleted on server - clearing local cache');
             await clearActiveIncident();
-          } else if (errorMsg.contains('Không thể kết nối') ||
-              errorMsg.contains('timeout') ||
-              errorMsg.contains('network')) {
-            // Network error - keep cached data temporarily
-            debugPrint('⚠️ Network error, cannot verify incident: $e');
-            debugPrint('📋 Using cached data temporarily');
-            state = state.copyWith(incident: incident);
           } else {
-            // Other error (auth, server error, etc) - clear to be safe
+            // Network or unknown error - keep cached data and retry later
             debugPrint('⚠️ Error verifying incident: $e');
-            debugPrint('🗑️ Clearing incident due to verification error');
-            await clearActiveIncident();
+            debugPrint('📋 Retaining cached incident until next verification');
+            state = state.copyWith(incident: incident);
           }
         }
       } else {
@@ -183,11 +179,38 @@ class ActiveIncidentNotifier extends StateNotifier<ActiveIncidentState> {
         cancellationReason: state.incident!.cancellationReason,
         severityLevel: state.incident!.severityLevel,
         incidentOccurredAt: state.incident!.incidentOccurredAt,
-        sessions: state.incident!.sessions,
       );
 
       await saveActiveIncident(updatedIncident);
       debugPrint('✅ Incident status updated: $status');
+    }
+  }
+
+  /// Cancel current active incident (pending/verified/assigned)
+  Future<void> cancelActiveIncident(String reason) async {
+    if (state.incident == null) {
+      debugPrint('⚠️ Cancel incident requested but no active incident loaded');
+      return;
+    }
+
+    try {
+      final incidentId = state.incident!.id;
+      final response = await incidentRepository.cancelIncident(
+        incidentId,
+        reason,
+      );
+      if (response.isSuccess && response.data != null) {
+        await saveActiveIncident(response.data!); // will auto-clear if canceled
+        debugPrint('✅ Incident cancelled on server: $incidentId');
+      } else {
+        debugPrint('❌ Cancel incident failed: ${response.message}');
+        state = state.copyWith(error: response.message);
+      }
+    } catch (e) {
+      debugPrint('❌ Exception during impact cancelIncident: $e');
+      state = state.copyWith(
+        error: 'Không thể hủy yêu cầu lúc này. Vui lòng thử lại sau.',
+      );
     }
   }
 

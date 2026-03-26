@@ -112,12 +112,47 @@ class IncidentRepository {
       debugPrint('❌ Error message: ${e.message}');
       debugPrint('❌ Response data: ${e.response?.data}');
       debugPrint('❌ Status code: ${e.response?.statusCode}');
-      throw _handleError(e);
+      throw _handleError(e, context: 'Tạo yêu cầu SOS thất bại');
     } catch (e, stackTrace) {
       debugPrint('❌ Unexpected error type: ${e.runtimeType}');
       debugPrint('❌ Unexpected error: $e');
       debugPrint('❌ Stack trace: $stackTrace');
       throw Exception('Tạo yêu cầu SOS thất bại. Vui lòng thử lại');
+    }
+  }
+
+  /// Cancel incident by ID (Pending/Verified/Assigned)
+  ///
+  /// Gọi API PUT /api/incidents/{incidentId}/cancel
+  /// Returns [SosIncidentResponse] với incident data sau hủy
+  Future<SosIncidentResponse> cancelIncident(
+    String incidentId,
+    String reason,
+  ) async {
+    try {
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint('🚫 Cancelling incident: $incidentId');
+
+      final response = await httpService.put(
+        '/api/incidents/$incidentId/cancel',
+        data: {'reason': reason},
+      );
+
+      debugPrint('✅ Cancel incident successful');
+      debugPrint('✅ Response: ${response.data}');
+
+      return SosIncidentResponse.fromJson(response.data);
+    } on DioException catch (e) {
+      debugPrint('❌ Cancel incident DioException: ${e.type}');
+      debugPrint('❌ Error message: ${e.message}');
+      debugPrint('❌ Response data: ${e.response?.data}');
+      debugPrint('❌ Status code: ${e.response?.statusCode}');
+      throw _handleError(e, context: 'Hủy yêu cầu SOS thất bại');
+    } catch (e, stackTrace) {
+      debugPrint('❌ Unexpected error type: ${e.runtimeType}');
+      debugPrint('❌ Unexpected error: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
+      throw Exception('Hủy yêu cầu SOS thất bại. Vui lòng thử lại');
     }
   }
 
@@ -138,7 +173,7 @@ class IncidentRepository {
       return SosIncidentResponse.fromJson(response.data);
     } on DioException catch (e) {
       debugPrint('❌ Get incident failed: ${e.message}');
-      throw _handleError(e);
+      throw _handleError(e, context: 'Không thể tải thông tin sự cố');
     }
   }
 
@@ -176,7 +211,7 @@ class IncidentRepository {
       return DetailedIncidentResponse.fromJson(response.data);
     } on DioException catch (e) {
       debugPrint('❌ Get detailed incident failed: ${e.message}');
-      throw _handleError(e);
+      throw _handleError(e, context: 'Không thể tải thông tin chi tiết sự cố');
     } catch (e, stackTrace) {
       debugPrint('❌ Unexpected error parsing detailed incident: $e');
       debugPrint('❌ Stack trace: $stackTrace');
@@ -235,9 +270,9 @@ class IncidentRepository {
       throw Exception('Dữ liệu phản hồi không hợp lệ từ máy chủ');
     } on DioException catch (e) {
       debugPrint('❌ Get user incident list failed: ${e.message}');
-      throw _handleError(e);
+      throw _handleError(e, context: 'Không thể tải danh sách sự cố');
     } catch (e, stackTrace) {
-      debugPrint('❌ Unexpected error parsing detailed incident: $e');
+      debugPrint('❌ Unexpected error parsing incident list: $e');
       debugPrint('❌ Stack trace: $stackTrace');
       throw Exception('Không thể tải danh sách sự cố');
     }
@@ -279,13 +314,11 @@ class IncidentRepository {
     } on DioException catch (e) {
       debugPrint('❌ PayOS incident payment DioException: ${e.message}');
       debugPrint('📥 Response: ${e.response?.data}');
-      throw _handleError(e);
+      throw _handleError(e, context: 'Không thể tạo đường dẫn thanh toán');
     } catch (e, stackTrace) {
       debugPrint('❌ PayOS incident payment error: $e');
       debugPrint('❌ Stack trace: $stackTrace');
-      throw Exception(
-        'Không thể tạo đường dẫn thanh toán. Vui lòng thử lại sau.',
-      );
+      throw Exception('Không thể tạo đường dẫn thanh toán. Vui lòng thử lại sau.');
     }
   }
 
@@ -325,7 +358,7 @@ class IncidentRepository {
     } on DioException catch (e) {
       debugPrint('❌ Wallet incident payment DioException: ${e.message}');
       debugPrint('📥 Response: ${e.response?.data}');
-      throw _handleError(e);
+      throw _handleError(e, context: 'Không thể thanh toán bằng ví');
     } catch (e, stackTrace) {
       debugPrint('❌ Wallet incident payment error: $e');
       debugPrint('❌ Stack trace: $stackTrace');
@@ -333,73 +366,35 @@ class IncidentRepository {
     }
   }
 
-  /// Handle API errors
-  Exception _handleError(DioException e) {
-    String errorMessage = 'Đã có lỗi xảy ra';
+  /// Handle API errors with simplified logic
+  ///
+  /// HttpService already extracts and formats error messages from backend,
+  /// including validation errors. This method just adds context-specific
+  /// fallbacks when needed.
+  ///
+  /// Priority:
+  /// 1. Use e.message from HttpService (already contains backend message)
+  /// 2. Add context-specific message for known scenarios
+  /// 3. Generic fallback
+  Exception _handleError(DioException e, {String? context}) {
+    // Use message from HttpService (already formatted with validation errors)
+    String errorMessage = e.message ?? 'Đã có lỗi xảy ra';
 
-    if (e.response != null) {
-      final data = e.response?.data;
-
-      // Xử lý error message từ backend
-      if (data is Map<String, dynamic>) {
-        errorMessage =
-            data['message'] ?? data['error'] ?? data['title'] ?? errorMessage;
-
-        // Nếu có validationErrors từ error object
-        if (data['error'] is Map && data['error']['validationErrors'] != null) {
-          final validationErrors =
-              data['error']['validationErrors'] as Map<String, dynamic>;
-          final errorList = validationErrors.values
-              .expand((e) => e is List ? e : [e])
-              .join('\n');
-          errorMessage = errorList.isNotEmpty ? errorList : errorMessage;
-        }
-        // Nếu có errors array (validation errors)
-        else if (data['errors'] != null) {
-          if (data['errors'] is Map) {
-            final errors = data['errors'] as Map<String, dynamic>;
-            final errorList = errors.values
-                .expand((e) => e is List ? e : [e])
-                .join('\n');
-            errorMessage = errorList.isNotEmpty ? errorList : errorMessage;
-          } else if (data['errors'] is List) {
-            errorMessage = (data['errors'] as List).join('\n');
-          }
-        }
-      } else if (data is String) {
-        errorMessage = data;
+    // Add context-specific overrides only for special cases
+    // where we want to provide more helpful messages
+    if (e.response?.statusCode == 409) {
+      // Conflict - likely duplicate SOS request
+      if (errorMessage.isEmpty || errorMessage == 'Đã có lỗi xảy ra') {
+        errorMessage = 'Bạn đang có yêu cầu SOS đang xử lý';
       }
+    } else if (e.response?.statusCode == 401) {
+      // Unauthorized - session expired
+      errorMessage = 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại';
+    }
 
-      // Xử lý theo status code
-      switch (e.response?.statusCode) {
-        case 400:
-          if (errorMessage == 'Đã có lỗi xảy ra') {
-            errorMessage = 'Thông tin vị trí không hợp lệ';
-          }
-          break;
-        case 401:
-          errorMessage = 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại';
-          break;
-        case 404:
-          errorMessage = 'Không tìm thấy thông tin yêu cầu';
-          break;
-        case 409:
-          errorMessage = 'Bạn đang có yêu cầu SOS đang xử lý';
-          break;
-        case 422:
-          if (errorMessage == 'Đã có lỗi xảy ra') {
-            errorMessage = 'Dữ liệu không hợp lệ';
-          }
-          break;
-        case 500:
-          errorMessage = 'Lỗi máy chủ, vui lòng thử lại sau';
-          break;
-      }
-    } else if (e.type == DioExceptionType.connectionTimeout ||
-        e.type == DioExceptionType.receiveTimeout) {
-      errorMessage = 'Kết nối timeout, vui lòng kiểm tra mạng';
-    } else if (e.type == DioExceptionType.connectionError) {
-      errorMessage = 'Không thể kết nối tới máy chủ';
+    // Add context prefix if provided (e.g., "Tạo SOS thất bại: <error>")
+    if (context != null && context.isNotEmpty) {
+      errorMessage = '$context: $errorMessage';
     }
 
     return Exception(errorMessage);

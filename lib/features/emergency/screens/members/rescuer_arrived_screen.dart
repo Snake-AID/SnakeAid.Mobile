@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/widgets/chat_screen.dart';
 import '../../providers/incident_provider.dart';
+import '../../providers/detailed_incident_provider.dart';
 
 class RescuerArrivedScreen extends ConsumerStatefulWidget {
-  const RescuerArrivedScreen({super.key});
+  final String? incidentId;
+  
+  const RescuerArrivedScreen({super.key, this.incidentId});
 
   @override
   ConsumerState<RescuerArrivedScreen> createState() => _RescuerArrivedScreenState();
@@ -14,6 +17,49 @@ class RescuerArrivedScreen extends ConsumerStatefulWidget {
 class _RescuerArrivedScreenState extends ConsumerState<RescuerArrivedScreen> {
   int _tapCount = 0;
   DateTime? _lastTapTime;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // 🔍 Check if incident is already completed (user returned after app restart)
+      await _checkIncidentStateAndNavigate();
+    });
+  }
+
+  /// Check if incident is already completed and auto-navigate to payment screen
+  Future<void> _checkIncidentStateAndNavigate() async {
+    final incidentId = widget.incidentId ?? 
+        ref.read(activeIncidentProvider).incident?.id;
+    
+    if (incidentId == null) {
+      debugPrint('⚠️ [RescuerArrived] No incidentId available for state check');
+      return;
+    }
+
+    try {
+      debugPrint('🔍 [RescuerArrived] Checking incident state...');
+      await ref
+          .read(detailedIncidentProvider.notifier)
+          .loadDetailedIncident(incidentId, forceRefresh: true);
+      
+      final incident = ref.read(detailedIncidentProvider).incident;
+      if (incident == null) return;
+
+      final status = incident.status.value.toLowerCase();
+      debugPrint('📊 [RescuerArrived] Current incident status: $status');
+
+      // If already Finished or Completed → navigate to payment screen
+      if (status == 'finished' || status == 'completed') {
+        debugPrint('🔄 Auto-navigating to finished detail (status: $status)');
+        if (mounted) {
+          context.go('/member-incident-finished-detail?incidentId=$incidentId');
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [RescuerArrived] Error checking incident state: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,7 +124,14 @@ class _RescuerArrivedScreenState extends ConsumerState<RescuerArrivedScreen> {
             _tapCount++;
             if (_tapCount >= 2) {
               // Navigate to completion screen on double tap
-              context.goNamed('emergency_completion');
+              final incidentId = widget.incidentId ?? 
+                  ref.read(activeIncidentProvider).incident?.id;
+              if (incidentId != null) {
+                context.push(
+                  '/member-incident-finished-detail',
+                  extra: {'incidentId': incidentId},
+                );
+              }
               _tapCount = 0;
             }
           } else {
