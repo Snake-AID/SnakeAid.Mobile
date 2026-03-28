@@ -576,6 +576,7 @@ class _DetailRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, size: 18, color: const Color(0xFF6C47C2)),
           const SizedBox(width: 12),
@@ -586,13 +587,18 @@ class _DetailRow extends StatelessWidget {
             ),
           ),
           trailing ??
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight:
-                      valueBold ? FontWeight.bold : FontWeight.w500,
-                  color: valueColor ?? const Color(0xFF2D2D2D),
+              Flexible(
+                child: Text(
+                  value,
+                  textAlign: TextAlign.right,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight:
+                        valueBold ? FontWeight.bold : FontWeight.w500,
+                    color: valueColor ?? const Color(0xFF2D2D2D),
+                  ),
                 ),
               ),
         ],

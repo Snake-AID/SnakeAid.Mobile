@@ -50,6 +50,7 @@ class MemberConsultationDetailScreen extends StatelessWidget {
         children: [
           _SectionCard(
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
                   width: 52,
@@ -67,6 +68,8 @@ class MemberConsultationDetailScreen extends StatelessWidget {
                     children: [
                       Text(
                         expertName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -78,28 +81,36 @@ class MemberConsultationDetailScreen extends StatelessWidget {
                         expertSpecialty.isEmpty
                             ? 'Chuyên gia tư vấn'
                             : expertSpecialty,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 13,
                           color: Color(0xFF6B7280),
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            statusLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: statusColor,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    statusLabel,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: statusColor,
-                    ),
                   ),
                 ),
               ],
@@ -257,6 +268,8 @@ class _DetailRow extends StatelessWidget {
           child: Text(
             value,
             textAlign: TextAlign.right,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 13,
               color: valueColor ?? const Color(0xFF374151),

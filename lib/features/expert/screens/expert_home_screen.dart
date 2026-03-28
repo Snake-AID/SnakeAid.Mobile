@@ -2265,12 +2265,16 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                   children: [
                     Row(
                       children: [
-                        Text(
-                          item.patientName,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2D2D2D),
+                        Expanded(
+                          child: Text(
+                            item.patientName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2D2D2D),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -2404,20 +2408,16 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
         children: [
           Icon(icon, size: 14, color: const Color(0xFF6B7280)),
           const SizedBox(width: 6),
-          Text(
-            '$label: ',
-            style: const TextStyle(
-              fontSize: 11,
-              color: Color(0xFF6B7280),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 11,
-              color: Color(0xFF2D2D2D),
-              fontWeight: FontWeight.w600,
+          Flexible(
+            child: Text(
+              '$label: $value',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                color: Color(0xFF2D2D2D),
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],

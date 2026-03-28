@@ -488,6 +488,8 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
                   // Name
                   Text(
                     expert.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -527,13 +529,17 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        expert.reviewCount > 0
-                            ? '(${expert.reviewCount} đánh giá)'
-                            : 'đánh giá',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF6B7280),
+                      Expanded(
+                        child: Text(
+                          expert.reviewCount > 0
+                              ? '(${expert.reviewCount} đánh giá)'
+                              : 'đánh giá',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF6B7280),
+                          ),
                         ),
                       ),
                     ],
@@ -543,6 +549,8 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
                   // Fee
                   Text(
                     expert.formattedFee,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,

@@ -890,6 +890,8 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
             Expanded(
               child: Text(
                 label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -897,11 +899,16 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                 ),
               ),
             ),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
+            Flexible(
+              child: Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
               ),
             ),
             if (verified || statusIcon != null) ...[
@@ -941,6 +948,8 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                 children: [
                   Text(
                     title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -950,6 +959,8 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],
@@ -959,12 +970,17 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            Text(
-              amount,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF6C47C2),
+            Flexible(
+              child: Text(
+                amount,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF6C47C2),
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -1068,6 +1084,8 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
             Expanded(
               child: Text(
                 label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -1075,11 +1093,16 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                 ),
               ),
             ),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
+            Flexible(
+              child: Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -1107,6 +1130,8 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                 children: [
                   Text(
                     title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -1116,6 +1141,8 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],

@@ -346,11 +346,15 @@ class _ConsultationCompletionScreenState
       children: [
         Icon(icon, size: 15, color: const Color(0xFF6C757D)),
         const SizedBox(width: 6),
-        Text(
-          text,
-          style: const TextStyle(
-            fontSize: 13,
-            color: Color(0xFF6C757D),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF6C757D),
+            ),
           ),
         ),
       ],
@@ -403,12 +407,16 @@ class _ConsultationCompletionScreenState
             children: const [
               Icon(Icons.check_circle, size: 18, color: _primary),
               SizedBox(width: 8),
-              Text(
-                'Đã thanh toán thành công',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: _primary,
+              Expanded(
+                child: Text(
+                  'Đã thanh toán thành công',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _primary,
+                  ),
                 ),
               ),
             ],
@@ -421,17 +429,30 @@ class _ConsultationCompletionScreenState
   Widget _buildPaymentRow(String label, String value,
       {bool valueGreen = false}) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label,
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-                fontSize: 13, color: Color(0xFF6C757D))),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: valueGreen ? 15 : 14,
-            fontWeight: FontWeight.bold,
-            color: valueGreen ? _primary : const Color(0xFF333333),
+              fontSize: 13,
+              color: Color(0xFF6C757D),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: valueGreen ? 15 : 14,
+              fontWeight: FontWeight.bold,
+              color: valueGreen ? _primary : const Color(0xFF333333),
+            ),
           ),
         ),
       ],

@@ -219,21 +219,27 @@ class _ExpertGlobalEmergencyPopupListenerState
           child: Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 40,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 520,
+                  maxHeight: MediaQuery.of(context).size.height * 0.88,
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 40,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
                       child: Column(
@@ -277,6 +283,8 @@ class _ExpertGlobalEmergencyPopupListenerState
                                 const SizedBox(width: 6),
                                 Text(
                                   'Tự từ chối sau $_countdownLabel',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.bold,
@@ -324,6 +332,8 @@ class _ExpertGlobalEmergencyPopupListenerState
                                     children: [
                                       Text(
                                         req.requesterName ?? 'Bệnh nhân',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           fontSize: 17,
                                           fontWeight: FontWeight.bold,
@@ -340,6 +350,8 @@ class _ExpertGlobalEmergencyPopupListenerState
                                       ),
                                       Text(
                                         req.snakeSuspect ?? 'Chưa rõ loài rắn',
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           fontSize: 12,
                                           color: Color(0xFF6B7280),
@@ -431,6 +443,8 @@ class _ExpertGlobalEmergencyPopupListenerState
                       ),
                     ),
                   ],
+                    ),
+                  ),
                 ),
               ),
             ),

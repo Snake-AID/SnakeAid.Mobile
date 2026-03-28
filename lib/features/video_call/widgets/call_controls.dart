@@ -22,52 +22,57 @@ class CallControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-      decoration: BoxDecoration(
-        color: Colors.black87,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            // Toggle microphone
-            _ControlButton(
-              icon: isMicEnabled ? Icons.mic : Icons.mic_off,
-              label: isMicEnabled ? 'Mute' : 'Unmute',
-              isActive: isMicEnabled,
-              onPressed: onToggleMic,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 360;
+        return Container(
+          padding: EdgeInsets.symmetric(
+            vertical: compact ? 12 : 16,
+            horizontal: compact ? 12 : 24,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.black87,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Wrap(
+              alignment: WrapAlignment.spaceEvenly,
+              runAlignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: compact ? 8 : 12,
+              runSpacing: 8,
+              children: [
+                _ControlButton(
+                  icon: isMicEnabled ? Icons.mic : Icons.mic_off,
+                  label: isMicEnabled ? 'Mute' : 'Unmute',
+                  isActive: isMicEnabled,
+                  onPressed: onToggleMic,
+                ),
+                _ControlButton(
+                  icon: isCameraEnabled ? Icons.videocam : Icons.videocam_off,
+                  label: isCameraEnabled ? 'Cam Off' : 'Cam On',
+                  isActive: isCameraEnabled,
+                  onPressed: onToggleCamera,
+                ),
+                _ControlButton(
+                  icon: Icons.flip_camera_ios,
+                  label: 'Flip',
+                  isActive: true,
+                  onPressed: onFlipCamera,
+                ),
+                _ControlButton(
+                  icon: Icons.call_end,
+                  label: 'End',
+                  isActive: true,
+                  isDestructive: true,
+                  onPressed: onEndCall,
+                ),
+              ],
             ),
-
-            // Toggle camera
-            _ControlButton(
-              icon: isCameraEnabled ? Icons.videocam : Icons.videocam_off,
-              label: isCameraEnabled ? 'Cam Off' : 'Cam On',
-              isActive: isCameraEnabled,
-              onPressed: onToggleCamera,
-            ),
-
-            // Flip camera
-            _ControlButton(
-              icon: Icons.flip_camera_ios,
-              label: 'Flip',
-              isActive: true,
-              onPressed: onFlipCamera,
-            ),
-
-            // End call
-            _ControlButton(
-              icon: Icons.call_end,
-              label: 'End',
-              isActive: true,
-              isDestructive: true,
-              onPressed: onEndCall,
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -89,6 +94,7 @@ class _ControlButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.of(context).size.width < 360;
     final bgColor = isDestructive
         ? Colors.red
         : isActive
@@ -105,15 +111,18 @@ class _ControlButton extends StatelessWidget {
             onTap: onPressed,
             customBorder: const CircleBorder(),
             child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Icon(icon, color: Colors.white, size: 24),
+              padding: EdgeInsets.all(compact ? 11 : 14),
+              child: Icon(icon, color: Colors.white, size: compact ? 20 : 24),
             ),
           ),
         ),
         const SizedBox(height: 4),
         Text(
           label,
-          style: const TextStyle(color: Colors.white70, fontSize: 11),
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: compact ? 10 : 11,
+          ),
         ),
       ],
     );

@@ -1412,25 +1412,34 @@ class _MemberIncidentFinishedDetailScreenState
 
   Widget _payRow(String label, String value, {bool isTotal = false}) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: isTotal ? 14 : 13,
-            fontWeight:
-                isTotal ? FontWeight.w700 : FontWeight.w500,
-            color: isTotal ? const Color(0xFF111827) : Colors.grey[700],
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: isTotal ? 14 : 13,
+              fontWeight:
+                  isTotal ? FontWeight.w700 : FontWeight.w500,
+              color: isTotal ? const Color(0xFF111827) : Colors.grey[700],
+            ),
           ),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: isTotal ? 16 : 13,
-            fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,
-            color: isTotal
-                ? const Color(0xFF2F65E0)
-                : const Color(0xFF374151),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: isTotal ? 16 : 13,
+              fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,
+              color: isTotal
+                  ? const Color(0xFF2F65E0)
+                  : const Color(0xFF374151),
+            ),
           ),
         ),
       ],
@@ -1591,8 +1600,22 @@ class _MemberIncidentFinishedDetailScreenState
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('$title: ', style: const TextStyle(fontWeight: FontWeight.w600)),
-          Expanded(child: Text(value)),
+          Flexible(
+            child: Text(
+              '$title: ',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              value,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );

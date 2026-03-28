@@ -15,6 +15,9 @@ class QuickActionCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final cardWidth = (screenWidth * 0.36).clamp(124.0, 164.0);
+
     return SizedBox(
       height: 120,
       child: ListView(
@@ -22,12 +25,14 @@ class QuickActionCards extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         children: [
           _QuickCard(
+            width: cardWidth,
             title: 'Hướng dẫn',
             subtitle: 'Sơ cứu ngay',
             onTap: onFirstAidPressed,
           ),
           const SizedBox(width: 16),
           _QuickCard(
+            width: cardWidth,
             title: 'Bệnh viện',
             subtitle: 'Có huyết thanh',
             badge: '2.3 km',
@@ -35,6 +40,7 @@ class QuickActionCards extends StatelessWidget {
           ),
           const SizedBox(width: 16),
           _QuickCard(
+            width: cardWidth,
             title: 'Theo dõi',
             subtitle: 'Cứu hộ real-time',
             hasStatusDot: true,
@@ -47,6 +53,7 @@ class QuickActionCards extends StatelessWidget {
 }
 
 class _QuickCard extends StatelessWidget {
+  final double width;
   final String title;
   final String subtitle;
   final String? badge;
@@ -54,6 +61,7 @@ class _QuickCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const _QuickCard({
+    required this.width,
     required this.title,
     required this.subtitle,
     this.badge,
@@ -67,7 +75,7 @@ class _QuickCard extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        width: 140,
+        width: width,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -88,6 +96,8 @@ class _QuickCard extends StatelessWidget {
               children: [
                 Text(
                   title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -100,6 +110,8 @@ class _QuickCard extends StatelessWidget {
                   width: double.infinity,
                   child: Text(
                     subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 14,
                       color: Colors.grey,

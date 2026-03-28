@@ -1022,6 +1022,8 @@ class _PaymentConfirmationScreenState
                   children: [
                     Text(
                       expert.displayName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -1058,10 +1060,14 @@ class _PaymentConfirmationScreenState
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                           const SizedBox(width: 6),
-                          Text(
-                            widget.selectedDate!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
+                          Expanded(
+                            child: Text(
+                              widget.selectedDate!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ),
                         ],
@@ -1078,10 +1084,14 @@ class _PaymentConfirmationScreenState
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          widget.duration ?? '30 phút',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                        Expanded(
+                          child: Text(
+                            widget.duration ?? '30 phút',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
                       ],
