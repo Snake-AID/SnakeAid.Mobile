@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:livekit_client/livekit_client.dart';
+import 'package:livekit_client/livekit_client.dart' hide ConnectionState;
 import 'package:snakeaid_mobile/core/services/consultation_chat_signalr_service.dart';
 import '../../repository/consultation_repository.dart';
 
@@ -17,6 +17,8 @@ class VideoConsultationScreen extends ConsumerStatefulWidget {
   final String consultationId;
   final String expertName;
   final String expertSpecialty;
+  /// Controls expert-only in-room features (e.g. snake search)
+  final bool isExpertMode;
   /// Mic state chosen in the waiting room (default on)
   final bool initialMicOn;
   /// Camera state chosen in the waiting room (default on)
@@ -33,6 +35,7 @@ class VideoConsultationScreen extends ConsumerStatefulWidget {
     required this.consultationId,
     required this.expertName,
     required this.expertSpecialty,
+    this.isExpertMode = false,
     this.initialMicOn = true,
     this.initialCameraOn = true,
     this.afterCallRoute,
@@ -75,8 +78,13 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
   // ── In-room chat (SignalR) ────────────────────────────────────────────────
   ConsultationChatSignalRService? _chatService;
   StreamSubscription<ConsultationChatMessage>? _chatSub;
+  StreamSubscription<({String eventType, String payload})>? _signalSub;
   final ValueNotifier<List<ConsultationChatMessage>> _chatMessagesNotifier =
       ValueNotifier<List<ConsultationChatMessage>>([]);
+  final ValueNotifier<bool> _remoteIsTypingNotifier = ValueNotifier(false);
+  Timer? _typingAutoHideTimer;
+  bool? _remoteMicOn;
+  bool? _remoteCameraOn;
   bool _isChatConnected = false;
   final List<_PendingOutgoingEcho> _pendingOutgoingEchoes = [];
 
@@ -328,8 +336,11 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
     _room.disconnect();
     _room.dispose();
     _chatSub?.cancel();
+    _signalSub?.cancel();
+    _typingAutoHideTimer?.cancel();
     _chatService?.dispose();
     _chatMessagesNotifier.dispose();
+    _remoteIsTypingNotifier.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
@@ -355,6 +366,12 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
         setState(() {
           _appendChatMessage(msg);
         });
+      });
+
+      // Listen to Signal events (typing, mic/cam state)
+      _signalSub = _chatService!.signalStream.listen((signal) {
+        if (!mounted) return;
+        _handleSignalEvent(signal.eventType, signal.payload);
       });
 
       await _chatService!.connect(widget.consultationId);
@@ -497,12 +514,14 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
   Future<void> _toggleMic() async {
     _isMicOn = !_isMicOn;
     await _room.localParticipant?.setMicrophoneEnabled(_isMicOn);
+    _sendMediaStateSignal('MicState', _isMicOn);
     setState(() {});
   }
 
   Future<void> _toggleCamera() async {
     _isCameraOn = !_isCameraOn;
     await _room.localParticipant?.setCameraEnabled(_isCameraOn);
+    _sendMediaStateSignal('CameraState', _isCameraOn);
     setState(() {});
   }
 
@@ -517,6 +536,73 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
       ),
     );
     setState(() {});
+  }
+
+  void _sendTypingSignal(bool isTyping) {
+    if (!_isChatConnected || _chatService == null) return;
+    try {
+      _chatService!.sendSignal(
+        eventType: 'Typing',
+        payload: isTyping.toString(),
+      );
+    } catch (e) {
+      debugPrint('Failed to send typing signal: $e');
+    }
+  }
+
+  void _sendMediaStateSignal(String eventType, bool enabled) {
+    if (!_isChatConnected || _chatService == null) return;
+    try {
+      _chatService!.sendSignal(
+        eventType: eventType,
+        payload: enabled.toString(),
+      );
+    } catch (e) {
+      debugPrint('Failed to send $eventType signal: $e');
+    }
+  }
+
+  bool? _parseSignalBool(String payload) {
+    final normalized = payload.trim().toLowerCase();
+    if (normalized == 'true' || normalized == 'on' || normalized == '1') {
+      return true;
+    }
+    if (normalized == 'false' || normalized == 'off' || normalized == '0') {
+      return false;
+    }
+    return null;
+  }
+
+  void _handleSignalEvent(String eventType, String payload) {
+    final type = eventType.trim().toLowerCase();
+
+    if (type == 'typing') {
+      final isTyping = payload.toLowerCase() == 'true';
+      setState(() => _remoteIsTypingNotifier.value = isTyping);
+
+      // Auto-dismiss typing indicator after a short grace period.
+      _typingAutoHideTimer?.cancel();
+      if (isTyping) {
+        _typingAutoHideTimer = Timer(const Duration(seconds: 3), () {
+          if (mounted) {
+            setState(() => _remoteIsTypingNotifier.value = false);
+          }
+        });
+      }
+      return;
+    }
+
+    final parsed = _parseSignalBool(payload);
+    if (parsed == null) return;
+
+    if (type == 'micstate' || type == 'mic' || type == 'microphone') {
+      setState(() => _remoteMicOn = parsed);
+      return;
+    }
+
+    if (type == 'camerastate' || type == 'camstate' || type == 'camera' || type == 'cam') {
+      setState(() => _remoteCameraOn = parsed);
+    }
   }
 
   void _showChat() {
@@ -535,10 +621,33 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
           expertName: widget.expertName,
           scrollController: controller,
           messagesListenable: _chatMessagesNotifier,
+          remoteIsTypingListenable: _remoteIsTypingNotifier,
           isConnected: _isChatConnected,
           onSendText: _handleSendChatText,
           onSendImage: _handleSendChatImage,
+          onTyping: _sendTypingSignal,
         ),
+      ),
+    );
+  }
+
+  void _showSnakeSearch() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1a1022),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _SnakeSearchPanel(
+        onSearch: (query) async {
+          final repo = ref.read(consultationRepositoryProvider);
+          return repo.searchSnakeSpecies(query);
+        },
+        onFetchDetail: (id) async {
+          final repo = ref.read(consultationRepositoryProvider);
+          return repo.getSnakeSpeciesDetail(id);
+        },
       ),
     );
   }
@@ -800,6 +909,16 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
+                    if (_remoteMicOn == false) ...[
+                      const Icon(Icons.mic_off,
+                          size: 16, color: Colors.redAccent),
+                      const SizedBox(width: 4),
+                    ],
+                    if (_remoteCameraOn == false) ...[
+                      const Icon(Icons.videocam_off,
+                          size: 16, color: Colors.redAccent),
+                      const SizedBox(width: 4),
+                    ],
                     Flexible(
                       child: Text(
                         widget.expertName,
@@ -993,6 +1112,12 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
               label: 'Chat',
               onTap: _showChat,
             ),
+            if (widget.isExpertMode)
+              _buildControlButton(
+                icon: Icons.pest_control_rodent,
+                label: 'Tìm Rắn',
+                onTap: _showSnakeSearch,
+              ),
             _buildControlButton(
               icon: Icons.flip_camera_ios_outlined,
               label: 'Lật Cam',
@@ -1056,17 +1181,21 @@ class _ChatPanel extends StatefulWidget {
   final String expertName;
   final ScrollController scrollController;
   final ValueListenable<List<ConsultationChatMessage>> messagesListenable;
+  final ValueListenable<bool> remoteIsTypingListenable;
   final bool isConnected;
   final Future<void> Function(String text) onSendText;
   final Future<void> Function(String filePath, String caption) onSendImage;
+  final Function(bool isTyping) onTyping;
 
   const _ChatPanel({
     required this.expertName,
     required this.scrollController,
     required this.messagesListenable,
+    required this.remoteIsTypingListenable,
     required this.isConnected,
     required this.onSendText,
     required this.onSendImage,
+    required this.onTyping,
   });
 
   @override
@@ -1077,11 +1206,15 @@ class _ChatPanelState extends State<_ChatPanel> {
   final TextEditingController _msgController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
   String? _pendingImagePath;
+  bool _isLocalTyping = false;
+  Timer? _typingTimer;
 
   @override
   void initState() {
     super.initState();
     widget.messagesListenable.addListener(_handleMessagesChanged);
+    widget.remoteIsTypingListenable.addListener(_handleRemoteTypingChanged);
+    _msgController.addListener(_handleLocalTextChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
@@ -1093,15 +1226,45 @@ class _ChatPanelState extends State<_ChatPanel> {
       widget.messagesListenable.addListener(_handleMessagesChanged);
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
     }
+    if (oldWidget.remoteIsTypingListenable != widget.remoteIsTypingListenable) {
+      oldWidget.remoteIsTypingListenable.removeListener(_handleRemoteTypingChanged);
+      widget.remoteIsTypingListenable.addListener(_handleRemoteTypingChanged);
+    }
   }
 
   void _handleMessagesChanged() {
     _scrollToBottom();
   }
 
+  void _handleRemoteTypingChanged() {
+    if (mounted) setState(() {});
+    _scrollToBottom();
+  }
+
+  void _handleLocalTextChanged() {
+    final hasText = _msgController.text.trim().isNotEmpty;
+    if (hasText && !_isLocalTyping) {
+      setState(() => _isLocalTyping = true);
+      widget.onTyping(true);
+    }
+
+    // Reset typing indicator timer on each change
+    _typingTimer?.cancel();
+    if (hasText) {
+      _typingTimer = Timer(const Duration(seconds: 2), () {
+        if (mounted) {
+          setState(() => _isLocalTyping = false);
+          widget.onTyping(false);
+        }
+      });
+    }
+  }
+
   @override
   void dispose() {
     widget.messagesListenable.removeListener(_handleMessagesChanged);
+    widget.remoteIsTypingListenable.removeListener(_handleRemoteTypingChanged);
+    _typingTimer?.cancel();
     _msgController.dispose();
     super.dispose();
   }
@@ -1280,12 +1443,23 @@ class _ChatPanelState extends State<_ChatPanel> {
           child: ValueListenableBuilder<List<ConsultationChatMessage>>(
             valueListenable: widget.messagesListenable,
             builder: (_, messages, __) {
-              return ListView.builder(
-                controller: widget.scrollController,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                itemCount: messages.length,
-                itemBuilder: (ctx, i) => _buildBubble(messages[i]),
+              return ValueListenableBuilder<bool>(
+                valueListenable: widget.remoteIsTypingListenable,
+                builder: (_, isRemoteTyping, __) {
+                  return ListView.builder(
+                    controller: widget.scrollController,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    itemCount: messages.length + (isRemoteTyping ? 1 : 0),
+                    itemBuilder: (ctx, i) {
+                      if (i < messages.length) {
+                        return _buildBubble(messages[i]);
+                      } else {
+                        return _buildTypingIndicator();
+                      }
+                    },
+                  );
+                },
               );
             },
           ),
@@ -1499,6 +1673,48 @@ class _ChatPanelState extends State<_ChatPanel> {
     return '$h:$m';
   }
 
+  Widget _buildTypingIndicator() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${widget.expertName} · Đang gõ',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.white.withOpacity(0.45),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (int i = 0; i < 3; i++) ...[
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                  if (i < 2) const SizedBox(width: 4),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _openImagePreview(String imageUrl) {
     showDialog(
       context: context,
@@ -1543,4 +1759,1273 @@ class _PendingOutgoingEcho {
     required this.attachmentUrl,
     required this.createdAt,
   });
+}
+
+class _SnakeSearchPanel extends StatefulWidget {
+  final Future<List<Map<String, dynamic>>> Function(String query) onSearch;
+  final Future<Map<String, dynamic>?> Function(int id) onFetchDetail;
+
+  const _SnakeSearchPanel({
+    required this.onSearch,
+    required this.onFetchDetail,
+  });
+
+  @override
+  State<_SnakeSearchPanel> createState() => _SnakeSearchPanelState();
+}
+
+class _SnakeSearchPanelState extends State<_SnakeSearchPanel> {
+  final TextEditingController _queryController = TextEditingController();
+  bool _isLoading = false;
+  List<Map<String, dynamic>> _results = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _search());
+  }
+
+  @override
+  void dispose() {
+    _queryController.dispose();
+    super.dispose();
+  }
+
+  String _firstNonEmpty(Map<String, dynamic> item, List<String> keys,
+      {String fallback = ''}) {
+    for (final key in keys) {
+      final value = item[key]?.toString().trim() ?? '';
+      if (value.isNotEmpty) return value;
+    }
+    return fallback;
+  }
+
+  List<String> _extractStringList(Map<String, dynamic> item, List<String> keys) {
+    for (final key in keys) {
+      final value = item[key];
+      if (value is List) {
+        final parsed = value
+            .map((e) => e.toString().trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+        if (parsed.isNotEmpty) return parsed;
+      }
+      if (value is String && value.trim().isNotEmpty) {
+        final parsed = value
+            .split(RegExp(r'[;,|]'))
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+        if (parsed.isNotEmpty) return parsed;
+      }
+    }
+    return const [];
+  }
+
+  bool _isVenomousSnake(Map<String, dynamic> item) {
+    final venomFlag = item['isVenomous'];
+    if (venomFlag is bool) return venomFlag;
+
+    final venomText = _firstNonEmpty(
+      item,
+      ['venomLevel', 'dangerLevel', 'venomType', 'venom', 'riskLevel'],
+    ).toLowerCase();
+
+    if (venomText.isEmpty) return false;
+    return venomText.contains('doc') ||
+        venomText.contains('venom') ||
+        venomText.contains('nguy hiem') ||
+        venomText.contains('cuc doc');
+  }
+
+  List<Map<String, dynamic>> get _displayResults {
+    Iterable<Map<String, dynamic>> data = _results;
+
+    final query = _queryController.text.trim().toLowerCase();
+    if (query.isNotEmpty) {
+      data = data.where((item) {
+        final combined = [
+          _firstNonEmpty(item, ['commonName', 'name', 'vietnameseName']),
+          _firstNonEmpty(item, ['scientificName', 'scientific_name']),
+          _firstNonEmpty(item, ['slug']),
+          _firstNonEmpty(item, ['description']),
+          _firstNonEmpty(item, ['identificationSummary']),
+          _firstNonEmpty(item, ['primaryVenomType']),
+        ].join(' ').toLowerCase();
+        return combined.contains(query);
+      });
+    }
+
+    return data.toList();
+  }
+
+  Future<void> _search() async {
+    if (_results.isNotEmpty) {
+      if (mounted) setState(() {});
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final data = await widget.onSearch('');
+      if (!mounted) return;
+      setState(() => _results = data);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _results = const []);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không thể tra cứu loài rắn lúc này'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Widget _buildFeaturedCard(Map<String, dynamic> item) {
+    final commonName = _firstNonEmpty(
+      item,
+      ['commonName', 'name', 'vietnameseName', 'snakeName', 'speciesName'],
+      fallback: 'Không rõ tên',
+    );
+    final scientificName = _firstNonEmpty(
+      item,
+      ['scientificName', 'scientific_name'],
+    );
+    final habitat = _firstNonEmpty(
+      item,
+      ['habitat', 'distribution', 'region', 'location'],
+      fallback: 'Chưa có dữ liệu môi trường sống',
+    );
+    final venom = _firstNonEmpty(
+      item,
+      ['venomLevel', 'dangerLevel', 'venomType', 'venom', 'riskLevel'],
+      fallback: _isVenomousSnake(item) ? 'Độc' : 'Không rõ',
+    );
+    final imageUrl = _firstNonEmpty(
+      item,
+      ['imageUrl', 'thumbnailUrl', 'image', 'photoUrl', 'avatarUrl'],
+    );
+    final identify = _extractStringList(
+      item,
+      ['identificationFeatures', 'identifyFeatures', 'characteristics', 'features'],
+    );
+    final firstAid = _extractStringList(
+      item,
+      ['firstAid', 'firstAidSteps', 'recommendedFirstAid'],
+    );
+    final antivenom = _firstNonEmpty(
+      item,
+      ['antivenom', 'serum', 'treatment'],
+    );
+
+    return InkWell(
+      onTap: () => _openDetail(item),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFF1B7F4B).withOpacity(0.2)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: const BoxDecoration(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                gradient: LinearGradient(
+                  colors: [Color(0x141B7F4B), Color(0x00FFFFFF)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      width: 68,
+                      height: 68,
+                      color: const Color(0xFFE3ECE7),
+                      child: imageUrl.isEmpty
+                          ? const Icon(Icons.pets, color: Color(0xFF1B7F4B))
+                          : Image.network(
+                              imageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  const Icon(Icons.pets, color: Color(0xFF1B7F4B)),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          commonName,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F2E1C),
+                          ),
+                        ),
+                        if (scientificName.isNotEmpty)
+                          Text(
+                            scientificName,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                              color: Color(0xFF5B7D6A),
+                            ),
+                          ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: _isVenomousSnake(item)
+                                    ? const Color(0xFFDC2626)
+                                    : const Color(0xFF16A34A),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                venom,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                habitat,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: Color(0xFF5B7D6A),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (identify.isNotEmpty) ...[
+                    _sectionTitle(Icons.visibility, 'Đặc điểm nhận dạng'),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: identify
+                          .take(6)
+                          .map(
+                            (e) => Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F6F3),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                e,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF335244),
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _infoBox(
+                          title: 'Nọc độc',
+                          color: const Color(0xFFB91C1C),
+                          icon: Icons.coronavirus,
+                          lines: [venom],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _infoBox(
+                          title: 'Sơ cứu',
+                          color: const Color(0xFF15803D),
+                          icon: Icons.medical_services,
+                          lines: firstAid.isEmpty
+                              ? const ['Băng ép, bất động và đưa đến cơ sở y tế']
+                              : firstAid.take(2).toList(),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (antivenom.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE1F0FF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.vaccines, color: Color(0xFF1D4ED8), size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Huyết thanh: $antivenom',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF1E3A8A),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompactCard(Map<String, dynamic> item) {
+    final commonName = _firstNonEmpty(
+      item,
+      ['commonName', 'name', 'vietnameseName', 'snakeName', 'speciesName'],
+      fallback: 'Không rõ tên',
+    );
+    final scientificName = _firstNonEmpty(
+      item,
+      ['scientificName', 'scientific_name'],
+    );
+    final habitat = _firstNonEmpty(
+      item,
+      ['habitat', 'distribution', 'region', 'location'],
+    );
+    final imageUrl = _firstNonEmpty(
+      item,
+      ['imageUrl', 'thumbnailUrl', 'image', 'photoUrl', 'avatarUrl'],
+    );
+
+    return InkWell(
+      onTap: () => _openDetail(item),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE6F2EA)),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              width: 64,
+              height: 64,
+                color: const Color(0xFFE3ECE7),
+              child: imageUrl.isEmpty
+                    ? const Icon(Icons.pets, color: Color(0xFF1B7F4B))
+                  : Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.pets, color: Color(0xFF1B7F4B)),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  commonName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F2E1C),
+                  ),
+                ),
+                if (scientificName.isNotEmpty)
+                  Text(
+                    scientificName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                        color: Color(0xFF5B7D6A),
+                    ),
+                  ),
+                if (habitat.isNotEmpty)
+                  Text(
+                    habitat,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                        color: Color(0xFF5B7D6A),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: _isVenomousSnake(item)
+                  ? const Color(0xFFDC2626)
+                  : const Color(0xFF16A34A),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ],
+      ),
+      ),
+    );
+  }
+
+  Widget _sectionTitle(IconData icon, String title) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: const Color(0xFF5B7D6A)),
+        const SizedBox(width: 6),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 11,
+            color: Color(0xFF5B7D6A),
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _openDetail(Map<String, dynamic> item) {
+    final id = item['id'];
+    if (id is! int) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0E1B14),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _SnakeDetailSheet(
+        seed: item,
+        detailFuture: widget.onFetchDetail(id),
+      ),
+    );
+  }
+
+  Widget _infoBox({
+    required String title,
+    required Color color,
+    required IconData icon,
+    required List<String> lines,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 4),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ...lines.take(2).map(
+                (line) => Text(
+                  '- $line',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF374151),
+                  ),
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = _displayResults;
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.72,
+      maxChildSize: 0.95,
+      minChildSize: 0.55,
+      builder: (_, controller) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFFF6FBF7),
+            borderRadius: BorderRadius.horizontal(left: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 10),
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD0E5D6),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1B7F4B).withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.pest_control_rodent,
+                        color: Color(0xFF1B7F4B),
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'Tra cứu loài rắn',
+                        style: TextStyle(
+                          color: Color(0xFF0F2E1C),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              setState(() => _results = const []);
+                              _search();
+                            },
+                      icon: const Icon(Icons.refresh,
+                          color: Color(0xFF5B7D6A)),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE6F2EA),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: TextField(
+                          controller: _queryController,
+                          style: const TextStyle(color: Color(0xFF0F2E1C)),
+                          textInputAction: TextInputAction.search,
+                          onSubmitted: (_) => _search(),
+                          decoration: InputDecoration(
+                            prefixIcon: const Icon(Icons.search, color: Color(0xFF5B7D6A)),
+                            hintText: 'Tìm loài rắn...',
+                            hintStyle: const TextStyle(color: Color(0xFF5B7D6A)),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.only(top: 12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      height: 46,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _search,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1B7F4B),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Tìm'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: Color(0xFFD0E5D6)),
+                  ),
+                ),
+                child: const Row(
+                  children: [
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: Text(
+                          'Loài rắn',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0F2E1C),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: items.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Nhập từ khóa để tìm rắn.\nVí dụ: hổ mang, lục, cạp nong...',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Color(0xFF5B7D6A)),
+                        ),
+                      )
+                    : ListView.separated(
+                        controller: controller,
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                        itemCount: items.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (_, index) {
+                          if (index == 0) {
+                            return _buildFeaturedCard(items[index]);
+                          }
+                          return _buildCompactCard(items[index]);
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SnakeDetailSheet extends StatelessWidget {
+  final Map<String, dynamic> seed;
+  final Future<Map<String, dynamic>?> detailFuture;
+
+  const _SnakeDetailSheet({
+    required this.seed,
+    required this.detailFuture,
+  });
+
+  String _stringFrom(Map<String, dynamic> data, String key) {
+    return (data[key] ?? '').toString().trim();
+  }
+
+  List<String> _stringList(dynamic value) {
+    if (value is List) {
+      return value
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    if (value is String && value.trim().isNotEmpty) {
+      return value
+          .split(RegExp(r'[;,|]'))
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    return const [];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.82,
+      maxChildSize: 0.98,
+      minChildSize: 0.6,
+      builder: (_, controller) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFFF4FAF5),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: FutureBuilder<Map<String, dynamic>?>(
+            future: detailFuture,
+            builder: (context, snapshot) {
+              final data = snapshot.data ?? seed;
+              final commonName = _stringFrom(data, 'commonName');
+              final scientificName = _stringFrom(data, 'scientificName');
+              final imageUrl = _stringFrom(data, 'imageUrl');
+              final description = _stringFrom(data, 'description');
+              final summary = _stringFrom(data, 'identificationSummary');
+              final venomType = _stringFrom(data, 'primaryVenomType');
+              final riskLevel = _stringFrom(data, 'riskLevel');
+              final isVenomous = data['isVenomous'] == true;
+              final alternativeNames = _stringList(data['alternativeNames']);
+              final identification = data['identification'] is Map<String, dynamic>
+                  ? data['identification'] as Map<String, dynamic>
+                  : const <String, dynamic>{};
+              final traits = _stringList(identification['physicalTraits']);
+              final behaviors = _stringList(identification['behaviors']);
+              final habitat = _stringFrom(identification, 'habitat');
+              final symptoms = data['symptomsByTime'] is List
+                  ? data['symptomsByTime'] as List<dynamic>
+                  : const [];
+              final firstAid = data['firstAidGuidelineOverride'] is Map<String, dynamic>
+                  ? data['firstAidGuidelineOverride'] as Map<String, dynamic>
+                  : const <String, dynamic>{};
+              final firstAidContent = firstAid['content'] is Map<String, dynamic>
+                  ? firstAid['content'] as Map<String, dynamic>
+                  : const <String, dynamic>{};
+              final firstAidSteps = firstAidContent['steps'] is List
+                  ? firstAidContent['steps'] as List<dynamic>
+                  : const [];
+              final venoms = data['venoms'] is List
+                  ? data['venoms'] as List<dynamic>
+                  : const [];
+              final antivenoms = data['antivenoms'] is List
+                  ? data['antivenoms'] as List<dynamic>
+                  : const [];
+
+              return ListView(
+                controller: controller,
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD0E5D6),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Stack(
+                    children: [
+                      Container(
+                        height: 190,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFF1B7F4B), Color(0xFF0F2E1C)],
+                          ),
+                          image: imageUrl.isEmpty
+                              ? null
+                              : DecorationImage(
+                                  image: NetworkImage(imageUrl),
+                                  fit: BoxFit.cover,
+                                  colorFilter: ColorFilter.mode(
+                                    Colors.black.withOpacity(0.2),
+                                    BlendMode.darken,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 14,
+                        right: 14,
+                        child: InkWell(
+                          onTap: () => Navigator.pop(context),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.35),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close, color: Colors.white, size: 18),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 16,
+                        bottom: 16,
+                        right: 16,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              commonName.isEmpty ? 'Không rõ tên' : commonName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            if (scientificName.isNotEmpty)
+                              Text(
+                                scientificName,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: isVenomous
+                                        ? const Color(0xFFDC2626)
+                                        : const Color(0xFF16A34A),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    isVenomous ? 'Có độc' : 'Không độc',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                if (venomType.isNotEmpty)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: Text(
+                                      venomType,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                if (riskLevel.isNotEmpty) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: Text(
+                                      'Risk $riskLevel',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (snapshot.connectionState == ConnectionState.waiting)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE6F2EA)),
+                      ),
+                      child: const Row(
+                        children: [
+                          SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Đang tải thông tin chi tiết...',
+                              style: TextStyle(color: Color(0xFF335244)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (description.isNotEmpty) ...[
+                    _detailSection('Tóm tắt', description),
+                  ],
+                  if (summary.isNotEmpty) ...[
+                    _detailSection('Nhận dạng nhanh', summary),
+                  ],
+                  if (alternativeNames.isNotEmpty) ...[
+                    _detailSection('Tên gọi khác', alternativeNames.join(', ')),
+                  ],
+                  if (traits.isNotEmpty) ...[
+                    _detailListSection('Đặc điểm nhận dạng', traits),
+                  ],
+                  if (behaviors.isNotEmpty) ...[
+                    _detailListSection('Hành vi', behaviors),
+                  ],
+                  if (habitat.isNotEmpty) ...[
+                    _detailSection('Môi trường sống', habitat),
+                  ],
+                  if (symptoms.isNotEmpty) ...[
+                    _symptomSection(symptoms),
+                  ],
+                  if (firstAidSteps.isNotEmpty) ...[
+                    _firstAidSection(firstAidSteps),
+                  ],
+                  if (venoms.isNotEmpty) ...[
+                    _venomSection(venoms),
+                  ],
+                  if (antivenoms.isNotEmpty) ...[
+                    _antivenomSection(antivenoms),
+                  ],
+                  const SizedBox(height: 12),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _detailSection(String title, String content) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE6F2EA)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F2E1C),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            content,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF335244)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailListSection(String title, List<String> items) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE6F2EA)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F2E1C),
+            ),
+          ),
+          const SizedBox(height: 6),
+          ...items.take(6).map(
+                (e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    '- $e',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF335244)),
+                  ),
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+
+  Widget _symptomSection(List<dynamic> symptoms) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE6F2EA)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Triệu chứng theo thời gian',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F2E1C),
+            ),
+          ),
+          const SizedBox(height: 6),
+          ...symptoms.take(4).map((entry) {
+            if (entry is! Map) return const SizedBox();
+            final timeRange = (entry['timeRange'] ?? '').toString();
+            final signs = _stringList(entry['signs']);
+            final critical = entry['isCritical'] == true;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: critical ? const Color(0xFFFEE2E2) : const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    timeRange.isEmpty ? 'Không rõ' : timeRange,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: critical ? const Color(0xFFB91C1C) : const Color(0xFF1D4ED8),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  ...signs.take(4).map(
+                        (s) => Text(
+                          '- $s',
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF334155)),
+                        ),
+                      ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _firstAidSection(List<dynamic> steps) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE6F2EA)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Sơ cứu đề xuất',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F2E1C),
+            ),
+          ),
+          const SizedBox(height: 6),
+          ...steps.take(4).map((e) {
+            if (e is! Map) return const SizedBox();
+            final text = (e['text'] ?? '').toString();
+            if (text.isEmpty) return const SizedBox();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                '- $text',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF335244)),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _venomSection(List<dynamic> venoms) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE6F2EA)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Thong tin doc to',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F2E1C),
+            ),
+          ),
+          const SizedBox(height: 6),
+          ...venoms.take(3).map((v) {
+            if (v is! Map) return const SizedBox();
+            final type = (v['venomType'] ?? '').toString();
+            final desc = (v['description'] ?? '').toString();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (type.isNotEmpty)
+                    Text(
+                      type,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1B7F4B),
+                      ),
+                    ),
+                  if (desc.isNotEmpty)
+                    Text(
+                      desc,
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF335244)),
+                    ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _antivenomSection(List<dynamic> antivenoms) {
+    final items = antivenoms
+        .map((e) => e is Map ? (e['name'] ?? e['type'] ?? e['title']) : e)
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (items.isEmpty) return const SizedBox();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Huyet thanh',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1D4ED8),
+            ),
+          ),
+          const SizedBox(height: 6),
+          ...items.take(4).map(
+                (e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    '- $e',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF1E3A8A)),
+                  ),
+                ),
+              ),
+        ],
+      ),
+    );
+  }
 }

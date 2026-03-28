@@ -41,11 +41,49 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
 
   // Profile loading
   bool _isLoadingProfile = true;
+  bool _isLoadingWallet = true;
+  String? _walletError;
+  double? _walletBalance;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadExpertProfile());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadExpertProfile();
+      _loadWalletBalance();
+    });
+  }
+
+  Future<void> _loadWalletBalance() async {
+    setState(() {
+      _isLoadingWallet = true;
+      _walletError = null;
+    });
+
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      final wallet = await repo.getMyWallet();
+      if (!mounted) return;
+      setState(() {
+        _walletBalance = (wallet['balance'] as num?)?.toDouble() ?? 0;
+        _isLoadingWallet = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingWallet = false;
+        _walletError = 'Không thể tải số dư ví';
+      });
+    }
+  }
+
+  String _formatCurrency(double value) {
+    final amount = value.round().toString();
+    final withSeparator = amount.replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]},',
+    );
+    return '$withSeparator VNĐ';
   }
 
   Future<void> _loadExpertProfile() async {
@@ -323,7 +361,67 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
               ],
             ),
 
-            // SECTION 3: Consultation Fees
+            // SECTION 3: Wallet
+            _buildSectionHeader('Ví SnakeAid'),
+            _buildCard(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6C47C2).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.account_balance_wallet_outlined,
+                          color: Color(0xFF6C47C2),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Số dư ví hiện tại',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2D2D2D),
+                          ),
+                        ),
+                      ),
+                      if (_isLoadingWallet)
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else
+                        Text(
+                          _walletError ?? _formatCurrency(_walletBalance ?? 0),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: _walletError != null
+                                ? Colors.red
+                                : const Color(0xFF16A34A),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                _buildSimpleRow(
+                  label: 'Làm mới số dư',
+                  icon: Icons.refresh,
+                  onTap: _loadWalletBalance,
+                ),
+              ],
+            ),
+
+            // SECTION 4: Consultation Fees
             _buildSectionHeader('Phí Tư Vấn'),
             _buildCard(
               children: [

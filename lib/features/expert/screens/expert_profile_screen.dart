@@ -1,17 +1,63 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../consultation/repository/consultation_repository.dart';
 
 /// Expert Profile Screen - Personal information and statistics for expert
-class ExpertProfileScreen extends StatefulWidget {
+class ExpertProfileScreen extends ConsumerStatefulWidget {
   final VoidCallback? onGoToHistory;
   const ExpertProfileScreen({super.key, this.onGoToHistory});
 
   @override
-  State<ExpertProfileScreen> createState() => _ExpertProfileScreenState();
+  ConsumerState<ExpertProfileScreen> createState() => _ExpertProfileScreenState();
 }
 
-class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
-  bool _isAvailable = true;
+class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
+  bool _isLoadingWallet = true;
+  double? _walletBalance;
+  String? _walletError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWalletBalance();
+  }
+
+  Future<void> _loadWalletBalance() async {
+    setState(() {
+      _isLoadingWallet = true;
+      _walletError = null;
+    });
+
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      final wallet = await repo.getMyWallet();
+      if (!mounted) return;
+      setState(() {
+        _walletBalance = (wallet['balance'] as num?)?.toDouble() ?? 0;
+        _isLoadingWallet = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _walletError = 'Không thể tải số dư ví';
+        _isLoadingWallet = false;
+      });
+    }
+  }
+
+  String _formatCurrency(double value) {
+    final number = value.toInt();
+    final formatted = number.toString().replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]},',
+    );
+    return '$formatted VNĐ';
+  }
+
+  Future<void> _refreshProfile() async {
+    await _loadWalletBalance();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,13 +86,15 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 100),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+      body: RefreshIndicator(
+        color: const Color(0xFF6C47C2),
+        onRefresh: _refreshProfile,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
                 // Profile Card
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -165,19 +213,10 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
-              ],
-            ),
+              const SizedBox(height: 24),
+            ],
           ),
-
-          // Fixed Availability Toggle at Bottom
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: _buildAvailabilityToggle(),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -451,6 +490,10 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
   }
 
   Widget _buildRevenueSummary() {
+    final balanceText = _isLoadingWallet
+        ? 'Đang tải...'
+        : (_walletError ?? _formatCurrency(_walletBalance ?? 0));
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -471,7 +514,7 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Doanh Thu Tháng Này',
+                'Ví SnakeAidPay',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -481,23 +524,23 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF28A745).withOpacity(0.1),
+                  color: const Color(0xFF6C47C2).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Row(
                   children: [
                     Icon(
-                      Icons.trending_up,
+                      Icons.account_balance_wallet,
                       size: 14,
-                      color: Color(0xFF28A745),
+                      color: Color(0xFF6C47C2),
                     ),
                     SizedBox(width: 4),
                     Text(
-                      '+15%',
+                      'Số dư',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF28A745),
+                        color: Color(0xFF6C47C2),
                       ),
                     ),
                   ],
@@ -506,17 +549,21 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
-            '4.26M VNĐ',
+          Text(
+            balanceText,
             style: TextStyle(
               fontSize: 30,
               fontWeight: FontWeight.w900,
-              color: Color(0xFF6C47C2),
+              color: _walletError == null
+                  ? const Color(0xFF6C47C2)
+                  : const Color(0xFFDC3545),
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            'So với tháng trước (3.65M VNĐ)',
+            _walletError == null
+                ? 'Số dư khả dụng hiện tại của chuyên gia'
+                : 'Vui lòng thử lại để cập nhật số dư ví',
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey[400],
@@ -526,7 +573,7 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
-              onPressed: () {},
+              onPressed: _loadWalletBalance,
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 side: const BorderSide(color: Color(0xFF6C47C2)),
@@ -538,7 +585,7 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'Xem Chi Tiết',
+                    'Làm Mới Số Dư Ví',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -547,7 +594,7 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
                   ),
                   SizedBox(width: 8),
                   Icon(
-                    Icons.arrow_forward,
+                    Icons.refresh,
                     size: 18,
                     color: Color(0xFF6C47C2),
                   ),
@@ -621,81 +668,6 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
     );
   }
 
-  Widget _buildAvailabilityToggle() {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFF6C47C2).withOpacity(0.2),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Sẵn Sàng Nhận Tư Vấn',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D2D2D),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF28A745),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _isAvailable
-                          ? 'Đang bật - Bạn sẽ nhận được yêu cầu'
-                          : 'Đang tắt - Không nhận yêu cầu',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: _isAvailable
-                            ? const Color(0xFF28A745)
-                            : Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: _isAvailable,
-            onChanged: (value) {
-              setState(() {
-                _isAvailable = value;
-              });
-            },
-            activeThumbColor: const Color(0xFF6C47C2),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // Specialty Tag Widget

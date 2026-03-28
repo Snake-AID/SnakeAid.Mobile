@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/consultation_booking_response.dart';
+import '../../models/my_consultation_response.dart';
+import 'consultation_completion_screen.dart';
+import 'member_consultation_detail_screen.dart';
 import '../../providers/consultation_bookings_provider.dart';
-import '../../repository/consultation_repository.dart';
+import '../../providers/my_consultations_provider.dart';
 
-/// Trạng thái hiển thị của một buổi tư vấn (derived from ConsultationBookingStatus)
+/// Trạng thái hiển thị của một buổi tư vấn
 enum ConsultationStatus {
   active,         // Đang diễn ra (confirmed + đến giờ)
   upcoming,       // Đã xác nhận, chưa đến giờ
@@ -27,6 +30,7 @@ class _ConsultationItem {
   final String serviceType;
   final int feeCost;
   final double? rating;
+  final String? problemDescription;
 
   const _ConsultationItem({
     required this.id,
@@ -40,36 +44,47 @@ class _ConsultationItem {
     required this.serviceType,
     required this.feeCost,
     this.rating,
+    this.problemDescription,
   });
 
-  /// Map from API booking response to UI model
-  factory _ConsultationItem.fromBooking(ConsultationBookingResponse b) {
+  /// Map from API my-consultation response to UI model
+  factory _ConsultationItem.fromConsultation(MyConsultationResponse c) {
+    final now = DateTime.now();
+    final scheduledAt = c.startTime ?? c.slotStartTime ?? DateTime.now();
+
     final ConsultationStatus uiStatus;
-    if (b.status == ConsultationBookingStatus.confirmed) {
-      final diff = b.scheduledTime.difference(DateTime.now());
-      uiStatus = diff.inMinutes <= 10
-          ? ConsultationStatus.active
-          : ConsultationStatus.upcoming;
-    } else if (b.status == ConsultationBookingStatus.pendingPayment) {
-      uiStatus = ConsultationStatus.pendingPayment;
-    } else if (b.status == ConsultationBookingStatus.completed) {
+    if (c.status == MyConsultationStatus.completed) {
       uiStatus = ConsultationStatus.completed;
+    } else if (c.status == MyConsultationStatus.scheduled) {
+      uiStatus = scheduledAt.isAfter(now)
+          ? ConsultationStatus.upcoming
+          : ConsultationStatus.active;
     } else {
-      uiStatus = ConsultationStatus.cancelled;
+      uiStatus = scheduledAt.isAfter(now)
+          ? ConsultationStatus.upcoming
+          : ConsultationStatus.active;
     }
 
+    final fee = c.price?.toInt() ?? 0;
+    final serviceType = c.type == MyConsultationType.emergency
+        ? 'Tư vấn khẩn cấp'
+        : 'Tư vấn đặt lịch';
+
     return _ConsultationItem(
-      id: b.id,
-      consultationId: b.consultationId,
-      expertId: b.expertId,
-      expertName: b.expertName,
-      expertSpecialty: b.expertSpecialty ?? '',
-      expertAvatarUrl: b.expertAvatarUrl,
-      scheduledTime: b.scheduledTime,
+      id: (c.bookingId != null && c.bookingId!.isNotEmpty)
+          ? c.bookingId!
+          : c.consultationId,
+      consultationId: c.consultationId,
+      expertId: c.expertId,
+      expertName: c.expertName,
+      expertSpecialty: '',
+      expertAvatarUrl: null,
+      scheduledTime: scheduledAt,
       status: uiStatus,
-      serviceType: b.consultationType == 'Instant' ? 'Tư vấn khẩn cấp' : 'Tư vấn đặt lịch',
-      feeCost: b.feeCost,
-      rating: b.rating,
+      serviceType: serviceType,
+      feeCost: fee,
+      rating: null,
+      problemDescription: c.problemDescription,
     );
   }
 }
@@ -101,13 +116,32 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
 
   /// Derive UI item list from provider bookings
   List<_ConsultationItem> _toItems(
-      List<ConsultationBookingResponse> bookings) {
-    return bookings.map(_ConsultationItem.fromBooking).toList();
+      List<MyConsultationResponse> consultations,
+      Map<String, double> ratingByConsultationId) {
+    return consultations.map((c) {
+      final item = _ConsultationItem.fromConsultation(c);
+      final rating = ratingByConsultationId[c.consultationId];
+      return _ConsultationItem(
+        id: item.id,
+        consultationId: item.consultationId,
+        expertId: item.expertId,
+        expertName: item.expertName,
+        expertSpecialty: item.expertSpecialty,
+        expertAvatarUrl: item.expertAvatarUrl,
+        scheduledTime: item.scheduledTime,
+        status: item.status,
+        serviceType: item.serviceType,
+        feeCost: item.feeCost,
+        rating: rating,
+        problemDescription: item.problemDescription,
+      );
+    }).toList();
   }
 
   List<_ConsultationItem> _upcomingList(
-      List<ConsultationBookingResponse> bookings) {
-    final list = _toItems(bookings)
+      List<MyConsultationResponse> consultations,
+      Map<String, double> ratingByConsultationId) {
+    final list = _toItems(consultations, ratingByConsultationId)
         .where((c) =>
             c.status == ConsultationStatus.active ||
             c.status == ConsultationStatus.upcoming ||
@@ -129,13 +163,44 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
   }
 
   List<_ConsultationItem> _historyList(
-      List<ConsultationBookingResponse> bookings) =>
-      _toItems(bookings)
+      List<MyConsultationResponse> consultations,
+      Map<String, double> ratingByConsultationId) =>
+      _toItems(consultations, ratingByConsultationId)
           .where((c) =>
               c.status == ConsultationStatus.completed ||
               c.status == ConsultationStatus.cancelled)
           .toList()
         ..sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
+
+  List<_ConsultationItem> _bookingFallbackItems(
+      List<ConsultationBookingResponse> bookings) {
+    final now = DateTime.now();
+    return bookings
+        .where((b) =>
+            b.status == ConsultationBookingStatus.pendingPayment ||
+            b.status == ConsultationBookingStatus.confirmed)
+        .map((b) => _ConsultationItem(
+              id: b.id,
+              consultationId: b.consultationId,
+              expertId: b.expertId,
+              expertName: b.expertName,
+              expertSpecialty: b.expertSpecialty ?? '',
+              expertAvatarUrl: b.expertAvatarUrl,
+              scheduledTime: b.scheduledTime,
+              status: b.status == ConsultationBookingStatus.pendingPayment
+                  ? ConsultationStatus.pendingPayment
+                  : (b.scheduledTime.isAfter(now)
+                      ? ConsultationStatus.upcoming
+                      : ConsultationStatus.active),
+              serviceType: b.consultationType == 'Instant'
+                  ? 'Tư vấn khẩn cấp'
+                  : 'Tư vấn đặt lịch',
+              feeCost: b.feeCost,
+              rating: b.rating,
+                problemDescription: b.problemDescription,
+            ))
+        .toList();
+  }
 
   @override
   void initState() {
@@ -157,6 +222,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
 
     // Reload data mỗi khi vào màn hình
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(myConsultationsProvider.notifier).loadConsultations();
       ref.read(consultationBookingsProvider.notifier).loadBookings();
       
       // Nếu có buổi tư vấn vừa được tạo, highlight nó khi danh sách load xong
@@ -186,9 +252,24 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final consultationsState = ref.watch(myConsultationsProvider);
     final bookingsState = ref.watch(consultationBookingsProvider);
-    final upcoming = _upcomingList(bookingsState.bookings);
-    final history = _historyList(bookingsState.bookings);
+    final ratingByConsultationId = <String, double>{
+      for (final entry in consultationsState.reviewsByConsultationId.entries)
+        if (entry.value != null) entry.key: entry.value!.rating.toDouble(),
+    };
+    final ongoingFromNewApi =
+        _upcomingList(consultationsState.ongoing, ratingByConsultationId);
+    final pendingFromLegacyBookings =
+      _bookingFallbackItems(bookingsState.bookings);
+    final upcomingById = <String, _ConsultationItem>{
+      for (final item in [...ongoingFromNewApi, ...pendingFromLegacyBookings])
+        item.id: item,
+    };
+    final upcoming = upcomingById.values.toList()
+      ..sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
+    final history =
+        _historyList(consultationsState.completed, ratingByConsultationId);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8F6),
@@ -203,7 +284,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
 
             // Tab Content
             Expanded(
-              child: bookingsState.isLoading
+              child: (consultationsState.isLoading && bookingsState.isLoading)
                   ? const Center(child: CircularProgressIndicator(color: Color(0xFF228B22)))
                   : TabBarView(
                       controller: _tabController,
@@ -360,7 +441,12 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
 
     return RefreshIndicator(
       color: const Color(0xFF228B22),
-      onRefresh: () => ref.read(consultationBookingsProvider.notifier).loadBookings(),
+      onRefresh: () async {
+        await Future.wait([
+          ref.read(myConsultationsProvider.notifier).loadConsultations(),
+          ref.read(consultationBookingsProvider.notifier).loadBookings(),
+        ]);
+      },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         children: [
@@ -658,7 +744,12 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
 
     return RefreshIndicator(
       color: const Color(0xFF228B22),
-      onRefresh: () => ref.read(consultationBookingsProvider.notifier).loadBookings(),
+      onRefresh: () async {
+        await Future.wait([
+          ref.read(myConsultationsProvider.notifier).loadConsultations(),
+          ref.read(consultationBookingsProvider.notifier).loadBookings(),
+        ]);
+      },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         children: historyList
@@ -770,7 +861,6 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
             // Action buttons
             Row(
               children: [
-                // Xem chi tiết (luôn có)
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => _viewDetail(context, item),
@@ -793,14 +883,29 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                 ),
 
                 // Đặt lại (nếu đã hủy hoặc đã hoàn thành)
-                if (!isCancelled && item.rating == null) ...[
-                  const SizedBox(width: 10),
+                const SizedBox(width: 10),
+                if (!isCancelled && item.rating == null)
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Đánh giá chuyên gia - Đang phát triển'),
+                        final consultationId = item.consultationId;
+                        if (consultationId == null || consultationId.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Không tìm thấy phiên tư vấn để đánh giá.'),
+                            ),
+                          );
+                          return;
+                        }
+
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => ConsultationCompletionScreen(
+                              expertName: item.expertName,
+                              expertSpecialty: item.expertSpecialty,
+                              durationSeconds: 1800,
+                              consultationId: consultationId,
+                            ),
                           ),
                         );
                       },
@@ -822,9 +927,27 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                         elevation: 0,
                       ),
                     ),
-                  ),
-                ] else if (isCancelled) ...[
-                  const SizedBox(width: 10),
+                  )
+                else if (!isCancelled && item.rating != null)
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3F4F6),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text(
+                        'Đã đánh giá',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                    ),
+                  )
+                else if (isCancelled)
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () => context.push('/expert-list'),
@@ -847,7 +970,6 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                       ),
                     ),
                   ),
-                ],
               ],
             ),
           ],
@@ -1024,11 +1146,19 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
   String _formatScheduledTime(DateTime dt) {
     final now = DateTime.now();
     final diff = dt.difference(now);
+    final totalMinutes = diff.inMinutes;
 
-    if (diff.inMinutes <= 10) {
-      return 'Bắt đầu sau ${diff.inMinutes} phút';
+    if (totalMinutes <= 0) {
+      return 'Đã đến giờ tư vấn';
+    } else if (totalMinutes < 60) {
+      return 'Bắt đầu sau $totalMinutes phút';
     } else if (diff.inHours < 24) {
-      return 'Hôm nay ${_padTime(dt.hour)}:${_padTime(dt.minute)}';
+      final hours = diff.inHours;
+      final minutes = totalMinutes % 60;
+      if (minutes == 0) {
+        return 'Bắt đầu sau $hours giờ';
+      }
+      return 'Bắt đầu sau $hours giờ $minutes phút';
     } else if (diff.inDays == 1) {
       return 'Ngày mai ${_padTime(dt.hour)}:${_padTime(dt.minute)}';
     } else {
@@ -1050,9 +1180,44 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
   }
 
   void _viewDetail(BuildContext context, _ConsultationItem item) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Chi tiết buổi tư vấn #${item.id} - Đang phát triển'),
+    Color statusColor;
+    String statusLabel;
+    switch (item.status) {
+      case ConsultationStatus.active:
+        statusColor = const Color(0xFF228B22);
+        statusLabel = 'Đang diễn ra';
+        break;
+      case ConsultationStatus.upcoming:
+        statusColor = const Color(0xFF3B82F6);
+        statusLabel = 'Sắp tới';
+        break;
+      case ConsultationStatus.pendingPayment:
+        statusColor = const Color(0xFFF59E0B);
+        statusLabel = 'Chờ thanh toán';
+        break;
+      case ConsultationStatus.completed:
+        statusColor = const Color(0xFF228B22);
+        statusLabel = 'Hoàn thành';
+        break;
+      case ConsultationStatus.cancelled:
+        statusColor = const Color(0xFFEF4444);
+        statusLabel = 'Đã hủy';
+        break;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => MemberConsultationDetailScreen(
+          expertName: item.expertName,
+          expertSpecialty: item.expertSpecialty,
+          serviceType: item.serviceType,
+          scheduledTime: item.scheduledTime,
+          feeCost: item.feeCost,
+          statusLabel: statusLabel,
+          statusColor: statusColor,
+          rating: item.rating,
+          problemDescription: item.problemDescription,
+        ),
       ),
     );
   }

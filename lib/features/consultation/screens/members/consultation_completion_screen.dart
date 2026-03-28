@@ -360,6 +360,23 @@ class _ConsultationCompletionScreenState
   // ── Payment Card ───────────────────────────────────────────────────────────
 
   Widget _buildPaymentCard() {
+    // Fee calculation (example from hardcoded amount)
+    const serviceFee = 150000; // Số tiền tư vấn
+    final platformFee = (serviceFee * 0.1).round(); // 10% phí nền tảng
+    final netAmount = serviceFee - platformFee;
+
+    // Format currency helper
+    String formatCurrency(int amount) {
+      if (amount <= 0) return '0 VNĐ';
+      final s = amount.toString();
+      final buf = StringBuffer();
+      for (int i = 0; i < s.length; i++) {
+        if (i > 0 && (s.length - i) % 3 == 0) buf.write('.');
+        buf.write(s[i]);
+      }
+      return '${buf.toString()} VNĐ';
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -374,10 +391,14 @@ class _ConsultationCompletionScreenState
       ),
       child: Column(
         children: [
-          _buildPaymentRow('Số tiền', '150.000 VNĐ', valueGreen: true),
+          _buildPaymentRow('Giá dịch vụ', formatCurrency(serviceFee), valueGreen: false),
+          const SizedBox(height: 10),
+          _buildPaymentRow('Phí nền tảng', '-${formatCurrency(platformFee)}', valueGreen: false),
+          const Divider(height: 20, color: Color(0xFFF3F4F6)),
+          _buildPaymentRow('Tổng cộng đã trả', formatCurrency(serviceFee), valueGreen: true),
           const SizedBox(height: 12),
-          _buildPaymentRow('Phương thức', 'PayOS'),
-          const Divider(height: 24, color: Color(0xFFF3F4F6)),
+          _buildPaymentRow('Phương thức', 'Ví điện tử / PayOS', valueGreen: false),
+          const Divider(height: 20, color: Color(0xFFF3F4F6)),
           Row(
             children: const [
               Icon(Icons.check_circle, size: 18, color: _primary),

@@ -10,6 +10,8 @@ import '../models/expert_detail_model.dart';
 import '../models/review_model.dart';
 import '../models/availability_model.dart';
 import '../models/consultation_booking_response.dart';
+import '../models/my_consultation_response.dart';
+import '../models/consultation_review_response.dart';
 import '../models/emergency_consultation_request.dart';
 import '../models/consultation_payment_response.dart';
 
@@ -396,6 +398,52 @@ class ConsultationRepository {
     }
   }
 
+  /// Get consultations for current user (scheduled + emergency).
+  ///
+  /// API: `GET /api/users/me/consultations`
+  Future<List<MyConsultationResponse>> getMyConsultations({
+    String? status,
+    String? type,
+    int pageNumber = 1,
+    int pageSize = 20,
+  }) async {
+    try {
+      debugPrint('📋 Fetching my consultations: status=$status, type=$type, page=$pageNumber, size=$pageSize');
+      final query = <String, dynamic>{
+        'pageNumber': pageNumber,
+        'pageSize': pageSize,
+      };
+      if (status != null && status.isNotEmpty) {
+        query['status'] = status;
+      }
+      if (type != null && type.isNotEmpty) {
+        query['type'] = type;
+      }
+
+      final response = await httpService.get(
+        '/api/users/me/consultations',
+        queryParameters: query,
+      );
+
+      final body = response.data as Map<String, dynamic>;
+      if (body['is_success'] == true && body['data'] != null) {
+        final data = body['data'] as Map<String, dynamic>;
+        final items = (data['items'] as List<dynamic>? ?? const []);
+        return items
+            .whereType<Map<String, dynamic>>()
+            .map(MyConsultationResponse.fromJson)
+            .toList();
+      }
+      return [];
+    } on DioException catch (e) {
+      debugPrint('❌ Failed to fetch consultations: ${e.message}');
+      return [];
+    } catch (e) {
+      debugPrint('❌ Unexpected error fetching consultations: $e');
+      return [];
+    }
+  }
+
   /// Create a new consultation booking
   ///
   /// API: `POST /api/consultation-bookings`
@@ -541,14 +589,9 @@ class ConsultationRepository {
 
   /// Search snake species by keyword for in-room expert assistance.
   ///
-  /// API: `GET /api/v1/snakes/search?q={query}`
+  /// API: `GET /api/snake-species`
   Future<List<Map<String, dynamic>>> searchSnakeSpecies(String query) async {
-    if (query.trim().isEmpty) return [];
-
-    final response = await httpService.get(
-      '/api/v1/snakes/search',
-      queryParameters: {'q': query.trim()},
-    );
+    final response = await httpService.get('/api/snake-species');
 
     final body = response.data as Map<String, dynamic>;
     if (body['is_success'] == true && body['data'] is List) {
@@ -558,6 +601,18 @@ class ConsultationRepository {
     }
 
     return [];
+  }
+
+  /// Get snake species detail by id.
+  ///
+  /// API: `GET /api/snake-species/{id}`
+  Future<Map<String, dynamic>?> getSnakeSpeciesDetail(int id) async {
+    final response = await httpService.get('/api/snake-species/$id');
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] == true && body['data'] is Map<String, dynamic>) {
+      return body['data'] as Map<String, dynamic>;
+    }
+    return null;
   }
 
   // ---------------------------------------------------------------------------
@@ -635,6 +690,29 @@ class ConsultationRepository {
     throw Exception(body['message'] ?? 'Không thể lấy thông tin ví');
   }
 
+  /// Create a PayOS top-up payment link for current user's wallet.
+  ///
+  /// API: `POST /api/wallet/topup`
+  Future<Map<String, dynamic>> createWalletTopup({
+    required double amount,
+    String? description,
+  }) async {
+    final response = await httpService.post(
+      '/api/wallet/topup',
+      data: {
+        'amount': amount,
+        if (description != null && description.isNotEmpty)
+          'description': description,
+      },
+    );
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] == true && body['data'] != null) {
+      return body['data'] as Map<String, dynamic>;
+    }
+    throw Exception(body['message'] ?? 'Không thể tạo giao dịch nạp ví');
+  }
+
   /// Submit a review for a completed consultation.
   ///
   /// API: `POST /api/consultations/{consultationId}/reviews`
@@ -659,6 +737,29 @@ class ConsultationRepository {
     if (body['is_success'] != true) {
       throw Exception(body['message'] ?? 'Không thể gửi đánh giá');
     }
+  }
+
+  /// Get review details for a specific consultation.
+  ///
+  /// API: `GET /api/consultations/{consultationId}/reviews`
+  /// Returns null when no review exists.
+  Future<ConsultationReviewResponse?> getConsultationReview(
+    String consultationId,
+  ) async {
+    final response = await httpService.get(
+      '/api/consultations/$consultationId/reviews',
+    );
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] == true) {
+      final data = body['data'];
+      if (data is Map<String, dynamic>) {
+        return ConsultationReviewResponse.fromJson(data);
+      }
+      return null;
+    }
+
+    throw Exception(body['message'] ?? 'Không thể lấy đánh giá buổi tư vấn');
   }
 
   // ---------------------------------------------------------------------------

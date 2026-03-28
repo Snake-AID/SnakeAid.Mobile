@@ -332,6 +332,7 @@ final router = GoRouter(
         final initialMicOn = extra?['initialMicOn'] as bool? ?? true;
         final initialCameraOn = extra?['initialCameraOn'] as bool? ?? true;
         final afterCallRoute = extra?['afterCallRoute'] as String?;
+        final isExpertMode = extra?['isExpertMode'] as bool? ?? false;
         return VideoConsultationScreen(
           consultationId: id,
           expertName: expertName,
@@ -339,6 +340,7 @@ final router = GoRouter(
           initialMicOn: initialMicOn,
           initialCameraOn: initialCameraOn,
           afterCallRoute: afterCallRoute,
+          isExpertMode: isExpertMode,
           livekitToken: extra?['livekitToken'] as String? ?? '',
           wsUrl: extra?['wsUrl'] as String? ?? '',
         );
@@ -501,8 +503,6 @@ final router = GoRouter(
           selectedTime: extraData?['selectedTime'],
           duration: extraData?['duration'],
           price: extraData?['price'],
-          hasDocuments: extraData?['hasDocuments'] ?? false,
-          uploadedImagesCount: extraData?['uploadedImagesCount'] ?? 0,
           problemDescription: extraData?['problemDescription'],
           questions: extraData?['questions'],
           bookingId: extraData?['bookingId'] as String?,

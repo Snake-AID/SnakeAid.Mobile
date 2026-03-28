@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
+import 'package:app_links/app_links.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,8 +31,6 @@ class PaymentConfirmationScreen extends ConsumerStatefulWidget {
   final String? selectedTime;
   final String? duration;
   final String? price;
-  final bool hasDocuments;
-  final int uploadedImagesCount;
   final String? problemDescription;
   final String? questions;
   /// Booking ID for payment API call
@@ -48,8 +48,6 @@ class PaymentConfirmationScreen extends ConsumerStatefulWidget {
     this.selectedTime,
     this.duration,
     this.price,
-    this.hasDocuments = false,
-    this.uploadedImagesCount = 0,
     this.problemDescription,
     this.questions,
     this.bookingId,
@@ -63,7 +61,8 @@ class PaymentConfirmationScreen extends ConsumerStatefulWidget {
 }
 
 class _PaymentConfirmationScreenState
-    extends ConsumerState<PaymentConfirmationScreen> {
+  extends ConsumerState<PaymentConfirmationScreen>
+  with WidgetsBindingObserver {
   static const String _instantRequestCachePrefix =
       'last_emergency_request_for_expert_';
 
@@ -72,6 +71,12 @@ class _PaymentConfirmationScreenState
   bool _isPaymentLoading = false;
   double? _walletBalance;
   bool _isLoadingWallet = true;
+  final AppLinks _appLinks = AppLinks();
+  StreamSubscription<Uri>? _payOsCallbackSub;
+  bool _isHandlingPayOsCallback = false;
+  String? _pendingPayOsTransactionId;
+  String? _pendingEmergencyRequestId;
+  String? _pendingBookingId;
 
   Future<void> _cacheLastEmergencyRequestId(String requestId) async {
     final prefs = await SharedPreferences.getInstance();
@@ -89,7 +94,23 @@ class _PaymentConfirmationScreenState
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _initPayOsCallbackListener();
     _fetchWallet();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _payOsCallbackSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _tryAutoFinalizePendingPayOs();
+    }
   }
 
   bool get _hasBookingId =>
@@ -118,6 +139,286 @@ class _PaymentConfirmationScreenState
           _isLoadingWallet = false;
         });
       }
+    }
+  }
+
+  void _initPayOsCallbackListener() {
+    _payOsCallbackSub = _appLinks.uriLinkStream.listen((uri) async {
+      if (!mounted || _pendingPayOsTransactionId == null) return;
+
+      final isSnakeaidPaymentLink =
+          uri.scheme == 'snakeaid' && uri.host == 'payment';
+      final isHttpPayOsCallback =
+          (uri.scheme == 'https' || uri.scheme == 'http') &&
+              (uri.host.contains('snakeaid') || uri.host.contains('payos')) &&
+              (uri.path.contains('pay') ||
+                  uri.path.contains('payment') ||
+                  uri.path.contains('callback') ||
+                  uri.path.contains('return') ||
+                  uri.path.contains('cancel'));
+
+      if (!isSnakeaidPaymentLink && !isHttpPayOsCallback) return;
+
+      if (_isHandlingPayOsCallback) return;
+      _isHandlingPayOsCallback = true;
+
+      try {
+        await _handlePayOsCallbackUri(uri);
+      } finally {
+        _isHandlingPayOsCallback = false;
+      }
+    });
+  }
+
+  Future<void> _handlePayOsCallbackUri(Uri uri) async {
+    final status = uri.queryParameters['status']?.toUpperCase();
+    final cancelParam = uri.queryParameters['cancel']?.toLowerCase() == 'true';
+    final path = uri.path.toLowerCase();
+
+    final isCancelled =
+        cancelParam || status == 'CANCELLED' || status == 'CANCELED' ||
+        status == 'FAILED' || path.endsWith('/cancel');
+
+    final isPaid =
+        (status == 'PAID' || status == 'SUCCESS' || status == 'COMPLETED') ||
+        path.endsWith('/return') ||
+        path.endsWith('/success');
+
+    if (isCancelled) {
+      if (!mounted) return;
+      setState(() {
+        _isPaymentLoading = false;
+      });
+      _clearPendingPayOsContext();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bạn đã hủy thanh toán PayOS.'),
+          backgroundColor: Color(0xFFFF8F00),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!isPaid) return;
+
+    final txId = _pendingPayOsTransactionId;
+    if (txId == null || txId.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _isPaymentLoading = false;
+      });
+      _clearPendingPayOsContext();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Thiếu transactionId để xác nhận thanh toán.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    final confirmedByUser = await _showPayOsReturnConfirmDialog();
+    if (confirmedByUser != true) {
+      if (!mounted) return;
+      setState(() {
+        _isPaymentLoading = false;
+      });
+      _clearPendingPayOsContext();
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isPaymentLoading = true;
+    });
+
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      final confirmedPayment = await repo.confirmConsultationPayment(txId);
+      if (!confirmedPayment.isEscrowed) {
+        throw Exception(
+          'Thanh toán chưa hoàn tất (trạng thái: ${confirmedPayment.status})',
+        );
+      }
+
+      ref.invalidate(consultationBookingsProvider);
+
+      final emergencyRequestId = _pendingEmergencyRequestId;
+      final bookingId = _pendingBookingId;
+      _clearPendingPayOsContext();
+
+      if (!mounted) return;
+      setState(() {
+        _isPaymentLoading = false;
+      });
+
+      if (emergencyRequestId != null && emergencyRequestId.isNotEmpty) {
+        context.go(
+          '/emergency-request-waiting/$emergencyRequestId',
+          extra: {
+            'expertId': widget.expertId,
+            'expertName': widget.expertName ?? 'Chuyên gia',
+          },
+        );
+      } else {
+        context.go(
+          '/consultation-home',
+          extra: {'newConsultationId': bookingId},
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isPaymentLoading = false;
+      });
+      _clearPendingPayOsContext();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _tryAutoFinalizePendingPayOs() async {
+    final txId = _pendingPayOsTransactionId;
+    if (!mounted || txId == null || txId.isEmpty) return;
+    if (_isHandlingPayOsCallback) return;
+
+    _isHandlingPayOsCallback = true;
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      final confirmedPayment = await repo.confirmConsultationPayment(txId);
+
+      if (!mounted) return;
+      if (!confirmedPayment.isEscrowed) {
+        // Keep pending context so user can return and retry confirm later.
+        return;
+      }
+
+      ref.invalidate(consultationBookingsProvider);
+
+      final emergencyRequestId = _pendingEmergencyRequestId;
+      final bookingId = _pendingBookingId;
+      _clearPendingPayOsContext();
+
+      if (!mounted) return;
+      setState(() {
+        _isPaymentLoading = false;
+      });
+
+      if (emergencyRequestId != null && emergencyRequestId.isNotEmpty) {
+        context.go(
+          '/emergency-request-waiting/$emergencyRequestId',
+          extra: {
+            'expertId': widget.expertId,
+            'expertName': widget.expertName ?? 'Chuyên gia',
+          },
+        );
+      } else {
+        context.go(
+          '/consultation-home',
+          extra: {'newConsultationId': bookingId},
+        );
+      }
+    } catch (e) {
+      // No snackbar here to avoid noisy errors while status may still be processing.
+      debugPrint('PayOS auto-confirm on resume failed: $e');
+    } finally {
+      _isHandlingPayOsCallback = false;
+    }
+  }
+
+  Future<bool?> _showPayOsReturnConfirmDialog() {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xác nhận thanh toán'),
+        content: const Text(
+          'Sau khi thanh toán xong trên PayOS, bấm "Tôi đã thanh toán" để hệ thống xác nhận giao dịch.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text(
+              'Tôi đã thanh toán',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _clearPendingPayOsContext() {
+    _pendingPayOsTransactionId = null;
+    _pendingEmergencyRequestId = null;
+    _pendingBookingId = null;
+  }
+
+  Future<void> _startWalletTopup() async {
+    final price = int.tryParse(_getPriceAmount()) ?? 0;
+    final shortfall = price - (_walletBalance?.toInt() ?? 0);
+    final suggestedAmount = shortfall > 0 ? shortfall : 1000;
+    final amount = suggestedAmount.clamp(1000, 10000000).toDouble();
+
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      final topup = await repo.createWalletTopup(
+        amount: amount,
+        description: 'Nap tien vi tu consultation payment',
+      );
+
+      final checkoutUrl = topup['checkoutUrl']?.toString() ?? '';
+      if (checkoutUrl.isEmpty) {
+        throw Exception('Topup khong tra ve checkoutUrl');
+      }
+
+      final uri = Uri.tryParse(checkoutUrl);
+      if (uri == null) {
+        throw Exception('checkoutUrl topup khong hop le');
+      }
+
+      final launched =
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        throw Exception('Khong the mo cong thanh toan topup');
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Da mo PayOS de nap ${_formatPrice(amount.toInt().toString())}. Thanh toan xong hay quay lai de tai lai so du.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+      await _fetchWallet();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -187,7 +488,16 @@ class _PaymentConfirmationScreenState
         );
 
         if (_selectedPaymentMethod == PaymentMethod.payos) {
-          await _handlePayOsFlow(repo, payment);
+          await _handlePayOsFlow(payment, emergencyRequestId: resolvedRequestId);
+          if (!mounted) return;
+          setState(() => _isPaymentLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Đã mở PayOS. Vui lòng hoàn tất thanh toán và quay lại ứng dụng.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          return;
         }
 
         if (!mounted) return;
@@ -235,7 +545,16 @@ class _PaymentConfirmationScreenState
         paymentMethod: paymentMethod,
       );
       if (_selectedPaymentMethod == PaymentMethod.payos) {
-        await _handlePayOsFlow(repo, payment);
+        await _handlePayOsFlow(payment, bookingId: widget.bookingId);
+        if (!mounted) return;
+        setState(() => _isPaymentLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã mở PayOS. Vui lòng hoàn tất thanh toán và quay lại ứng dụng.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
       }
       ref.invalidate(consultationBookingsProvider);
       if (!mounted) return;
@@ -257,8 +576,11 @@ class _PaymentConfirmationScreenState
   }
 
   Future<void> _handlePayOsFlow(
-    ConsultationRepository repo,
     ConsultationPaymentResponse payment,
+    {
+    String? emergencyRequestId,
+    String? bookingId,
+  }
   ) async {
     if (payment.isEscrowed) {
       return;
@@ -268,6 +590,9 @@ class _PaymentConfirmationScreenState
     final transactionId = (payment.transactionId ?? '').toString();
     if (checkoutUrl.isEmpty) {
       throw Exception('Thiếu checkoutUrl cho PayOS');
+    }
+    if (transactionId.isEmpty) {
+      throw Exception('Thiếu transactionId cho PayOS');
     }
 
     final uri = Uri.tryParse(checkoutUrl);
@@ -280,43 +605,9 @@ class _PaymentConfirmationScreenState
       throw Exception('Không thể mở cổng thanh toán PayOS');
     }
 
-    if (!mounted) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Xác nhận thanh toán'),
-        content: const Text(
-          'Sau khi thanh toán xong trên PayOS, bấm "Tôi đã thanh toán" để hệ thống xác nhận giao dịch.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: _primaryColor),
-            child: const Text('Tôi đã thanh toán'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) {
-      throw Exception('Bạn chưa xác nhận hoàn tất thanh toán PayOS');
-    }
-
-    if (transactionId.isEmpty) {
-      throw Exception('Thiếu transactionId để xác nhận thanh toán');
-    }
-
-    final confirmedPayment = await repo.confirmConsultationPayment(transactionId);
-    if (!confirmedPayment.isEscrowed) {
-      throw Exception(
-        'Thanh toán chưa hoàn tất (trạng thái: ${confirmedPayment.status})',
-      );
-    }
+    _pendingPayOsTransactionId = transactionId;
+    _pendingEmergencyRequestId = emergencyRequestId;
+    _pendingBookingId = bookingId;
   }
 
   /// Show wallet payment confirmation dialog
@@ -482,6 +773,24 @@ class _PaymentConfirmationScreenState
                         ),
                       ),
                     ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: _startWalletTopup,
+                    icon: const Icon(Icons.add_card, size: 18),
+                    label: const Text('Nạp ví ngay'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: _startWalletTopup,
+                    icon: const Icon(Icons.add_card, size: 18),
+                    label: const Text('Nạp ví ngay'),
                   ),
                 ),
               ],
@@ -783,53 +1092,6 @@ class _PaymentConfirmationScreenState
             ],
           ),
 
-          // Documents info (if uploaded)
-          if (widget.hasDocuments) ...[
-            const SizedBox(height: 16),
-            Divider(color: Colors.grey.shade200),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.image,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Tài liệu đã tải lên (${widget.uploadedImagesCount} ảnh)',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-                TextButton(
-                  onPressed: () {
-                    // TODO: Show document details
-                  },
-                  child: const Text(
-                    'Xem chi tiết',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.blue,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );

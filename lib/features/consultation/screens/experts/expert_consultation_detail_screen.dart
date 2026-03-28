@@ -62,6 +62,15 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
     return '$d/$m/${dt.year}  $h:$min';
   }
 
+  String _formatDateTimePlus7(int ms) {
+    final dt = DateTime.fromMillisecondsSinceEpoch(ms).add(const Duration(hours: 7));
+    final d = dt.day.toString().padLeft(2, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    final h = dt.hour.toString().padLeft(2, '0');
+    final min = dt.minute.toString().padLeft(2, '0');
+    return '$d/$m/${dt.year}  $h:$min';
+  }
+
   String _formatCurrency(int amount) {
     if (amount >= 1000000) {
       return '${(amount / 1000000).toStringAsFixed(1)}M ₫';
@@ -73,12 +82,16 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final id = data['id'] as String? ?? '';
+    final consultationId =
+        (data['consultationId'] as String?) ?? (data['id'] as String?) ?? '';
     final patientName = data['patientName'] as String? ?? '';
     final patientPhone = data['patientPhone'] as String? ?? '';
     final consultationType = data['consultationType'] as String? ?? '';
-    final snakeSuspect = data['snakeSuspect'] as String? ?? 'Chưa xác định';
     final scheduledMs = (data['scheduledTime'] as int?) ?? 0;
+    final bookedAtMs = data['bookedAt'] as int?;
+    final paymentDeadlineMs = data['paymentDeadline'] as int?;
+    final slotStartMs = data['slotStartTime'] as int?;
+    final slotEndMs = data['slotEndTime'] as int?;
     final feeCost = (data['feeCost'] as int?) ?? 0;
     final rating = data['rating'] as double?;
     final durationSeconds = data['durationSeconds'] as int?;
@@ -245,7 +258,7 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
                               const SizedBox(width: 5),
                               Text(
                                 consultationMethod == 'video'
-                                    ? 'Video Call'
+                                    ? 'Gọi video'
                                     : 'Chat',
                                 style: const TextStyle(
                                   fontSize: 12,
@@ -271,6 +284,50 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
                         valueColor: _isCompleted ? _green : _darkPurple,
                         valueBold: true,
                       ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                _SectionCard(
+                  label: 'Thông Tin Phiên Tư Vấn',
+                  child: Column(
+                    children: [
+                      if (bookedAtMs != null)
+                        _DetailRow(
+                          icon: Icons.event_available_outlined,
+                          label: 'Đặt lúc',
+                          value: _formatDateTimePlus7(bookedAtMs),
+                        ),
+                      if (bookedAtMs != null &&
+                          (paymentDeadlineMs != null ||
+                              slotStartMs != null ||
+                              slotEndMs != null))
+                        const _Divider(),
+                      if (paymentDeadlineMs != null) ...[
+                        _DetailRow(
+                          icon: Icons.timer_outlined,
+                          label: 'Hạn thanh toán',
+                          value: _formatDateTimePlus7(paymentDeadlineMs),
+                        ),
+                        if (slotStartMs != null || slotEndMs != null)
+                          const _Divider(),
+                      ],
+                      if (slotStartMs != null) ...[
+                        _DetailRow(
+                          icon: Icons.schedule_outlined,
+                          label: 'Bắt đầu khung giờ',
+                          value: _formatDateTime(slotStartMs),
+                        ),
+                        if (slotEndMs != null) const _Divider(),
+                      ],
+                      if (slotEndMs != null) ...[
+                        _DetailRow(
+                          icon: Icons.schedule,
+                          label: 'Kết thúc khung giờ',
+                          value: _formatDateTime(slotEndMs),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -309,37 +366,6 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                 ],
-
-                // ── Snake suspect ───────────────────────────────────────────
-                _SectionCard(
-                  label: 'Nghi Vấn Rắn Cắn',
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: _red.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.dangerous,
-                            color: _red, size: 24),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          snakeSuspect,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF2D2D2D),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
 
                 // ── Rating (completed only) ─────────────────────────────────
                 if (_isCompleted && durationSeconds != null) ...[
@@ -443,9 +469,9 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: () {
                     context.push(
-                      '/expert-video-waiting/$id',
+                      '/expert-video-waiting/$consultationId',
                       extra: {
-                        'consultationId': id,
+                        'consultationId': consultationId,
                         'patientName': patientName,
                         'consultationType': consultationType,
                         'feeCost': feeCost,
