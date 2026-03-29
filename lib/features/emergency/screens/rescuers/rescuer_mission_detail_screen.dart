@@ -22,11 +22,8 @@ import '../../../../core/services/openroute_service.dart';
 import '../../providers/mission_hub_provider.dart' hide MissionStatus;
 import '../../../rescuer/providers/tracking_provider.dart';
 
-/// Rescuer Mission Detail Screen
-/// Main screen for rescuer to view mission details and manage status
 class RescuerMissionDetailScreen extends ConsumerStatefulWidget {
   final String missionId;
-
   const RescuerMissionDetailScreen({super.key, required this.missionId});
 
   @override
@@ -39,14 +36,24 @@ class _RescuerMissionDetailScreenState
   Timer? _elapsedTimer;
   Duration _elapsedTime = Duration.zero;
   StreamSubscription<Position>? _locationSubscription;
-  RouteNavigationData? _routeData; // Route data from OpenRouteService
+  RouteNavigationData? _routeData;
   String? _routeError;
   final List<StreamSubscription> _missionHubSubscriptions = [];
-
-  // Address fallback support
   final _nominatimService = NominatimService();
   String? _incidentAddress;
   bool _isLoadingIncidentAddress = false;
+  bool _missionEnded = false;
+  bool _isInitializing = true;
+
+  // Design tokens
+  static const _accent = Color(0xFFE65100);
+  static const _surface = Color(0xFFF5F5F5);
+  static const _cardBg = Colors.white;
+  static const _danger = Color(0xFFC62828);
+  static const _textPrimary = Color(0xFF1A1A1A);
+  static const _textSecondary = Color(0xFF757575);
+  static const _divider = Color(0xFFEEEEEE);
+  static const _green = Color(0xFF2E7D32);
 
   @override
   void initState() {
@@ -58,153 +65,86 @@ class _RescuerMissionDetailScreenState
   void dispose() {
     _elapsedTimer?.cancel();
     _locationSubscription?.cancel();
-    for (final s in _missionHubSubscriptions) {
-      s.cancel();
-    }
-
-    // NOTE: We do NOT stop LocationManager or disconnect MissionHub here because:
-    // 1. User may navigate to Navigation screen → still need GPS broadcast
-    // 2. LocationManager and MissionHub must persist across screen transitions
-    // 3. They will be stopped only when mission truly ends (completed/cancelled)
-    // 4. This matches member-side architecture where connections persist globally
-
+    for (final s in _missionHubSubscriptions) s.cancel();
     super.dispose();
   }
 
   Future<void> _loadMissionAndStartTracking() async {
-    // Get current location
     try {
       final position = await Geolocator.getCurrentPosition();
-
-      // Load mission with location
       await ref
           .read(missionDetailProvider.notifier)
           .loadMissionDetail(
             missionId: widget.missionId,
             rescuerLocation: position,
           );
-
-      // Resolve incident address (from API or fallback OSM reverse geocode)
       await _resolveIncidentAddress();
-
-      // Connect to MissionHub for real-time bidirectional GPS
       final mission = ref.read(missionDetailProvider).mission;
       if (mission != null) {
         try {
           await ref
               .read(missionHubConnectionProvider.notifier)
               .connectForIncident(mission.incident.id);
-          debugPrint(
-            '✅ Rescuer connected to MissionHub for incident: ${mission.incident.id}',
-          );
-
-          // Setup listener for member location updates
           _setupMissionHubListeners();
-
-          try {
-            final prefs = await SharedPreferences.getInstance();
-            final rescuerId = prefs.getString('user_id');
-            if (rescuerId != null) {
-              final missionHubService = ref.read(missionHubServiceProvider);
-              await ref
-                  .read(locationManagerProvider)
-                  .startMissionTracking(
-                    rescuerId,
-                    mission.incident.id,
-                    missionHubService,
-                  );
-              debugPrint(
-                '✅ [MissionDetail] Started GPS broadcast to MissionHub',
-              );
-            } else {
-              debugPrint('⚠️ [MissionDetail] No rescuer ID found');
-            }
-          } catch (e) {
-            debugPrint('❌ [MissionDetail] Failed to start GPS broadcast: $e');
+          final prefs = await SharedPreferences.getInstance();
+          final rescuerId = prefs.getString('user_id');
+          if (rescuerId != null) {
+            final svc = ref.read(missionHubServiceProvider);
+            await ref
+                .read(locationManagerProvider)
+                .startMissionTracking(rescuerId, mission.incident.id, svc);
           }
         } catch (e) {
-          debugPrint('⚠️ Failed to connect to MissionHub: $e');
+          debugPrint('⚠️ MissionHub connect failed: $e');
         }
       }
-
-      // Start location tracking
       _startLocationTracking();
-
-      // Start elapsed timer
       _startElapsedTimer();
     } catch (e) {
-      debugPrint('❌ Error loading mission: $e');
-
-      // Load mission without location
       await ref
           .read(missionDetailProvider.notifier)
           .loadMissionDetail(missionId: widget.missionId);
+    } finally {
+      if (mounted) setState(() => _isInitializing = false);
     }
   }
 
   void _startLocationTracking() {
-    // This stream is ONLY for local provider updates (distance/ETA display)
     _locationSubscription =
         Geolocator.getPositionStream(
           locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.high,
-            distanceFilter: 15, // Match LocationManager for consistency
+            distanceFilter: 15,
           ),
-        ).listen((position) {
-          // Update local provider for distance/ETA calculations
-          ref
+        ).listen(
+          (pos) => ref
               .read(missionDetailProvider.notifier)
-              .updateRescuerLocation(position);
-        });
+              .updateRescuerLocation(pos),
+        );
   }
 
   Future<void> _resolveIncidentAddress() async {
     final mission = ref.read(missionDetailProvider).mission;
     if (mission == null) return;
-
-    final addressFromApi = mission.incident.address;
-    if (addressFromApi != null && addressFromApi.isNotEmpty) {
-      setState(() {
-        _incidentAddress = addressFromApi;
-      });
+    final apiAddr = mission.incident.address;
+    if (apiAddr != null && apiAddr.isNotEmpty) {
+      setState(() => _incidentAddress = apiAddr);
       return;
     }
-
-    setState(() {
-      _isLoadingIncidentAddress = true;
-    });
-
+    setState(() => _isLoadingIncidentAddress = true);
     final lat = mission.incident.locationCoordinates.latitude;
     final lon = mission.incident.locationCoordinates.longitude;
     final address = await _nominatimService.reverseGeocode(lat, lon);
-
     setState(() {
       _incidentAddress = address ?? 'Không xác định';
       _isLoadingIncidentAddress = false;
     });
   }
 
-  bool _missionEnded = false;
-
   void _setupMissionHubListeners() {
     final svc = ref.read(missionHubServiceProvider);
-
-    // Listen for member live location updates
-    _missionHubSubscriptions.add(
-      svc.memberLocationUpdatedStream.listen((data) {
-        debugPrint(
-          '📍 [RescuerDetail] Member location updated: ${data.latitude}, ${data.longitude}',
-        );
-        // Could update a state variable here if you want to show member location on preview map
-      }),
-    );
-
-    // Listen for backend mission cancellation event
     _missionHubSubscriptions.add(
       svc.missionCancelledStream.listen((reason) async {
-        debugPrint(
-          '❌ [RescuerDetail] MissionCancelled event received: $reason',
-        );
         await _handleMissionTermination('Nhiệm vụ đã bị hủy bởi nạn nhân.');
       }),
     );
@@ -216,21 +156,15 @@ class _RescuerMissionDetailScreenState
   }) async {
     if (_missionEnded) return;
     _missionEnded = true;
-
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message), backgroundColor: Colors.orange),
       );
     }
-
-    // Stop mission tracking + disconnect mission hub and clear active state
     ref.read(locationManagerProvider).stopMissionTracking();
     await ref.read(missionHubConnectionProvider.notifier).disconnect();
     await ref.read(activeMissionProvider.notifier).clearActiveMission();
-    debugPrint('✅ Active mission cleared after mission termination');
-
     if (restartIdle) {
-      // Restart idle tracking and rescue mode so rescuer can receive new requests
       try {
         final prefs = await SharedPreferences.getInstance();
         final rescuerId = prefs.getString('user_id');
@@ -239,16 +173,9 @@ class _RescuerMissionDetailScreenState
           await ref
               .read(rescueModeProvider.notifier)
               .startRescueMode(rescuerId);
-          debugPrint('✅ Reconnected rescue mode after mission termination');
         }
-      } catch (e) {
-        debugPrint('⚠️ Failed to reconnect rescue mode after termination: $e');
-      }
-    } else {
-      debugPrint('ℹ️ Mission terminated without restarting idle mode');
+      } catch (_) {}
     }
-
-    // Give user time to read toast
     await Future.delayed(const Duration(seconds: 1));
     if (!mounted) return;
     context.goNamed('rescuer_home');
@@ -257,65 +184,45 @@ class _RescuerMissionDetailScreenState
   void _startElapsedTimer() {
     final mission = ref.read(missionDetailProvider).mission;
     if (mission == null) return;
-
-    // Calculate initial elapsed time
     if (mission.startedAt != null) {
       _elapsedTime = DateTime.now().difference(mission.startedAt!);
     }
-
-    _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        _elapsedTime += const Duration(seconds: 1);
-      });
+    _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      setState(() => _elapsedTime += const Duration(seconds: 1));
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(missionDetailProvider);
-
-    // Show loading while fetching data
-    if (state.isLoading) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFF8F7F5),
-        body: const Center(
-          child: CircularProgressIndicator(color: Color(0xFFFF8800)),
-        ),
+    if (state.isLoading || _isInitializing) {
+      return const Scaffold(
+        backgroundColor: _surface,
+        body: Center(child: CircularProgressIndicator(color: _accent)),
       );
     }
-
-    // Show error if loading failed
     if (state.error != null && state.error!.isNotEmpty) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF8F7F5),
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
-          ),
-          title: const Text('Nhiệm vụ cứu hộ'),
-        ),
+        backgroundColor: _surface,
+        appBar: _simpleAppBar('Nhiệm vụ cứu hộ'),
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(32),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const Icon(Icons.error_outline, size: 48, color: _danger),
                 const SizedBox(height: 16),
                 Text(
                   state.error!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 16),
+                  style: const TextStyle(fontSize: 15, color: _textPrimary),
                 ),
                 const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () {
-                    ref.read(missionDetailProvider.notifier).refresh();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF8800),
-                  ),
+                FilledButton(
+                  onPressed: () =>
+                      ref.read(missionDetailProvider.notifier).refresh(),
+                  style: FilledButton.styleFrom(backgroundColor: _accent),
                   child: const Text('Thử lại'),
                 ),
               ],
@@ -324,61 +231,39 @@ class _RescuerMissionDetailScreenState
         ),
       );
     }
-
     final mission = state.mission;
-    
-    // Only show "not found" if loading is complete and mission is still null
     if (mission == null) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF8F7F5),
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
-          ),
-          title: const Text('Nhiệm vụ cứu hộ'),
-        ),
+        backgroundColor: _surface,
+        appBar: _simpleAppBar('Nhiệm vụ cứu hộ'),
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(32),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Icon(
-                  Icons.search_off,
-                  size: 64,
-                  color: Color(0xFF999999),
+                  Icons.search_off_rounded,
+                  size: 48,
+                  color: _textSecondary,
                 ),
                 const SizedBox(height: 16),
                 const Text(
                   'Không tìm thấy nhiệm vụ',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
-                Text(
+                const Text(
                   'Nhiệm vụ có thể đã bị hủy hoặc không tồn tại',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 14, color: _textSecondary),
                 ),
                 const SizedBox(height: 24),
-                ElevatedButton.icon(
+                FilledButton.icon(
                   onPressed: () => context.goNamed('rescuer_home'),
-                  icon: const Icon(Icons.home),
+                  icon: const Icon(Icons.home_outlined, size: 18),
                   label: const Text('Về trang chủ'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF8800),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
-                    ),
-                  ),
+                  style: FilledButton.styleFrom(backgroundColor: _accent),
                 ),
               ],
             ),
@@ -387,28 +272,44 @@ class _RescuerMissionDetailScreenState
       );
     }
 
-    // Allow user to view details in any status
-    // No auto-redirect - let user choose to navigate
     final status = mission.missionStatus;
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F7F5),
+      backgroundColor: _surface,
       body: Column(
         children: [
           _buildHeader(mission),
           Expanded(
             child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Small preview map - show for active missions
                   if (status == MissionStatus.preparing ||
                       status == MissionStatus.enRoute ||
                       status == MissionStatus.rescuerArrived)
-                    _buildPreviewMapSection(mission, state),
+                    _buildPreviewMap(mission, state),
                   _buildActionButton(mission, state),
                   const SizedBox(height: 16),
-                  _buildContent(mission, state),
-                  const SizedBox(height: 80),
+                  _buildPriceCard(mission),
+                  const SizedBox(height: 12),
+                  if (mission.incident.identifiedSnakeSpecies != null) ...[
+                    _buildSnakeCard(
+                      mission.incident.identifiedSnakeSpecies!,
+                      mission.incident.identificationContext,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  _buildVictimCard(mission),
+                  const SizedBox(height: 12),
+                  _buildEmergencyContactsCard(mission),
+                  const SizedBox(height: 12),
+                  _buildLocationCard(mission),
+                  const SizedBox(height: 12),
+                  _buildSymptomsCard(mission),
+                  const SizedBox(height: 12),
+                  _buildMediaCard(mission),
+                  const SizedBox(height: 12),
+                  _buildIncidentTimeCard(mission),
                 ],
               ),
             ),
@@ -418,93 +319,79 @@ class _RescuerMissionDetailScreenState
     );
   }
 
+  AppBar _simpleAppBar(String title) => AppBar(
+    backgroundColor: _cardBg,
+    elevation: 0,
+    surfaceTintColor: Colors.transparent,
+    leading: IconButton(
+      icon: const Icon(Icons.arrow_back, color: _textPrimary),
+      onPressed: () => context.pop(),
+    ),
+    title: Text(
+      title,
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        color: _textPrimary,
+      ),
+    ),
+    bottom: const PreferredSize(
+      preferredSize: Size.fromHeight(1),
+      child: Divider(height: 1, color: _divider),
+    ),
+  );
+
+  // ── Header ─────────────────────────────────────────────────────────────────
   Widget _buildHeader(DetailRescueMissionResponse mission) {
     final status = mission.missionStatus;
-    Color statusColor;
-    String statusText;
-
-    switch (status) {
-      case MissionStatus.preparing:
-        statusColor = const Color(0xFFFF9800);
-        statusText = 'ĐANG CHUẨN BỊ';
-        break;
-      case MissionStatus.enRoute:
-        statusColor = const Color(0xFF2196F3);
-        statusText = 'ĐANG DI CHUYỂN';
-        break;
-      case MissionStatus.rescuerArrived:
-        statusColor = const Color(0xFF4CAF50);
-        statusText = 'ĐÃ ĐẾN NƠI';
-        break;
-      case MissionStatus.missionCompleted:
-        statusColor = const Color(0xFF10B981);
-        statusText = 'HOÀN THÀNH';
-        break;
-      case MissionStatus.missionUncompleted:
-        statusColor = const Color(0xFFF59E0B);
-        statusText = 'CHƯA HOÀN THÀNH';
-        break;
-      case MissionStatus.missionAborted:
-        statusColor = const Color(0xFFEF4444);
-        statusText = 'ĐÃ HỦY BỎ';
-        break;
-      case MissionStatus.cancelled:
-        statusColor = const Color(0xFF9E9E9E);
-        statusText = 'ĐÃ HỦY';
-        break;
-    }
+    final (statusLabel, statusColor) = _statusInfo(status);
 
     return SafeArea(
       bottom: false,
       child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
+        decoration: const BoxDecoration(
+          color: _cardBg,
+          border: Border(bottom: BorderSide(color: _divider)),
         ),
+        padding: const EdgeInsets.fromLTRB(4, 8, 8, 12),
         child: Column(
           children: [
             Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back),
+                  icon: const Icon(Icons.arrow_back, color: _textPrimary),
                   onPressed: () => context.pop(),
                 ),
-                const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
                     'NHIỆM VỤ CỨU HỘ',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: _textPrimary,
+                    ),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.phone),
+                  icon: const Icon(Icons.phone_outlined, color: _accent),
                   onPressed: () =>
                       _makePhoneCall(mission.user.phoneNumber ?? ''),
                   style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF8800).withOpacity(0.1),
+                    backgroundColor: _accent.withOpacity(0.08),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
+                const SizedBox(width: 4),
                 IconButton(
-                  icon: const Icon(Icons.more_vert),
+                  icon: const Icon(Icons.more_vert, color: _textSecondary),
                   onPressed: () => _showOptionsMenu(mission),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: statusColor.withOpacity(0.3)),
-              ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
                 children: [
                   Container(
@@ -513,26 +400,28 @@ class _RescuerMissionDetailScreenState
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: statusColor,
+                      color: statusColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: statusColor.withOpacity(0.3)),
                     ),
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            color: statusColor,
                             shape: BoxShape.circle,
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         Text(
-                          statusText,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          statusLabel,
+                          style: TextStyle(
                             fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w600,
+                            color: statusColor,
                           ),
                         ),
                       ],
@@ -540,13 +429,18 @@ class _RescuerMissionDetailScreenState
                   ),
                   const Spacer(),
                   if (_elapsedTime.inSeconds > 0) ...[
-                    const Icon(Icons.access_time, size: 16),
+                    const Icon(
+                      Icons.timer_outlined,
+                      size: 15,
+                      color: _textSecondary,
+                    ),
                     const SizedBox(width: 4),
                     Text(
-                      _formatElapsedTime(_elapsedTime),
+                      _formatElapsed(_elapsedTime),
                       style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: _textPrimary,
                       ),
                     ),
                   ],
@@ -559,38 +453,43 @@ class _RescuerMissionDetailScreenState
     );
   }
 
-  String _formatElapsedTime(Duration duration) {
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes % 60;
-    final seconds = duration.inSeconds % 60;
+  (String, Color) _statusInfo(MissionStatus status) => switch (status) {
+    MissionStatus.preparing => ('Đang chuẩn bị', const Color(0xFFE65100)),
+    MissionStatus.enRoute => ('Đang di chuyển', const Color(0xFF1565C0)),
+    MissionStatus.rescuerArrived => ('Đã đến nơi', _green),
+    MissionStatus.missionCompleted => ('Hoàn thành', _green),
+    MissionStatus.missionUncompleted => (
+      'Chưa hoàn thành',
+      const Color(0xFFE65100),
+    ),
+    MissionStatus.missionAborted => ('Đã hủy bỏ', _danger),
+    MissionStatus.cancelled => ('Đã hủy', _textSecondary),
+  };
 
-    if (hours > 0) {
-      return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-    }
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  String _formatElapsed(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes % 60;
+    final s = d.inSeconds % 60;
+    if (h > 0)
+      return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
-  // Small preview map for Preparing state (200px height)
-  Widget _buildPreviewMapSection(
+  // ── Preview Map ────────────────────────────────────────────────────────────
+  Widget _buildPreviewMap(
     DetailRescueMissionResponse mission,
     MissionDetailState state,
   ) {
-    final incidentLat = mission.incident.locationCoordinates.latitude;
-    final incidentLon = mission.incident.locationCoordinates.longitude;
-    final incidentLatLng = LatLng(incidentLat, incidentLon);
-
+    final incidentLatLng = LatLng(
+      mission.incident.locationCoordinates.latitude,
+      mission.incident.locationCoordinates.longitude,
+    );
     return Container(
-      height: 200,
-      margin: const EdgeInsets.all(16),
+      height: 180,
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _divider),
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -600,7 +499,7 @@ class _RescuerMissionDetailScreenState
               initialCenter: incidentLatLng,
               initialZoom: 13.0,
               interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.none, // Disable interaction
+                flags: InteractiveFlag.none,
               ),
             ),
             children: [
@@ -610,31 +509,29 @@ class _RescuerMissionDetailScreenState
               ),
               MarkerLayer(
                 markers: [
-                  // Victim location (red pin)
                   Marker(
                     point: incidentLatLng,
-                    width: 40,
-                    height: 40,
+                    width: 36,
+                    height: 36,
                     child: const Icon(
                       Icons.location_pin,
-                      color: Colors.red,
-                      size: 40,
+                      color: _danger,
+                      size: 36,
                     ),
                   ),
-                  // Rescuer location (blue dot) if available
                   if (state.rescuerLocation != null)
                     Marker(
                       point: LatLng(
                         state.rescuerLocation!.latitude,
                         state.rescuerLocation!.longitude,
                       ),
-                      width: 30,
-                      height: 30,
+                      width: 24,
+                      height: 24,
                       child: Container(
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2196F3),
+                          color: const Color(0xFF1565C0),
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
+                          border: Border.all(color: Colors.white, width: 2.5),
                         ),
                       ),
                     ),
@@ -642,12 +539,11 @@ class _RescuerMissionDetailScreenState
               ),
             ],
           ),
-          // Preview label overlay
           Positioned(
-            top: 12,
-            left: 12,
+            top: 10,
+            left: 10,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
@@ -661,12 +557,12 @@ class _RescuerMissionDetailScreenState
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.location_on, size: 16, color: Colors.red),
+                  const Icon(Icons.location_on, size: 14, color: _danger),
                   const SizedBox(width: 4),
                   Text(
                     'Vị trí nạn nhân',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
                       color: Colors.grey[800],
                     ),
@@ -675,25 +571,24 @@ class _RescuerMissionDetailScreenState
               ),
             ),
           ),
-          // Distance info if available
           if (state.distanceKm != null)
             Positioned(
-              bottom: 12,
-              right: 12,
+              bottom: 10,
+              right: 10,
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
+                  horizontal: 10,
+                  vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2196F3),
+                  color: const Color(0xFF1565C0),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   DistanceUtils.formatDistance(state.distanceKm!),
                   style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
                 ),
@@ -704,191 +599,243 @@ class _RescuerMissionDetailScreenState
     );
   }
 
+  // ── Action Button ──────────────────────────────────────────────────────────
   Widget _buildActionButton(
     DetailRescueMissionResponse mission,
     MissionDetailState state,
   ) {
     final status = mission.missionStatus;
-
-    // Special handling for EnRoute: show only navigation button
-    // "Đã đến nơi" should only be pressed in Navigation Screen to avoid conflict
     if (status == MissionStatus.enRoute) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 4),
         child: SizedBox(
           width: double.infinity,
-          child: ElevatedButton.icon(
+          child: FilledButton.icon(
             onPressed: () => _navigateToNavigation(mission, state),
-            icon: const Icon(Icons.navigation, color: Colors.white),
+            icon: const Icon(Icons.navigation_outlined, size: 18),
             label: const Text(
-              'QUAY LẠI ĐIỀU HƯỚNG',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+              'Quay lại điều hướng',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF8800),
-              padding: const EdgeInsets.symmetric(vertical: 16),
+            style: FilledButton.styleFrom(
+              backgroundColor: _accent,
+              padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
           ),
         ),
       );
     }
-
-    // Standard single button for other statuses
-    String buttonText;
-    Color buttonColor;
-    IconData buttonIcon;
-    VoidCallback? onPressed;
-
-    switch (status) {
-      case MissionStatus.preparing:
-        buttonText = 'BẮT ĐẦU DI CHUYỂN';
-        buttonColor = const Color(0xFFFF8800);
-        buttonIcon = Icons.directions_car;
-        onPressed = state.isUpdatingStatus ? null : () => _startMission();
-        break;
-      case MissionStatus.rescuerArrived:
-        buttonText = 'BẮT ĐẦU XỬ LÝ';
-        buttonColor = const Color(0xFFFF6B35);
-        buttonIcon = Icons.local_hospital;
-        onPressed = () => _navigateToSupport(mission);
-        break;
-      default:
-        return const SizedBox();
+    if (status == MissionStatus.preparing) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: state.isUpdatingStatus ? null : _startMission,
+            icon: state.isUpdatingStatus
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Icon(Icons.directions_car_outlined, size: 18),
+            label: const Text(
+              'Bắt đầu di chuyển',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: _accent,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ),
+      );
     }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: onPressed,
-          icon: state.isUpdatingStatus
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
-                )
-              : Icon(buttonIcon, color: Colors.white),
-          label: Text(
-            buttonText,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+    if (status == MissionStatus.rescuerArrived) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: () => _navigateToSupport(mission),
+            icon: const Icon(Icons.medical_services_outlined, size: 18),
+            label: const Text(
+              'Bắt đầu xử lý',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             ),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: buttonColor,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+            style: FilledButton.styleFrom(
+              backgroundColor: _green,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    }
+    return const SizedBox.shrink();
   }
 
-  Widget _buildContent(
-    DetailRescueMissionResponse mission,
-    MissionDetailState state,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildMissionPriceCard(mission),
-          const SizedBox(height: 16),
-          // Identified Snake Section (Official confirmed species)
-          if (mission.incident.identifiedSnakeSpecies != null) ...[
-            _buildIdentifiedSnakeCard(
-              mission.incident.identifiedSnakeSpecies!,
-              mission.incident.identificationContext,
-            ),
-            const SizedBox(height: 16),
-          ],
-          _buildVictimInfoCard(mission),
-          const SizedBox(height: 16),
-          _buildEmergencyContactsCard(mission),
-          const SizedBox(height: 16),
-          _buildLocationCard(mission),
-          const SizedBox(height: 16),
-          _buildMissionDetailsCard(mission),
-          const SizedBox(height: 16),
-          _buildSymptomsCard(mission),
-          const SizedBox(height: 16),
-          _buildSnakeDetectionCard(mission),
-          const SizedBox(height: 16),
-          _buildIncidentTimeCard(mission),
-        ],
-      ),
-    );
-  }
-
-  // Helper method definitions continued in part 2...
-  // (The file is getting long, I'll create the helper methods)
-
-  Widget _buildMissionPriceCard(DetailRescueMissionResponse mission) {
+  // ── Price Card ─────────────────────────────────────────────────────────────
+  Widget _buildPriceCard(DetailRescueMissionResponse mission) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF4CAF50), Color(0xFF2E7D32)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF4CAF50).withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: _cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _divider),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
+              color: _green.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(
-              Icons.attach_money,
-              color: Colors.white,
-              size: 32,
+            child: const Icon(Icons.payments_outlined, color: _green, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Phí dịch vụ',
+                style: TextStyle(fontSize: 12, color: _textSecondary),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                mission.formattedPrice,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: _green,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Snake Card ─────────────────────────────────────────────────────────────
+  Widget _buildSnakeCard(
+    DetectedSnakeSpecies species,
+    SnakeIdentificationContext? ctx,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: _cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+            child: Row(
+              children: [
+                const Icon(Icons.verified_rounded, size: 15, color: _green),
+                const SizedBox(width: 6),
+                const Text(
+                  'Loài rắn xác định',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _green,
+                  ),
+                ),
+                const Spacer(),
+                if (ctx != null)
+                  _MethodBadge(
+                    isAI: ctx.method == SnakeIdentificationMethod.ai,
+                  ),
+              ],
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
+          const SizedBox(height: 12),
+          if (species.imageUrl != null)
+            Image.network(
+              species.imageUrl!,
+              height: 180,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                height: 180,
+                color: const Color(0xFFF5F5F5),
+                child: const Center(
+                  child: Icon(
+                    Icons.image_not_supported,
+                    color: Colors.grey,
+                    size: 40,
+                  ),
+                ),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Phí dịch vụ',
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
-                ),
-                const SizedBox(height: 4),
                 Text(
-                  mission.formattedPrice,
+                  species.commonName,
                   style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: _textPrimary,
                   ),
                 ),
+                const SizedBox(height: 2),
+                Text(
+                  species.scientificName,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                    color: _textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    SnakeRiskBadges.buildRiskLevelBadge(
+                      species.riskLevel,
+                      compact: true,
+                    ),
+                    SnakeRiskBadges.buildVenomTypeBadge(
+                      species.primaryVenomType,
+                      compact: true,
+                    ),
+                  ],
+                ),
+                if (species.identificationSummary != null &&
+                    species.identificationSummary!.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  const Divider(color: _divider),
+                  const SizedBox(height: 8),
+                  Text(
+                    species.identificationSummary!,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: _textSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -897,30 +844,31 @@ class _RescuerMissionDetailScreenState
     );
   }
 
-  Widget _buildVictimInfoCard(DetailRescueMissionResponse mission) {
+  // ── Victim Card ────────────────────────────────────────────────────────────
+  Widget _buildVictimCard(DetailRescueMissionResponse mission) {
     final user = mission.user;
     final account = user.account;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _cardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: _divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '👤 Thông tin nạn nhân',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          _sectionLabelWithIcon(
+            Icons.person_outline,
+            const Color(0xFF1565C0),
+            'Thông tin nạn nhân',
           ),
           const SizedBox(height: 12),
           Row(
             children: [
               CircleAvatar(
-                radius: 30,
-                backgroundColor: const Color(0xFFFF8800).withOpacity(0.1),
+                radius: 26,
+                backgroundColor: _accent.withOpacity(0.1),
                 backgroundImage: account?.avatarUrl != null
                     ? NetworkImage(account!.avatarUrl!)
                     : null,
@@ -928,9 +876,9 @@ class _RescuerMissionDetailScreenState
                     ? Text(
                         account?.fullName?.substring(0, 1).toUpperCase() ?? 'U',
                         style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFFFF8800),
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: _accent,
                         ),
                       )
                     : null,
@@ -943,54 +891,69 @@ class _RescuerMissionDetailScreenState
                     Text(
                       account?.fullName ?? 'Không rõ',
                       style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: _textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    if (user.ratingCount > 0)
+                    if (user.ratingCount > 0) ...[
+                      const SizedBox(height: 2),
                       Row(
                         children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 16),
-                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.star_rounded,
+                            color: Colors.amber,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 3),
                           Text(
                             '${user.rating.toStringAsFixed(1)} (${user.ratingCount})',
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 14,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: _textSecondary,
                             ),
                           ),
                         ],
                       ),
+                    ],
                   ],
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.phone, color: Color(0xFFFF8800)),
+                icon: const Icon(Icons.phone_outlined, color: _accent),
                 onPressed: () => _makePhoneCall(user.phoneNumber ?? ''),
+                style: IconButton.styleFrom(
+                  backgroundColor: _accent.withOpacity(0.08),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
               ),
             ],
           ),
           if (user.hasUnderlyingDisease) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: const Color(0xFFFFF3E0),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                border: Border.all(color: _accent.withOpacity(0.3)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.warning, color: Colors.orange, size: 20),
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    size: 16,
+                    color: _accent,
+                  ),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '⚠️ Bệnh nhân có bệnh nền',
-                      style: TextStyle(
-                        color: Colors.orange[800],
-                        fontWeight: FontWeight.w500,
-                      ),
+                  const Text(
+                    'Bệnh nhân có bệnh nền',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: _accent,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
@@ -1002,999 +965,570 @@ class _RescuerMissionDetailScreenState
     );
   }
 
+  // ── Emergency Contacts ─────────────────────────────────────────────────────
   Widget _buildEmergencyContactsCard(DetailRescueMissionResponse mission) {
     final contacts = mission.user.emergencyContacts
         .where((c) => c.trim().isNotEmpty)
         .toList();
-
-    final hasContacts = contacts.isNotEmpty;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: hasContacts ? const Color(0xFFFFF3E0) : Colors.grey[100],
+        color: _cardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: hasContacts
-              ? const Color(0xFFFF9800).withOpacity(0.3)
-              : Colors.grey[300]!,
-        ),
+        border: Border.all(color: _divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                Icons.phone_in_talk,
-                color: hasContacts ? const Color(0xFFFF6B35) : Colors.grey[600],
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Liên hệ khẩn cấp',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: hasContacts ? Colors.black87 : Colors.grey[600],
-                ),
-              ),
-            ],
+          _sectionLabelWithIcon(
+            Icons.phone_in_talk_outlined,
+            const Color(0xFFFF6B35),
+            'Liên hệ khẩn cấp',
           ),
           const SizedBox(height: 12),
-          if (hasContacts)
-            ...contacts.asMap().entries.map((entry) {
-              final index = entry.key;
-              final phone = entry.value;
+          if (contacts.isEmpty)
+            const Text(
+              'Chưa có số liên hệ khẩn cấp',
+              style: TextStyle(
+                fontSize: 14,
+                color: _textSecondary,
+                fontStyle: FontStyle.italic,
+              ),
+            )
+          else
+            ...contacts.asMap().entries.map((e) {
+              final i = e.key;
+              final phone = e.value;
               return Column(
                 children: [
-                  if (index > 0) const Divider(height: 16),
+                  if (i > 0) const Divider(height: 16, color: _divider),
                   Row(
                     children: [
-                      CircleAvatar(
-                        radius: 16,
-                        backgroundColor: const Color(
-                          0xFFFF9800,
-                        ).withOpacity(0.2),
-                        child: Text(
-                          '${index + 1}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFFF6B35),
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: _accent.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${i + 1}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: _accent,
+                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           phone,
                           style: const TextStyle(
-                            fontSize: 15,
+                            fontSize: 14,
                             fontWeight: FontWeight.w500,
+                            color: _textPrimary,
                           ),
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.phone),
+                        icon: const Icon(
+                          Icons.phone_outlined,
+                          size: 18,
+                          color: _accent,
+                        ),
                         onPressed: () => _makePhoneCall(phone),
-                        color: const Color(0xFFFF6B35),
                         style: IconButton.styleFrom(
-                          backgroundColor: Colors.white,
+                          backgroundColor: _accent.withOpacity(0.08),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.all(6),
                         ),
                       ),
                     ],
                   ),
                 ],
               );
-            }).toList()
+            }).toList(),
+        ],
+      ),
+    );
+  }
+
+  // ── Location Card ──────────────────────────────────────────────────────────
+  Widget _buildLocationCard(DetailRescueMissionResponse mission) {
+    final lat = mission.incident.locationCoordinates.latitude;
+    final lon = mission.incident.locationCoordinates.longitude;
+    final address = _incidentAddress ?? mission.incident.address;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionLabelWithIcon(
+            Icons.place_outlined,
+            const Color(0xFF4CAF50),
+            'Địa điểm sự cố',
+          ),
+          const SizedBox(height: 12),
+          _infoRow(
+            Icons.my_location_outlined,
+            'Tọa độ',
+            '${lat.toStringAsFixed(5)}, ${lon.toStringAsFixed(5)}',
+          ),
+          if (_isLoadingIncidentAddress) ...[
+            const SizedBox(height: 8),
+            _infoRow(Icons.place_outlined, 'Địa chỉ', 'Đang tải...'),
+          ] else if (address != null && address.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _infoRow(Icons.place_outlined, 'Địa chỉ', address),
+          ],
+          if (mission.incident.severityLevel != null &&
+              mission.incident.severityLevel! > 0) ...[
+            const SizedBox(height: 8),
+            _infoRow(
+              Icons.monitor_heart_outlined,
+              'Mức độ',
+              mission.incident.getSeverityText(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ── Symptoms Card ──────────────────────────────────────────────────────────
+  Widget _buildSymptomsCard(DetailRescueMissionResponse mission) {
+    final symptoms = mission.incident.symptomsReport ?? [];
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionLabelWithIcon(
+            Icons.medical_information_outlined,
+            const Color(0xFFE65100),
+            'Triệu chứng',
+          ),
+          const SizedBox(height: 12),
+          if (symptoms.isEmpty)
+            const Text(
+              'Chưa có thông tin triệu chứng',
+              style: TextStyle(
+                fontSize: 14,
+                color: _textSecondary,
+                fontStyle: FontStyle.italic,
+              ),
+            )
           else
-            Row(
-              children: [
-                Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Người dùng chưa cung cấp số liên hệ khẩn cấp',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                      fontStyle: FontStyle.italic,
+            Column(
+              children: symptoms.asMap().entries.map((e) {
+                final i = e.key;
+                final s = e.value;
+                return Padding(
+                  padding: EdgeInsets.only(top: i == 0 ? 0 : 6),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 9,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFBE9E7),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFFCCBC)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFBF360C),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            s.symptomName,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFFBF360C),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ],
+                );
+              }).toList(),
             ),
         ],
       ),
     );
   }
 
-  // Continued in next message...
-  // Due to length limits, I'll split the file into parts
-
-  Widget _buildLocationCard(DetailRescueMissionResponse mission) {
-    final lat = mission.incident.locationCoordinates.latitude;
-    final lon = mission.incident.locationCoordinates.longitude;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF4CAF50).withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF4CAF50).withOpacity(0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF4CAF50).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.place,
-                  color: Color(0xFF4CAF50),
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text(
-                  'Địa điểm',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Tọa độ: ${lat.toStringAsFixed(6)}, ${lon.toStringAsFixed(6)}',
-            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _isLoadingIncidentAddress
-                ? 'Đang tải địa chỉ...'
-                : (_incidentAddress ??
-                      mission.incident.address ??
-                      'Không xác định'),
-            style: const TextStyle(fontSize: 14, color: Color(0xFF444444)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMissionDetailsCard(DetailRescueMissionResponse mission) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '💼 Chi tiết nhiệm vụ',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-          if (mission.incident.address != null &&
-              mission.incident.address!.isNotEmpty) ...[
-            _buildDetailRow('Địa chỉ', mission.incident.address!),
-            const Divider(height: 20),
-          ],
-          _buildDetailRow(
-            'Mức độ nghiêm trọng',
-            mission.incident.getSeverityText(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSymptomsCard(DetailRescueMissionResponse mission) {
-    final hasSymptoms =
-        mission.incident.symptomsReport != null &&
-        mission.incident.symptomsReport!.isNotEmpty;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: hasSymptoms ? const Color(0xFFFFF3E0) : Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: hasSymptoms
-              ? const Color(0xFFFF9800).withOpacity(0.3)
-              : Colors.grey[300]!,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.medical_services,
-                color: hasSymptoms
-                    ? const Color.fromARGB(255, 218, 2, 2)
-                    : Colors.grey[600],
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Triệu chứng',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: hasSymptoms ? Colors.black87 : Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          hasSymptoms
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: mission.incident.symptomsReport!
-                      .map(
-                        (symptom) => Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Text(
-                            '• ${symptom.symptomName}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFFE65100),
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                )
-              : Row(
-                  children: [
-                    Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Người dùng chưa cung cấp thông tin',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSnakeDetectionCard(DetailRescueMissionResponse mission) {
+  // ── Media Card ─────────────────────────────────────────────────────────────
+  Widget _buildMediaCard(DetailRescueMissionResponse mission) {
     final media = mission.incident.media;
-    final hasMedia = media.isNotEmpty;
+    if (media.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _cardBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _divider),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sectionLabelWithIcon(
+              Icons.image_search_outlined,
+              const Color(0xFF4CAF50),
+              'Hình ảnh & Nhận diện',
+            ),
+            const SizedBox(height: 12),
+            Container(
+              height: 100,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F5F5),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Center(
+                child: Text(
+                  'Chưa có hình ảnh',
+                  style: TextStyle(fontSize: 13, color: _textSecondary),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _cardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: _divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.image, color: Color(0xFF4CAF50), size: 20),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'Hình ảnh & nhận diện',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
+              _sectionLabelWithIcon(
+                Icons.image_search_outlined,
+                const Color(0xFF4CAF50),
+                'Hình ảnh & Nhận diện',
               ),
-              if (hasMedia && media.length > 1)
+              const Spacer(),
+              if (media.length > 1)
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
-                    vertical: 4,
+                    vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4CAF50).withOpacity(0.1),
+                    color: _green.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     '${media.length} ảnh',
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF4CAF50),
+                      color: _green,
                     ),
                   ),
                 ),
             ],
           ),
           const SizedBox(height: 12),
-          if (hasMedia)
-            SizedBox(
-              height: 400,
-              child: PageView.builder(
-                itemCount: media.length,
-                itemBuilder: (context, index) {
-                  final currentMedia = media[index];
-                  final hasAI = currentMedia.detectedSpecies.isNotEmpty;
-
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Image
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            currentMedia.mediaUrl,
+          SizedBox(
+            height: 380,
+            child: PageView.builder(
+              itemCount: media.length,
+              itemBuilder: (context, index) {
+                final m = media[index];
+                final hasAI = m.detectedSpecies.isNotEmpty;
+                final species = hasAI ? m.detectedSpecies.first : null;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.network(
+                          m.mediaUrl,
+                          height: 200,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
                             height: 200,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                height: 200,
-                                color: Colors.grey[200],
-                                child: const Center(
-                                  child: Icon(Icons.error, color: Colors.grey),
-                                ),
-                              );
-                            },
+                            color: const Color(0xFFF5F5F5),
+                            child: const Center(
+                              child: Icon(
+                                Icons.image_not_supported,
+                                color: Colors.grey,
+                              ),
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        // Page indicator
-                        if (media.length > 1)
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: List.generate(
-                              media.length,
-                              (i) => Container(
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: 3,
-                                ),
-                                width: i == index ? 20 : 6,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                  color: i == index
-                                      ? const Color(0xFF4CAF50)
-                                      : Colors.grey[300],
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
+                      ),
+                      const SizedBox(height: 10),
+                      if (media.length > 1)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(
+                            media.length,
+                            (i) => Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 3),
+                              width: i == index ? 16 : 5,
+                              height: 5,
+                              decoration: BoxDecoration(
+                                color: i == index
+                                    ? _green
+                                    : const Color(0xFFDDDDDD),
+                                borderRadius: BorderRadius.circular(3),
                               ),
                             ),
                           ),
-                        if (media.length > 1) const SizedBox(height: 12),
-                        // AI Detection Result
-                        if (hasAI)
-                          Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: SnakeRiskBadges.getRiskGradient(
-                                  currentMedia.detectedSpecies.first.riskLevel,
-                                ),
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: SnakeRiskBadges.getRiskColor(
-                                  currentMedia.detectedSpecies.first.riskLevel,
-                                ),
-                                width: 2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: SnakeRiskBadges.getRiskColor(
-                                    currentMedia
-                                        .detectedSpecies
-                                        .first
-                                        .riskLevel,
-                                  ).withOpacity(0.2),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
+                        ),
+                      const SizedBox(height: 10),
+                      if (hasAI && species != null) ...[
+                        Text(
+                          species.commonName,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: _textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          species.scientificName,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            color: _textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            SnakeRiskBadges.buildRiskLevelBadge(
+                              species.riskLevel,
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: SnakeRiskBadges.getRiskColor(
-                                          currentMedia
-                                              .detectedSpecies
-                                              .first
-                                              .riskLevel,
-                                        ),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Icon(
-                                        SnakeRiskBadges.getRiskIcon(
-                                          currentMedia
-                                              .detectedSpecies
-                                              .first
-                                              .riskLevel,
-                                        ),
-                                        size: 18,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            currentMedia
-                                                .detectedSpecies
-                                                .first
-                                                .commonName,
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                              color: Color.fromARGB(
-                                                255,
-                                                5,
-                                                30,
-                                                58,
-                                              ),
-                                            ),
-                                          ),
-                                          Text(
-                                            currentMedia
-                                                .detectedSpecies
-                                                .first
-                                                .scientificName,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontStyle: FontStyle.italic,
-                                              color: Colors.grey[700],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceEvenly,
-                                  children: [
-                                    SnakeRiskBadges.buildRiskLevelBadge(
-                                      currentMedia
-                                          .detectedSpecies
-                                          .first
-                                          .riskLevel,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    SnakeRiskBadges.buildVenomTypeBadge(
-                                      currentMedia
-                                          .detectedSpecies
-                                          .first
-                                          .primaryVenomType,
-                                    ),
-                                  ],
-                                ),
-                              ],
+                            SnakeRiskBadges.buildVenomTypeBadge(
+                              species.primaryVenomType,
                             ),
-                          )
-                        else if (currentMedia.isProcessed)
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Colors.grey[400]!,
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.info_outline,
-                                  size: 20,
-                                  color: Colors.grey[700],
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    'Không nhận diện được loài rắn',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.grey[700],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        else
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFF3E0),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFFFF9800),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: Icon(
-                                    Icons.hourglass_top,
-                                    size: 20,
-                                    color: Color(0xFFFF9800),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    'Chưa có kết quả nhận diện.',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.orange[900],
-                                    ),
-                                  ),
-                                ),
-                              ],
+                          ],
+                        ),
+                      ] else if (m.isProcessed)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF5F5F5),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'Không nhận diện được loài rắn',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: _textSecondary,
                             ),
                           ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            )
-          else
-            Container(
-              height: 150,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.image_not_supported,
-                      size: 48,
-                      color: Colors.grey[400],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Người dùng chưa cung cấp hình ảnh',
-                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-              ),
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF3E0),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: _accent.withOpacity(0.3)),
+                          ),
+                          child: const Text(
+                            'Chưa có kết quả nhận diện',
+                            style: TextStyle(fontSize: 13, color: _accent),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
             ),
+          ),
         ],
       ),
     );
   }
 
+  // ── Incident Time Card ─────────────────────────────────────────────────────
   Widget _buildIncidentTimeCard(DetailRescueMissionResponse mission) {
     final occurredAt = mission.incident.incidentOccurredAt;
+    if (occurredAt == null) return const SizedBox.shrink();
 
-    if (occurredAt != null) {
-      final elapsed = DateTime.now().difference(occurredAt);
-      final minutes = elapsed.inMinutes;
+    final elapsed = DateTime.now().difference(occurredAt);
+    final minutes = elapsed.inMinutes;
+    final color = minutes > 60
+        ? _danger
+        : minutes > 30
+        ? _accent
+        : _green;
+    final timeText = minutes < 60
+        ? '$minutes phút trước'
+        : '${minutes ~/ 60} giờ ${minutes % 60} phút trước';
 
-      String timeText;
-      Color timeColor;
-
-      if (minutes < 60) {
-        timeText = '$minutes phút trước';
-        timeColor = minutes > 30
-            ? const Color(0xFFD32F2F)
-            : const Color(0xFFFF9800);
-      } else {
-        final hours = minutes ~/ 60;
-        final remainingMinutes = minutes % 60;
-        timeText = '$hours giờ $remainingMinutes phút trước';
-        timeColor = const Color(0xFFD32F2F);
-      }
-
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: timeColor.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: timeColor.withOpacity(0.3)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: timeColor.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(Icons.access_time, color: timeColor, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Thời gian xảy ra',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    timeText,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    } else {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey[300]!),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.access_time_outlined,
-                color: Colors.grey[600],
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Thời gian xảy ra',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Không xác định',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-  }
-
-  // Helper widgets
-
-  /// Build identified snake card (official confirmed species for this incident)
-  Widget _buildIdentifiedSnakeCard(
-    DetectedSnakeSpecies species,
-    SnakeIdentificationContext? context,
-  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _cardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF228B22), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF228B22).withOpacity(0.1),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: _divider),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          // Header with badge
-          Row(
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF228B22),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.verified,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'Loài rắn của sự cố này',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1C100D),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (context != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: context.method == SnakeIdentificationMethod.ai
-                        ? const Color(0xFF2196F3).withOpacity(0.1)
-                        : const Color(0xFF9C27B0).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        context.method == SnakeIdentificationMethod.ai
-                            ? Icons.smart_toy
-                            : Icons.person,
-                        size: 12,
-                        color: context.method == SnakeIdentificationMethod.ai
-                            ? const Color(0xFF2196F3)
-                            : const Color(0xFF9C27B0),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        context.method == SnakeIdentificationMethod.ai
-                            ? 'AI'
-                            : 'Chuyên gia',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: context.method == SnakeIdentificationMethod.ai
-                              ? const Color(0xFF2196F3)
-                              : const Color(0xFF9C27B0),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Snake image
-          if (species.imageUrl != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                species.imageUrl!,
-                height: 160,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 160,
-                    color: Colors.grey[200],
-                    child: const Center(
-                      child: Icon(Icons.pets, size: 48, color: Colors.grey),
-                    ),
-                  );
-                },
-              ),
-            ),
-          const SizedBox(height: 12),
-          // Species info card
           Container(
-            padding: const EdgeInsets.all(14),
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: SnakeRiskBadges.getRiskGradient(species.riskLevel),
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: SnakeRiskBadges.getRiskColor(species.riskLevel),
-                width: 2,
-              ),
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: SnakeRiskBadges.getRiskColor(species.riskLevel),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        SnakeRiskBadges.getRiskIcon(species.riskLevel),
-                        size: 18,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            species.commonName,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: SnakeRiskBadges.getRiskColor(
-                                species.riskLevel,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            species.scientificName,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontStyle: FontStyle.italic,
-                              color: SnakeRiskBadges.getRiskColor(
-                                species.riskLevel,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+            child: Icon(Icons.schedule_rounded, color: color, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Thời gian xảy ra',
+                style: TextStyle(fontSize: 12, color: _textSecondary),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                timeText,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: color,
                 ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    SnakeRiskBadges.buildRiskLevelBadge(
-                      species.riskLevel,
-                      compact: true,
-                    ),
-                    SnakeRiskBadges.buildVenomTypeBadge(
-                      species.primaryVenomType,
-                      compact: true,
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  // Action methods
-
-  Future<void> _makePhoneCall(String phoneNumber) async {
-    final cleanedPhone = phoneNumber.trim().replaceAll(RegExp(r'[^0-9+]'), '');
-
-    if (cleanedPhone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Số điện thoại không hợp lệ'),
-          backgroundColor: Colors.red,
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  Widget _sectionLabelWithIcon(IconData icon, Color iconColor, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: iconColor),
+        const SizedBox(width: 7),
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: _textSecondary,
+            letterSpacing: 0.3,
+          ),
         ),
-      );
-      return;
+      ],
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    Color _iconColor(IconData icon) {
+      if (icon == Icons.my_location_outlined) return const Color(0xFF4CAF50);
+      if (icon == Icons.place_outlined) return const Color(0xFF4CAF50);
+      if (icon == Icons.monitor_heart_outlined) return const Color(0xFFE65100);
+      if (icon == Icons.schedule_outlined) return const Color(0xFFFF9800);
+      return _textSecondary;
     }
 
-    final Uri phoneUri = Uri(scheme: 'tel', path: cleanedPhone);
-    try {
-      if (await canLaunchUrl(phoneUri)) {
-        await launchUrl(phoneUri);
-      }
-    } catch (e) {
-      debugPrint('❌ Failed to make call: $e');
-    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: _iconColor(icon)),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 72,
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 13, color: _textSecondary),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              color: _textPrimary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Actions ────────────────────────────────────────────────────────────────
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    final cleaned = phoneNumber.trim().replaceAll(RegExp(r'[^0-9+]'), '');
+    if (cleaned.isEmpty) return;
+    final uri = Uri(scheme: 'tel', path: cleaned);
+    if (await canLaunchUrl(uri)) await launchUrl(uri);
   }
 
   Future<void> _startMission() async {
-    // First, fetch route from OpenRouteService
     await _fetchRoute();
-
-    // If route fetch failed, show error and don't proceed
     if (_routeError != null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ $_routeError'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(_routeError!), backgroundColor: _danger),
         );
       }
       return;
     }
-
-    // Then start the mission (update status to EnRoute)
     final success = await ref
         .read(missionDetailProvider.notifier)
         .startMission();
-
     if (!mounted) return;
-
     if (success) {
-      // Update active mission status to EnRoute
       await ref
           .read(activeMissionProvider.notifier)
           .updateMissionStatus('EnRoute');
-      debugPrint('💾 Active mission status updated: EnRoute');
-
       final mission = ref.read(missionDetailProvider).mission;
       final routeData = ref.read(missionDetailProvider).routeData;
-
-      // Navigate to full-screen Navigation Screen
-      debugPrint('🗺️ Navigating to Navigation Screen');
-      debugPrint('   Route points: ${routeData?.points.length ?? 0}');
-      debugPrint('   Distance: ${routeData?.formattedDistance}');
-      debugPrint('   Duration: ${routeData?.formattedDuration}');
-
       context.push(
         '/rescuer/navigation',
         extra: {
@@ -2003,21 +1537,12 @@ class _RescuerMissionDetailScreenState
           'routeData': routeData,
         },
       );
-
-      // Show success message briefly before navigation
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Đã bắt đầu di chuyển'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 1),
-        ),
-      );
     } else {
       final error = ref.read(missionDetailProvider).error;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(error ?? 'Lỗi khi bắt đầu nhiệm vụ'),
-          backgroundColor: Colors.red,
+          backgroundColor: _danger,
         ),
       );
     }
@@ -2027,25 +1552,8 @@ class _RescuerMissionDetailScreenState
     final state = ref.read(missionDetailProvider);
     final mission = state.mission;
     final rescuerLocation = state.rescuerLocation;
-
-    if (mission == null || rescuerLocation == null) {
-      debugPrint('⚠️ Cannot fetch route: missing mission or location');
-      return;
-    }
-
-    setState(() {
-      _routeError = null;
-    });
-
-    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    debugPrint('🗺️ Fetching Route from OpenRouteService...');
-    debugPrint(
-      '   Start: ${rescuerLocation.latitude}, ${rescuerLocation.longitude}',
-    );
-    debugPrint(
-      '   End: ${mission.incident.locationCoordinates.latitude}, ${mission.incident.locationCoordinates.longitude}',
-    );
-
+    if (mission == null || rescuerLocation == null) return;
+    setState(() => _routeError = null);
     try {
       final openRoute = ref.read(openRouteServiceProvider);
       final route = await openRoute.getRoute(
@@ -2055,7 +1563,6 @@ class _RescuerMissionDetailScreenState
           mission.incident.locationCoordinates.longitude,
         ),
       );
-
       if (mounted) {
         setState(() {
           _routeData = RouteNavigationData(
@@ -2063,53 +1570,24 @@ class _RescuerMissionDetailScreenState
             distanceKm: route.distanceKm,
             durationMinutes: route.durationMinutes,
             steps: route.steps.isNotEmpty
-                ? route
-                      .steps // Use parsed steps from OpenRoute API
+                ? route.steps
                 : [
-                    // Fallback if no steps parsed
                     RouteStep(
-                      instruction: 'Đi theo đường màu cam đến vị trí nạn nhân',
+                      instruction: 'Đi theo đường đến vị trí nạn nhân',
                       distanceMeters: route.distanceKm * 1000,
                       durationSeconds: route.durationMinutes * 60,
-                      type: 7, // Continue straight
+                      type: 7,
                       roadName: null,
                     ),
                   ],
           );
         });
-
-        // Save routeData to provider
         ref.read(missionDetailProvider.notifier).setRouteData(_routeData!);
-
-        debugPrint('✅ Route fetched successfully!');
-        debugPrint('   📍 Points: ${route.points.length}');
-        debugPrint('   📏 Distance: ${route.formattedDistance}');
-        debugPrint('   ⏱️ Duration: ${route.formattedDuration}');
-        debugPrint('   🧭 Instructions: ${route.steps.length} steps');
-        if (route.steps.isNotEmpty) {
-          debugPrint('   → First: ${route.steps.first.instruction}');
-          if (route.steps.length > 1) {
-            debugPrint('   → Second: ${route.steps[1].instruction}');
-          }
-        }
-        debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       }
     } on OpenRouteException catch (e) {
-      if (mounted) {
-        setState(() {
-          _routeError = e.message;
-        });
-        debugPrint('❌ OpenRoute API Error: ${e.message}');
-        debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      }
+      if (mounted) setState(() => _routeError = e.message);
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _routeError = 'Lỗi không xác định: $e';
-        });
-        debugPrint('❌ Route fetch error: $e');
-        debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      }
+      if (mounted) setState(() => _routeError = 'Lỗi không xác định: $e');
     }
   }
 
@@ -2120,83 +1598,76 @@ class _RescuerMissionDetailScreenState
     );
   }
 
+  void _navigateToNavigation(
+    DetailRescueMissionResponse mission,
+    MissionDetailState state,
+  ) {
+    context.push(
+      '/rescuer/navigation',
+      extra: {
+        'missionId': mission.id,
+        'mission': mission,
+        'routeData': state.routeData,
+      },
+    );
+  }
+
   void _showOptionsMenu(DetailRescueMissionResponse mission) {
     showModalBottomSheet(
       context: context,
-      builder: (context) => SafeArea(
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDDDDDD),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
             ListTile(
-              leading: const Icon(Icons.refresh),
+              leading: const Icon(Icons.refresh_rounded),
               title: const Text('Làm mới'),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(ctx);
                 ref.read(missionDetailProvider.notifier).refresh();
               },
             ),
-            // ListTile(
-            //   leading: const Icon(Icons.report_problem, color: Colors.red),
-            //   title: const Text('Báo cáo sự cố'),
-            //   onTap: () {
-            //     Navigator.pop(context);
-            //     // TODO: Show report issue dialog
-            //   },
-            // ),
             if (mission.missionStatus == MissionStatus.preparing ||
                 mission.missionStatus == MissionStatus.enRoute)
               ListTile(
-                leading: const Icon(Icons.cancel, color: Colors.red),
-                title: const Text('Hủy nhiệm vụ'),
+                leading: const Icon(Icons.cancel_outlined, color: _danger),
+                title: const Text(
+                  'Hủy nhiệm vụ',
+                  style: TextStyle(color: _danger),
+                ),
                 onTap: () {
-                  Navigator.pop(context);
+                  Navigator.pop(ctx);
                   _showAbortDialog(mission);
                 },
               ),
+            const SizedBox(height: 8),
           ],
         ),
       ),
     );
   }
 
-  void _navigateToNavigation(
-    DetailRescueMissionResponse mission,
-    MissionDetailState state,
-  ) {
-    // Route data is already in provider, no need to fetch again
-    debugPrint('🗺️ Navigating to Navigation Screen from Detail');
-    debugPrint('   Route data available: ${state.routeData != null}');
-
-    context.push(
-      '/rescuer/navigation',
-      extra: {
-        'missionId': mission.id,
-        'mission': mission,
-        'routeData': state.routeData, // Get from provider
-      },
-    );
-  }
-
   void _showAbortDialog(DetailRescueMissionResponse mission) {
-    // Only allow abort for Preparing and EnRoute statuses
     if (mission.missionStatus != MissionStatus.preparing &&
-        mission.missionStatus != MissionStatus.enRoute) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Chỉ có thể hủy nhiệm vụ khi đang chuẩn bị hoặc đang di chuyển',
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
+        mission.missionStatus != MissionStatus.enRoute)
       return;
-    }
 
     String? selectedReason;
-    final customReasonController = TextEditingController();
-    bool showCustomField = false;
-
-    final abortReasons = [
+    final customController = TextEditingController();
+    bool showCustom = false;
+    final reasons = [
       'Phương tiện gặp sự cố',
       'Có việc khẩn cấp',
       'Không thể tiếp cận địa điểm',
@@ -2207,33 +1678,14 @@ class _RescuerMissionDetailScreenState
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
           ),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.warning_rounded,
-                  color: Colors.red,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text(
-                  'Hủy nhiệm vụ?',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
+          title: const Text(
+            'Hủy nhiệm vụ?',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
           content: SingleChildScrollView(
             child: Column(
@@ -2241,82 +1693,73 @@ class _RescuerMissionDetailScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Vui lòng chọn lý do hủy nhiệm vụ:',
-                  style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
+                  'Chọn lý do hủy nhiệm vụ:',
+                  style: TextStyle(fontSize: 13, color: _textSecondary),
                 ),
-                const SizedBox(height: 16),
-                // Radio buttons for abort reasons
-                ...abortReasons.map((reason) {
-                  final isSelected = selectedReason == reason;
-                  final isOther = reason == 'Lý do khác';
-
+                const SizedBox(height: 12),
+                ...reasons.map((r) {
+                  final isSelected = selectedReason == r;
+                  final isOther = r == 'Lý do khác';
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.only(bottom: 6),
                     child: InkWell(
-                      onTap: () {
-                        setState(() {
-                          selectedReason = reason;
-                          showCustomField = isOther;
-                          if (!isOther) {
-                            customReasonController.clear();
-                          }
-                        });
-                      },
+                      onTap: () => setState(() {
+                        selectedReason = r;
+                        showCustom = isOther;
+                        if (!isOther) customController.clear();
+                      }),
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? const Color(0xFFFF8800).withOpacity(0.1)
+                              ? _accent.withOpacity(0.06)
                               : Colors.transparent,
-                          border: Border.all(
-                            color: isSelected
-                                ? const Color(0xFFFF8800)
-                                : Colors.grey.shade300,
-                            width: isSelected ? 2 : 1,
-                          ),
                           borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSelected ? _accent : _divider,
+                            width: isSelected ? 1.5 : 1,
+                          ),
                         ),
                         child: Row(
                           children: [
                             Container(
-                              width: 20,
-                              height: 20,
+                              width: 18,
+                              height: 18,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: isSelected
-                                      ? const Color(0xFFFF8800)
-                                      : Colors.grey.shade400,
+                                  color: isSelected ? _accent : _textSecondary,
                                   width: 2,
                                 ),
                               ),
                               child: isSelected
                                   ? Center(
                                       child: Container(
-                                        width: 10,
-                                        height: 10,
+                                        width: 8,
+                                        height: 8,
                                         decoration: const BoxDecoration(
-                                          color: Color(0xFFFF8800),
+                                          color: _accent,
                                           shape: BoxShape.circle,
                                         ),
                                       ),
                                     )
                                   : null,
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                reason,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                  color: isSelected
-                                      ? const Color(0xFF1C100D)
-                                      : const Color(0xFF666666),
-                                ),
+                            const SizedBox(width: 10),
+                            Text(
+                              r,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isSelected
+                                    ? _textPrimary
+                                    : _textSecondary,
+                                fontWeight: isSelected
+                                    ? FontWeight.w500
+                                    : FontWeight.normal,
                               ),
                             ),
                           ],
@@ -2325,32 +1768,16 @@ class _RescuerMissionDetailScreenState
                     ),
                   );
                 }).toList(),
-
-                // Custom reason text field
-                if (showCustomField) ...[
-                  const SizedBox(height: 12),
+                if (showCustom) ...[
+                  const SizedBox(height: 8),
                   TextField(
-                    controller: customReasonController,
-                    decoration: InputDecoration(
+                    controller: customController,
+                    decoration: const InputDecoration(
                       hintText: 'Nhập lý do cụ thể...',
-                      hintStyle: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF999999),
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(
-                          color: Color(0xFFFF8800),
-                          width: 2,
-                        ),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(
                         horizontal: 12,
-                        vertical: 12,
+                        vertical: 10,
                       ),
                     ),
                     maxLines: 3,
@@ -2362,85 +1789,84 @@ class _RescuerMissionDetailScreenState
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(ctx),
               child: const Text(
                 'Quay lại',
-                style: TextStyle(
-                  color: Color(0xFF666666),
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(color: _textSecondary),
               ),
             ),
-            ElevatedButton(
+            FilledButton(
               onPressed: () async {
-                // Validate selection
-                if (selectedReason == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Vui lòng chọn lý do hủy nhiệm vụ'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                  return;
-                }
-
-                // Get final reason
+                if (selectedReason == null) return;
                 String finalReason = selectedReason!;
-                if (showCustomField) {
-                  final customReason = customReasonController.text.trim();
-                  if (customReason.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Vui lòng nhập lý do cụ thể'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                    return;
-                  }
-                  finalReason = customReason;
+                if (showCustom) {
+                  final custom = customController.text.trim();
+                  if (custom.isEmpty) return;
+                  finalReason = custom;
                 }
-
-                Navigator.pop(context);
-
+                Navigator.pop(ctx);
                 final success = await ref
                     .read(missionDetailProvider.notifier)
                     .abortMission(finalReason);
-
                 if (!mounted) return;
-
                 if (success) {
                   await _handleMissionTermination(
-                    '✅ Đã hủy nhiệm vụ, đang chuyển về màn hình chính...',
+                    'Đã hủy nhiệm vụ.',
                     restartIdle: false,
                   );
                 } else {
                   final error = ref.read(missionDetailProvider).error;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(error ?? 'Lỗi khi hủy nhiệm vụ'),
-                      backgroundColor: Colors.red,
+                      content: Text(error ?? 'Lỗi khi hủy'),
+                      backgroundColor: _danger,
                     ),
                   );
                 }
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Xác nhận hủy',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
+              style: FilledButton.styleFrom(backgroundColor: _danger),
+              child: const Text('Xác nhận hủy'),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Shared small widgets ───────────────────────────────────────────────────
+class _MethodBadge extends StatelessWidget {
+  final bool isAI;
+  const _MethodBadge({required this.isAI});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isAI ? const Color(0xFF1565C0) : const Color(0xFF6A1B9A);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isAI ? Icons.smart_toy_outlined : Icons.person_outline,
+            size: 12,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            isAI ? 'AI' : 'Chuyên gia',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }

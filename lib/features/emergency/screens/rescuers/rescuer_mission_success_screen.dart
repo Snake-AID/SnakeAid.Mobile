@@ -251,7 +251,7 @@ class _RescuerMissionSuccessScreenState
                         const SizedBox(height: 16),
                         _buildDetailRow(
                           'Mã nhiệm vụ:',
-                          missionState.mission?.id ?? '-',
+                          missionState.mission?.formattedMissionId ?? '-',
                           true,
                         ),
                         const SizedBox(height: 12),

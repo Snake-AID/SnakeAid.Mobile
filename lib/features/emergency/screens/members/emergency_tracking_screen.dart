@@ -158,7 +158,7 @@ class _EmergencyTrackingScreenState
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       // 🔍 Check if incident is already in advanced state (user returned after app restart)
       await _checkIncidentStateAndNavigate();
-      
+
       await _ensureMissionHubConnected();
       _setupMissionHubListeners();
       // Rescuer may have accepted while member was navigating to this screen
@@ -185,9 +185,9 @@ class _EmergencyTrackingScreenState
   /// Check if incident is already in RescuerArrived/Finished/Completed state
   /// If yes, auto-navigate to appropriate screen (handles app restart scenario)
   Future<void> _checkIncidentStateAndNavigate() async {
-    final incidentId = widget.incidentId ?? 
-        ref.read(activeIncidentProvider).incident?.id;
-    
+    final incidentId =
+        widget.incidentId ?? ref.read(activeIncidentProvider).incident?.id;
+
     if (incidentId == null) {
       debugPrint('⚠️ No incidentId available for state check');
       return;
@@ -198,7 +198,7 @@ class _EmergencyTrackingScreenState
       await ref
           .read(detailedIncidentProvider.notifier)
           .loadDetailedIncident(incidentId, forceRefresh: true);
-      
+
       final incident = ref.read(detailedIncidentProvider).incident;
       if (incident == null) {
         debugPrint('⚠️ Failed to load incident for state check');
@@ -212,7 +212,10 @@ class _EmergencyTrackingScreenState
       if (status == 'finished' || status == 'completed') {
         debugPrint('🔄 Auto-navigating to finished detail (status: $status)');
         if (mounted) {
-          context.go('/member-incident-finished-detail?incidentId=$incidentId');
+          context.go(
+            '/member-incident-finished-detail',
+            extra: {'incidentId': incidentId},
+          );
         }
         return;
       }
@@ -222,7 +225,7 @@ class _EmergencyTrackingScreenState
       if (mission != null) {
         final missionStatus = mission.status;
         debugPrint('📊 Current mission status: ${missionStatus.value}');
-        
+
         if (missionStatus == incident_models.MissionStatus.rescuerArrived) {
           debugPrint('🔄 Auto-navigating to rescuer arrived screen');
           if (mounted) {
@@ -235,7 +238,9 @@ class _EmergencyTrackingScreenState
         }
       }
 
-      debugPrint('✅ Incident in tracking-appropriate state, staying on tracking screen');
+      debugPrint(
+        '✅ Incident in tracking-appropriate state, staying on tracking screen',
+      );
     } catch (e) {
       debugPrint('⚠️ Error checking incident state: $e');
       // Continue to tracking screen on error
@@ -299,7 +304,9 @@ class _EmergencyTrackingScreenState
     // (no need to send location updates after rescuer is at scene)
     final missionStatus = ref.read(missionStatusProvider);
     if (missionStatus.rescuerArrived || missionStatus.missionCompleted) {
-      debugPrint('🛑 Skipping location broadcast: rescuer already arrived/completed');
+      debugPrint(
+        '🛑 Skipping location broadcast: rescuer already arrived/completed',
+      );
       return;
     }
 
@@ -521,8 +528,8 @@ class _EmergencyTrackingScreenState
             duration: Duration(seconds: 4),
           ),
         );
-        final incidentId = widget.incidentId ?? 
-            ref.read(activeIncidentProvider).incident?.id;
+        final incidentId =
+            widget.incidentId ?? ref.read(activeIncidentProvider).incident?.id;
         context.push(
           '/member-rescuer-arrived',
           extra: {'incidentId': incidentId},
@@ -534,17 +541,17 @@ class _EmergencyTrackingScreenState
     _missionHubSubscriptions.add(
       svc.missionCompletedStream.listen((_) async {
         if (!mounted) return;
-        
+
         // Get incident ID before clearing state
-        final incidentId = widget.incidentId ?? 
-            ref.read(activeIncidentProvider).incident?.id;
-        
+        final incidentId =
+            widget.incidentId ?? ref.read(activeIncidentProvider).incident?.id;
+
         if (incidentId == null) {
           debugPrint('⚠️ MissionCompleted: No incidentId available');
           context.go('/member-home');
           return;
         }
-        
+
         // 🔄 Load detailed incident data BEFORE clearing state
         // This ensures the finished detail screen has data in cache
         debugPrint('🔄 Pre-loading incident data before navigation...');
@@ -557,12 +564,15 @@ class _EmergencyTrackingScreenState
           debugPrint('⚠️ Failed to pre-load incident data: $e');
           // Continue anyway - the finished screen will try to load it
         }
-        
+
         if (!mounted) return;
-        
+
         // Navigate to finished detail screen for payment
-        context.go('/member-incident-finished-detail?incidentId=$incidentId');
-        
+        context.go(
+          '/member-incident-finished-detail',
+          extra: {'incidentId': incidentId},
+        );
+
         // Clean up member-side state AFTER navigation
         // This ensures data is available during screen transition
         await Future.delayed(const Duration(milliseconds: 500));
@@ -1880,7 +1890,7 @@ class _EmergencyTrackingScreenState
             ),
             const SizedBox(width: 6),
             Text(
-              connected ? 'MissionHub đã kết nối' : 'Đang kết nối lại...',
+              connected ? 'Đã kết nối' : 'Đang kết nối lại...',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -1970,9 +1980,13 @@ class _EmergencyTrackingScreenState
                 color: const Color(0xFFFFA500),
                 onTap: () {
                   if (incident == null) return;
+                  // Mark as direct entry from quick actions
                   context.push(
                     '/symptom-report',
-                    extra: {'incidentId': incident.id},
+                    extra: {
+                      'incidentId': incident.id,
+                      'isDirectEntry': true, // Direct from quick actions
+                    },
                   );
                 },
               ),
@@ -1985,7 +1999,15 @@ class _EmergencyTrackingScreenState
                 subtitle: 'Đánh giá',
                 color: const Color(0xFFFF6B00),
                 onTap: () {
-                  context.push('/severity-assessment');
+                  if (incident == null) return;
+                  // Mark as direct entry from quick actions
+                  context.push(
+                    '/severity-assessment',
+                    extra: {
+                      'incidentId': incident.id,
+                      'isDirectEntry': true, // Direct from quick actions
+                    },
+                  );
                 },
               ),
             ),
