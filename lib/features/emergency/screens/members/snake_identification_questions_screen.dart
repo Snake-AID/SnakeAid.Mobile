@@ -1,123 +1,69 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../models/filter_question.dart';
+import '../../repository/filter_question_repository.dart';
 
 /// Snake Identification Questions Screen - Multi-step questionnaire for accurate identification
-class SnakeIdentificationQuestionsScreen extends StatefulWidget {
-  const SnakeIdentificationQuestionsScreen({super.key});
+class SnakeIdentificationQuestionsScreen extends ConsumerStatefulWidget {
+  final String? incidentId;
+
+  const SnakeIdentificationQuestionsScreen({super.key, this.incidentId});
 
   @override
-  State<SnakeIdentificationQuestionsScreen> createState() =>
+  ConsumerState<SnakeIdentificationQuestionsScreen> createState() =>
       _SnakeIdentificationQuestionsScreenState();
 }
 
 class _SnakeIdentificationQuestionsScreenState
-    extends State<SnakeIdentificationQuestionsScreen> {
+    extends ConsumerState<SnakeIdentificationQuestionsScreen> {
   int _currentQuestionIndex = 0;
-  final Map<int, String> _selectedAnswers = {};
+  final Map<int, int> _selectedAnswers = {}; // Map<questionIndex, optionId>
+  List<FilterQuestion> _questions = [];
+  bool _isLoading = true;
+  String? _errorMessage;
 
-  final List<QuestionData> _questions = [
-    QuestionData(
-      question: 'Hình dạng đầu rắn?',
-      helper: 'Nhìn từ phía trên xuống',
-      options: [
-        QuestionOption(
-          title: 'Đầu tròn / Oval',
-          subtitle: '(Thường không độc)',
-          imageUrl:
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuBA--AwuLRvg2fpNWhUrNeq3tLuvZx3EITq0ZxzTNVXP1lel-p0C2N5J518obzn-wyKTEVrnJU4dUgdSqrhRWD9K3i98DeZ6UoUqMptk_BTiBZBtdvJYyLtroNtwjk7NIl69EW9z7OuoworYokUy9gX2-rPsHxWQ-poysja2B4l_5KMG-0ZgCgGhERGH-mqMvWJvr2xa2eKA2g-y585tJZvTeS6hAQZx-_EQ7SqBXTThykrL7fmXk9UrQ9ZC76ZwBdDXFzTP5MjPoqa',
-          value: 'round',
-        ),
-        QuestionOption(
-          title: 'Đầu tam giác / Dẹt',
-          subtitle: '(Thường có độc)',
-          imageUrl:
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuAHMOyKBW_MwEiBoKUjQBxQ_GlKs7mo4flnZICvtlan1AWKZuKhn3iesdQtc2b5OzpZSHhLthB2_iMapyYEmSKITrHJBPcGIKKf_ZqHtnvq-nAOnY-XGm-qW1qBmFKtIlvQCGyMqIvQmG8OwC65I9rL_ltWj7d6hrpEz389BKvBxzFa2zqLGG73OzzvmL0s2-0eRfzBBADTvllmPQ3jIWzaKejVKrSDAy6VKw8paTep-0JCw3kvz30yBW5SmndwwcDe4e3AxjA0GQRw',
-          value: 'triangle',
-        ),
-      ],
-    ),
-    QuestionData(
-      question: 'Hoa văn trên thân?',
-      helper: 'Quan sát kỹ các chi tiết',
-      options: [
-        QuestionOption(
-          title: 'Có vân / Hoa văn rõ',
-          subtitle: '(Sọc, đốm, vân phức tạp)',
-          imageUrl:
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuDXKRqvmxA8NnH7sL0hRLhJLOLl5cPVMBqXqOFc3e2d4h3p8b5m2g9r1j4n',
-          value: 'patterned',
-        ),
-        QuestionOption(
-          title: 'Màu đơn sắc / Trơn',
-          subtitle: '(Không có hoa văn rõ)',
-          imageUrl:
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuCYMRqvmxA8NnH7sL0hRLhJLOLl5cPVMBqXqOFc3e2d4h3p8b5m2g9r1j4n',
-          value: 'solid',
-        ),
-      ],
-    ),
-    QuestionData(
-      question: 'Kích thước con rắn?',
-      helper: 'Ước lượng chiều dài',
-      options: [
-        QuestionOption(
-          title: 'Nhỏ (< 50cm)',
-          subtitle: '(Khoảng bằng cánh tay)',
-          imageUrl:
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuDXKRqvmxA8NnH7sL0hRLhJLOLl5cPVMBqXqOFc3e2d4h3p8b5m2g9r1j4n',
-          value: 'small',
-        ),
-        QuestionOption(
-          title: 'Trung bình (50cm - 1.5m)',
-          subtitle: '(Dài ngang người)',
-          imageUrl:
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuCYMRqvmxA8NnH7sL0hRLhJLOLl5cPVMBqXqOFc3e2d4h3p8b5m2g9r1j4n',
-          value: 'medium',
-        ),
-        QuestionOption(
-          title: 'Lớn (> 1.5m)',
-          subtitle: '(Dài hơn người)',
-          imageUrl:
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuDXKRqvmxA8NnH7sL0hRLhJLOLl5cPVMBqXqOFc3e2d4h3p8b5m2g9r1j4n',
-          value: 'large',
-        ),
-      ],
-    ),
-    QuestionData(
-      question: 'Môi trường bắt gặp?',
-      helper: 'Nơi bạn nhìn thấy rắn',
-      options: [
-        QuestionOption(
-          title: 'Gần nguồn nước',
-          subtitle: '(Sông, hồ, ao, ruộng)',
-          imageUrl:
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuDXKRqvmxA8NnH7sL0hRLhJLOLl5cPVMBqXqOFc3e2d4h3p8b5m2g9r1j4n',
-          value: 'water',
-        ),
-        QuestionOption(
-          title: 'Trên cây / Bụi rậm',
-          subtitle: '(Rừng, vườn cây)',
-          imageUrl:
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuCYMRqvmxA8NnH7sL0hRLhJLOLl5cPVMBqXqOFc3e2d4h3p8b5m2g9r1j4n',
-          value: 'tree',
-        ),
-        QuestionOption(
-          title: 'Mặt đất / Trong nhà',
-          subtitle: '(Sân, đường, trong phòng)',
-          imageUrl:
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuDXKRqvmxA8NnH7sL0hRLhJLOLl5cPVMBqXqOFc3e2d4h3p8b5m2g9r1j4n',
-          value: 'ground',
-        ),
-      ],
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadQuestions();
+  }
+
+  Future<void> _loadQuestions() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+
+      final repository = ref.read(filterQuestionRepositoryProvider);
+      final response = await repository.getFilterQuestions();
+
+      if (response.isSuccess && response.data != null) {
+        setState(() {
+          _questions = response.data!;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage = response.message;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _isLoading = false;
+      });
+    }
+  }
 
   double get _progress =>
-      (_currentQuestionIndex + 1) / _questions.length;
+      _questions.isEmpty ? 0 : (_currentQuestionIndex + 1) / _questions.length;
 
-  void _selectOption(String value) {
+  void _selectOption(int optionId) {
     setState(() {
-      _selectedAnswers[_currentQuestionIndex] = value;
+      _selectedAnswers[_currentQuestionIndex] = optionId;
     });
   }
 
@@ -152,16 +98,236 @@ class _SnakeIdentificationQuestionsScreenState
     }
   }
 
-  void _showResults() {
-    // Navigate to filtered results screen with answers
-    context.pushNamed(
-      'snake_filtered_results',
-      extra: _selectedAnswers,
+  void _showResults() async {
+    // Check if user answered at least 3 questions
+    if (_selectedAnswers.length < 3) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng trả lời ít nhất 3 câu hỏi để xem kết quả'),
+          backgroundColor: Color(0xFFFF9800),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF228B22)),
+      ),
+    );
+
+    try {
+      // Get selected option IDs
+      final selectedOptionIds = _selectedAnswers.values.toList();
+
+      // Call API to filter snakes
+      final repository = ref.read(filterQuestionRepositoryProvider);
+      final response = await repository.filterSnakesByAnswers(
+        selectedOptionIds: selectedOptionIds,
+      );
+
+      if (mounted) {
+        // Close loading dialog
+        Navigator.pop(context);
+
+        if (response.isSuccess && response.data != null) {
+          // Navigate to filtered results screen with API data AND selectedOptionIds
+          context.pushNamed(
+            'snake_filtered_results',
+            extra: {
+              'filteredSnakes': response.data,
+              'selectedOptionIds': selectedOptionIds,
+              'incidentId': widget.incidentId,
+            },
+          );
+        } else {
+          _showError(response.message);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading
+        _showError(e.toString().replaceAll('Exception: ', ''));
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFDC3545),
+        duration: const Duration(seconds: 4),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    // Show loading state
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8F8F6),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new,
+              color: Color(0xFF666666),
+            ),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                // Fallback: go to emergency tracking if no navigation stack
+                context.goNamed(
+                  'emergency_tracking',
+                  extra: {'incidentId': widget.incidentId},
+                );
+              }
+            },
+          ),
+          title: const Text(
+            'Nhận dạng qua câu hỏi',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF333333),
+            ),
+          ),
+          centerTitle: true,
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(color: Color(0xFF228B22)),
+        ),
+      );
+    }
+
+    // Show error state
+    if (_errorMessage != null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8F8F6),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new,
+              color: Color(0xFF666666),
+            ),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                // Fallback: go to emergency tracking if no navigation stack
+                context.goNamed(
+                  'emergency_tracking',
+                  extra: {'incidentId': widget.incidentId},
+                );
+              }
+            },
+          ),
+          title: const Text(
+            'Nhận dạng qua câu hỏi',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF333333),
+            ),
+          ),
+          centerTitle: true,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: Color(0xFFDC3545),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Color(0xFF666666),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: _loadQuestions,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF228B22),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 12,
+                    ),
+                  ),
+                  child: const Text('Thử lại'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Show empty state
+    if (_questions.isEmpty) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8F8F6),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new,
+              color: Color(0xFF666666),
+            ),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                // Fallback: go to emergency tracking if no navigation stack
+                context.goNamed(
+                  'emergency_tracking',
+                  extra: {'incidentId': widget.incidentId},
+                );
+              }
+            },
+          ),
+          title: const Text(
+            'Nhận dạng qua câu hỏi',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF333333),
+            ),
+          ),
+          centerTitle: true,
+        ),
+        body: const Center(
+          child: Text(
+            'Không có câu hỏi nào',
+            style: TextStyle(fontSize: 16, color: Color(0xFF666666)),
+          ),
+        ),
+      );
+    }
+
     final currentQuestion = _questions[_currentQuestionIndex];
 
     return Scaffold(
@@ -173,11 +339,9 @@ class _SnakeIdentificationQuestionsScreenState
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF666666)),
           onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.goNamed('snake_selection_by_location');
-            }
+            // Pop về tracking screen (bỏ qua location/camera filter)
+            // Vì question filter được replace từ location hoặc camera
+            Navigator.of(context).popUntil((route) => route.isFirst);
           },
         ),
         title: const Text(
@@ -216,16 +380,12 @@ class _SnakeIdentificationQuestionsScreenState
                 Container(
                   height: 6,
                   width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE0E0E0),
-                  ),
+                  decoration: BoxDecoration(color: const Color(0xFFE0E0E0)),
                   child: FractionallySizedBox(
                     alignment: Alignment.centerLeft,
                     widthFactor: _progress,
                     child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF228B22),
-                      ),
+                      decoration: BoxDecoration(color: const Color(0xFF228B22)),
                     ),
                   ),
                 ),
@@ -251,32 +411,25 @@ class _SnakeIdentificationQuestionsScreenState
                         height: 1.2,
                       ),
                     ),
-                    const SizedBox(height: 8),
-
-                    // Helper Text
-                    Text(
-                      currentQuestion.helper,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[600],
-                      ),
-                    ),
                     const SizedBox(height: 32),
 
-                    // Options Grid
+                    // Options Grid - Always 2 columns for better image display
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: currentQuestion.options.length > 2 ? 1 : 2,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        childAspectRatio: currentQuestion.options.length > 2 ? 3.5 : 0.85,
-                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: 0.75,
+                          ),
                       itemCount: currentQuestion.options.length,
                       itemBuilder: (context, index) {
                         final option = currentQuestion.options[index];
-                        final isSelected = _selectedAnswers[_currentQuestionIndex] == option.value;
+                        final isSelected =
+                            _selectedAnswers[_currentQuestionIndex] ==
+                            option.id;
 
                         return _buildOptionCard(option, isSelected);
                       },
@@ -289,9 +442,7 @@ class _SnakeIdentificationQuestionsScreenState
                       decoration: BoxDecoration(
                         color: const Color(0xFFE3F2FD),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: const Color(0xFFBBDEFB),
-                        ),
+                        border: Border.all(color: const Color(0xFFBBDEFB)),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -328,10 +479,7 @@ class _SnakeIdentificationQuestionsScreenState
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border(
-                top: BorderSide(
-                  color: Colors.grey[200]!,
-                  width: 1,
-                ),
+                top: BorderSide(color: Colors.grey[200]!, width: 1),
               ),
               boxShadow: [
                 BoxShadow(
@@ -402,103 +550,177 @@ class _SnakeIdentificationQuestionsScreenState
     );
   }
 
-  Widget _buildOptionCard(QuestionOption option, bool isSelected) {
+  Widget _buildOptionCard(FilterOption option, bool isSelected) {
     return InkWell(
-      onTap: () => _selectOption(option.value),
-      borderRadius: BorderRadius.circular(12),
+      onTap: () => _selectOption(option.id),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFF0FDF0) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? const Color(0xFF228B22) : const Color(0xFFE0E0E0),
-            width: isSelected ? 2 : 1,
+            color: isSelected
+                ? const Color(0xFF228B22)
+                : const Color(0xFFE0E0E0),
+            width: isSelected ? 2.5 : 1,
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFF228B22).withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : [],
+          boxShadow: [
+            BoxShadow(
+              color: isSelected
+                  ? const Color(0xFF228B22).withValues(alpha: 0.15)
+                  : Colors.black.withValues(alpha: 0.06),
+              blurRadius: isSelected ? 12 : 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Image
+            // Image with selection indicator
             Expanded(
+              flex: 3,
               child: Stack(
                 children: [
                   Container(
-                    width: double.infinity,
                     decoration: BoxDecoration(
                       color: const Color(0xFFF5F5F5),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(16),
+                      ),
                     ),
                     clipBehavior: Clip.antiAlias,
-                    child: Image.network(
-                      option.imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(
-                          child: Icon(
-                            Icons.image_outlined,
-                            size: 40,
-                            color: Color(0xFFBDBDBD),
+                    child: option.optionImageUrl != null
+                        ? Image.network(
+                            option.optionImageUrl!,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Center(
+                                child: Icon(
+                                  Icons.image_outlined,
+                                  size: 48,
+                                  color: Color(0xFFBDBDBD),
+                                ),
+                              );
+                            },
+                          )
+                        : const Center(
+                            child: Icon(
+                              Icons.image_outlined,
+                              size: 48,
+                              color: Color(0xFFBDBDBD),
+                            ),
                           ),
-                        );
-                      },
-                    ),
                   ),
-                  // Selection Indicator
+
+                  // Selection check badge (top-left)
                   if (isSelected)
                     Positioned(
                       top: 8,
-                      right: 8,
+                      left: 8,
                       child: Container(
-                        padding: const EdgeInsets.all(4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
+                          color: const Color(0xFF228B22),
+                          borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
+                              color: Colors.black.withValues(alpha: 0.2),
                               blurRadius: 4,
                             ),
                           ],
                         ),
-                        child: const Icon(
-                          Icons.check_circle,
-                          color: Color(0xFF228B22),
-                          size: 24,
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              color: Colors.white,
+                              size: 14,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'Đã chọn',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
 
-            // Title
-            Text(
-              option.title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF333333),
-              ),
-            ),
-            const SizedBox(height: 4),
+            // Content section
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Option text
+                    Text(
+                      option.optionText,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected
+                            ? const Color(0xFF228B22)
+                            : const Color(0xFF333333),
+                        height: 1.3,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
 
-            // Subtitle
-            Text(
-              option.subtitle,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
+                    // Select button
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? const Color(0xFF228B22)
+                            : const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            isSelected ? 'Đã chọn' : 'Chọn phương án này',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected
+                                  ? Colors.white
+                                  : const Color(0xFF666666),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            isSelected ? Icons.check : Icons.arrow_forward,
+                            size: 14,
+                            color: isSelected
+                                ? Colors.white
+                                : const Color(0xFF666666),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -506,30 +728,4 @@ class _SnakeIdentificationQuestionsScreenState
       ),
     );
   }
-}
-
-class QuestionData {
-  final String question;
-  final String helper;
-  final List<QuestionOption> options;
-
-  QuestionData({
-    required this.question,
-    required this.helper,
-    required this.options,
-  });
-}
-
-class QuestionOption {
-  final String title;
-  final String subtitle;
-  final String imageUrl;
-  final String value;
-
-  QuestionOption({
-    required this.title,
-    required this.subtitle,
-    required this.imageUrl,
-    required this.value,
-  });
 }
