@@ -366,6 +366,56 @@ class IncidentRepository {
     }
   }
 
+  /// Confirm snake identification by filter questions
+  ///
+  /// POST /api/incidents/{incidentId}/identify/filter
+  /// Body: {
+  ///   "selectedOptionIds": [1, 5, 9, 12],
+  ///   "selectedSnakeSpeciesId": 42,
+  ///   "matchScore": 3,
+  ///   "matchPercentage": 75.0
+  /// }
+  Future<SosIncidentResponse> confirmSnakeIdentificationByFilter({
+    required String incidentId,
+    required List<int> selectedOptionIds,
+    required int selectedSnakeSpeciesId,
+    required int matchScore,
+    required double matchPercentage,
+  }) async {
+    try {
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint('🐍 Confirming snake identification by filter');
+      debugPrint('📍 Incident ID: $incidentId');
+      debugPrint('🔢 Selected option IDs: $selectedOptionIds');
+      debugPrint('🐍 Selected snake species ID: $selectedSnakeSpeciesId');
+      debugPrint('📊 Match score: $matchScore / ${selectedOptionIds.length}');
+      debugPrint('📈 Match percentage: $matchPercentage%');
+
+      final response = await httpService.post(
+        '/api/incidents/$incidentId/identify/filter',
+        data: {
+          'selectedOptionIds': selectedOptionIds,
+          'selectedSnakeSpeciesId': selectedSnakeSpeciesId,
+          'matchScore': matchScore,
+          'matchPercentage': matchPercentage,
+        },
+      );
+
+      debugPrint('✅ Snake identification confirmed successfully');
+      debugPrint('✅ Response: ${response.data}');
+
+      return SosIncidentResponse.fromJson(response.data);
+    } on DioException catch (e) {
+      debugPrint('❌ Confirm snake identification failed: ${e.message}');
+      debugPrint('❌ Response data: ${e.response?.data}');
+      throw _handleError(e, context: 'Xác nhận loài rắn thất bại');
+    } catch (e, stackTrace) {
+      debugPrint('❌ Unexpected error: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
+      throw Exception('Xác nhận loài rắn thất bại. Vui lòng thử lại');
+    }
+  }
+
   /// Handle API errors with simplified logic
   ///
   /// HttpService already extracts and formats error messages from backend,

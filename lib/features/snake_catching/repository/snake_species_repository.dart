@@ -30,13 +30,13 @@ class SnakeSpeciesRepository {
       final response = await _httpService.get('/api/snake-species');
       
       if (response.statusCode == 200 && response.data != null) {
-        // Handle array response
+        // Handle array response (legacy)
         if (response.data is List) {
           return (response.data as List)
               .map((json) => SnakeSpecies.fromJson(json))
               .toList();
         }
-        // Handle wrapped response with data field
+        // Handle wrapped response with data field (ApiResponse format with snake_case)
         else if (response.data is Map && response.data['data'] != null) {
           return (response.data['data'] as List)
               .map((json) => SnakeSpecies.fromJson(json))
