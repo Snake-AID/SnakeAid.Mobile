@@ -128,7 +128,7 @@ class ConsultationBookingResponse {
 }
 
 /// Request DTO for creating a new consultation booking
-/// API: POST /api/v1/consultation-bookings
+/// API: POST /api/consultations/scheduled
 class CreateConsultationBookingRequest {
   final String timeSlotId;
   final String problemDescription;
