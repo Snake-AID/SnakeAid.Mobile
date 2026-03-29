@@ -19,12 +19,13 @@ import 'package:snakeaid_mobile/features/auth/screens/forgot_password_otp_screen
 import 'package:snakeaid_mobile/features/auth/screens/reset_password_screen.dart';
 import 'package:snakeaid_mobile/features/auth/screens/password_reset_success_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_identification_screen.dart';
-import 'package:snakeaid_mobile/features/emergency/screens/members/snake_selection_by_location_screen.dart';
+import 'package:snakeaid_mobile/features/emergency/screens/members/snake_selection_by_location_screen_new.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_identification_questions_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_filtered_results_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_confirmation_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/first_aid_steps_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/models/sos_incident_response.dart';
+import 'package:snakeaid_mobile/features/emergency/models/filtered_snake.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/symptom_report_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/severity_assessment_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_tracking_screen.dart';
@@ -718,14 +719,25 @@ final router = GoRouter(
     GoRoute(
       path: '/snake-identification-questions',
       name: 'snake_identification_questions',
-      builder: (context, state) => const SnakeIdentificationQuestionsScreen(),
+      builder: (context, state) {
+        final data = state.extra as Map<String, dynamic>?;
+        return SnakeIdentificationQuestionsScreen(
+          incidentId: data?['incidentId'] as String?,
+        );
+      },
     ),
     GoRoute(
       path: '/snake-filtered-results',
       name: 'snake_filtered_results',
       builder: (context, state) {
-        final answers = state.extra as Map<int, String>;
-        return SnakeFilteredResultsScreen(answers: answers);
+        final data = state.extra as Map<String, dynamic>;
+        final filteredSnakes = data['filteredSnakes'] as List<dynamic>;
+        final selectedOptionIds = data['selectedOptionIds'] as List<dynamic>;
+        return SnakeFilteredResultsScreen(
+          filteredSnakes: filteredSnakes.cast<FilteredSnake>(),
+          selectedOptionIds: selectedOptionIds.cast<int>(),
+          incidentId: data['incidentId'] as String?,
+        );
       },
     ),
     GoRoute(
@@ -742,6 +754,13 @@ final router = GoRouter(
           features: (data['features'] as List<dynamic>)
               .cast<IdentificationFeature>(),
           matchedFeaturesCount: data['matchedFeaturesCount'] as int,
+          // API call data
+          snakeId: data['snakeId'] as int?,
+          selectedOptionIds: (data['selectedOptionIds'] as List<dynamic>?)
+              ?.cast<int>(),
+          matchScore: data['matchScore'] as int?,
+          matchPercentage: data['matchPercentage'] as double?,
+          incidentId: data['incidentId'] as String?,
         );
       },
     ),
@@ -761,6 +780,7 @@ final router = GoRouter(
         return SymptomReportScreen(
           incidentId: data['incidentId'] as String,
           recognitionResultId: data['recognitionResultId'] as String?,
+          isDirectEntry: data['isDirectEntry'] as bool? ?? false,
         );
       },
     ),
@@ -772,6 +792,7 @@ final router = GoRouter(
         return SeverityAssessmentScreen(
           incidentId: data?['incidentId'] as String? ?? '',
           recognitionResultId: data?['recognitionResultId'] as String?,
+          isDirectEntry: data?['isDirectEntry'] as bool? ?? false,
         );
       },
     ),
@@ -815,8 +836,11 @@ final router = GoRouter(
       name: 'member_incident_finished_detail',
       builder: (context, state) {
         final data = state.extra as Map<String, dynamic>?;
-        final incidentId = data?['incidentId'] as String?;
-        return MemberIncidentFinishedDetailScreen(incidentId: incidentId ?? '');
+        final incidentId =
+            data?['incidentId'] as String? ??
+            state.uri.queryParameters['incidentId'] ??
+            '';
+        return MemberIncidentFinishedDetailScreen(incidentId: incidentId);
       },
     ),
     GoRoute(
