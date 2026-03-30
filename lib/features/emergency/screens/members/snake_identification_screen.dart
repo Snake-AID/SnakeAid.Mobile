@@ -367,9 +367,9 @@ class _SnakeIdentificationScreenState
         icon: Icons.photo_camera_outlined,
         iconBackgroundColor: const Color(0xFFFFF3E0),
         iconColor: const Color(0xFFFF9800),
-        title: 'Không có ảnh rắn?',
+        title: 'Chọn phương pháp xác minh khác',
         description:
-            'Bạn có thể chọn rắn theo vị trí hoặc liên hệ với chuyên gia để được tư vấn trực tiếp.',
+            'Bạn có thể chọn rắn theo vị trí GPS để xác định loài rắn phổ biến trong khu vực.',
         actions: [
           DialogAction(
             label: 'Đóng',
@@ -379,15 +379,15 @@ class _SnakeIdentificationScreenState
           DialogAction(
             label: 'Chọn theo vị trí',
             onPressed: () {
-              context.pop();
-              context.goNamed(
+              context.pop(); // Close dialog
+              // Replace camera screen with location filter
+              context.pushReplacementNamed(
                 'snake_selection_by_location',
                 extra: {'incident': widget.incident},
               );
             },
             backgroundColor: const Color(0xFF228B22),
             icon: Icons.location_on,
-            flex: 2,
           ),
         ],
       ),

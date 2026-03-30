@@ -85,8 +85,11 @@ class DetailRescueMissionResponse {
   final double? actualCost;
 
   // Distance from rescuer to incident (calculated on demand)
-  @JsonKey(name: 'distanceKm')
-  final double? distanceKm;
+  @JsonKey(name: 'distanceFromCenterKm')
+  final double? distanceFromCenterKm;
+
+  @JsonKey(name: 'costFromCenter')
+  final double? costFromCenter;
 
   // Related entities
   @JsonKey(name: 'incident')
@@ -113,7 +116,8 @@ class DetailRescueMissionResponse {
     this.cancellationReason,
     this.estimatedCost,
     this.actualCost,
-    this.distanceKm,
+    this.distanceFromCenterKm,
+    this.costFromCenter,
     required this.incident,
     required this.rescuer,
     required this.user,
@@ -129,6 +133,24 @@ class DetailRescueMissionResponse {
 
   String get formattedPrice =>
       '${price.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} VNĐ';
+
+  String get formattedActualCost => actualCost == null
+      ? "0 VNĐ"
+      : '${actualCost!.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} VNĐ';
+
+  String get formattedCostFromCenter => costFromCenter == null
+      ? "0 VNĐ"
+      : '${costFromCenter!.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} VNĐ';
+
+  String get formattedMissionId {
+    final idStr = id.toString().replaceAll('-', '');
+
+    final last6 = idStr.length >= 6
+        ? idStr.substring(idStr.length - 6)
+        : idStr.padLeft(6, '0');
+
+    return 'INC-$last6';
+  }
 
   Duration? get elapsedTime {
     if (startedAt == null) return null;
