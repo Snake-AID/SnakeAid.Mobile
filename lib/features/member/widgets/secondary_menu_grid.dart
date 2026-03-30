@@ -30,7 +30,7 @@ class SecondaryMenuGrid extends StatelessWidget {
                 icon: Icons.menu_book,
                 label: 'Thư viện\nloài rắn',
                 badge: '250+',
-                onTap: () {},
+                onTap: () => context.push('/snake-species'),
               ),
             ],
           ),

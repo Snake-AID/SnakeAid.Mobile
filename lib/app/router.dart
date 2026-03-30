@@ -83,6 +83,9 @@ import 'package:snakeaid_mobile/features/consultation/screens/members/emergency_
 import 'package:snakeaid_mobile/features/consultation/screens/experts/expert_waiting_room_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/experts/expert_consultation_detail_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/experts/expert_consultation_completion_screen.dart';
+import 'package:snakeaid_mobile/features/snake_species/screens/snake_library_screen.dart';
+import 'package:snakeaid_mobile/features/snake_species/screens/snake_detail_screen.dart';
+import 'package:snakeaid_mobile/features/snake_species/screens/snake_first_aid_screen.dart';
 
 /// App routing configuration using go_router
 final router = GoRouter(
@@ -277,6 +280,33 @@ final router = GoRouter(
         return PasswordResetSuccessScreen(
           themeColor: data['themeColor'] as Color,
           roleRoute: data['roleRoute'] as String,
+        );
+      },
+    ),
+
+    // === SNAKE SPECIES ROUTES ===
+    GoRoute(
+      path: '/snake-species',
+      name: 'snake_library',
+      builder: (context, state) => const SnakeLibraryScreen(),
+    ),
+    GoRoute(
+      path: '/snake-species/:id',
+      name: 'snake_detail',
+      builder: (context, state) {
+        final id = int.parse(state.pathParameters['id']!);
+        return SnakeDetailScreen(snakeId: id);
+      },
+    ),
+    GoRoute(
+      path: '/snake-first-aid/:id',
+      name: 'snake_first_aid',
+      builder: (context, state) {
+        final id = int.parse(state.pathParameters['id']!);
+        final extra = state.extra as Map<String, dynamic>?;
+        return SnakeFirstAidScreen(
+          snakeSpeciesId: id,
+          commonName: extra?['commonName'] as String?,
         );
       },
     ),
