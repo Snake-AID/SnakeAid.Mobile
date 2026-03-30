@@ -132,7 +132,9 @@ class MissionHubService {
   final _missionCompletedController =
       StreamController<MissionCompletedData>.broadcast();
   final _missionCancelledController = StreamController<String>.broadcast();
+  final _missionAbortedController = StreamController<String>.broadcast();
   final _sessionExpiredController = StreamController<void>.broadcast();
+  final _missionStartedController = StreamController<void>.broadcast();
   final _connectionStateController =
       StreamController<HubConnectionState>.broadcast();
 
@@ -144,10 +146,13 @@ class MissionHubService {
   Stream<MemberLocationData> get memberLocationUpdatedStream =>
       _memberLocationUpdatedController.stream;
   Stream<void> get rescuerArrivedStream => _rescuerArrivedController.stream;
+  Stream<void> get missionStartedStream => _missionStartedController.stream;
   Stream<MissionCompletedData> get missionCompletedStream =>
       _missionCompletedController.stream;
   Stream<String> get missionCancelledStream =>
       _missionCancelledController.stream;
+  Stream<String> get missionAbortedStream =>
+      _missionAbortedController.stream;
   Stream<void> get sessionExpiredStream => _sessionExpiredController.stream;
   Stream<HubConnectionState> get connectionStateStream =>
       _connectionStateController.stream;
@@ -339,7 +344,7 @@ class MissionHubService {
       }
     });
 
-    // ❌ Mission cancelled
+    // ❌ Mission cancelled (by member)
     _hubConnection!.on('MissionCancelled', (arguments) {
       try {
         if (arguments == null || arguments.isEmpty) {
@@ -352,6 +357,32 @@ class MissionHubService {
         _missionCancelledController.add(reason);
       } catch (e) {
         debugPrint('❌ Error parsing MissionCancelled: $e');
+      }
+    });
+
+    // 🚫 Mission aborted (by rescuer) → incident reset to Pending for redispatch
+    _hubConnection!.on('MissionAborted', (arguments) {
+      try {
+        if (arguments == null || arguments.isEmpty) {
+          _missionAbortedController.add('');
+          return;
+        }
+        final data = arguments[0] as Map<String, dynamic>;
+        final reason = (data['reason'] ?? data['Reason']) as String? ?? '';
+        debugPrint('🚫 MissionAborted by rescuer: $reason');
+        _missionAbortedController.add(reason);
+      } catch (e) {
+        debugPrint('❌ Error parsing MissionAborted: $e');
+      }
+    });
+
+    // 🚏 Mission started (rescuer en-route)
+    _hubConnection!.on('MissionStarted', (arguments) {
+      try {
+        debugPrint('🚏 MissionStarted');
+        _missionStartedController.add(null);
+      } catch (e) {
+        debugPrint('❌ Error parsing MissionStarted: $e');
       }
     });
 
@@ -428,7 +459,9 @@ class MissionHubService {
     _rescuerArrivedController.close();
     _missionCompletedController.close();
     _missionCancelledController.close();
+    _missionAbortedController.close();
     _sessionExpiredController.close();
+    _missionStartedController.close();
     _connectionStateController.close();
   }
 }

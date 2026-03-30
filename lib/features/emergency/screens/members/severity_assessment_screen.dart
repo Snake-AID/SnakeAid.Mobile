@@ -11,11 +11,13 @@ import '../../providers/incident_provider.dart';
 class SeverityAssessmentScreen extends ConsumerStatefulWidget {
   final String incidentId;
   final String? recognitionResultId;
+  final bool isDirectEntry; // true = from quick actions, false = from symptom flow
 
   const SeverityAssessmentScreen({
     super.key,
     required this.incidentId,
     this.recognitionResultId,
+    this.isDirectEntry = false, // Default: from symptom flow
   });
 
   @override
@@ -200,11 +202,10 @@ class _SeverityAssessmentScreenState
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF191910)),
           onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.goNamed('emergency_alert');
-            }
+            // Always pop back (works for both flows)
+            // - From symptom flow: back to symptom report
+            // - From quick actions: back to tracking
+            context.pop();
           },
         ),
         title: const Text(
@@ -359,7 +360,7 @@ class _SeverityAssessmentScreenState
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -431,7 +432,7 @@ class _SeverityAssessmentScreenState
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -526,7 +527,7 @@ class _SeverityAssessmentScreenState
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -619,7 +620,7 @@ class _SeverityAssessmentScreenState
         color: const Color(0xFFF3F4F6),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, -4),
           ),
@@ -629,10 +630,17 @@ class _SeverityAssessmentScreenState
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Back to Emergency Alert Button
+          // Back to Emergency Tracking Button
           ElevatedButton(
             onPressed: () {
-              context.pop();
+              // Pop back based on entry context
+              if (widget.isDirectEntry) {
+                // Direct entry: just pop once to tracking
+                Navigator.of(context).pop();
+              } else {
+                // From symptom flow: pop 3 levels (severity + symptom + snake location)
+                Navigator.of(context)..pop()..pop()..pop();
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF228B22),
@@ -650,7 +658,7 @@ class _SeverityAssessmentScreenState
                 Icon(Icons.crisis_alert, size: 20),
                 SizedBox(width: 8),
                 Text(
-                  'Quay lại màn hình chờ cứu hộ',
+                  'Về màn hình theo dõi cứu hộ',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -658,7 +666,7 @@ class _SeverityAssessmentScreenState
           ),
           const SizedBox(height: 16),
 
-          // Update Symptoms Link
+          // Update Symptoms Link - context aware
           RichText(
             textAlign: TextAlign.center,
             text: TextSpan(
@@ -669,7 +677,10 @@ class _SeverityAssessmentScreenState
                 ),
                 WidgetSpan(
                   child: GestureDetector(
-                    onTap: () => context.pop(),
+                    onTap: () {
+                      // Pop back to symptom report (works for both flows)
+                      context.pop();
+                    },
                     child: const Text(
                       'Cập nhật triệu chứng',
                       style: TextStyle(

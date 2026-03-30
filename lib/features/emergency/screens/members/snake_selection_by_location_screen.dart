@@ -1,41 +1,93 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'snake_confirmation_screen.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../models/sos_incident_response.dart';
+import '../../models/snakes_by_location_response.dart';
+import '../../providers/snake_location_provider.dart';
+import '../../repository/incident_repository.dart';
 
-/// Snake Selection by Location Screen - Manual snake selection when no image available
-class SnakeSelectionByLocationScreen extends StatelessWidget {
+/// Snake Selection by Location Screen - Location-based snake filtering with API
+class SnakeSelectionByLocationScreen extends ConsumerStatefulWidget {
   final IncidentData? incident;
   
   const SnakeSelectionByLocationScreen({super.key, this.incident});
 
   @override
+  ConsumerState<SnakeSelectionByLocationScreen> createState() =>
+      _SnakeSelectionByLocationScreenState();
+}
+
+class _SnakeSelectionByLocationScreenState
+    extends ConsumerState<SnakeSelectionByLocationScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _fetchLocationAndSnakes();
+  }
+
+  Future<void> _fetchLocationAndSnakes() async {
+    try {
+      // Get current GPS location
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      // Fetch snakes by location from API
+      await ref.read(snakeLocationProvider.notifier).fetchSnakesByLocation(
+            latitude: position.latitude,
+            longitude: position.longitude,
+          );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Không thể lấy vị trí: ${e.toString()}'),
+            backgroundColor: const Color(0xFFDC3545),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final locationState = ref.watch(snakeLocationProvider);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F8F6),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF333333)),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.goNamed('snake_identification');
-            }
-          },
+      appBar: _buildAppBar(locationState),
+      body: _buildBody(locationState),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(SnakeLocationState locationState) {
+    return AppBar(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.white,
+      elevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF333333)),
+        onPressed: () {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.goNamed('emergency_tracking', extra: {'incidentId': widget.incident?.id});
+          }
+        },
+      ),
+      title: const Text(
+        'Rắn thường gặp ở khu vực bạn',
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF333333),
         ),
-        title: const Text(
-          'Rắn thường gặp ở khu vực bạn',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF333333),
-          ),
-        ),
-        actions: [
+      ),
+      actions: [
+        if (locationState.data != null)
           Container(
             margin: const EdgeInsets.only(right: 16),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -45,20 +97,20 @@ class SnakeSelectionByLocationScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
               ],
             ),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.location_on, color: Color(0xFFDC3545), size: 16),
-                SizedBox(width: 4),
+                const Icon(Icons.location_on, color: Color(0xFFDC3545), size: 16),
+                const SizedBox(width: 4),
                 Text(
-                  'Quận 1, TP.HCM',
-                  style: TextStyle(
+                  locationState.data!.region.name,
+                  style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF333333),
@@ -67,232 +119,470 @@ class SnakeSelectionByLocationScreen extends StatelessWidget {
               ],
             ),
           ),
+      ],
+    );
+  }
+
+  Widget _buildBody(SnakeLocationState locationState) {
+    if (locationState.isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: Color(0xFF228B22)),
+            SizedBox(height: 16),
+            Text(
+              'Đang tải danh sách rắn...',
+              style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (locationState.error != null) {
+      return _buildErrorState(locationState.error!);
+    }
+
+    if (locationState.data == null) {
+      return const Center(child: Text('Không có dữ liệu'));
+    }
+
+    return _buildSnakeList(locationState.data!);
+  }
+
+  Widget _buildErrorState(String error) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Color(0xFFDC3545),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              error,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _fetchLocationAndSnakes,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Thử lại'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF228B22),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSnakeList(dynamic data) {
+    // Cast to proper type
+    final locationData = data as SnakesByLocationResponse;
+    final snakes = locationData.snakes;
+
+    return Column(
+      children: [
+        // Info Banner
+        Container(
+          margin: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE3F2FD),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFBBDEFB)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.info_outline,
+                color: Color(0xFF2196F3),
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Dựa trên vị trí của bạn tại ${locationData.region.name}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0D47A1),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Tìm thấy ${snakes.length} loài rắn thường gặp',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Warning Banner
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+          color: const Color(0xFFFFFACD),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('💡', style: TextStyle(fontSize: 16)),
+              SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  'Lưu ý: Chọn con GIỐNG NHẤT, không cần chính xác 100%',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF7F6000),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Snake Grid
+        Expanded(
+          child: snakes.isEmpty
+              ? const Center(
+                  child: Text(
+                    'Không tìm thấy rắn nào trong khu vực này',
+                    style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
+                  ),
+                )
+              : GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 0.65,
+                  ),
+                  itemCount: snakes.length,
+                  itemBuilder: (context, index) {
+                    final snake = snakes[index];
+                    return _buildSnakeCard(context, snake: snake);
+                  },
+                ),
+        ),
+
+        // Footer
+        _buildFooter(),
+      ],
+    );
+  }
+
+  Widget _buildFooter() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
         ],
       ),
-      body: Column(
-        children: [
-          // Info Banner
-          Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE3F2FD),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFBBDEFB)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  Icons.info_outline,
-                  color: Color(0xFF2196F3),
-                  size: 24,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Dựa trên vị trí của bạn, đây là các loài rắn thường gặp nhất',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0D47A1),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Chọn con giống với rắn bạn gặp nhất',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Warning Banner
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-            color: const Color(0xFFFFFACD),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('💡', style: TextStyle(fontSize: 16)),
-                SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    'Lưu ý: Chọn con GIỐNG NHẤT, không cần chính xác 100%',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF7F6000),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Tiếp tục báo cáo triệu chứng (Primary action)
+            ElevatedButton.icon(
+              onPressed: () {
+                if (widget.incident != null) {
+                  // Use push instead of goNamed to maintain navigation stack
+                  context.push(
+                    '/symptom-report',
+                    extra: {
+                      'incidentId': widget.incident!.id,
+                      'isDirectEntry': false, // From snake verification flow
+                    },
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Không tìm thấy thông tin sự cố'),
+                      backgroundColor: Color(0xFFDC3545),
                     ),
-                    textAlign: TextAlign.center,
-                  ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.assignment, size: 20),
+              label: const Text('Tiếp tục báo cáo triệu chứng'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF228B22),
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ],
+              ),
             ),
-          ),
+            const SizedBox(height: 12),
+            
+            // Quay về theo dõi (Secondary action)
+            OutlinedButton.icon(
+              onPressed: () {
+                // Pop back to emergency tracking screen (1 level)
+                Navigator.of(context).pop();
+              },
+              icon: const Icon(Icons.crisis_alert, size: 18),
+              label: const Text('Quay về theo dõi cứu hộ'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF228B22),
+                side: const BorderSide(color: Color(0xFF228B22)),
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-          // Snake Grid
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.65,
+  /// Handle snake selection with auto-confirm
+  Future<void> _onSnakeSelected(BuildContext context, SnakeInRegionDto snake) async {
+    final name = snake.commonName;
+    final scientificName = snake.scientificName;
+    final isPoisonous = snake.isVenomous;
+    final snakeId = snake.id;
+
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF228B22)),
+      ),
+    );
+
+    try {
+      // Call confirm API (simple confirm by location - no filter data needed)
+      if (widget.incident != null) {
+        final repository = ref.read(incidentRepositoryProvider);
+        
+        // For location-based selection, we use simplified confirm
+        // No selectedOptionIds (no questions), just the snake species
+        await repository.confirmSnakeIdentificationByFilter(
+          incidentId: widget.incident!.id,
+          selectedOptionIds: [], // Empty for location-based selection
+          selectedSnakeSpeciesId: snakeId,
+          matchScore: 0, // Not applicable for location selection
+          matchPercentage: 0.0, // Not applicable for location selection
+        );
+      }
+
+      if (!mounted) return;
+
+      // Close loading
+      Navigator.pop(context);
+
+      // Show success dialog with 2 options
+      _showSuccessDialog(context, name, scientificName, isPoisonous);
+    } catch (e) {
+      if (!mounted) return;
+
+      // Close loading
+      Navigator.pop(context);
+
+      // Show error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: const Color(0xFFDC3545),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  /// Show success dialog with 2 action options
+  void _showSuccessDialog(
+    BuildContext context,
+    String snakeName,
+    String scientificName,
+    bool isPoisonous,
+  ) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF228B22).withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_circle,
+                color: Color(0xFF228B22),
+                size: 32,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Đã xác nhận loài rắn',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              snakeName,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF333333),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              scientificName,
+              style: TextStyle(
+                fontSize: 13,
+                fontStyle: FontStyle.italic,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isPoisonous
+                    ? const Color(0xFFFEF2F2)
+                    : const Color(0xFFDCFCE7),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isPoisonous
+                      ? const Color(0xFFFECDD3)
+                      : const Color(0xFFBBF7D0),
+                ),
+              ),
+              child: Row(
                 children: [
-                  _buildSnakeCard(
-                    context,
-                    name: 'Rắn hổ mang chúa',
-                    scientificName: 'Ophiophagus hannah',
-                    englishName: 'King Cobra',
-                    isPoisonous: true,
-                    features: [
-                      'Đầu dẹt hình thìa',
-                      'Màu nâu vàng, có vân',
-                      'Dài 1-3m',
-                    ],
-                    imageUrl: 'https://images.unsplash.com/photo-1531386151447-fd76ad50012f?w=400',
+                  Icon(
+                    isPoisonous ? Icons.warning : Icons.shield,
+                    color: isPoisonous
+                        ? const Color(0xFFDC3545)
+                        : const Color(0xFF228B22),
+                    size: 20,
                   ),
-                  _buildSnakeCard(
-                    context,
-                    name: 'Rắn ráo trâu',
-                    scientificName: 'Ptyas mucosa',
-                    englishName: 'Oriental Rat Snake',
-                    isPoisonous: false,
-                    features: [
-                      'Mắt to, màu đen',
-                      'Màu nâu hoặc xám',
-                      'Di chuyển rất nhanh',
-                    ],
-                    imageUrl: 'https://images.unsplash.com/photo-1516426122078-c23e76319801?w=400',
-                  ),
-                  _buildSnakeCard(
-                    context,
-                    name: 'Rắn lục đuôi đỏ',
-                    scientificName: 'Trimeresurus albolabris',
-                    englishName: 'White-lipped Pit Viper',
-                    isPoisonous: true,
-                    features: [
-                      'Đầu hình tam giác',
-                      'Xanh lá cây, đuôi đỏ',
-                    ],
-                    imageUrl: 'https://images.unsplash.com/photo-1547656584-f8a3649e2e3c?w=400',
-                  ),
-                  _buildSnakeCard(
-                    context,
-                    name: 'Rắn cạp nia',
-                    scientificName: 'Bungarus candidus',
-                    englishName: 'Malayan Krait',
-                    isPoisonous: true,
-                    features: [
-                      'Khoang đen trắng',
-                      'Hoạt động về đêm',
-                    ],
-                    imageUrl: 'https://images.unsplash.com/photo-1494548162494-384bba4ab999?w=400',
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      isPoisonous ? 'RẮN ĐỘC' : 'KHÔNG ĐỘC',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: isPoisonous
+                            ? const Color(0xFFDC3545)
+                            : const Color(0xFF228B22),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
-
-          // Footer
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, -2),
-                ),
-              ],
+            const SizedBox(height: 12),
+            Text(
+              'Thông tin đã được cập nhật vào yêu cầu SOS của bạn.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
             ),
-            child: SafeArea(
-              top: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Không thấy trong danh sách
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      context.goNamed('snake_identification_questions');
+          ],
+        ),
+        actions: [
+          // Primary: Go to Symptom Report
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog
+                if (widget.incident != null) {
+                  context.push(
+                    '/symptom-report',
+                    extra: {
+                      'incidentId': widget.incident!.id,
+                      'isDirectEntry': false, // From snake verification flow
                     },
-                    icon: const Icon(Icons.search_off, size: 20),
-                    label: const Text('Không thấy trong danh sách này'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF333333),
-                      side: const BorderSide(color: Color(0xFFBDBDBD)),
-                      minimumSize: const Size(double.infinity, 48),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  
-                  // Bỏ qua nhận định
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      if (incident != null) {
-                        context.goNamed(
-                          'symptom_report',
-                          extra: {
-                            'incidentId': incident!.id,
-                          },
-                        );
-                      } else {
-                        // Fallback if no incident
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Không tìm thấy thông tin sự cố'),
-                            backgroundColor: Color(0xFFDC3545),
-                          ),
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.skip_next, size: 20),
-                    label: const Text('Bỏ qua nhận định rắn'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF333333),
-                      side: const BorderSide(color: Color(0xFFBDBDBD)),
-                      minimumSize: const Size(double.infinity, 48),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  
-                  // Quay lại chụp ảnh
-                  TextButton.icon(
-                    onPressed: () {
-                      if (context.canPop()) {
-                        context.pop();
-                      } else {
-                        context.goNamed('snake_identification');
-                      }
-                    },
-                    icon: const Icon(Icons.camera_alt, size: 16),
-                    label: const Text('Quay lại chụp ảnh'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF228B22),
-                    ),
-                  ),
-                ],
+                  );
+                }
+              },
+              icon: const Icon(Icons.assignment, size: 18),
+              label: const Text(
+                'Tiếp theo: Báo cáo triệu chứng',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF228B22),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Secondary: Back to Tracking
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                // Close dialog, then pop back to emergency tracking (2 levels total)
+                Navigator.of(context)..pop()..pop();
+              },
+              icon: const Icon(Icons.crisis_alert, size: 18),
+              label: const Text(
+                'Về theo dõi cứu hộ',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF228B22),
+                side: const BorderSide(color: Color(0xFF228B22), width: 2),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
           ),
@@ -301,22 +591,20 @@ class SnakeSelectionByLocationScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSnakeCard(
-    BuildContext context, {
-    required String name,
-    required String scientificName,
-    required String englishName,
-    required bool isPoisonous,
-    required List<String> features,
-    required String imageUrl,
-  }) {
+  Widget _buildSnakeCard(BuildContext context, {required SnakeInRegionDto snake}) {
+    final name = snake.commonName;
+    final scientificName = snake.scientificName;
+    final isPoisonous = snake.isVenomous;
+    final imageUrl = snake.imageUrl;
+    final identificationSummary = snake.identificationSummary;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -335,12 +623,23 @@ class SnakeSelectionByLocationScreen extends StatelessWidget {
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(16),
                   ),
-                  image: DecorationImage(
-                    image: NetworkImage(imageUrl),
-                    fit: BoxFit.cover,
-                    onError: (_, __) {},
-                  ),
+                  image: imageUrl.isNotEmpty
+                      ? DecorationImage(
+                          image: NetworkImage(imageUrl),
+                          fit: BoxFit.cover,
+                          onError: (_, __) {},
+                        )
+                      : null,
                 ),
+                child: imageUrl.isEmpty
+                    ? const Center(
+                        child: Icon(
+                          Icons.image_not_supported,
+                          size: 48,
+                          color: Color(0xFFBDBDBD),
+                        ),
+                      )
+                    : null,
               ),
               Positioned(
                 top: 8,
@@ -352,7 +651,7 @@ class SnakeSelectionByLocationScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(6),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.black.withValues(alpha: 0.2),
                         blurRadius: 4,
                       ),
                     ],
@@ -415,39 +714,16 @@ class SnakeSelectionByLocationScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   
-                  // Features
-                  Flexible(
-                    child: ListView(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: features.map((feature) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 2),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '• ',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.grey[400],
-                                ),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  feature,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey[700],
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
+                  // Identification Summary
+                  Expanded(
+                    child: Text(
+                      identificationSummary,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey[700],
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   
@@ -456,20 +732,7 @@ class SnakeSelectionByLocationScreen extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {
-                        context.pushNamed(
-                          'snake_confirmation',
-                          extra: {
-                            'snakeName': name,
-                            'englishName': englishName,
-                            'scientificName': scientificName,
-                            'isPoisonous': isPoisonous,
-                            'imageUrl': imageUrl,
-                            'features': _getConfirmationFeatures(name),
-                            'matchedFeaturesCount': _getConfirmationFeatures(name).where((f) => f.isMatched).length,
-                          },
-                        );
-                      },
+                      onPressed: () => _onSnakeSelected(context, snake),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF228B22),
                         foregroundColor: Colors.white,
@@ -503,63 +766,5 @@ class SnakeSelectionByLocationScreen extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  List<IdentificationFeature> _getConfirmationFeatures(String snakeName) {
-    if (snakeName == 'Rắn hổ mang chúa') {
-      return [
-        const IdentificationFeature(
-          icon: Icons.psychology,
-          title: 'Hình dạng đầu',
-          description: 'Đầu dẹt hình thìa, rõ ràng so với cổ',
-          isMatched: true,
-        ),
-        const IdentificationFeature(
-          icon: Icons.texture,
-          title: 'Màu sắc & hoa văn',
-          description: 'Màu nâu vàng với vân đen chạy dọc',
-          isMatched: true,
-        ),
-        const IdentificationFeature(
-          icon: Icons.straighten,
-          title: 'Kích thước',
-          description: 'Thường 1.5-3m, có thể lên đến 5m',
-          isMatched: true,
-        ),
-        const IdentificationFeature(
-          icon: Icons.sentiment_very_dissatisfied,
-          title: 'Hành vi',
-          description: 'Có thể dựng cổ lên khi bị đe dọa',
-          isMatched: true,
-        ),
-        const IdentificationFeature(
-          icon: Icons.forest,
-          title: 'Môi trường sống',
-          description: 'Thường ở rừng, gần nước, núi đá',
-          isMatched: false,
-        ),
-      ];
-    } else {
-      return [
-        const IdentificationFeature(
-          icon: Icons.psychology,
-          title: 'Hình dạng đầu',
-          description: 'Đặc điểm về hình dạng đầu',
-          isMatched: true,
-        ),
-        const IdentificationFeature(
-          icon: Icons.texture,
-          title: 'Màu sắc & hoa văn',
-          description: 'Đặc điểm về màu sắc',
-          isMatched: true,
-        ),
-        const IdentificationFeature(
-          icon: Icons.straighten,
-          title: 'Kích thước',
-          description: 'Đặc điểm về kích thước',
-          isMatched: true,
-        ),
-      ];
-    }
   }
 }

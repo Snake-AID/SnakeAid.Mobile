@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../models/filtered_snake.dart';
 import 'snake_confirmation_screen.dart';
 
 /// Snake Filtered Results Screen - Shows filtered snake results based on questionnaire answers
 class SnakeFilteredResultsScreen extends StatelessWidget {
-  final Map<int, String> answers;
+  final List<FilteredSnake> filteredSnakes;
+  final List<int> selectedOptionIds;
+  final String? incidentId;
 
   const SnakeFilteredResultsScreen({
     super.key,
-    required this.answers,
+    required this.filteredSnakes,
+    required this.selectedOptionIds,
+    this.incidentId,
   });
 
   @override
@@ -25,7 +30,8 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
             if (context.canPop()) {
               context.pop();
             } else {
-              context.goNamed('snake_identification_questions');
+              // Fallback: go to emergency tracking if no navigation stack
+              context.goNamed('emergency_tracking', extra: {'incidentId': incidentId});
             }
           },
         ),
@@ -181,69 +187,58 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
 
           // Snake Grid
           Expanded(
-            child: GridView.count(
-              crossAxisCount: 2,
-              padding: const EdgeInsets.all(16),
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 0.65,
-              children: [
-                _buildSnakeCard(
-                  context: context,
-                  name: 'Rắn hổ mang chúa',
-                  englishName: 'King Cobra',
-                  scientificName: 'Ophiophagus hannah',
-                  isPoisonous: true,
-                  imageUrl:
-                      'https://lh3.googleusercontent.com/aida-public/AB6AXuB3iYF_YxR9JjZdQAqYN_emcm0lPiZbfDNnJkxmrHLoDnRNscK6NA2d4PUYAWZb-yv8x_jQOEv-wQcgUDdV0xdY-Byr1sorfuAue6p9u0m00PP-PGI03E3JGrpxVJFY5a4Q6iyhGmYCvdiktmFb5EcS3Z9Ux_QBzvG_NtFDFOgHVvT6MOecXyjPPUKkqf-kATR8s7XtQrAVdIe14ZYAzsTB36bh_h9EQqKR4mXDQWadTnXpgpELtqc7UZJkAppGYSdz8Yqwr5_UM_NS',
-                  features: [
-                    'Đầu dẹt hình thìa',
-                    'Màu nâu vàng, có vân',
-                    'Dài 1-3m',
-                  ],
-                ),
-                _buildSnakeCard(
-                  context: context,
-                  name: 'Rắn ráo trâu',
-                  englishName: 'Oriental Rat Snake',
-                  scientificName: 'Ptyas mucosa',
-                  isPoisonous: false,
-                  imageUrl:
-                      'https://lh3.googleusercontent.com/aida-public/AB6AXuA5kmOdxTyFaUJGPVwydfBlLJoO76xVwYQQit-lpI1pyS36awh_Ijncxm9zBnibCLaxlYEVq4W_Ydz0IMGg_9YIkydep3TYaZmMhOoVtnux9So5lafYmx16jHTMts-UXAAuW-2vqqaAU-FCCdEY942JL10pRgFT0Qq05YrZVBrqbJuV0Aeb4LgmfJSRDh629id6ABr5iUhDIOgtjRH864OvGBdfE6oJ1CMDVH-8zXuG1jYx6LH_Rdq2g4wU0D0D8LAfAR_0FHRCNAGy',
-                  features: [
-                    'Mắt to, màu đen',
-                    'Màu nâu hoặc xám',
-                    'Di chuyển rất nhanh',
-                  ],
-                ),
-                _buildSnakeCard(
-                  context: context,
-                  name: 'Rắn lục đuôi đỏ',
-                  englishName: 'White-lipped Pit Viper',
-                  scientificName: 'Trimeresurus albolabris',
-                  isPoisonous: true,
-                  imageUrl:
-                      'https://lh3.googleusercontent.com/aida-public/AB6AXuB8Yj6XnclUL6RhGokpHsxe2vT9C5TQK5lHl2goyZNQXxzFGEd4x69PJHFIJ8n6wheu7EiWh4UwLW574TvQ48jI1yDWELygeN41iDhL89B3rG29s0LOS53hdw7zIPw58601qLHymXrW9lXumTOGsbo3fjl9u4_Lz-2nZPJ5ir_DPaTtY2vTSW152gQuYT_6JrLpGmFAHRqPEvjK3CIy22qvLCX1aL94WtxMz4NWtvYSkYfel_3zgQUqFyNOSMu94e4zzY2e7BfDXL20',
-                  features: [
-                    'Đầu hình tam giác',
-                    'Xanh lá cây, đuôi đỏ',
-                  ],
-                ),
-                _buildSnakeCard(
-                  context: context,
-                  name: 'Rắn cạp nia',
-                  englishName: 'Malayan Krait',
-                  scientificName: 'Bungarus candidus',
-                  isPoisonous: true,
-                  imageUrl:
-                      'https://lh3.googleusercontent.com/aida-public/AB6AXuAKdTkiMiOs78CAHPcR7fi9kHDRb35zTvfoSJLPr9CvA9zzOwYLy3zsTSGvx5djM1H1SkIV2UxMFq584jrqqzCHk2325U9gSo3FOjopw4U7bDkAJHcm6lOUiTesAXu4zsBve5_VvEUW3q1JBUShiWXWnxTOYFQpnM0yA8vpwFXcCpOKfqkVn8yu4F3jsV14rpHszZgyrpuU5FV8K966jtHY4y7anagioZJ7DVXfswVCI_7NgSHr5xjw2FM8MYShL7ShDSuhtQNkPkWx',
-                  features: [
-                    'Khoang đen trắng',
-                    'Hoạt động về đêm',
-                  ],
-                ),
-              ],
-            ),
+            child: filteredSnakes.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.search_off,
+                            size: 64,
+                            color: Color(0xFFBDBDBD),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Không tìm thấy rắn phù hợp',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF333333),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Vui lòng thử lại với các câu trả lời khác hoặc liên hệ chuyên gia',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : GridView.builder(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 0.65,
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filteredSnakes.length,
+                    itemBuilder: (context, index) {
+                      final snake = filteredSnakes[index];
+                      return _buildSnakeCard(
+                        context: context,
+                        snake: snake,
+                      );
+                    },
+                  ),
           ),
 
           // Footer
@@ -296,12 +291,7 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
 
   Widget _buildSnakeCard({
     required BuildContext context,
-    required String name,
-    required String englishName,
-    required String scientificName,
-    required bool isPoisonous,
-    required String imageUrl,
-    required List<String> features,
+    required FilteredSnake snake,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -332,7 +322,7 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Image.network(
-                  imageUrl,
+                  snake.imageUrl,
                   fit: BoxFit.cover,
                   width: double.infinity,
                   errorBuilder: (context, error, stackTrace) {
@@ -346,17 +336,49 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
                   },
                 ),
               ),
+              // Match percentage badge
+              Positioned(
+                top: 8,
+                left: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.check_circle,
+                        color: Color(0xFF4CAF50),
+                        size: 14,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${snake.matchPercentage.toStringAsFixed(0)}%',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Poison badge
               Positioned(
                 top: 8,
                 right: 8,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isPoisonous ? const Color(0xFFDC3545) : const Color(0xFF28A745),
+                    color: snake.isVenomous ? const Color(0xFFDC3545) : const Color(0xFF28A745),
                     borderRadius: BorderRadius.circular(4),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.black.withValues(alpha: 0.2),
                         blurRadius: 4,
                       ),
                     ],
@@ -365,13 +387,13 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        isPoisonous ? Icons.dangerous : Icons.shield,
+                        snake.isVenomous ? Icons.dangerous : Icons.shield,
                         color: Colors.white,
                         size: 12,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        isPoisonous ? 'RẮN ĐỘC' : 'KHÔNG ĐỘC',
+                        snake.isVenomous ? 'RẮN ĐỘC' : 'KHÔNG ĐỘC',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 9,
@@ -394,7 +416,7 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
                 children: [
                   // Name
                   Text(
-                    name,
+                    snake.commonName,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -408,7 +430,7 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
 
                   // Scientific name
                   Text(
-                    scientificName,
+                    snake.scientificName,
                     style: TextStyle(
                       fontSize: 10,
                       fontStyle: FontStyle.italic,
@@ -420,12 +442,12 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
 
-                  // Features
+                  // Matched Features
                   Expanded(
                     child: ListView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      itemCount: features.length > 3 ? 3 : features.length,
+                      itemCount: snake.matchedFeatures.length > 3 ? 3 : snake.matchedFeatures.length,
                       itemBuilder: (context, index) {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 4),
@@ -433,15 +455,16 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '• ',
+                                '✓ ',
                                 style: TextStyle(
                                   fontSize: 10,
-                                  color: Colors.grey[400],
+                                  color: Colors.green[600],
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                               Flexible(
                                 child: Text(
-                                  features[index],
+                                  snake.matchedFeatures[index],
                                   style: TextStyle(
                                     fontSize: 10,
                                     color: Colors.grey[700],
@@ -463,17 +486,23 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
-                        final confirmationFeatures = _getConfirmationFeatures(name);
+                        final confirmationFeatures = _getConfirmationFeatures(snake);
                         context.pushNamed(
                           'snake_confirmation',
                           extra: {
-                            'snakeName': name,
-                            'englishName': englishName,
-                            'scientificName': scientificName,
-                            'isPoisonous': isPoisonous,
-                            'imageUrl': imageUrl,
+                            'snakeName': snake.commonName,
+                            'englishName': '', // Not provided in API response
+                            'scientificName': snake.scientificName,
+                            'isPoisonous': snake.isVenomous,
+                            'imageUrl': snake.imageUrl,
                             'features': confirmationFeatures,
-                            'matchedFeaturesCount': confirmationFeatures.where((f) => f.isMatched).length,
+                            'matchedFeaturesCount': snake.matchScore,
+                            // Pass data needed for API call
+                            'snakeId': snake.id,
+                            'selectedOptionIds': selectedOptionIds,
+                            'matchScore': snake.matchScore,
+                            'matchPercentage': snake.matchPercentage,
+                            'incidentId': incidentId,
                           },
                         );
                       },
@@ -511,72 +540,32 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
     );
   }
 
-  List<IdentificationFeature> _getConfirmationFeatures(String snakeName) {
-    // Return features based on snake name
-    switch (snakeName) {
-      case 'Rắn hổ mang chúa':
-        return [
-          IdentificationFeature(
-            icon: Icons.psychology,
-            title: 'Hình dạng đầu',
-            description: 'Đầu dẹt hình thìa, rõ ràng so với cổ',
-            isMatched: true,
-          ),
-          IdentificationFeature(
-            icon: Icons.texture,
-            title: 'Màu sắc & vân',
-            description: 'Màu nâu vàng với vân đen rõ ràng',
-            isMatched: true,
-          ),
-          IdentificationFeature(
-            icon: Icons.straighten,
-            title: 'Kích thước',
-            description: 'Dài từ 1-3m, có thể lớn hơn',
-            isMatched: true,
-          ),
-        ];
-      case 'Rắn ráo trâu':
-        return [
-          IdentificationFeature(
-            icon: Icons.remove_red_eye,
-            title: 'Đặc điểm mắt',
-            description: 'Mắt to, màu đen bóng',
-            isMatched: true,
-          ),
-          IdentificationFeature(
-            icon: Icons.palette,
-            title: 'Màu sắc',
-            description: 'Màu nâu hoặc xám đồng nhất',
-            isMatched: true,
-          ),
-          IdentificationFeature(
-            icon: Icons.speed,
-            title: 'Hành vi',
-            description: 'Di chuyển rất nhanh, hay trèo cây',
-            isMatched: true,
-          ),
-        ];
-      default:
-        return [
-          IdentificationFeature(
-            icon: Icons.psychology,
-            title: 'Hình dạng đầu',
-            description: 'Đầu tam giác, rõ ràng so với cổ',
-            isMatched: true,
-          ),
-          IdentificationFeature(
-            icon: Icons.texture,
-            title: 'Màu sắc & vân',
-            description: 'Có đặc điểm màu sắc rõ ràng',
-            isMatched: true,
-          ),
-          IdentificationFeature(
-            icon: Icons.forest,
-            title: 'Môi trường sống',
-            description: 'Thường gặp ở khu vực này',
-            isMatched: true,
-          ),
-        ];
+  List<IdentificationFeature> _getConfirmationFeatures(FilteredSnake snake) {
+    // Convert matched features from API to IdentificationFeature objects
+    final features = <IdentificationFeature>[];
+    
+    for (int i = 0; i < snake.matchedFeatures.length && i < 5; i++) {
+      features.add(
+        IdentificationFeature(
+          icon: _getIconForFeature(i),
+          title: 'Đặc điểm ${i + 1}',
+          description: snake.matchedFeatures[i],
+          isMatched: true,
+        ),
+      );
     }
+    
+    return features;
+  }
+  
+  IconData _getIconForFeature(int index) {
+    const icons = [
+      Icons.psychology,
+      Icons.texture,
+      Icons.straighten,
+      Icons.palette,
+      Icons.forest,
+    ];
+    return icons[index % icons.length];
   }
 }

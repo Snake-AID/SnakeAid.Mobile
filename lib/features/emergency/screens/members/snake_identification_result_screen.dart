@@ -365,33 +365,23 @@ class _SnakeIdentificationResultScreenState
                     ),
                   ] else ...[
                     // After confirmation: Show action buttons
-                    // Primary Action: View First Aid Guide
+                    // Primary Action: Report Symptoms
                     ElevatedButton.icon(
                       onPressed: () {
-                        // Pop result screen (Navigator) then camera screen (go_router)
-                        Navigator.pop(context); // Pop result
-
-                        // Wait for frame, then pop camera and push first aid
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (mounted) {
-                            // Pop camera screen back to tracking hub
-                            context.pop();
-
-                            // Wait another frame before pushing first aid
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              if (mounted) {
-                                context.pushNamed(
-                                  'first_aid_steps',
-                                  extra: {'incident': widget.incident},
-                                );
-                              }
-                            });
-                          }
-                        });
+                        // Use push to keep tracking screen alive
+                        // Mark as NOT direct entry (from snake flow)
+                        context.push(
+                          '/symptom-report',
+                          extra: {
+                            'incidentId': widget.incident.id,
+                            'recognitionResultId': widget.detectionData.recognitionResultId,
+                            'isDirectEntry': false, // From snake verification flow
+                          },
+                        );
                       },
-                      icon: const Icon(Icons.medical_services, size: 20),
+                      icon: const Icon(Icons.assignment, size: 20),
                       label: const Text(
-                        'Xem hướng dẫn sơ cứu chi tiết',
+                        'Tiếp theo: Báo cáo triệu chứng',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -410,24 +400,17 @@ class _SnakeIdentificationResultScreenState
                     ),
                     const SizedBox(height: 12),
 
-                    // Secondary Action: Return to Map
+                    // Secondary Action: Skip to Tracking
                     OutlinedButton.icon(
                       onPressed: () {
-                        // Pop result screen and camera screen back to tracking hub
-                        Navigator.pop(context); // Pop result
-
-                        // Wait for frame before popping camera screen
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (mounted) {
-                            context.pop(); // Pop camera back to tracking hub
-                          }
-                        });
+                        // Pop all sub-screens back to tracking
+                        // This preserves tracking screen state
+                        Navigator.of(context).popUntil((route) => route.isFirst);
                       },
-                      icon: const Icon(Icons.map_outlined, size: 20),
+                      icon: const Icon(Icons.skip_next, size: 20),
                       label: const Text(
-                        'Quay về bản đồ',
+                        'Bỏ qua - Về theo dõi',
                         style: TextStyle(
-                          color: Color(0xFFFFFFFF),
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                         ),

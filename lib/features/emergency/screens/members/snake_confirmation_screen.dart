@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/widgets/custom_dialog.dart';
+import '../../repository/incident_repository.dart';
 
 /// Snake Confirmation Screen - Verify identified snake species
-class SnakeConfirmationScreen extends StatefulWidget {
+class SnakeConfirmationScreen extends ConsumerStatefulWidget {
   final String snakeName;
   final String englishName;
   final String scientificName;
@@ -11,6 +13,13 @@ class SnakeConfirmationScreen extends StatefulWidget {
   final String? imageUrl;
   final List<IdentificationFeature> features;
   final int matchedFeaturesCount;
+  
+  // Data for API call
+  final int? snakeId;
+  final List<int>? selectedOptionIds;
+  final int? matchScore;
+  final double? matchPercentage;
+  final String? incidentId;
 
   const SnakeConfirmationScreen({
     super.key,
@@ -21,13 +30,18 @@ class SnakeConfirmationScreen extends StatefulWidget {
     this.imageUrl,
     required this.features,
     required this.matchedFeaturesCount,
+    this.snakeId,
+    this.selectedOptionIds,
+    this.matchScore,
+    this.matchPercentage,
+    this.incidentId,
   });
 
   @override
-  State<SnakeConfirmationScreen> createState() => _SnakeConfirmationScreenState();
+  ConsumerState<SnakeConfirmationScreen> createState() => _SnakeConfirmationScreenState();
 }
 
-class _SnakeConfirmationScreenState extends State<SnakeConfirmationScreen> {
+class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScreen> {
   late List<bool> _selectedFeatures;
 
   @override
@@ -77,16 +91,7 @@ class _SnakeConfirmationScreenState extends State<SnakeConfirmationScreen> {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF666666)),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.goNamed('snake_identification_questions');
-            }
-          },
-        ),
+        automaticallyImplyLeading: false, // Remove default back button
         title: const Text(
           'Xác nhận loài rắn',
           style: TextStyle(
@@ -97,18 +102,64 @@ class _SnakeConfirmationScreenState extends State<SnakeConfirmationScreen> {
         ),
         centerTitle: true,
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Center(
-              child: Text(
-                'Bước 1/2',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[500],
+          // Help button
+          IconButton(
+            icon: const Icon(Icons.help_outline, color: Color(0xFF666666)),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Color(0xFF228B22)),
+                      SizedBox(width: 8),
+                      Text('Hướng dẫn'),
+                    ],
+                  ),
+                  content: const SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Kiểm tra kỹ các đặc điểm:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        SizedBox(height: 8),
+                        Text('✓ Hình dạng đầu'),
+                        Text('✓ Màu sắc và hoa văn'),
+                        Text('✓ Kích thước'),
+                        Text('✓ Môi trường sống'),
+                        SizedBox(height: 12),
+                        Text(
+                          'Nếu chắc chắn:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text('→ Nhấn "Xác nhận và sơ cứu"'),
+                        SizedBox(height: 8),
+                        Text(
+                          'Nếu không chắc:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text('→ Nhấn "Chọn loài khác"'),
+                        SizedBox(height: 8),
+                        Text(
+                          'Nếu muốn bỏ qua:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text('→ Nhấn "Bỏ qua nhận dạng"'),
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Đã hiểu'),
+                    ),
+                  ],
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ],
       ),
@@ -381,7 +432,7 @@ class _SnakeConfirmationScreenState extends State<SnakeConfirmationScreen> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 8,
                   offset: const Offset(0, -2),
                 ),
@@ -392,23 +443,24 @@ class _SnakeConfirmationScreenState extends State<SnakeConfirmationScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Confirm Button
+                  // Primary: Confirm and Start First Aid
                   SizedBox(
                     width: double.infinity,
                     height: 54,
-                    child: ElevatedButton(
+                    child: ElevatedButton.icon(
                       onPressed: _showConfirmationDialog,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF228B22),
                         foregroundColor: Colors.white,
                         elevation: 2,
-                        shadowColor: const Color(0xFF228B22).withOpacity(0.3),
+                        shadowColor: const Color(0xFF228B22).withValues(alpha: 0.3),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text(
-                        'Xác nhận - Đây là con rắn tôi gặp',
+                      icon: const Icon(Icons.medical_services, size: 20),
+                      label: const Text(
+                        'Xác nhận - Bắt đầu sơ cứu',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -418,11 +470,11 @@ class _SnakeConfirmationScreenState extends State<SnakeConfirmationScreen> {
                   ),
                   const SizedBox(height: 12),
                   
-                  // Not Sure Button
+                  // Secondary: Not Sure - Choose Another
                   SizedBox(
                     width: double.infinity,
                     height: 48,
-                    child: OutlinedButton(
+                    child: OutlinedButton.icon(
                       onPressed: () => context.pop(),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF666666),
@@ -431,7 +483,8 @@ class _SnakeConfirmationScreenState extends State<SnakeConfirmationScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text(
+                      icon: const Icon(Icons.arrow_back, size: 18),
+                      label: const Text(
                         'Không chắc - Chọn loài khác',
                         style: TextStyle(
                           fontSize: 15,
@@ -440,15 +493,50 @@ class _SnakeConfirmationScreenState extends State<SnakeConfirmationScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   
-                  // Not Similar Button
-                  TextButton(
+                  // Tertiary: Skip Identification - Go to Tracking
+                  TextButton.icon(
                     onPressed: () {
-                      context.push('/emergency/snake-identification-questions');
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          icon: const Icon(
+                            Icons.warning_amber_rounded,
+                            size: 48,
+                            color: Color(0xFFFF9800),
+                          ),
+                          title: const Text('Bỏ qua nhận dạng rắn?'),
+                          content: const Text(
+                            'Bạn sẽ quay về màn hình theo dõi mà chưa xác định loài rắn.\n\n'
+                            '⚠️ Lưu ý: Việc xác định loài rắn giúp đội cứu hộ chuẩn bị tốt hơn và hướng dẫn sơ cứu chính xác hơn.',
+                            style: TextStyle(height: 1.5),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Ở lại'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(context); // Close dialog
+                                
+                                // Pop all screens back to Emergency Tracking (existing instance)
+                                // This preserves the tracking screen state without recreating it
+                                Navigator.of(context).popUntil((route) => route.isFirst);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFF9800),
+                              ),
+                              child: const Text('Bỏ qua và quay về'),
+                            ),
+                          ],
+                        ),
+                      );
                     },
-                    child: Text(
-                      'Không giống - Trả lời câu hỏi chi tiết',
+                    icon: const Icon(Icons.home_outlined, size: 16),
+                    label: Text(
+                      'Bỏ qua nhận dạng - Về theo dõi',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -533,18 +621,7 @@ class _SnakeConfirmationScreenState extends State<SnakeConfirmationScreen> {
           DialogAction(
             label: 'Bắt đầu sơ cứu',
             icon: Icons.arrow_forward,
-            onPressed: () {
-              context.pop(); // Close dialog
-              context.pushNamed(
-                'first_aid_steps',
-                extra: {
-                  'snakeName': widget.snakeName,
-                  'snakeNameVi': widget.snakeName,
-                  'venomType': widget.isPoisonous ? 'Độc' : 'Không độc',
-                  'snakeImageUrl': widget.imageUrl,
-                },
-              );
-            },
+            onPressed: () => _confirmAndProceed(),
             backgroundColor: const Color(0xFF228B22),
             textColor: Colors.white,
             isBold: true,
@@ -553,6 +630,80 @@ class _SnakeConfirmationScreenState extends State<SnakeConfirmationScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _confirmAndProceed() async {
+    // Close confirmation dialog
+    context.pop();
+
+    // If we have API data, call the confirm identification API
+    if (widget.incidentId != null &&
+        widget.snakeId != null &&
+        widget.selectedOptionIds != null &&
+        widget.matchScore != null &&
+        widget.matchPercentage != null) {
+      
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(color: Color(0xFF228B22)),
+        ),
+      );
+
+      try {
+        final repository = ref.read(incidentRepositoryProvider);
+        await repository.confirmSnakeIdentificationByFilter(
+          incidentId: widget.incidentId!,
+          selectedOptionIds: widget.selectedOptionIds!,
+          selectedSnakeSpeciesId: widget.snakeId!,
+          matchScore: widget.matchScore!,
+          matchPercentage: widget.matchPercentage!,
+        );
+
+        if (mounted) {
+          // Close loading
+          Navigator.pop(context);
+          
+          // Navigate to first aid
+          context.pushNamed(
+            'first_aid_steps',
+            extra: {
+              'snakeName': widget.snakeName,
+              'snakeNameVi': widget.snakeName,
+              'venomType': widget.isPoisonous ? 'Độc' : 'Không độc',
+              'snakeImageUrl': widget.imageUrl,
+            },
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          // Close loading
+          Navigator.pop(context);
+          
+          // Show error
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceAll('Exception: ', '')),
+              backgroundColor: const Color(0xFFDC3545),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    } else {
+      // No API data - just navigate to first aid (for AI detection flow)
+      context.pushNamed(
+        'first_aid_steps',
+        extra: {
+          'snakeName': widget.snakeName,
+          'snakeNameVi': widget.snakeName,
+          'venomType': widget.isPoisonous ? 'Độc' : 'Không độc',
+          'snakeImageUrl': widget.imageUrl,
+        },
+      );
+    }
   }
 
   Widget _buildFeatureCard(IdentificationFeature feature, int index) {

@@ -370,8 +370,8 @@ class _RescuerNavigationScreenState
         );
         debugPrint('   Instruction: ${steps[_currentStepIndex].instruction}');
 
-        // Show notification for new instruction
-        if (mounted) {
+        // Show notification for new instruction only when this route screen is active.
+        if (mounted && _isCurrentRoute()) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -427,7 +427,7 @@ class _RescuerNavigationScreenState
         '⚠️ OFF ROUTE! Distance to route: ${minDistance.toStringAsFixed(0)}m',
       );
 
-      if (mounted) {
+      if (mounted && _isCurrentRoute()) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -459,7 +459,7 @@ class _RescuerNavigationScreenState
       _hasShownOffRouteAlert = false;
       debugPrint('✅ Back on route!');
 
-      if (mounted) {
+      if (mounted && _isCurrentRoute()) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Row(
@@ -476,6 +476,11 @@ class _RescuerNavigationScreenState
         );
       }
     }
+  }
+
+  bool _isCurrentRoute() {
+    final route = ModalRoute.of(context);
+    return route != null && route.isCurrent;
   }
 
   void _toggleFollowUser() {

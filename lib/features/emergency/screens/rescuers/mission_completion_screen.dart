@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
 import '../../repository/media_repository.dart';
 import '../../providers/mission_detail_provider.dart';
 import '../../providers/mission_hub_provider.dart';
 import '../../providers/active_mission_provider.dart';
 import '../../providers/rescuer_emergency_provider.dart';
+import '../../providers/hospital_provider.dart';
 import '../../../rescuer/providers/tracking_provider.dart';
 
 class MissionCompletionScreen extends ConsumerStatefulWidget {
@@ -28,10 +30,7 @@ class MissionCompletionScreen extends ConsumerStatefulWidget {
 
 class _MissionCompletionScreenState
     extends ConsumerState<MissionCompletionScreen> {
-  String _patientOutcome = 'Ổn định - Không cần cấp cứu';
   final TextEditingController _notesController = TextEditingController();
-  final TextEditingController _feedbackController = TextEditingController();
-  int _rating = 0;
   final List<File> _evidenceImages = [];
   final ImagePicker _picker = ImagePicker();
 
@@ -47,7 +46,6 @@ class _MissionCompletionScreenState
   @override
   void dispose() {
     _notesController.dispose();
-    _feedbackController.dispose();
     super.dispose();
   }
 
@@ -62,6 +60,38 @@ class _MissionCompletionScreenState
           backgroundColor: Colors.red,
         ),
       );
+      return;
+    }
+
+    // Request camera permission
+    final status = await Permission.camera.request();
+
+    if (status.isDenied) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cần quyền truy cập camera để chụp ảnh'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (status.isPermanentlyDenied) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Vui lòng bật quyền camera trong Cài đặt'),
+            backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Cài đặt',
+              textColor: Colors.white,
+              onPressed: () => openAppSettings(),
+            ),
+          ),
+        );
+      }
       return;
     }
 
@@ -192,7 +222,9 @@ class _MissionCompletionScreenState
             debugPrint('✅ Restarted idle tracking after mission completion');
 
             // Reconnect to RescuerHub to receive new rescue requests
-            await ref.read(rescueModeProvider.notifier).startRescueMode(rescuerId);
+            await ref
+                .read(rescueModeProvider.notifier)
+                .startRescueMode(rescuerId);
             debugPrint('✅ Reconnected to RescuerHub successfully');
           }
         } catch (e) {
@@ -201,11 +233,9 @@ class _MissionCompletionScreenState
         }
         debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-        // Success! Navigate to incident finished detail
-        context.go(
-          '/member-incident-finished-detail',
-          extra: {'incidentId': widget.incidentId},
-        );
+        // Success! Navigate to rescuer mission success screen
+        if (!mounted) return;
+        context.go('/rescuer/mission-success');
       } else {
         // Show error
         final error = ref.read(missionDetailProvider).error;
@@ -272,8 +302,8 @@ class _MissionCompletionScreenState
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
-                  Icons.check_circle,
-                  color: Color(0xFF28A745),
+                  Icons.camera_alt_rounded,
+                  color: Color(0xFFFF8800),
                   size: 36,
                 ),
               ),
@@ -398,6 +428,9 @@ class _MissionCompletionScreenState
 
   @override
   Widget build(BuildContext context) {
+    final missionState = ref.watch(missionDetailProvider);
+    final mission = missionState.mission;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7F5),
       body: Column(
@@ -441,7 +474,7 @@ class _MissionCompletionScreenState
                   ),
                   const Icon(
                     Icons.check_circle,
-                    color: Color(0xFF28A745),
+                    color: Color(0xFFFF8800),
                     size: 28,
                   ),
                 ],
@@ -533,21 +566,21 @@ class _MissionCompletionScreenState
                             children: [
                               _buildCleanInfoRow(
                                 label: 'Thời gian',
-                                value: '25 phút',
+                                value: mission?.formattedElapsedTime ?? '-',
                                 valueColor: const Color(0xFFFF8800),
                                 icon: Icons.access_time_rounded,
                               ),
                               const SizedBox(height: 14),
                               _buildCleanInfoRow(
                                 label: 'Bệnh nhân',
-                                value: 'Nguyễn Văn A',
+                                value: mission?.user.account?.fullName ?? '-',
                                 valueColor: const Color(0xFF1C100D),
                                 icon: Icons.person_outline_rounded,
                               ),
                               const SizedBox(height: 14),
                               _buildCleanInfoRow(
                                 label: 'Địa điểm',
-                                value: '123 Nguyễn Huệ, Q.1',
+                                value: mission?.incident.address ?? '-',
                                 valueColor: const Color(0xFF1C100D),
                                 icon: Icons.location_on_outlined,
                               ),
@@ -579,36 +612,55 @@ class _MissionCompletionScreenState
                                   Column(
                                     crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
-                                      const Text(
-                                        'Rắn hổ mang chúa',
-                                        style: TextStyle(
+                                      Text(
+                                        mission
+                                                ?.incident
+                                                .identifiedSnakeSpecies
+                                                ?.commonName ??
+                                            '-',
+                                        style: const TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
                                           color: Color(0xFF1C100D),
                                         ),
                                       ),
                                       const SizedBox(height: 4),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFDC3545),
-                                          borderRadius: BorderRadius.circular(
-                                            6,
+                                      if (mission
+                                              ?.incident
+                                              .identifiedSnakeSpecies
+                                              ?.riskLevel !=
+                                          null)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: _getRiskLevelColor(
+                                              mission!
+                                                  .incident
+                                                  .identifiedSnakeSpecies!
+                                                  .riskLevel,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            _getRiskLevelText(
+                                              mission
+                                                  .incident
+                                                  .identifiedSnakeSpecies!
+                                                  .riskLevel,
+                                            ),
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                              letterSpacing: 0.5,
+                                            ),
                                           ),
                                         ),
-                                        child: const Text(
-                                          'CỰC ĐỘC',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                            letterSpacing: 0.5,
-                                          ),
-                                        ),
-                                      ),
                                     ],
                                   ),
                                 ],
@@ -623,10 +675,10 @@ class _MissionCompletionScreenState
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF28A745).withOpacity(0.15),
+                            color: const Color(0xFFFF8800).withOpacity(0.15),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: const Color(0xFF28A745).withOpacity(0.3),
+                              color: const Color(0xFFFF8800).withOpacity(0.3),
                               width: 1,
                             ),
                           ),
@@ -634,17 +686,17 @@ class _MissionCompletionScreenState
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const Icon(
-                                Icons.check_circle,
+                                Icons.camera_alt_rounded,
                                 size: 16,
-                                color: Color(0xFF28A745),
+                                color: Color(0xFFFF8800),
                               ),
                               const SizedBox(width: 6),
                               const Text(
-                                'HOÀN THÀNH',
+                                'CHỜ XÁC NHẬN',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF28A745),
+                                  color: Color(0xFFFF8800),
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -657,94 +709,8 @@ class _MissionCompletionScreenState
 
                   const SizedBox(height: 16),
 
-                  // Patient Outcome Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.withOpacity(0.2)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Kết Quả Hỗ Trợ',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1C100D),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: Colors.grey.withOpacity(0.3),
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: DropdownButtonFormField<String>(
-                            value: _patientOutcome,
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'Ổn định - Không cần cấp cứu',
-                                child: Text('Ổn định - Không cần cấp cứu'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'Cần đưa đến bệnh viện',
-                                child: Text('Cần đưa đến bệnh viện'),
-                              ),
-                            ],
-                            onChanged: (value) {
-                              setState(() {
-                                _patientOutcome = value!;
-                              });
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _notesController,
-                          maxLines: 3,
-                          decoration: InputDecoration(
-                            hintText: 'Ghi chú bổ sung (không bắt buộc)',
-                            hintStyle: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF999999),
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: Colors.grey.withOpacity(0.3),
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFFF8800),
-                                width: 2,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  // Patient Outcome Card (read-only)
+                  _buildPatientOutcomeReadOnly(),
 
                   const SizedBox(height: 16),
 
@@ -944,6 +910,42 @@ class _MissionCompletionScreenState
                                     MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Text(
+                                    'Tổng cộng',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Color(0xFF666666),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  Text(
+                                    mission?.formattedPrice ?? '-',
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFFFF8800),
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Container(
+                                height: 1,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.grey.withOpacity(0.1),
+                                      Colors.grey.withOpacity(0.3),
+                                      Colors.grey.withOpacity(0.1),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
                                     'Phí dịch vụ',
                                     style: TextStyle(
                                       fontSize: 14,
@@ -951,12 +953,48 @@ class _MissionCompletionScreenState
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
-                                  const Text(
-                                    '300,000 VNĐ',
-                                    style: TextStyle(
-                                      fontSize: 20,
+                                  Text(
+                                    mission?.formattedPrice ?? '-',
+                                    style: const TextStyle(
+                                      fontSize: 18,
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFFFF8800),
+                                      color: Color.fromARGB(255, 0, 151, 88),
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Container(
+                                height: 1,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.grey.withOpacity(0.1),
+                                      Colors.grey.withOpacity(0.3),
+                                      Colors.grey.withOpacity(0.1),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Phí di chuyển',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Color(0xFF666666),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  Text(
+                                    mission?.formattedCostFromCenter ?? "-",
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color.fromARGB(255, 0, 151, 88),
                                       letterSpacing: -0.5,
                                     ),
                                   ),
@@ -988,9 +1026,9 @@ class _MissionCompletionScreenState
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
-                                  const Text(
-                                    '25 phút',
-                                    style: TextStyle(
+                                  Text(
+                                    mission?.formattedElapsedTime ?? '-',
+                                    style: const TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.bold,
                                       color: Color(0xFF1C100D),
@@ -999,142 +1037,6 @@ class _MissionCompletionScreenState
                                 ],
                               ),
                             ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF9E6),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: const Color(0xFFFFD54F).withOpacity(0.3),
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: const Color(
-                                    0xFFFFD54F,
-                                  ).withOpacity(0.3),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Icon(
-                                  Icons.lightbulb_outline_rounded,
-                                  size: 18,
-                                  color: Color(0xFFF57C00),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              const Expanded(
-                                child: Text(
-                                  'Thu nhập sẽ được chuyển vào tài khoản sau 24h',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFF856404),
-                                    fontWeight: FontWeight.w500,
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Feedback Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.withOpacity(0.2)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Text(
-                              'Đánh Giá ',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1C100D),
-                              ),
-                            ),
-                            Text(
-                              '(không bắt buộc)',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[400],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Đánh giá mức độ hợp tác của bệnh nhân',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF666666),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(5, (index) {
-                            return GestureDetector(
-                              onTap: () => setState(() => _rating = index + 1),
-                              child: Icon(
-                                _rating > index
-                                    ? Icons.star
-                                    : Icons.star_border,
-                                size: 36,
-                                color: _rating > index
-                                    ? const Color(0xFFFFC107)
-                                    : const Color(0xFFCCCCCC),
-                              ),
-                            );
-                          }),
-                        ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: _feedbackController,
-                          decoration: InputDecoration(
-                            hintText: 'Nhận xét (không bắt buộc)',
-                            hintStyle: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF999999),
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: Colors.grey.withOpacity(0.3),
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFFF8800),
-                                width: 2,
-                              ),
-                            ),
                           ),
                         ),
                       ],
@@ -1198,6 +1100,132 @@ class _MissionCompletionScreenState
     );
   }
 
+  Widget _buildPatientOutcomeReadOnly() {
+    final hospitalState = ref.watch(hospitalProvider);
+    final needsHospital = hospitalState.hasSelectedHospital;
+    final hospitalName = hospitalState.selectedHospitalPricing?.hospitalName;
+
+    final outcomeLabel = needsHospital
+        ? 'Cần đưa đến bệnh viện'
+        : 'Ổn định - Không cần cấp cứu';
+    final outcomeColor = needsHospital
+        ? const Color(0xFFDC3545)
+        : const Color(0xFF28A745);
+    final outcomeIcon = needsHospital
+        ? Icons.local_hospital_rounded
+        : Icons.check_circle_rounded;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Kết Quả Hỗ Trợ',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1C100D),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: outcomeColor.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: outcomeColor.withOpacity(0.25)),
+            ),
+            child: Row(
+              children: [
+                Icon(outcomeIcon, color: outcomeColor, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        outcomeLabel,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: outcomeColor,
+                        ),
+                      ),
+                      if (hospitalName != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          hospitalName,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: outcomeColor.withOpacity(0.8),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'Tự động',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF999999),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _notesController,
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: 'Ghi chú bổ sung (không bắt buộc)',
+              hintStyle: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF999999),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: Color(0xFFFF8800),
+                  width: 2,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCleanInfoRow({
     required String label,
     required String value,
@@ -1205,6 +1233,7 @@ class _MissionCompletionScreenState
     required IconData icon,
   }) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           padding: const EdgeInsets.all(6),
@@ -1215,7 +1244,9 @@ class _MissionCompletionScreenState
           child: Icon(icon, size: 18, color: const Color(0xFF666666)),
         ),
         const SizedBox(width: 12),
+
         Expanded(
+          flex: 3,
           child: Text(
             label,
             style: const TextStyle(
@@ -1225,16 +1256,45 @@ class _MissionCompletionScreenState
             ),
           ),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: valueColor,
+
+        const SizedBox(width: 8),
+
+        Expanded(
+          flex: 5,
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: valueColor,
+            ),
+            textAlign: TextAlign.right,
+            maxLines: 5,
+            overflow: TextOverflow.ellipsis,
+            softWrap: true,
           ),
-          textAlign: TextAlign.right,
         ),
       ],
     );
+  }
+
+  Color _getRiskLevelColor(int riskLevel) {
+    if (riskLevel >= 7) {
+      return const Color(0xFFDC3545); // High risk - red
+    } else if (riskLevel >= 4) {
+      return const Color(0xFFFF8800); // Medium risk - orange
+    } else {
+      return const Color(0xFF28A745); // Low risk - green
+    }
+  }
+
+  String _getRiskLevelText(int riskLevel) {
+    if (riskLevel >= 7) {
+      return 'CỰC ĐỘC';
+    } else if (riskLevel >= 3) {
+      return 'TRUNG BÌNH';
+    } else {
+      return 'THẤP';
+    }
   }
 }

@@ -11,11 +11,13 @@ import '../../providers/detailed_incident_provider.dart';
 class SymptomReportScreen extends ConsumerStatefulWidget {
   final String incidentId;
   final String? recognitionResultId;
+  final bool isDirectEntry; // true = from quick actions, false = from snake flow
 
   const SymptomReportScreen({
     super.key,
     required this.incidentId,
     this.recognitionResultId,
+    this.isDirectEntry = false, // Default: from snake flow
   });
 
   @override
@@ -320,17 +322,14 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
             debugPrint('⚠️ Could not invalidate cache: $e');
           }
 
-          // Pop symptom report screen first, then navigate to severity
-          // This prevents user from going back to symptom report from severity screen
-          context.pop(); // Close symptom report
-
-          // Navigate to severity assessment screen
-          // Severity will fetch data from incident DB using incidentId
-          context.pushNamed(
-            'severity_assessment',
+          // Navigate to severity assessment using push
+          // Pass isDirectEntry flag to maintain context
+          context.push(
+            '/severity-assessment',
             extra: {
               'incidentId': widget.incidentId,
               'recognitionResultId': widget.recognitionResultId,
+              'isDirectEntry': widget.isDirectEntry, // Propagate context
             },
           );
         } else {
@@ -378,7 +377,10 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
         surfaceTintColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF191910)),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            // Always allow back navigation
+            context.pop();
+          },
         ),
         title: const Text(
           'Báo cáo triệu chứng',
@@ -438,17 +440,25 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
 
                     // Submit Button
                     _buildSubmitButton(),
+                    const SizedBox(height: 16),
 
-                    // Skip Link
+                    // Skip to tracking - context aware
                     Center(
-                      child: TextButton(
-                        onPressed: () => context.pop(),
-                        child: Text(
-                          'Bỏ qua bước này',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
+                      child: TextButton.icon(
+                        onPressed: () {
+                          // Pop back based on entry context
+                          if (widget.isDirectEntry) {
+                            // Direct entry: just pop once to tracking
+                            Navigator.of(context).pop();
+                          } else {
+                            // From snake flow: pop twice (symptom + snake location)
+                            Navigator.of(context)..pop()..pop();
+                          }
+                        },
+                        icon: const Icon(Icons.crisis_alert, size: 18),
+                        label: const Text('Quay về theo dõi cứu hộ'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF228B22),
                         ),
                       ),
                     ),

@@ -111,11 +111,13 @@ final missionHubConnectionProvider =
 // ── Mission status (updated by events) ───────────────────────────────────────
 
 class MissionStatus {
+  final String? incidentId;
   final String? missionId;
   final String? rescuerId;
   final double? rescuerLat;
   final double? rescuerLng;
   final DateTime? rescuerLocationUpdatedAt;
+  final bool missionStarted;
   final bool rescuerArrived;
   final bool missionCompleted;
   final bool missionCancelled;
@@ -123,11 +125,13 @@ class MissionStatus {
   final bool sessionExpired;
 
   const MissionStatus({
+    this.incidentId,
     this.missionId,
     this.rescuerId,
     this.rescuerLat,
     this.rescuerLng,
     this.rescuerLocationUpdatedAt,
+    this.missionStarted = false,
     this.rescuerArrived = false,
     this.missionCompleted = false,
     this.missionCancelled = false,
@@ -138,11 +142,13 @@ class MissionStatus {
   bool get hasRescuer => missionId != null && rescuerId != null;
 
   MissionStatus copyWith({
+    String? incidentId,
     String? missionId,
     String? rescuerId,
     double? rescuerLat,
     double? rescuerLng,
     DateTime? rescuerLocationUpdatedAt,
+    bool? missionStarted,
     bool? rescuerArrived,
     bool? missionCompleted,
     bool? missionCancelled,
@@ -150,12 +156,14 @@ class MissionStatus {
     bool? sessionExpired,
   }) {
     return MissionStatus(
+      incidentId: incidentId ?? this.incidentId,
       missionId: missionId ?? this.missionId,
       rescuerId: rescuerId ?? this.rescuerId,
       rescuerLat: rescuerLat ?? this.rescuerLat,
       rescuerLng: rescuerLng ?? this.rescuerLng,
       rescuerLocationUpdatedAt:
           rescuerLocationUpdatedAt ?? this.rescuerLocationUpdatedAt,
+      missionStarted: missionStarted ?? this.missionStarted,
       rescuerArrived: rescuerArrived ?? this.rescuerArrived,
       missionCompleted: missionCompleted ?? this.missionCompleted,
       missionCancelled: missionCancelled ?? this.missionCancelled,
@@ -167,18 +175,22 @@ class MissionStatus {
 
 class MissionStatusNotifier extends StateNotifier<MissionStatus> {
   final MissionHubService _service;
+  final Ref _ref;
   final List<StreamSubscription> _subscriptions = [];
 
-  MissionStatusNotifier(this._service) : super(const MissionStatus()) {
+  MissionStatusNotifier(this._service, this._ref) : super(const MissionStatus()) {
     _subscriptions.add(
       _service.rescuerAcceptedStream.listen((data) {
+        final incidentId = _ref.read(missionHubConnectionProvider).incidentId;
         debugPrint(
           '🎯 MissionStatusNotifier: RescuerAccepted '
-          'mission=${data.missionId}',
+          'incident=$incidentId mission=${data.missionId}',
         );
         state = state.copyWith(
+          incidentId: incidentId,
           missionId: data.missionId,
           rescuerId: data.rescuerId,
+          missionStarted: false,
         );
       }),
     );
@@ -194,14 +206,21 @@ class MissionStatusNotifier extends StateNotifier<MissionStatus> {
     );
 
     _subscriptions.add(
+      _service.missionStartedStream.listen((_) {
+        debugPrint('🎯 MissionStatusNotifier: MissionStarted');
+        state = state.copyWith(missionStarted: true);
+      }),
+    );
+
+    _subscriptions.add(
       _service.rescuerArrivedStream.listen((_) {
-        state = state.copyWith(rescuerArrived: true);
+        state = state.copyWith(rescuerArrived: true, missionStarted: true);
       }),
     );
 
     _subscriptions.add(
       _service.missionCompletedStream.listen((_) {
-        state = state.copyWith(missionCompleted: true);
+        state = state.copyWith(missionCompleted: true, missionStarted: false);
       }),
     );
 
@@ -210,6 +229,7 @@ class MissionStatusNotifier extends StateNotifier<MissionStatus> {
         state = state.copyWith(
           missionCancelled: true,
           cancellationReason: reason,
+          missionStarted: false,
         );
       }),
     );
@@ -235,7 +255,7 @@ class MissionStatusNotifier extends StateNotifier<MissionStatus> {
 final missionStatusProvider =
     StateNotifierProvider<MissionStatusNotifier, MissionStatus>((ref) {
       final service = ref.watch(missionHubServiceProvider);
-      return MissionStatusNotifier(service);
+      return MissionStatusNotifier(service, ref);
     });
 
 // ── Convenience stream providers ──────────────────────────────────────────────

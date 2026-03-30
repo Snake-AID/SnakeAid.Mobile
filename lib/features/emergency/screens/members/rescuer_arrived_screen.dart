@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../shared/widgets/chat_screen.dart';
 import '../../providers/incident_provider.dart';
+import '../../providers/detailed_incident_provider.dart';
 
 class RescuerArrivedScreen extends ConsumerStatefulWidget {
-  const RescuerArrivedScreen({super.key});
+  final String? incidentId;
+
+  const RescuerArrivedScreen({super.key, this.incidentId});
 
   @override
-  ConsumerState<RescuerArrivedScreen> createState() => _RescuerArrivedScreenState();
+  ConsumerState<RescuerArrivedScreen> createState() =>
+      _RescuerArrivedScreenState();
 }
 
 class _RescuerArrivedScreenState extends ConsumerState<RescuerArrivedScreen> {
@@ -16,11 +19,56 @@ class _RescuerArrivedScreenState extends ConsumerState<RescuerArrivedScreen> {
   DateTime? _lastTapTime;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // 🔍 Check if incident is already completed (user returned after app restart)
+      await _checkIncidentStateAndNavigate();
+    });
+  }
+
+  /// Check if incident is already completed and auto-navigate to payment screen
+  Future<void> _checkIncidentStateAndNavigate() async {
+    final incidentId =
+        widget.incidentId ?? ref.read(activeIncidentProvider).incident?.id;
+
+    if (incidentId == null) {
+      debugPrint('⚠️ [RescuerArrived] No incidentId available for state check');
+      return;
+    }
+
+    try {
+      debugPrint('🔍 [RescuerArrived] Checking incident state...');
+      await ref
+          .read(detailedIncidentProvider.notifier)
+          .loadDetailedIncident(incidentId, forceRefresh: true);
+
+      final incident = ref.read(detailedIncidentProvider).incident;
+      if (incident == null) return;
+
+      final status = incident.status.value.toLowerCase();
+      debugPrint('📊 [RescuerArrived] Current incident status: $status');
+
+      // If already Finished or Completed → navigate to payment screen
+      if (status == 'finished' || status == 'completed') {
+        debugPrint('🔄 Auto-navigating to finished detail (status: $status)');
+        if (mounted) {
+          context.go(
+            '/member-incident-finished-detail',
+            extra: {'incidentId': incidentId},
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [RescuerArrived] Error checking incident state: $e');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Get incident from provider
     final incidentState = ref.watch(activeIncidentProvider);
-    final incident = incidentState.incident;
-    final hasRescuer = incident?.assignedRescuerId != null;
+    final _ = incidentState.incident; // kept for provider subscription
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F8F6),
@@ -78,7 +126,15 @@ class _RescuerArrivedScreenState extends ConsumerState<RescuerArrivedScreen> {
             _tapCount++;
             if (_tapCount >= 2) {
               // Navigate to completion screen on double tap
-              context.goNamed('emergency_completion');
+              final incidentId =
+                  widget.incidentId ??
+                  ref.read(activeIncidentProvider).incident?.id;
+              if (incidentId != null) {
+                context.push(
+                  '/member-incident-finished-detail',
+                  extra: {'incidentId': incidentId},
+                );
+              }
               _tapCount = 0;
             }
           } else {
@@ -92,40 +148,34 @@ class _RescuerArrivedScreenState extends ConsumerState<RescuerArrivedScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-              // Success Banner
-              _buildSuccessBanner(),
-              const SizedBox(height: 16),
+                // Success Banner
+                _buildSuccessBanner(),
+                const SizedBox(height: 16),
 
-              // Main Status Card, mission
-              _buildMainStatusCard(),
-              const SizedBox(height: 16),
+                // Main Status Card, mission
+                _buildMainStatusCard(),
+                const SizedBox(height: 16),
 
-              // Rescuer Information Card
-              if (hasRescuer) _buildRescuerInfoCard(context),
-              const SizedBox(height: 24),
+                // Rescuer Information Card removed (no real rescuer data available on member side)
+                const SizedBox(height: 24),
 
-              // Section Header
-              const Text(
-                'Điều Cần Làm',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF191910),
+                // Section Header
+                const Text(
+                  'Điều Cần Làm',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF191910),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // Instructions Card
-              _buildInstructionsCard(),
-              const SizedBox(height: 32),
-
-              // Footer Action
-              _buildFooterAction(context),
-              const SizedBox(height: 16),
-            ],
+                // Instructions Card
+                _buildInstructionsCard(),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -267,149 +317,6 @@ class _RescuerArrivedScreenState extends ConsumerState<RescuerArrivedScreen> {
     );
   }
 
-  Widget _buildRescuerInfoCard(BuildContext context) {
-    // Member side only has rescuer ID, not full profile
-    // Display generic rescuer info
-    const rescuerName = 'Đội Cứu Hộ SnakeAid';
-    
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  rescuerName,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF191910),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Chuyên gia cứu hộ rắn',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          // TODO: Implement call rescuer functionality
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Tính năng gọi điện đang được phát triển'),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.call_rounded, size: 18),
-                        label: const Text('Gọi'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF228B22),
-                          side: const BorderSide(
-                            color: Color(0xFF228B22),
-                            width: 1.5,
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          // Open chat screen with rescuer
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ChatScreen(
-                                recipientName: rescuerName,
-                                recipientAvatar: '🚑',
-                                isExpert: true,
-                              ),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.chat_bubble_rounded, size: 18),
-                        label: const Text('Nhắn Tin'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF228B22),
-                          side: const BorderSide(
-                            color: Color(0xFF228B22),
-                            width: 1.5,
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF228B22),
-                  Color(0xFF1a6b1a),
-                ],
-              ),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF228B22).withOpacity(0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.person_rounded,
-              color: Colors.white,
-              size: 36,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildInstructionsCard() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -500,73 +407,6 @@ class _RescuerArrivedScreenState extends ConsumerState<RescuerArrivedScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildFooterAction(BuildContext context) {
-    return Center(
-      child: TextButton(
-        onPressed: () {
-          // Show confirmation dialog
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              title: const Text(
-                'Hủy cứu hộ?',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              content: const Text(
-                'Bạn có chắc chắn muốn hủy yêu cầu cứu hộ này không?',
-                style: TextStyle(
-                  fontSize: 15,
-                  height: 1.4,
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => context.pop(),
-                  child: Text(
-                    'Không',
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    context.pop(); // Close dialog
-                    context.pop(); // Go back
-                  },
-                  child: const Text(
-                    'Hủy cứu hộ',
-                    style: TextStyle(
-                      color: Color(0xFFDC3545),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-        style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        ),
-        child: Text(
-          'Hủy cứu hộ (nếu cần)',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.grey[600],
-          ),
-        ),
-      ),
     );
   }
 }
