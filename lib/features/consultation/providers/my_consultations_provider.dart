@@ -40,7 +40,7 @@ class MyConsultationsNotifier extends StateNotifier<MyConsultationsState> {
   final ConsultationRepository _repository;
 
   MyConsultationsNotifier(this._repository)
-      : super(const MyConsultationsState()) {
+    : super(const MyConsultationsState()) {
     loadConsultations();
   }
 
@@ -48,9 +48,21 @@ class MyConsultationsNotifier extends StateNotifier<MyConsultationsState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final results = await Future.wait([
-        _repository.getMyConsultations(status: 'Ongoing', pageNumber: 1, pageSize: 50),
-        _repository.getMyConsultations(status: 'Scheduled', pageNumber: 1, pageSize: 50),
-        _repository.getMyConsultations(status: 'Completed', pageNumber: 1, pageSize: 50),
+        _repository.getMyConsultations(
+          status: 'Ongoing',
+          pageNumber: 1,
+          pageSize: 10,
+        ),
+        _repository.getMyConsultations(
+          status: 'Scheduled',
+          pageNumber: 1,
+          pageSize: 10,
+        ),
+        _repository.getMyConsultations(
+          status: 'Completed',
+          pageNumber: 1,
+          pageSize: 10,
+        ),
       ]);
 
       final ongoingAndScheduled = [...results[0], ...results[1]];
@@ -68,8 +80,9 @@ class MyConsultationsNotifier extends StateNotifier<MyConsultationsState> {
             );
           }
           try {
-            final review =
-                await _repository.getConsultationReview(consultationId);
+            final review = await _repository.getConsultationReview(
+              consultationId,
+            );
             return MapEntry<String, ConsultationReviewResponse?>(
               consultationId,
               review,
@@ -87,21 +100,17 @@ class MyConsultationsNotifier extends StateNotifier<MyConsultationsState> {
         isLoading: false,
         ongoing: ongoingById.values.toList(),
         completed: completed,
-        reviewsByConsultationId: Map<String, ConsultationReviewResponse?>.fromEntries(
-          reviewPairs,
-        ),
+        reviewsByConsultationId:
+            Map<String, ConsultationReviewResponse?>.fromEntries(reviewPairs),
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 }
 
 final myConsultationsProvider =
     StateNotifierProvider<MyConsultationsNotifier, MyConsultationsState>((ref) {
-  final repository = ref.watch(consultationRepositoryProvider);
-  return MyConsultationsNotifier(repository);
-});
+      final repository = ref.watch(consultationRepositoryProvider);
+      return MyConsultationsNotifier(repository);
+    });

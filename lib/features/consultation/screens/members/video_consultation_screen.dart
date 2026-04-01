@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,16 +18,22 @@ class VideoConsultationScreen extends ConsumerStatefulWidget {
   final String consultationId;
   final String expertName;
   final String expertSpecialty;
+
   /// Controls expert-only in-room features (e.g. snake search)
   final bool isExpertMode;
+
   /// Mic state chosen in the waiting room (default on)
   final bool initialMicOn;
+
   /// Camera state chosen in the waiting room (default on)
   final bool initialCameraOn;
+
   /// Route to go to after ending the call (null = use default member waiting room)
   final String? afterCallRoute;
+
   /// LiveKit JWT token received from backend
   final String livekitToken;
+
   /// LiveKit server WebSocket URL received from backend (e.g. wss://livekit.example.com)
   final String wsUrl;
 
@@ -48,7 +55,8 @@ class VideoConsultationScreen extends ConsumerStatefulWidget {
       _VideoConsultationScreenState();
 }
 
-class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScreen>
+class _VideoConsultationScreenState
+    extends ConsumerState<VideoConsultationScreen>
     with TickerProviderStateMixin {
   // ── LiveKit ────────────────────────────────────────────────────────────────
   late Room _room;
@@ -79,6 +87,7 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
   ConsultationChatSignalRService? _chatService;
   StreamSubscription<ConsultationChatMessage>? _chatSub;
   StreamSubscription<({String eventType, String payload})>? _signalSub;
+  StreamSubscription<ConsultationRoomExpiringEvent>? _roomExpiringSub;
   final ValueNotifier<List<ConsultationChatMessage>> _chatMessagesNotifier =
       ValueNotifier<List<ConsultationChatMessage>>([]);
   final ValueNotifier<bool> _remoteIsTypingNotifier = ValueNotifier(false);
@@ -86,6 +95,7 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
   bool? _remoteMicOn;
   bool? _remoteCameraOn;
   bool _isChatConnected = false;
+  bool _isHandlingRoomExpiry = false;
   final List<_PendingOutgoingEcho> _pendingOutgoingEchoes = [];
 
   ConsultationChatMessage _buildOptimisticMessage({
@@ -184,12 +194,14 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
 
     final messages = _chatMessagesNotifier.value;
 
-    final hasSameId = msg.id.isNotEmpty &&
+    final hasSameId =
+        msg.id.isNotEmpty &&
         messages.any((m) => m.id.isNotEmpty && m.id == msg.id);
     if (hasSameId) return;
 
     // Deduplicate optimistic self message when server echoes back shortly after.
-    final hasRecentSelfEcho = msg.isMine &&
+    final hasRecentSelfEcho =
+        msg.isMine &&
         messages.any(
           (m) =>
               m.isMine == msg.isMine &&
@@ -235,15 +247,12 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
     _room = Room(
-      roomOptions: const RoomOptions(
-        adaptiveStream: true,
-        dynacast: true,
-      ),
+      roomOptions: const RoomOptions(adaptiveStream: true, dynacast: true),
     );
-    
+
     // Listen to all important room events
     _room.addListener(_onRoomChanged);
-    
+
     _connectToRoom();
     _initChatRealtime();
 
@@ -276,25 +285,25 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
     try {
       await _room.connect(wsUrl, widget.livekitToken);
       if (!mounted) return;
-      
+
       // Enable microphone
       await _room.localParticipant?.setMicrophoneEnabled(_isMicOn);
-      
+
       // Enable camera with proper capture options
       if (_isCameraOn) {
         await _room.localParticipant?.setCameraEnabled(
           true,
           cameraCaptureOptions: CameraCaptureOptions(
-            cameraPosition: _isFrontCamera 
-                ? CameraPosition.front 
+            cameraPosition: _isFrontCamera
+                ? CameraPosition.front
                 : CameraPosition.back,
           ),
         );
       }
-      
+
       // Subscribe to any existing remote participant tracks
       _subscribeToRemoteTracks();
-      
+
       if (mounted) setState(() => _isConnecting = false);
     } catch (e) {
       if (mounted) {
@@ -337,6 +346,7 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
     _room.dispose();
     _chatSub?.cancel();
     _signalSub?.cancel();
+    _roomExpiringSub?.cancel();
     _typingAutoHideTimer?.cancel();
     _chatService?.dispose();
     _chatMessagesNotifier.dispose();
@@ -347,7 +357,10 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
 
   Future<void> _initChatRealtime() async {
     try {
-      final baseUrl = ref.read(consultationRepositoryProvider).httpService.baseUrl;
+      final baseUrl = ref
+          .read(consultationRepositoryProvider)
+          .httpService
+          .baseUrl;
       _chatService = ConsultationChatSignalRService(baseUrl: baseUrl);
 
       _appendChatMessage(
@@ -372,6 +385,10 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
       _signalSub = _chatService!.signalStream.listen((signal) {
         if (!mounted) return;
         _handleSignalEvent(signal.eventType, signal.payload);
+      });
+
+      _roomExpiringSub = _chatService!.roomExpiringStream.listen((event) {
+        _handleRoomExpiringEvent(event);
       });
 
       await _chatService!.connect(widget.consultationId);
@@ -408,8 +425,7 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
   }
 
   Future<void> _handleSendChatImage(String filePath, String caption) async {
-    final outgoingContent =
-        caption.trim().isEmpty ? '[image]' : caption.trim();
+    final outgoingContent = caption.trim().isEmpty ? '[image]' : caption.trim();
     String? uploadedUrl;
     String? optimisticId;
 
@@ -465,15 +481,21 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1a1022),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Quay Về Sảnh Chờ?',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: const Text('Bạn có muốn tạm rời khỏi cuộc gọi và quay về sảnh chờ không?\nBạn có thể vào lại bất cứ lúc nào.',
-            style: TextStyle(color: Colors.white70)),
+        title: const Text(
+          'Quay Về Sảnh Chờ?',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'Bạn có muốn tạm rời khỏi cuộc gọi và quay về sảnh chờ không?\nBạn có thể vào lại bất cứ lúc nào.',
+          style: TextStyle(color: Colors.white70),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Ở Lại',
-                style: TextStyle(color: Color(0xFF228B22))),
+            child: const Text(
+              'Ở Lại',
+              style: TextStyle(color: Color(0xFF228B22)),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -482,7 +504,8 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
               // User will end consultation from waiting room with separate button
 
               if (!mounted) return;
-              final targetRoute = widget.afterCallRoute ??
+              final targetRoute =
+                  widget.afterCallRoute ??
                   '/video-waiting/${widget.consultationId}';
               context.go(
                 targetRoute,
@@ -500,11 +523,16 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            child: const Text('Về Sảnh Chờ',
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Về Sảnh Chờ',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -531,8 +559,9 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
     await _room.localParticipant?.setCameraEnabled(
       true,
       cameraCaptureOptions: CameraCaptureOptions(
-        cameraPosition:
-            _isFrontCamera ? CameraPosition.front : CameraPosition.back,
+        cameraPosition: _isFrontCamera
+            ? CameraPosition.front
+            : CameraPosition.back,
       ),
     );
     setState(() {});
@@ -576,6 +605,25 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
   void _handleSignalEvent(String eventType, String payload) {
     final type = eventType.trim().toLowerCase();
 
+    if (type == 'roomexpiring') {
+      try {
+        final decoded = jsonDecode(payload);
+        if (decoded is Map<String, dynamic>) {
+          _handleRoomExpiringEvent(
+            ConsultationRoomExpiringEvent(
+              consultationId:
+                  (decoded['ConsultationId'] ?? decoded['consultationId'] ?? '')
+                      .toString(),
+              reason: (decoded['Reason'] ?? decoded['reason'] ?? '').toString(),
+            ),
+          );
+        }
+      } catch (_) {
+        // Ignore malformed RoomExpiring payload.
+      }
+      return;
+    }
+
     if (type == 'typing') {
       final isTyping = payload.toLowerCase() == 'true';
       setState(() => _remoteIsTypingNotifier.value = isTyping);
@@ -600,8 +648,62 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
       return;
     }
 
-    if (type == 'camerastate' || type == 'camstate' || type == 'camera' || type == 'cam') {
+    if (type == 'camerastate' ||
+        type == 'camstate' ||
+        type == 'camera' ||
+        type == 'cam') {
       setState(() => _remoteCameraOn = parsed);
+    }
+  }
+
+  Future<void> _handleRoomExpiringEvent(
+    ConsultationRoomExpiringEvent event,
+  ) async {
+    if (!mounted || _isHandlingRoomExpiry) return;
+    if (event.consultationId != widget.consultationId) return;
+
+    _isHandlingRoomExpiry = true;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Phòng sắp đóng do hết giờ. Đang kết thúc phiên tư vấn...',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
+    await Future.delayed(const Duration(milliseconds: 350));
+
+    try {
+      await _room.disconnect();
+    } catch (_) {
+      // Ignore disconnect failure and continue navigation.
+    }
+
+    if (!mounted) return;
+
+    if (widget.isExpertMode) {
+      context.go(
+        '/expert-consultation-complete',
+        extra: {
+          'consultationId': widget.consultationId,
+          'patientName': widget.expertName,
+          'durationSeconds': _secondsElapsed,
+          'feeCost': 0,
+          'expiryReason': event.reason,
+        },
+      );
+    } else {
+      context.go(
+        '/consultation-complete',
+        extra: {
+          'consultationId': widget.consultationId,
+          'expertName': widget.expertName,
+          'expertSpecialty': widget.expertSpecialty,
+          'durationSeconds': _secondsElapsed,
+        },
+      );
     }
   }
 
@@ -686,9 +788,7 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
   Widget _buildRemoteVideo() {
     final remoteTrack = _remoteVideoTrack;
     if (remoteTrack != null) {
-      return Positioned.fill(
-        child: VideoTrackRenderer(remoteTrack),
-      );
+      return Positioned.fill(child: VideoTrackRenderer(remoteTrack));
     }
     return Container(
       width: double.infinity,
@@ -710,8 +810,10 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.white.withOpacity(0.08),
-                border:
-                    Border.all(color: Colors.white.withOpacity(0.15), width: 2),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.15),
+                  width: 2,
+                ),
               ),
               child: const Icon(Icons.person, size: 56, color: Colors.white38),
             ),
@@ -720,8 +822,10 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
               _isAnyoneConnected
                   ? '${widget.expertName} đang tắt camera'
                   : 'Đang chờ đối phương kết nối...',
-              style:
-                  TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14),
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+                fontSize: 14,
+              ),
             ),
           ],
         ),
@@ -744,9 +848,10 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
               Text(
                 'Đang kết nối phòng...',
                 style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600),
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -772,15 +877,15 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
                 const Text(
                   'Không thể kết nối',
                   style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold),
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   _connectionError ?? '',
-                  style:
-                      const TextStyle(color: Colors.white60, fontSize: 13),
+                  style: const TextStyle(color: Colors.white60, fontSize: 13),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
@@ -793,15 +898,20 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
                     _connectToRoom();
                   },
                   style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF228B22)),
-                  child: const Text('Thử lại',
-                      style: TextStyle(color: Colors.white)),
+                    backgroundColor: const Color(0xFF228B22),
+                  ),
+                  child: const Text(
+                    'Thử lại',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextButton(
                   onPressed: () => context.go('/consultation-home'),
-                  child: const Text('Quay về',
-                      style: TextStyle(color: Colors.white60)),
+                  child: const Text(
+                    'Quay về',
+                    style: TextStyle(color: Colors.white60),
+                  ),
                 ),
               ],
             ),
@@ -910,13 +1020,19 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     if (_remoteMicOn == false) ...[
-                      const Icon(Icons.mic_off,
-                          size: 16, color: Colors.redAccent),
+                      const Icon(
+                        Icons.mic_off,
+                        size: 16,
+                        color: Colors.redAccent,
+                      ),
                       const SizedBox(width: 4),
                     ],
                     if (_remoteCameraOn == false) ...[
-                      const Icon(Icons.videocam_off,
-                          size: 16, color: Colors.redAccent),
+                      const Icon(
+                        Icons.videocam_off,
+                        size: 16,
+                        color: Colors.redAccent,
+                      ),
                       const SizedBox(width: 4),
                     ],
                     Flexible(
@@ -931,8 +1047,7 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
                       ),
                     ),
                     const SizedBox(width: 6),
-                    const Icon(Icons.person,
-                        size: 18, color: Colors.white70),
+                    const Icon(Icons.person, size: 18, color: Colors.white70),
                   ],
                 ),
               ),
@@ -955,10 +1070,13 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
             _pipTop += details.delta.dy;
             _pipRight -= details.delta.dx;
             _pipTop = _pipTop.clamp(
-                MediaQuery.of(context).padding.top + 8.0,
-                MediaQuery.of(context).size.height - 200.0);
+              MediaQuery.of(context).padding.top + 8.0,
+              MediaQuery.of(context).size.height - 200.0,
+            );
             _pipRight = _pipRight.clamp(
-                8.0, MediaQuery.of(context).size.width - 128.0);
+              8.0,
+              MediaQuery.of(context).size.width - 128.0,
+            );
           });
         },
         child: Container(
@@ -970,7 +1088,10 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
             color: Colors.black,
             boxShadow: const [
               BoxShadow(
-                  color: Colors.black54, blurRadius: 16, offset: Offset(0, 4))
+                color: Colors.black54,
+                blurRadius: 16,
+                offset: Offset(0, 4),
+              ),
             ],
           ),
           clipBehavior: Clip.antiAlias,
@@ -999,17 +1120,19 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
                                 color: Colors.white.withOpacity(0.1),
                               ),
                               child: Icon(
-                                _isCameraOn
-                                    ? Icons.person
-                                    : Icons.videocam_off,
+                                _isCameraOn ? Icons.person : Icons.videocam_off,
                                 size: 28,
                                 color: Colors.white54,
                               ),
                             ),
                             const SizedBox(height: 6),
-                            const Text('Bạn',
-                                style: TextStyle(
-                                    color: Colors.white70, fontSize: 11)),
+                            const Text(
+                              'Bạn',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -1027,8 +1150,11 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
                       color: Colors.black.withOpacity(0.5),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.cameraswitch,
-                        color: Colors.white, size: 14),
+                    child: const Icon(
+                      Icons.cameraswitch,
+                      color: Colors.white,
+                      size: 14,
+                    ),
                   ),
                 ),
               ),
@@ -1083,7 +1209,9 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
                       color: Colors.red.shade700,
                       shape: BoxShape.circle,
                       border: Border.all(
-                          color: Colors.black.withOpacity(0.3), width: 4),
+                        color: Colors.black.withOpacity(0.3),
+                        width: 4,
+                      ),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.red.withOpacity(0.5),
@@ -1091,8 +1219,11 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
                         ),
                       ],
                     ),
-                    child: const Icon(Icons.call_end,
-                        color: Colors.white, size: 30),
+                    child: const Icon(
+                      Icons.call_end,
+                      color: Colors.white,
+                      size: 30,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -1149,11 +1280,9 @@ class _VideoConsultationScreenState extends ConsumerState<VideoConsultationScree
               color: highlighted
                   ? const Color(0xFF228B22)
                   : active
-                      ? Colors.red.withOpacity(0.3)
-                      : Colors.white.withOpacity(0.12),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.06),
-              ),
+                  ? Colors.red.withOpacity(0.3)
+                  : Colors.white.withOpacity(0.12),
+              border: Border.all(color: Colors.white.withOpacity(0.06)),
             ),
             child: Icon(icon, color: Colors.white, size: 22),
           ),
@@ -1227,7 +1356,9 @@ class _ChatPanelState extends State<_ChatPanel> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
     }
     if (oldWidget.remoteIsTypingListenable != widget.remoteIsTypingListenable) {
-      oldWidget.remoteIsTypingListenable.removeListener(_handleRemoteTypingChanged);
+      oldWidget.remoteIsTypingListenable.removeListener(
+        _handleRemoteTypingChanged,
+      );
       widget.remoteIsTypingListenable.addListener(_handleRemoteTypingChanged);
     }
   }
@@ -1273,7 +1404,8 @@ class _ChatPanelState extends State<_ChatPanel> {
     final text = _msgController.text.trim();
     final pendingImagePath = _pendingImagePath;
 
-    if ((pendingImagePath == null || pendingImagePath.isEmpty) && text.isEmpty) {
+    if ((pendingImagePath == null || pendingImagePath.isEmpty) &&
+        text.isEmpty) {
       return;
     }
 
@@ -1377,7 +1509,10 @@ class _ChatPanelState extends State<_ChatPanel> {
           Text(
             label,
             style: const TextStyle(
-                color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+              color: Colors.white70,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -1415,8 +1550,7 @@ class _ChatPanelState extends State<_ChatPanel> {
               const Spacer(),
               Text(
                 widget.expertName,
-                style: const TextStyle(
-                    color: Colors.white54, fontSize: 13),
+                style: const TextStyle(color: Colors.white54, fontSize: 13),
               ),
             ],
           ),
@@ -1448,8 +1582,10 @@ class _ChatPanelState extends State<_ChatPanel> {
                 builder: (_, isRemoteTyping, __) {
                   return ListView.builder(
                     controller: widget.scrollController,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     itemCount: messages.length + (isRemoteTyping ? 1 : 0),
                     itemBuilder: (ctx, i) {
                       if (i < messages.length) {
@@ -1475,7 +1611,9 @@ class _ChatPanelState extends State<_ChatPanel> {
           ),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.05),
-            border: Border(top: BorderSide(color: Colors.white.withOpacity(0.08))),
+            border: Border(
+              top: BorderSide(color: Colors.white.withOpacity(0.08)),
+            ),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1531,7 +1669,11 @@ class _ChatPanelState extends State<_ChatPanel> {
                         color: Colors.white.withOpacity(0.08),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.add, color: Colors.white70, size: 22),
+                      child: const Icon(
+                        Icons.add,
+                        color: Colors.white70,
+                        size: 22,
+                      ),
                     ),
                   ),
 
@@ -1548,8 +1690,9 @@ class _ChatPanelState extends State<_ChatPanel> {
                         hintText: _pendingImagePath != null
                             ? 'Thêm chú thích (tuỳ chọn)...'
                             : 'Nhắn tin...',
-                        hintStyle:
-                            TextStyle(color: Colors.white.withOpacity(0.4)),
+                        hintStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.4),
+                        ),
                         filled: true,
                         fillColor: Colors.white.withOpacity(0.08),
                         border: OutlineInputBorder(
@@ -1557,7 +1700,9 @@ class _ChatPanelState extends State<_ChatPanel> {
                           borderSide: BorderSide.none,
                         ),
                         contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                       ),
                     ),
                   ),
@@ -1574,7 +1719,11 @@ class _ChatPanelState extends State<_ChatPanel> {
                         color: Color(0xFF228B22),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.send, color: Colors.white, size: 18),
+                      child: const Icon(
+                        Icons.send,
+                        color: Colors.white,
+                        size: 18,
+                      ),
                     ),
                   ),
                 ],
@@ -1589,13 +1738,15 @@ class _ChatPanelState extends State<_ChatPanel> {
   Widget _buildBubble(ConsultationChatMessage msg) {
     final isMe = msg.isMine;
     final hasImage = msg.attachmentUrl != null && msg.attachmentUrl!.isNotEmpty;
-    final showCaption = msg.content.trim().isNotEmpty &&
+    final showCaption =
+        msg.content.trim().isNotEmpty &&
         msg.content.trim().toLowerCase() != '[image]';
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
-        crossAxisAlignment:
-            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: isMe
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           Text(
             '${isMe ? 'Bạn' : msg.senderName} · ${_formatTime(msg.sentAt)}',
@@ -1607,8 +1758,9 @@ class _ChatPanelState extends State<_ChatPanel> {
           const SizedBox(height: 4),
           if (hasImage)
             Column(
-              crossAxisAlignment:
-                  isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              crossAxisAlignment: isMe
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
               children: [
                 GestureDetector(
                   onTap: () => _openImagePreview(msg.attachmentUrl!),
@@ -1628,8 +1780,10 @@ class _ChatPanelState extends State<_ChatPanel> {
                     constraints: BoxConstraints(
                       maxWidth: MediaQuery.of(context).size.width * 0.7,
                     ),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: isMe
                           ? const Color(0xFF228B22).withOpacity(0.7)
@@ -1649,8 +1803,7 @@ class _ChatPanelState extends State<_ChatPanel> {
               constraints: BoxConstraints(
                 maxWidth: MediaQuery.of(context).size.width * 0.7,
               ),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: isMe
                     ? const Color(0xFF228B22).withOpacity(0.7)
@@ -1746,7 +1899,6 @@ class _ChatPanelState extends State<_ChatPanel> {
       ),
     );
   }
-
 }
 
 class _PendingOutgoingEcho {
@@ -1791,8 +1943,11 @@ class _SnakeSearchPanelState extends State<_SnakeSearchPanel> {
     super.dispose();
   }
 
-  String _firstNonEmpty(Map<String, dynamic> item, List<String> keys,
-      {String fallback = ''}) {
+  String _firstNonEmpty(
+    Map<String, dynamic> item,
+    List<String> keys, {
+    String fallback = '',
+  }) {
     for (final key in keys) {
       final value = item[key]?.toString().trim() ?? '';
       if (value.isNotEmpty) return value;
@@ -1800,7 +1955,10 @@ class _SnakeSearchPanelState extends State<_SnakeSearchPanel> {
     return fallback;
   }
 
-  List<String> _extractStringList(Map<String, dynamic> item, List<String> keys) {
+  List<String> _extractStringList(
+    Map<String, dynamic> item,
+    List<String> keys,
+  ) {
     for (final key in keys) {
       final value = item[key];
       if (value is List) {
@@ -1826,10 +1984,13 @@ class _SnakeSearchPanelState extends State<_SnakeSearchPanel> {
     final venomFlag = item['isVenomous'];
     if (venomFlag is bool) return venomFlag;
 
-    final venomText = _firstNonEmpty(
-      item,
-      ['venomLevel', 'dangerLevel', 'venomType', 'venom', 'riskLevel'],
-    ).toLowerCase();
+    final venomText = _firstNonEmpty(item, [
+      'venomLevel',
+      'dangerLevel',
+      'venomType',
+      'venom',
+      'riskLevel',
+    ]).toLowerCase();
 
     if (venomText.isEmpty) return false;
     return venomText.contains('doc') ||
@@ -1885,41 +2046,49 @@ class _SnakeSearchPanelState extends State<_SnakeSearchPanel> {
   }
 
   Widget _buildFeaturedCard(Map<String, dynamic> item) {
-    final commonName = _firstNonEmpty(
-      item,
-      ['commonName', 'name', 'vietnameseName', 'snakeName', 'speciesName'],
-      fallback: 'Không rõ tên',
-    );
-    final scientificName = _firstNonEmpty(
-      item,
-      ['scientificName', 'scientific_name'],
-    );
-    final habitat = _firstNonEmpty(
-      item,
-      ['habitat', 'distribution', 'region', 'location'],
-      fallback: 'Chưa có dữ liệu môi trường sống',
-    );
-    final venom = _firstNonEmpty(
-      item,
-      ['venomLevel', 'dangerLevel', 'venomType', 'venom', 'riskLevel'],
-      fallback: _isVenomousSnake(item) ? 'Độc' : 'Không rõ',
-    );
-    final imageUrl = _firstNonEmpty(
-      item,
-      ['imageUrl', 'thumbnailUrl', 'image', 'photoUrl', 'avatarUrl'],
-    );
-    final identify = _extractStringList(
-      item,
-      ['identificationFeatures', 'identifyFeatures', 'characteristics', 'features'],
-    );
-    final firstAid = _extractStringList(
-      item,
-      ['firstAid', 'firstAidSteps', 'recommendedFirstAid'],
-    );
-    final antivenom = _firstNonEmpty(
-      item,
-      ['antivenom', 'serum', 'treatment'],
-    );
+    final commonName = _firstNonEmpty(item, [
+      'commonName',
+      'name',
+      'vietnameseName',
+      'snakeName',
+      'speciesName',
+    ], fallback: 'Không rõ tên');
+    final scientificName = _firstNonEmpty(item, [
+      'scientificName',
+      'scientific_name',
+    ]);
+    final habitat = _firstNonEmpty(item, [
+      'habitat',
+      'distribution',
+      'region',
+      'location',
+    ], fallback: 'Chưa có dữ liệu môi trường sống');
+    final venom = _firstNonEmpty(item, [
+      'venomLevel',
+      'dangerLevel',
+      'venomType',
+      'venom',
+      'riskLevel',
+    ], fallback: _isVenomousSnake(item) ? 'Độc' : 'Không rõ');
+    final imageUrl = _firstNonEmpty(item, [
+      'imageUrl',
+      'thumbnailUrl',
+      'image',
+      'photoUrl',
+      'avatarUrl',
+    ]);
+    final identify = _extractStringList(item, [
+      'identificationFeatures',
+      'identifyFeatures',
+      'characteristics',
+      'features',
+    ]);
+    final firstAid = _extractStringList(item, [
+      'firstAid',
+      'firstAidSteps',
+      'recommendedFirstAid',
+    ]);
+    final antivenom = _firstNonEmpty(item, ['antivenom', 'serum', 'treatment']);
 
     return InkWell(
       onTap: () => _openDetail(item),
@@ -1964,8 +2133,10 @@ class _SnakeSearchPanelState extends State<_SnakeSearchPanel> {
                           : Image.network(
                               imageUrl,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  const Icon(Icons.pets, color: Color(0xFF1B7F4B)),
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.pets,
+                                color: Color(0xFF1B7F4B),
+                              ),
                             ),
                     ),
                   ),
@@ -1996,7 +2167,9 @@ class _SnakeSearchPanelState extends State<_SnakeSearchPanel> {
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 2),
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: _isVenomousSnake(item)
                                     ? const Color(0xFFDC2626)
@@ -2047,7 +2220,9 @@ class _SnakeSearchPanelState extends State<_SnakeSearchPanel> {
                           .map(
                             (e) => Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF1F6F3),
                                 borderRadius: BorderRadius.circular(8),
@@ -2082,7 +2257,9 @@ class _SnakeSearchPanelState extends State<_SnakeSearchPanel> {
                           color: const Color(0xFF15803D),
                           icon: Icons.medical_services,
                           lines: firstAid.isEmpty
-                              ? const ['Băng ép, bất động và đưa đến cơ sở y tế']
+                              ? const [
+                                  'Băng ép, bất động và đưa đến cơ sở y tế',
+                                ]
                               : firstAid.take(2).toList(),
                         ),
                       ),
@@ -2100,7 +2277,11 @@ class _SnakeSearchPanelState extends State<_SnakeSearchPanel> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.vaccines, color: Color(0xFF1D4ED8), size: 18),
+                          const Icon(
+                            Icons.vaccines,
+                            color: Color(0xFF1D4ED8),
+                            size: 18,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -2126,103 +2307,110 @@ class _SnakeSearchPanelState extends State<_SnakeSearchPanel> {
   }
 
   Widget _buildCompactCard(Map<String, dynamic> item) {
-    final commonName = _firstNonEmpty(
-      item,
-      ['commonName', 'name', 'vietnameseName', 'snakeName', 'speciesName'],
-      fallback: 'Không rõ tên',
-    );
-    final scientificName = _firstNonEmpty(
-      item,
-      ['scientificName', 'scientific_name'],
-    );
-    final habitat = _firstNonEmpty(
-      item,
-      ['habitat', 'distribution', 'region', 'location'],
-    );
-    final imageUrl = _firstNonEmpty(
-      item,
-      ['imageUrl', 'thumbnailUrl', 'image', 'photoUrl', 'avatarUrl'],
-    );
+    final commonName = _firstNonEmpty(item, [
+      'commonName',
+      'name',
+      'vietnameseName',
+      'snakeName',
+      'speciesName',
+    ], fallback: 'Không rõ tên');
+    final scientificName = _firstNonEmpty(item, [
+      'scientificName',
+      'scientific_name',
+    ]);
+    final habitat = _firstNonEmpty(item, [
+      'habitat',
+      'distribution',
+      'region',
+      'location',
+    ]);
+    final imageUrl = _firstNonEmpty(item, [
+      'imageUrl',
+      'thumbnailUrl',
+      'image',
+      'photoUrl',
+      'avatarUrl',
+    ]);
 
     return InkWell(
       onTap: () => _openDetail(item),
       borderRadius: BorderRadius.circular(12),
       child: Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0xFFE6F2EA)),
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              width: 64,
-              height: 64,
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: 64,
+                height: 64,
                 color: const Color(0xFFE3ECE7),
-              child: imageUrl.isEmpty
+                child: imageUrl.isEmpty
                     ? const Icon(Icons.pets, color: Color(0xFF1B7F4B))
-                  : Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          const Icon(Icons.pets, color: Color(0xFF1B7F4B)),
-                    ),
+                    : Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            const Icon(Icons.pets, color: Color(0xFF1B7F4B)),
+                      ),
+              ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  commonName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    commonName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
                       color: Color(0xFF0F2E1C),
-                  ),
-                ),
-                if (scientificName.isNotEmpty)
-                  Text(
-                    scientificName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontStyle: FontStyle.italic,
-                        color: Color(0xFF5B7D6A),
                     ),
                   ),
-                if (habitat.isNotEmpty)
-                  Text(
-                    habitat,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11,
+                  if (scientificName.isNotEmpty)
+                    Text(
+                      scientificName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic,
                         color: Color(0xFF5B7D6A),
+                      ),
                     ),
-                  ),
-              ],
+                  if (habitat.isNotEmpty)
+                    Text(
+                      habitat,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF5B7D6A),
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
-          Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: _isVenomousSnake(item)
-                  ? const Color(0xFFDC2626)
-                  : const Color(0xFF16A34A),
-              shape: BoxShape.circle,
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: _isVenomousSnake(item)
+                    ? const Color(0xFFDC2626)
+                    : const Color(0xFF16A34A),
+                shape: BoxShape.circle,
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -2255,10 +2443,8 @@ class _SnakeSearchPanelState extends State<_SnakeSearchPanel> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => _SnakeDetailSheet(
-        seed: item,
-        detailFuture: widget.onFetchDetail(id),
-      ),
+      builder: (_) =>
+          _SnakeDetailSheet(seed: item, detailFuture: widget.onFetchDetail(id)),
     );
   }
 
@@ -2293,7 +2479,9 @@ class _SnakeSearchPanelState extends State<_SnakeSearchPanel> {
             ],
           ),
           const SizedBox(height: 6),
-          ...lines.take(2).map(
+          ...lines
+              .take(2)
+              .map(
                 (line) => Text(
                   '- $line',
                   maxLines: 2,
@@ -2370,8 +2558,7 @@ class _SnakeSearchPanelState extends State<_SnakeSearchPanel> {
                               setState(() => _results = const []);
                               _search();
                             },
-                      icon: const Icon(Icons.refresh,
-                          color: Color(0xFF5B7D6A)),
+                      icon: const Icon(Icons.refresh, color: Color(0xFF5B7D6A)),
                     ),
                   ],
                 ),
@@ -2393,9 +2580,14 @@ class _SnakeSearchPanelState extends State<_SnakeSearchPanel> {
                           textInputAction: TextInputAction.search,
                           onSubmitted: (_) => _search(),
                           decoration: InputDecoration(
-                            prefixIcon: const Icon(Icons.search, color: Color(0xFF5B7D6A)),
+                            prefixIcon: const Icon(
+                              Icons.search,
+                              color: Color(0xFF5B7D6A),
+                            ),
                             hintText: 'Tìm loài rắn...',
-                            hintStyle: const TextStyle(color: Color(0xFF5B7D6A)),
+                            hintStyle: const TextStyle(
+                              color: Color(0xFF5B7D6A),
+                            ),
                             border: InputBorder.none,
                             contentPadding: const EdgeInsets.only(top: 12),
                           ),
@@ -2433,9 +2625,7 @@ class _SnakeSearchPanelState extends State<_SnakeSearchPanel> {
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: const BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: Color(0xFFD0E5D6)),
-                  ),
+                  border: Border(bottom: BorderSide(color: Color(0xFFD0E5D6))),
                 ),
                 child: const Row(
                   children: [
@@ -2490,10 +2680,7 @@ class _SnakeDetailSheet extends StatelessWidget {
   final Map<String, dynamic> seed;
   final Future<Map<String, dynamic>?> detailFuture;
 
-  const _SnakeDetailSheet({
-    required this.seed,
-    required this.detailFuture,
-  });
+  const _SnakeDetailSheet({required this.seed, required this.detailFuture});
 
   String _stringFrom(Map<String, dynamic> data, String key) {
     return (data[key] ?? '').toString().trim();
@@ -2542,7 +2729,8 @@ class _SnakeDetailSheet extends StatelessWidget {
               final riskLevel = _stringFrom(data, 'riskLevel');
               final isVenomous = data['isVenomous'] == true;
               final alternativeNames = _stringList(data['alternativeNames']);
-              final identification = data['identification'] is Map<String, dynamic>
+              final identification =
+                  data['identification'] is Map<String, dynamic>
                   ? data['identification'] as Map<String, dynamic>
                   : const <String, dynamic>{};
               final traits = _stringList(identification['physicalTraits']);
@@ -2551,10 +2739,12 @@ class _SnakeDetailSheet extends StatelessWidget {
               final symptoms = data['symptomsByTime'] is List
                   ? data['symptomsByTime'] as List<dynamic>
                   : const [];
-              final firstAid = data['firstAidGuidelineOverride'] is Map<String, dynamic>
+              final firstAid =
+                  data['firstAidGuidelineOverride'] is Map<String, dynamic>
                   ? data['firstAidGuidelineOverride'] as Map<String, dynamic>
                   : const <String, dynamic>{};
-              final firstAidContent = firstAid['content'] is Map<String, dynamic>
+              final firstAidContent =
+                  firstAid['content'] is Map<String, dynamic>
                   ? firstAid['content'] as Map<String, dynamic>
                   : const <String, dynamic>{};
               final firstAidSteps = firstAidContent['steps'] is List
@@ -2616,7 +2806,11 @@ class _SnakeDetailSheet extends StatelessWidget {
                               color: Colors.black.withOpacity(0.35),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.close, color: Colors.white, size: 18),
+                            child: const Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 18,
+                            ),
                           ),
                         ),
                       ),
@@ -2648,7 +2842,10 @@ class _SnakeDetailSheet extends StatelessWidget {
                             Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: isVenomous
                                         ? const Color(0xFFDC2626)
@@ -2667,7 +2864,10 @@ class _SnakeDetailSheet extends StatelessWidget {
                                 const SizedBox(width: 8),
                                 if (venomType.isNotEmpty)
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: Colors.white.withOpacity(0.2),
                                       borderRadius: BorderRadius.circular(999),
@@ -2684,7 +2884,10 @@ class _SnakeDetailSheet extends StatelessWidget {
                                 if (riskLevel.isNotEmpty) ...[
                                   const SizedBox(width: 8),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: Colors.white.withOpacity(0.2),
                                       borderRadius: BorderRadius.circular(999),
@@ -2750,18 +2953,12 @@ class _SnakeDetailSheet extends StatelessWidget {
                   if (habitat.isNotEmpty) ...[
                     _detailSection('Môi trường sống', habitat),
                   ],
-                  if (symptoms.isNotEmpty) ...[
-                    _symptomSection(symptoms),
-                  ],
+                  if (symptoms.isNotEmpty) ...[_symptomSection(symptoms)],
                   if (firstAidSteps.isNotEmpty) ...[
                     _firstAidSection(firstAidSteps),
                   ],
-                  if (venoms.isNotEmpty) ...[
-                    _venomSection(venoms),
-                  ],
-                  if (antivenoms.isNotEmpty) ...[
-                    _antivenomSection(antivenoms),
-                  ],
+                  if (venoms.isNotEmpty) ...[_venomSection(venoms)],
+                  if (antivenoms.isNotEmpty) ...[_antivenomSection(antivenoms)],
                   const SizedBox(height: 12),
                 ],
               );
@@ -2823,12 +3020,17 @@ class _SnakeDetailSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          ...items.take(6).map(
+          ...items
+              .take(6)
+              .map(
                 (e) => Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Text(
                     '- $e',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF335244)),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF335244),
+                    ),
                   ),
                 ),
               ),
@@ -2867,7 +3069,9 @@ class _SnakeDetailSheet extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: critical ? const Color(0xFFFEE2E2) : const Color(0xFFEFF6FF),
+                color: critical
+                    ? const Color(0xFFFEE2E2)
+                    : const Color(0xFFEFF6FF),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Column(
@@ -2878,14 +3082,21 @@ class _SnakeDetailSheet extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: critical ? const Color(0xFFB91C1C) : const Color(0xFF1D4ED8),
+                      color: critical
+                          ? const Color(0xFFB91C1C)
+                          : const Color(0xFF1D4ED8),
                     ),
                   ),
                   const SizedBox(height: 4),
-                  ...signs.take(4).map(
+                  ...signs
+                      .take(4)
+                      .map(
                         (s) => Text(
                           '- $s',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF334155)),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF334155),
+                          ),
                         ),
                       ),
                 ],
@@ -2977,7 +3188,10 @@ class _SnakeDetailSheet extends StatelessWidget {
                   if (desc.isNotEmpty)
                     Text(
                       desc,
-                      style: const TextStyle(fontSize: 12, color: Color(0xFF335244)),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF335244),
+                      ),
                     ),
                 ],
               ),
@@ -3015,12 +3229,17 @@ class _SnakeDetailSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          ...items.take(4).map(
+          ...items
+              .take(4)
+              .map(
                 (e) => Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Text(
                     '- $e',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF1E3A8A)),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF1E3A8A),
+                    ),
                   ),
                 ),
               ),

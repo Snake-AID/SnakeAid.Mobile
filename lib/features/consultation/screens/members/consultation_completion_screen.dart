@@ -9,6 +9,7 @@ class ConsultationCompletionScreen extends ConsumerStatefulWidget {
   final String expertSpecialty;
   final int durationSeconds;
   final String consultationId;
+  final DateTime? consultationTime;
 
   const ConsultationCompletionScreen({
     super.key,
@@ -16,6 +17,7 @@ class ConsultationCompletionScreen extends ConsumerStatefulWidget {
     required this.expertSpecialty,
     required this.durationSeconds,
     required this.consultationId,
+    this.consultationTime,
   });
 
   @override
@@ -198,11 +200,17 @@ class _ConsultationCompletionScreenState
               Align(
                 alignment: Alignment.centerRight,
                 child: GestureDetector(
-                  onTap: () => context.go('/member-home'),
+                  onTap: () => context.go(
+                    '/consultation-home',
+                    extra: {'initialTab': 1},
+                  ),
                   child: Container(
                     padding: const EdgeInsets.all(4),
-                    child: const Icon(Icons.close,
-                        size: 24, color: Color(0xFF333333)),
+                    child: const Icon(
+                      Icons.close,
+                      size: 24,
+                      color: Color(0xFF333333),
+                    ),
                   ),
                 ),
               ),
@@ -228,11 +236,7 @@ class _ConsultationCompletionScreenState
                 color: const Color(0xFFD4EDDA),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.check_circle,
-                size: 48,
-                color: _primary,
-              ),
+              child: const Icon(Icons.check_circle, size: 48, color: _primary),
             ),
           ),
           const SizedBox(height: 24),
@@ -249,10 +253,7 @@ class _ConsultationCompletionScreenState
           const SizedBox(height: 8),
           const Text(
             'Phiên tư vấn đã kết thúc',
-            style: TextStyle(
-              fontSize: 15,
-              color: Color(0xFF6C757D),
-            ),
+            style: TextStyle(fontSize: 15, color: Color(0xFF6C757D)),
             textAlign: TextAlign.center,
           ),
         ],
@@ -270,9 +271,10 @@ class _ConsultationCompletionScreenState
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2))
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Row(
@@ -304,15 +306,19 @@ class _ConsultationCompletionScreenState
                   ),
                 ),
                 const SizedBox(height: 6),
-                _buildInfoRow(Icons.calendar_today_outlined,
-                    _formatDateTime(DateTime.now())),
+                _buildInfoRow(
+                  Icons.calendar_today_outlined,
+                  _formatDateTime(widget.consultationTime ?? DateTime.now()),
+                ),
                 const SizedBox(height: 4),
                 _buildInfoRow(Icons.schedule_outlined, _formattedDuration),
                 const SizedBox(height: 8),
                 // Status badge
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: _primary.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(20),
@@ -351,10 +357,7 @@ class _ConsultationCompletionScreenState
             text,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF6C757D),
-            ),
+            style: const TextStyle(fontSize: 13, color: Color(0xFF6C757D)),
           ),
         ),
       ],
@@ -388,20 +391,37 @@ class _ConsultationCompletionScreenState
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2))
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
         children: [
-          _buildPaymentRow('Giá dịch vụ', formatCurrency(serviceFee), valueGreen: false),
+          _buildPaymentRow(
+            'Giá dịch vụ',
+            formatCurrency(serviceFee),
+            valueGreen: false,
+          ),
           const SizedBox(height: 10),
-          _buildPaymentRow('Phí nền tảng', '-${formatCurrency(platformFee)}', valueGreen: false),
+          _buildPaymentRow(
+            'Phí nền tảng',
+            '-${formatCurrency(platformFee)}',
+            valueGreen: false,
+          ),
           const Divider(height: 20, color: Color(0xFFF3F4F6)),
-          _buildPaymentRow('Tổng cộng đã trả', formatCurrency(serviceFee), valueGreen: true),
+          _buildPaymentRow(
+            'Tổng cộng đã trả',
+            formatCurrency(serviceFee),
+            valueGreen: true,
+          ),
           const SizedBox(height: 12),
-          _buildPaymentRow('Phương thức', 'Ví điện tử / PayOS', valueGreen: false),
+          _buildPaymentRow(
+            'Phương thức',
+            'Ví điện tử / PayOS',
+            valueGreen: false,
+          ),
           const Divider(height: 20, color: Color(0xFFF3F4F6)),
           Row(
             children: const [
@@ -426,8 +446,11 @@ class _ConsultationCompletionScreenState
     );
   }
 
-  Widget _buildPaymentRow(String label, String value,
-      {bool valueGreen = false}) {
+  Widget _buildPaymentRow(
+    String label,
+    String value, {
+    bool valueGreen = false,
+  }) {
     return Row(
       children: [
         Expanded(
@@ -435,10 +458,7 @@ class _ConsultationCompletionScreenState
             label,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF6C757D),
-            ),
+            style: const TextStyle(fontSize: 13, color: Color(0xFF6C757D)),
           ),
         ),
         const SizedBox(width: 12),
@@ -485,9 +505,7 @@ class _ConsultationCompletionScreenState
         ),
         const SizedBox(height: 8),
         Text(
-          _selectedStars == 0
-              ? 'Chọn số sao'
-              : _starLabel(_selectedStars),
+          _selectedStars == 0 ? 'Chọn số sao' : _starLabel(_selectedStars),
           style: const TextStyle(fontSize: 13, color: Color(0xFF6C757D)),
           textAlign: TextAlign.center,
         ),
@@ -497,12 +515,18 @@ class _ConsultationCompletionScreenState
 
   String _starLabel(int stars) {
     switch (stars) {
-      case 1: return 'Không hài lòng';
-      case 2: return 'Cần cải thiện';
-      case 3: return 'Bình thường';
-      case 4: return 'Hài lòng';
-      case 5: return 'Tuyệt vời!';
-      default: return '';
+      case 1:
+        return 'Không hài lòng';
+      case 2:
+        return 'Cần cải thiện';
+      case 3:
+        return 'Bình thường';
+      case 4:
+        return 'Hài lòng';
+      case 5:
+        return 'Tuyệt vời!';
+      default:
+        return '';
     }
   }
 
@@ -515,9 +539,10 @@ class _ConsultationCompletionScreenState
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2))
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Stack(
@@ -529,8 +554,10 @@ class _ConsultationCompletionScreenState
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               hintText: 'Chia sẻ trải nghiệm của bạn...',
-              hintStyle:
-                  const TextStyle(fontSize: 14, color: Color(0xFF9CA3AF)),
+              hintStyle: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF9CA3AF),
+              ),
               filled: true,
               fillColor: Colors.white,
               counterText: '',
@@ -554,8 +581,7 @@ class _ConsultationCompletionScreenState
             right: 14,
             child: Text(
               '$_charCount/200',
-              style: const TextStyle(
-                  fontSize: 11, color: Color(0xFF9CA3AF)),
+              style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
             ),
           ),
         ],
@@ -583,7 +609,9 @@ class _ConsultationCompletionScreenState
               }),
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 9),
+                  horizontal: 16,
+                  vertical: 9,
+                ),
                 decoration: BoxDecoration(
                   color: selected ? _primary.withOpacity(0.12) : Colors.white,
                   borderRadius: BorderRadius.circular(999),
@@ -630,15 +658,18 @@ class _ConsultationCompletionScreenState
           backgroundColor: _primary,
           foregroundColor: Colors.white,
           elevation: 0,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
         child: _isSubmitting
             ? const SizedBox(
                 width: 22,
                 height: 22,
                 child: CircularProgressIndicator(
-                    strokeWidth: 2.5, color: Colors.white),
+                  strokeWidth: 2.5,
+                  color: Colors.white,
+                ),
               )
             : const Text(
                 'Gửii Đánh Giá',
@@ -682,12 +713,12 @@ class _ConsultationCompletionScreenState
                 foregroundColor: _primary,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               child: const Text(
                 'Lịch Sử Tư Vấn',
-                style:
-                    TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -700,12 +731,12 @@ class _ConsultationCompletionScreenState
                 foregroundColor: _primary,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               child: const Text(
                 'Về Trang Chủ',
-                style:
-                    TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ),
           ),

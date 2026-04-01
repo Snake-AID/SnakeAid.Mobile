@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/consultation_booking_response.dart';
 import '../../models/my_consultation_response.dart';
+import '../../repository/consultation_repository.dart';
 import 'consultation_completion_screen.dart';
 import 'member_consultation_detail_screen.dart';
 import '../../providers/consultation_bookings_provider.dart';
@@ -10,16 +11,16 @@ import '../../providers/my_consultations_provider.dart';
 
 /// Trạng thái hiển thị của một buổi tư vấn
 enum ConsultationStatus {
-  active,         // Đang diễn ra (confirmed + đến giờ)
-  upcoming,       // Đã xác nhận, chưa đến giờ
+  active, // Đang diễn ra (confirmed + đến giờ)
+  upcoming, // Đã xác nhận, chưa đến giờ
   pendingPayment, // Chờ thanh toán
-  completed,      // Đã hoàn thành
-  cancelled,      // Đã hủy
+  completed, // Đã hoàn thành
+  cancelled, // Đã hủy
 }
 
 /// Internal UI model for a consultation card
 class _ConsultationItem {
-  final String id;             // bookingId — dùng cho highlight, display
+  final String id; // bookingId — dùng cho highlight, display
   final String? consultationId; // consultationId thật — dùng cho LiveKit token
   final String expertId;
   final String expertName;
@@ -94,8 +95,13 @@ class _ConsultationItem {
 class ConsultationHomeScreen extends ConsumerStatefulWidget {
   /// ID buổi tư vấn vừa được đặt (từ màn hình thanh toán) — sẽ được highlight vàng
   final String? highlightedId;
+  final int initialTab;
 
-  const ConsultationHomeScreen({super.key, this.highlightedId});
+  const ConsultationHomeScreen({
+    super.key,
+    this.highlightedId,
+    this.initialTab = 0,
+  });
 
   @override
   ConsumerState<ConsultationHomeScreen> createState() =>
@@ -104,6 +110,8 @@ class ConsultationHomeScreen extends ConsumerStatefulWidget {
 
 class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
     with TickerProviderStateMixin {
+  static const int _historyPageSize = 10;
+
   late TabController _tabController;
 
   // ── Highlight flash ──────────────────────────────────────────────────────
@@ -114,10 +122,18 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
   // ── Payment loading ───────────────────────────────────────────────────────
   String? _payingId; // bookingId đang được thanh toán
 
+  // ── Member history paging ────────────────────────────────────────────────
+  List<_ConsultationItem> _historyItems = [];
+  int _historyCurrentPage = 1;
+  bool _isLoadingMoreHistory = false;
+  bool _hasMoreHistory = true;
+  String _historyFirstPageKey = '';
+
   /// Derive UI item list from provider bookings
   List<_ConsultationItem> _toItems(
-      List<MyConsultationResponse> consultations,
-      Map<String, double> ratingByConsultationId) {
+    List<MyConsultationResponse> consultations,
+    Map<String, double> ratingByConsultationId,
+  ) {
     return consultations.map((c) {
       final item = _ConsultationItem.fromConsultation(c);
       final rating = ratingByConsultationId[c.consultationId];
@@ -139,92 +155,110 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
   }
 
   List<_ConsultationItem> _upcomingList(
-      List<MyConsultationResponse> consultations,
-      Map<String, double> ratingByConsultationId) {
-    final list = _toItems(consultations, ratingByConsultationId)
-        .where((c) =>
-            c.status == ConsultationStatus.active ||
-            c.status == ConsultationStatus.upcoming ||
-            c.status == ConsultationStatus.pendingPayment)
-        .toList()
-      ..sort((a, b) {
-        // Active first, then pendingPayment, then by time
-        if (a.status == ConsultationStatus.active &&
-            b.status != ConsultationStatus.active) return -1;
-        if (b.status == ConsultationStatus.active &&
-            a.status != ConsultationStatus.active) return 1;
-        if (_highlightedId != null) {
-          if (a.id == _highlightedId) return -1;
-          if (b.id == _highlightedId) return 1;
-        }
-        return a.scheduledTime.compareTo(b.scheduledTime);
-      });
+    List<MyConsultationResponse> consultations,
+    Map<String, double> ratingByConsultationId,
+  ) {
+    final list =
+        _toItems(consultations, ratingByConsultationId)
+            .where(
+              (c) =>
+                  c.status == ConsultationStatus.active ||
+                  c.status == ConsultationStatus.upcoming ||
+                  c.status == ConsultationStatus.pendingPayment,
+            )
+            .toList()
+          ..sort((a, b) {
+            // Active first, then pendingPayment, then by time
+            if (a.status == ConsultationStatus.active &&
+                b.status != ConsultationStatus.active)
+              return -1;
+            if (b.status == ConsultationStatus.active &&
+                a.status != ConsultationStatus.active)
+              return 1;
+            if (_highlightedId != null) {
+              if (a.id == _highlightedId) return -1;
+              if (b.id == _highlightedId) return 1;
+            }
+            return a.scheduledTime.compareTo(b.scheduledTime);
+          });
     return list;
   }
 
   List<_ConsultationItem> _historyList(
-      List<MyConsultationResponse> consultations,
-      Map<String, double> ratingByConsultationId) =>
+    List<MyConsultationResponse> consultations,
+    Map<String, double> ratingByConsultationId,
+  ) =>
       _toItems(consultations, ratingByConsultationId)
-          .where((c) =>
-              c.status == ConsultationStatus.completed ||
-              c.status == ConsultationStatus.cancelled)
+          .where(
+            (c) =>
+                c.status == ConsultationStatus.completed ||
+                c.status == ConsultationStatus.cancelled,
+          )
           .toList()
         ..sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
 
   List<_ConsultationItem> _bookingFallbackItems(
-      List<ConsultationBookingResponse> bookings) {
+    List<ConsultationBookingResponse> bookings,
+  ) {
     final now = DateTime.now();
     return bookings
-        .where((b) =>
-            b.status == ConsultationBookingStatus.pendingPayment ||
-            b.status == ConsultationBookingStatus.confirmed)
-        .map((b) => _ConsultationItem(
-              id: b.id,
-              consultationId: b.consultationId,
-              expertId: b.expertId,
-              expertName: b.expertName,
-              expertSpecialty: b.expertSpecialty ?? '',
-              expertAvatarUrl: b.expertAvatarUrl,
-              scheduledTime: b.scheduledTime,
-              status: b.status == ConsultationBookingStatus.pendingPayment
-                  ? ConsultationStatus.pendingPayment
-                  : (b.scheduledTime.isAfter(now)
+        .where(
+          (b) =>
+              b.status == ConsultationBookingStatus.pendingPayment ||
+              b.status == ConsultationBookingStatus.confirmed,
+        )
+        .map(
+          (b) => _ConsultationItem(
+            id: b.id,
+            consultationId: b.consultationId,
+            expertId: b.expertId,
+            expertName: b.expertName,
+            expertSpecialty: b.expertSpecialty ?? '',
+            expertAvatarUrl: b.expertAvatarUrl,
+            scheduledTime: b.scheduledTime,
+            status: b.status == ConsultationBookingStatus.pendingPayment
+                ? ConsultationStatus.pendingPayment
+                : (b.scheduledTime.isAfter(now)
                       ? ConsultationStatus.upcoming
                       : ConsultationStatus.active),
-              serviceType: b.consultationType == 'Instant'
-                  ? 'Tư vấn khẩn cấp'
-                  : 'Tư vấn đặt lịch',
-              feeCost: b.feeCost,
-              rating: b.rating,
-                problemDescription: b.problemDescription,
-            ))
+            serviceType: b.consultationType == 'Instant'
+                ? 'Tư vấn khẩn cấp'
+                : 'Tư vấn đặt lịch',
+            feeCost: b.feeCost,
+            rating: b.rating,
+            problemDescription: b.problemDescription,
+          ),
+        )
         .toList();
   }
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTab.clamp(0, 1),
+    );
 
     // Khởi tạo animation highlight vàng
     _flashController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
     );
-    _flashColorAnimation = ColorTween(
-      begin: const Color(0xFFFFE082), // Amber 200
-      end: Colors.white,
-    ).animate(CurvedAnimation(
-      parent: _flashController,
-      curve: Curves.easeInOut,
-    ));
+    _flashColorAnimation =
+        ColorTween(
+          begin: const Color(0xFFFFE082), // Amber 200
+          end: Colors.white,
+        ).animate(
+          CurvedAnimation(parent: _flashController, curve: Curves.easeInOut),
+        );
 
     // Reload data mỗi khi vào màn hình
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(myConsultationsProvider.notifier).loadConsultations();
       ref.read(consultationBookingsProvider.notifier).loadBookings();
-      
+
       // Nếu có buổi tư vấn vừa được tạo, highlight nó khi danh sách load xong
       if (widget.highlightedId != null) {
         _highlightedId = widget.highlightedId;
@@ -243,6 +277,66 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
     if (mounted) setState(() => _highlightedId = null);
   }
 
+  Future<void> _refreshAllData() async {
+    await Future.wait([
+      ref.read(myConsultationsProvider.notifier).loadConsultations(),
+      ref.read(consultationBookingsProvider.notifier).loadBookings(),
+    ]);
+  }
+
+  Future<void> _loadMoreHistory() async {
+    if (!mounted || _isLoadingMoreHistory || !_hasMoreHistory) return;
+
+    setState(() => _isLoadingMoreHistory = true);
+    try {
+      final nextPage = _historyCurrentPage + 1;
+      final repo = ref.read(consultationRepositoryProvider);
+      final nextConsultations = await repo.getMyConsultations(
+        status: 'Completed',
+        pageNumber: nextPage,
+        pageSize: _historyPageSize,
+      );
+
+      if (!mounted) return;
+
+      final reviews = ref.read(myConsultationsProvider).reviewsByConsultationId;
+      final ratingByConsultationId = <String, double>{
+        for (final entry in reviews.entries)
+          if (entry.value != null) entry.key: entry.value!.rating.toDouble(),
+      };
+
+      final mapped = _historyList(nextConsultations, ratingByConsultationId);
+
+      if (mapped.isEmpty) {
+        setState(() {
+          _isLoadingMoreHistory = false;
+          _hasMoreHistory = false;
+        });
+        return;
+      }
+
+      final dedup = <String, _ConsultationItem>{
+        for (final item in _historyItems) item.id: item,
+      };
+      for (final item in mapped) {
+        dedup[item.id] = item;
+      }
+
+      final merged = dedup.values.toList()
+        ..sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
+
+      setState(() {
+        _historyItems = merged;
+        _historyCurrentPage = nextPage;
+        _hasMoreHistory = mapped.length >= _historyPageSize;
+        _isLoadingMoreHistory = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingMoreHistory = false);
+    }
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -258,18 +352,32 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
       for (final entry in consultationsState.reviewsByConsultationId.entries)
         if (entry.value != null) entry.key: entry.value!.rating.toDouble(),
     };
-    final ongoingFromNewApi =
-        _upcomingList(consultationsState.ongoing, ratingByConsultationId);
-    final pendingFromLegacyBookings =
-      _bookingFallbackItems(bookingsState.bookings);
+    final ongoingFromNewApi = _upcomingList(
+      consultationsState.ongoing,
+      ratingByConsultationId,
+    );
+    final pendingFromLegacyBookings = _bookingFallbackItems(
+      bookingsState.bookings,
+    );
     final upcomingById = <String, _ConsultationItem>{
       for (final item in [...ongoingFromNewApi, ...pendingFromLegacyBookings])
         item.id: item,
     };
     final upcoming = upcomingById.values.toList()
       ..sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
-    final history =
-        _historyList(consultationsState.completed, ratingByConsultationId);
+    final history = _historyList(
+      consultationsState.completed,
+      ratingByConsultationId,
+    );
+
+    final firstPageKey = history.map((e) => e.id).join('|');
+    if (firstPageKey != _historyFirstPageKey) {
+      _historyFirstPageKey = firstPageKey;
+      _historyItems = history;
+      _historyCurrentPage = 1;
+      _hasMoreHistory = history.length >= _historyPageSize;
+      _isLoadingMoreHistory = false;
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8F6),
@@ -285,12 +393,20 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
             // Tab Content
             Expanded(
               child: (consultationsState.isLoading && bookingsState.isLoading)
-                  ? const Center(child: CircularProgressIndicator(color: Color(0xFF228B22)))
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF228B22),
+                      ),
+                    )
                   : TabBarView(
                       controller: _tabController,
                       children: [
                         _buildUpcomingTab(context, upcoming),
-                        _buildHistoryTab(context, history),
+                        _buildHistoryTab(
+                          context,
+                          _historyItems,
+                          isLoading: consultationsState.isLoading,
+                        ),
                       ],
                     ),
             ),
@@ -306,10 +422,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
         icon: const Icon(Icons.add),
         label: const Text(
           'Đặt Lịch Mới',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 15,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
         ),
       ),
     );
@@ -320,9 +433,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(
-          bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1),
-        ),
+        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1)),
       ),
       child: Row(
         children: [
@@ -333,10 +444,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
               width: 40,
               height: 40,
               alignment: Alignment.center,
-              child: const Icon(
-                Icons.arrow_back,
-                color: Color(0xFF1F2937),
-              ),
+              child: const Icon(Icons.arrow_back, color: Color(0xFF1F2937)),
             ),
           ),
           const Expanded(
@@ -384,10 +492,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
         unselectedLabelColor: const Color(0xFF6B7280),
         indicatorColor: const Color(0xFF228B22),
         indicatorWeight: 3,
-        labelStyle: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
-        ),
+        labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
         unselectedLabelStyle: const TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w500,
@@ -402,7 +507,9 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                   const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF228B22),
                       borderRadius: BorderRadius.circular(10),
@@ -428,8 +535,10 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
 
   // ─── Tab "Sắp Tới" ────────────────────────────────────────────────────────
 
-  Widget _buildUpcomingTab(BuildContext context,
-      List<_ConsultationItem> upcomingList) {
+  Widget _buildUpcomingTab(
+    BuildContext context,
+    List<_ConsultationItem> upcomingList,
+  ) {
     if (upcomingList.isEmpty) {
       return _buildEmptyState(
         icon: Icons.calendar_today_outlined,
@@ -441,12 +550,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
 
     return RefreshIndicator(
       color: const Color(0xFF228B22),
-      onRefresh: () async {
-        await Future.wait([
-          ref.read(myConsultationsProvider.notifier).loadConsultations(),
-          ref.read(consultationBookingsProvider.notifier).loadBookings(),
-        ]);
-      },
+      onRefresh: _refreshAllData,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         children: [
@@ -454,10 +558,12 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
           _buildInfoBanner(),
           const SizedBox(height: 16),
 
-          ...upcomingList.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _buildUpcomingCard(context, item),
-              )),
+          ...upcomingList.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildUpcomingCard(context, item),
+            ),
+          ),
         ],
       ),
     );
@@ -469,17 +575,11 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
       decoration: BoxDecoration(
         color: const Color(0xFF228B22).withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF228B22).withOpacity(0.25),
-        ),
+        border: Border.all(color: const Color(0xFF228B22).withOpacity(0.25)),
       ),
       child: const Row(
         children: [
-          Icon(
-            Icons.info_outline,
-            color: Color(0xFF228B22),
-            size: 20,
-          ),
+          Icon(Icons.info_outline, color: Color(0xFF228B22), size: 20),
           SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -509,10 +609,13 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
             : Colors.white;
         final borderColor = isHighlighted
             ? Color.lerp(
-                const Color(0xFFFFC107), const Color(0xFFE5E7EB), _flashController.value)
+                const Color(0xFFFFC107),
+                const Color(0xFFE5E7EB),
+                _flashController.value,
+              )
             : isActive
-                ? const Color(0xFF228B22)
-                : null;
+            ? const Color(0xFF228B22)
+            : null;
 
         return Container(
           decoration: BoxDecoration(
@@ -521,7 +624,8 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
             border: (isHighlighted || isActive)
                 ? Border.all(
                     color: borderColor ?? const Color(0xFF228B22),
-                    width: isHighlighted ? 2 : 1.5)
+                    width: isHighlighted ? 2 : 1.5,
+                  )
                 : null,
             boxShadow: [
               BoxShadow(
@@ -608,7 +712,9 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
 
                 // Thông tin chi tiết
                 _buildDetailRow(
-                    Icons.medical_services_outlined, item.serviceType),
+                  Icons.medical_services_outlined,
+                  item.serviceType,
+                ),
                 const SizedBox(height: 8),
                 _buildDetailRow(Icons.access_time, timeText),
                 const SizedBox(height: 8),
@@ -648,7 +754,8 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                     // Nút chính (vào / thanh toán / chờ)
                     Expanded(
                       flex: 2,
-                      child: isActive || item.status == ConsultationStatus.upcoming
+                      child:
+                          isActive || item.status == ConsultationStatus.upcoming
                           ? ElevatedButton.icon(
                               onPressed: () => _joinConsultation(context, item),
                               icon: const Icon(Icons.video_call, size: 18),
@@ -662,8 +769,9 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF228B22),
                                 foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -671,51 +779,56 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                               ),
                             )
                           : item.status == ConsultationStatus.pendingPayment
-                              ? ElevatedButton.icon(
-                                  onPressed: () => _goToPayment(context, item),
-                                  icon: const Icon(Icons.payment, size: 18),
-                                  label: const Text(
-                                    'Thanh Toán Ngay',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFF59E0B),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    elevation: 0,
-                                  ),
-                                )
-                              : ElevatedButton.icon(
-                                  onPressed: null, // disabled
-                                  icon: const Icon(Icons.hourglass_empty, size: 18),
-                                  label: const Text(
-                                    'Chưa Đến Giờ',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFE5E7EB),
-                                    foregroundColor: const Color(0xFF9CA3AF),
-                                    disabledBackgroundColor:
-                                        const Color(0xFFE5E7EB),
-                                    disabledForegroundColor:
-                                        const Color(0xFF9CA3AF),
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 12),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    elevation: 0,
-                                  ),
+                          ? ElevatedButton.icon(
+                              onPressed: () => _goToPayment(context, item),
+                              icon: const Icon(Icons.payment, size: 18),
+                              label: const Text(
+                                'Thanh Toán Ngay',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
                                 ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFF59E0B),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                elevation: 0,
+                              ),
+                            )
+                          : ElevatedButton.icon(
+                              onPressed: null, // disabled
+                              icon: const Icon(Icons.hourglass_empty, size: 18),
+                              label: const Text(
+                                'Chưa Đến Giờ',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFE5E7EB),
+                                foregroundColor: const Color(0xFF9CA3AF),
+                                disabledBackgroundColor: const Color(
+                                  0xFFE5E7EB,
+                                ),
+                                disabledForegroundColor: const Color(
+                                  0xFF9CA3AF,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                elevation: 0,
+                              ),
+                            ),
                     ),
                   ],
                 ),
@@ -731,9 +844,35 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
 
   // ─── Tab "Lịch Sử" ────────────────────────────────────────────────────────
 
-  Widget _buildHistoryTab(BuildContext context,
-      List<_ConsultationItem> historyList) {
+  Widget _buildHistoryTab(
+    BuildContext context,
+    List<_ConsultationItem> historyList, {
+    required bool isLoading,
+  }) {
     if (historyList.isEmpty) {
+      if (isLoading) {
+        return const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: Color(0xFF228B22),
+                ),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Đang tải lịch sử tư vấn...',
+                style: TextStyle(fontSize: 14, color: Color(0xFF8A8A8A)),
+              ),
+            ],
+          ),
+        );
+      }
+
       return _buildEmptyState(
         icon: Icons.history,
         message: 'Chưa có lịch sử tư vấn',
@@ -744,26 +883,43 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
 
     return RefreshIndicator(
       color: const Color(0xFF228B22),
-      onRefresh: () async {
-        await Future.wait([
-          ref.read(myConsultationsProvider.notifier).loadConsultations(),
-          ref.read(consultationBookingsProvider.notifier).loadBookings(),
-        ]);
-      },
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-        children: historyList
-            .map((item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _buildHistoryCard(context, item),
-                ))
-            .toList(),
+      onRefresh: _refreshAllData,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification.metrics.pixels >=
+              notification.metrics.maxScrollExtent - 180) {
+            _loadMoreHistory();
+          }
+          return false;
+        },
+        child: ListView.separated(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+          itemCount: historyList.length + (_isLoadingMoreHistory ? 1 : 0),
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            if (index >= historyList.length) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              );
+            }
+            return _buildHistoryCard(context, historyList[index]);
+          },
+        ),
       ),
     );
   }
 
   Widget _buildHistoryCard(BuildContext context, _ConsultationItem item) {
     final isCancelled = item.status == ConsultationStatus.cancelled;
+    final isEmergencyType = item.serviceType.toLowerCase().contains('khẩn');
+    final typeLabel = isEmergencyType ? 'Khẩn Cấp' : 'Đặt Lịch';
 
     return Container(
       decoration: BoxDecoration(
@@ -802,11 +958,26 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        item.expertSpecialty,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF6B7280),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isEmergencyType
+                              ? const Color(0xFFFEE2E2)
+                              : const Color(0xFFE8F5E9),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          typeLabel,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: isEmergencyType
+                                ? const Color(0xFFDC2626)
+                                : const Color(0xFF228B22),
+                          ),
                         ),
                       ),
                     ],
@@ -838,11 +1009,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Icon(
-                    Icons.star,
-                    size: 16,
-                    color: Color(0xFFFBBF24),
-                  ),
+                  const Icon(Icons.star, size: 16, color: Color(0xFFFBBF24)),
                   const SizedBox(width: 6),
                   Text(
                     'Đánh giá của bạn: ${item.rating!.toStringAsFixed(1)}/5',
@@ -892,7 +1059,9 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                         if (consultationId == null || consultationId.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Không tìm thấy phiên tư vấn để đánh giá.'),
+                              content: Text(
+                                'Không tìm thấy phiên tư vấn để đánh giá.',
+                              ),
                             ),
                           );
                           return;
@@ -905,6 +1074,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                               expertSpecialty: item.expertSpecialty,
                               durationSeconds: 1800,
                               consultationId: consultationId,
+                              consultationTime: item.scheduledTime,
                             ),
                           ),
                         );
@@ -993,9 +1163,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
       child: Icon(
         Icons.person,
         size: 28,
-        color: greyed
-            ? const Color(0xFF9CA3AF)
-            : const Color(0xFF228B22),
+        color: greyed ? const Color(0xFF9CA3AF) : const Color(0xFF228B22),
       ),
     );
   }
@@ -1058,10 +1226,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF4B5563),
-            ),
+            style: const TextStyle(fontSize: 13, color: Color(0xFF4B5563)),
           ),
         ),
       ],
@@ -1106,10 +1271,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
             const SizedBox(height: 8),
             Text(
               subMessage,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF6B7280),
-              ),
+              style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
               textAlign: TextAlign.center,
             ),
             if (showBookButton) ...[
@@ -1119,16 +1281,15 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                 icon: const Icon(Icons.add),
                 label: const Text(
                   'Đặt Lịch Tư Vấn',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF228B22),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 24, vertical: 14),
+                    horizontal: 24,
+                    vertical: 14,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -1174,8 +1335,9 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
 
   String _formatFee(int fee) {
     final formatted = fee.toString().replaceAllMapped(
-        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-        (m) => '${m[1]}.');
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
     return '$formatted VNĐ';
   }
 
