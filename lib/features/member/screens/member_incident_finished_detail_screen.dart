@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:app_links/app_links.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:async';
 import '../../emergency/models/detailed_incident_response.dart';
 import '../../emergency/providers/detailed_incident_provider.dart';
 import '../../emergency/repository/incident_repository.dart';
@@ -22,15 +24,24 @@ class MemberIncidentFinishedDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _MemberIncidentFinishedDetailScreenState
-    extends ConsumerState<MemberIncidentFinishedDetailScreen> {
+    extends ConsumerState<MemberIncidentFinishedDetailScreen>
+    with WidgetsBindingObserver {
   bool _isProcessingPayment = false;
   bool _hasPaid = false;
   bool _isLoadingWallet = false;
   WalletInfo? _walletInfo;
+  final AppLinks _appLinks = AppLinks();
+  StreamSubscription<Uri>? _payOsCallbackSub;
+  bool _isHandlingPayOsCallback = false;
+  bool _isWaitingPayOsResult = false;
+  bool _isShowingPaymentStatusDialog = false;
+  DateTime? _pendingPayOsStartedAt;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _initPayOsCallbackListener();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.incidentId.isNotEmpty) {
         ref
@@ -39,6 +50,210 @@ class _MemberIncidentFinishedDetailScreenState
       }
       _loadWallet();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _payOsCallbackSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _tryRefreshPendingPayOsOnResume();
+    }
+  }
+
+  void _initPayOsCallbackListener() {
+    _payOsCallbackSub = _appLinks.uriLinkStream.listen((uri) async {
+      if (!mounted || !_isWaitingPayOsResult) return;
+
+      final isSnakeaidPaymentLink =
+          uri.scheme == 'snakeaid' && uri.host == 'payment';
+      final isHttpPayOsCallback =
+          (uri.scheme == 'https' || uri.scheme == 'http') &&
+          (uri.host.contains('snakeaid') || uri.host.contains('payos')) &&
+          (uri.path.contains('pay') ||
+              uri.path.contains('payment') ||
+              uri.path.contains('callback') ||
+              uri.path.contains('return') ||
+              uri.path.contains('cancel'));
+
+      if (!isSnakeaidPaymentLink && !isHttpPayOsCallback) return;
+      if (_isHandlingPayOsCallback) return;
+
+      _isHandlingPayOsCallback = true;
+      try {
+        await _handlePayOsCallbackUri(uri);
+      } finally {
+        _isHandlingPayOsCallback = false;
+      }
+    });
+  }
+
+  Future<void> _handlePayOsCallbackUri(Uri uri) async {
+    final status = uri.queryParameters['status']?.toUpperCase();
+    final cancelParam = uri.queryParameters['cancel']?.toLowerCase() == 'true';
+    final path = uri.path.toLowerCase();
+
+    final isCancelled =
+        cancelParam ||
+        status == 'CANCELLED' ||
+        status == 'CANCELED' ||
+        status == 'FAILED' ||
+        path.endsWith('/cancel');
+
+    final isPaid =
+        (status == 'PAID' || status == 'SUCCESS' || status == 'COMPLETED') ||
+        path.endsWith('/return') ||
+        path.endsWith('/success');
+
+    if (isCancelled) {
+      _clearPendingPayOsContext();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bạn đã hủy thanh toán PayOS.'),
+          backgroundColor: Color(0xFFFF8F00),
+        ),
+      );
+      return;
+    }
+
+    if (!isPaid) return;
+
+    await _refreshIncidentAfterPayOsReturn(showSuccessMessage: true);
+  }
+
+  Future<void> _tryRefreshPendingPayOsOnResume() async {
+    if (!mounted || !_isWaitingPayOsResult || _isHandlingPayOsCallback) return;
+
+    final startedAt = _pendingPayOsStartedAt;
+    if (startedAt != null &&
+        DateTime.now().difference(startedAt) > const Duration(minutes: 30)) {
+      _clearPendingPayOsContext();
+      return;
+    }
+
+    _isHandlingPayOsCallback = true;
+    try {
+      await _refreshIncidentAfterPayOsReturn(showSuccessMessage: false);
+    } finally {
+      _isHandlingPayOsCallback = false;
+    }
+  }
+
+  Future<void> _refreshIncidentAfterPayOsReturn({
+    required bool showSuccessMessage,
+  }) async {
+    if (!mounted) return;
+
+    _showPaymentStatusDialog();
+    setState(() => _isProcessingPayment = true);
+
+    try {
+      for (var attempt = 0; attempt < 5; attempt++) {
+        await ref
+            .read(detailedIncidentProvider.notifier)
+            .loadDetailedIncident(widget.incidentId, forceRefresh: true);
+
+        final updatedIncident = ref.read(detailedIncidentProvider).incident;
+        final paid = updatedIncident?.status == IncidentStatus.completed;
+
+        if (paid) {
+          if (!mounted) return;
+          setState(() => _hasPaid = true);
+          _clearPendingPayOsContext();
+          if (showSuccessMessage) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Thanh toán PayOS thành công.'),
+                backgroundColor: Color(0xFF228B22),
+              ),
+            );
+          }
+          return;
+        }
+
+        if (attempt < 4) {
+          await Future.delayed(const Duration(seconds: 2));
+        }
+      }
+
+      if (showSuccessMessage && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Đã quay lại ứng dụng. Hệ thống đang cập nhật trạng thái thanh toán.',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Không thể cập nhật trạng thái thanh toán: ${e.toString()}',
+            ),
+          ),
+        );
+      }
+    } finally {
+      _hidePaymentStatusDialog();
+      if (mounted) {
+        setState(() => _isProcessingPayment = false);
+      }
+    }
+  }
+
+  void _showPaymentStatusDialog() {
+    if (!mounted || _isShowingPaymentStatusDialog) return;
+    _isShowingPaymentStatusDialog = true;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text('Đang kiểm tra thanh toán'),
+          content: const Row(
+            children: [
+              SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.6),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Hệ thống đang xác nhận trạng thái từ PayOS. Vui lòng đợi...',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ).then((_) {
+      _isShowingPaymentStatusDialog = false;
+    });
+  }
+
+  void _hidePaymentStatusDialog() {
+    if (!mounted || !_isShowingPaymentStatusDialog) return;
+    Navigator.of(context, rootNavigator: true).pop();
+    _isShowingPaymentStatusDialog = false;
+  }
+
+  void _clearPendingPayOsContext() {
+    _isWaitingPayOsResult = false;
+    _pendingPayOsStartedAt = null;
   }
 
   Future<void> _loadWallet() async {
@@ -139,22 +354,26 @@ class _MemberIncidentFinishedDetailScreenState
           paymentResponse.checkoutUrl!.isNotEmpty) {
         final uri = Uri.tryParse(paymentResponse.checkoutUrl!);
         if (uri != null && await canLaunchUrl(uri)) {
+          _isWaitingPayOsResult = true;
+          _pendingPayOsStartedAt = DateTime.now();
           await launchUrl(uri, mode: LaunchMode.externalApplication);
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('Mở PayOS checkout...')));
+          ).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Đã mở PayOS. Vui lòng hoàn tất thanh toán và quay lại ứng dụng.',
+              ),
+            ),
+          );
         } else {
           throw Exception('Liên kết thanh toán không hợp lệ');
         }
       } else {
         throw Exception('Không nhận được liên kết thanh toán từ PayOS');
       }
-
-      // After redirect and webhook, refresh UI state
-      await ref
-          .read(detailedIncidentProvider.notifier)
-          .refreshDetailedIncident();
     } catch (e) {
+      _clearPendingPayOsContext();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('PayOS payment thất bại: ${e.toString()}')),
       );
