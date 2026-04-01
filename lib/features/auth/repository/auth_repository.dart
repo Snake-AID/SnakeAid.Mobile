@@ -407,6 +407,34 @@ class AuthRepository {
     }
   }
 
+  /// Update current user's FCM device token on backend.
+  Future<void> updateDeviceToken(String token) async {
+    final sanitizedToken = token.trim();
+    if (sanitizedToken.isEmpty) return;
+
+    try {
+      await httpService.put(
+        '/api/notifications/device-token',
+        data: {'deviceToken': sanitizedToken},
+      );
+      debugPrint('✅ Device token synced to backend');
+    } on DioException catch (e) {
+      debugPrint('❌ Failed to sync device token: ${e.message}');
+      rethrow;
+    }
+  }
+
+  /// Clear current user's FCM device token on backend.
+  Future<void> clearDeviceToken() async {
+    try {
+      await httpService.delete('/api/notifications/device-token');
+      debugPrint('✅ Device token cleared on backend');
+    } on DioException catch (e) {
+      debugPrint('❌ Failed to clear device token: ${e.message}');
+      rethrow;
+    }
+  }
+
   /// Clear session data (logout)
   Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
