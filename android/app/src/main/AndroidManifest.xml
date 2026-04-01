@@ -36,10 +36,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     
     <!-- Foreground service type for Android 14+ (API 34+) -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    
-    <!-- Request ignore battery optimization to keep service running -->
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -58,6 +54,10 @@
         android:label="snakeaid_mobile"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="general_notifications" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -97,13 +97,6 @@
                     android:pathPrefix="/payos/"/>
             </intent-filter>
         </activity>
-        
-        <!-- Background Service configuration for flutter_background_service -->
-        <service
-            android:name="id.flutter.flutter_background_service.BackgroundService"
-            android:exported="true"
-            android:foregroundServiceType="dataSync"
-            tools:replace="android:exported" />
         
         <!-- FileProvider for image_picker camera functionality -->
         <provider
