@@ -8,7 +8,9 @@ class FCMService {
   final NotificationService _notificationService = NotificationService();
 
   /// Initialize FCM and request permissions
-  Future<void> initialize() async {
+  Future<void> initialize({
+    Future<void> Function(String token)? onTokenRefresh,
+  }) async {
     // Initialize notification service first
     await _notificationService.initialize();
 
@@ -26,7 +28,9 @@ class FCMService {
     _firebaseMessaging.onTokenRefresh.listen((newToken) async {
       debugPrint('FCM Token refreshed: $newToken');
       await saveToken(newToken);
-      // Token will be updated on next app launch or can be handled separately
+      if (onTokenRefresh != null) {
+        await onTokenRefresh(newToken);
+      }
     });
   }
 

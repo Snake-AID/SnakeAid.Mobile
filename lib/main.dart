@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:snakeaid_mobile/core/services/notification_service.dart';
+import 'package:snakeaid_mobile/core/services/background_notification_service.dart';
+import 'package:snakeaid_mobile/core/services/fcm_service.dart';
 import 'core/config/base_url_config.dart';
 import 'core/handlers/deep_link_handler.dart';
 import 'package:snakeaid_mobile/features/auth/providers/auth_provider.dart';
@@ -52,23 +54,23 @@ void main() async {
   // Initialize deep link handler
   await _deepLinkHandler!.initialize();
 
-  // // Initialize Firebase
-  // await Firebase.initializeApp();
+  // Initialize Firebase
+  await Firebase.initializeApp();
 
-  // // Set up background message handler (must be done early)
-  // FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  // Set up background message handler (must be done early)
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // // Initialize Background Service (để nhận notification khi app bị kill)
-  // try {
-  //   await BackgroundNotificationService.initializeService();
-  //   debugPrint('Background service initialized');
-  // } catch (e) {
-  //   debugPrint('Background service initialization failed: $e');
-  // }
+  // Initialize Background Service (để nhận notification khi app bị kill)
+  try {
+    await BackgroundNotificationService.initializeService();
+    debugPrint('Background service initialized');
+  } catch (e) {
+    debugPrint('Background service initialization failed: $e');
+  }
 
-  // // Initialize FCM and Notification services
-  // final fcmService = FCMService();
-  // await fcmService.initialize();
+  // Initialize FCM and Notification services
+  final fcmService = FCMService();
+  await fcmService.initialize();
 
   runApp(
     ProviderScope(

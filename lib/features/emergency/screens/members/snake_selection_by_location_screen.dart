@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,7 +11,7 @@ import '../../repository/incident_repository.dart';
 /// Snake Selection by Location Screen - Location-based snake filtering with API
 class SnakeSelectionByLocationScreen extends ConsumerStatefulWidget {
   final IncidentData? incident;
-  
+
   const SnakeSelectionByLocationScreen({super.key, this.incident});
 
   @override
@@ -36,7 +37,9 @@ class _SnakeSelectionByLocationScreenState
       );
 
       // Fetch snakes by location from API
-      await ref.read(snakeLocationProvider.notifier).fetchSnakesByLocation(
+      await ref
+          .read(snakeLocationProvider.notifier)
+          .fetchSnakesByLocation(
             latitude: position.latitude,
             longitude: position.longitude,
           );
@@ -49,6 +52,92 @@ class _SnakeSelectionByLocationScreenState
           ),
         );
       }
+    }
+  }
+
+  /// Get current location using Geolocator
+  Future<Position?> _getCurrentLocation() async {
+    try {
+      // Check if location services are enabled
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        debugPrint('❌ Location services are disabled');
+        return null;
+      }
+
+      // Check location permission
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          debugPrint('❌ Location permissions are denied');
+          return null;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        debugPrint('❌ Location permissions are permanently denied');
+        return null;
+      }
+
+      // Get current position
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 10,
+        ),
+      );
+
+      debugPrint('✅ Location: ${position.latitude}, ${position.longitude}');
+      return position;
+    } catch (e) {
+      debugPrint('❌ Error getting location: $e');
+      return null;
+    }
+  }
+
+  /// Reverse geocode coordinates to human-readable address using OSM Nominatim
+  Future<String?> _reverseGeocodeAddress(double lat, double lng) async {
+    try {
+      final dio = Dio();
+      final response = await dio.get(
+        'https://nominatim.openstreetmap.org/reverse',
+        queryParameters: {
+          'format': 'json',
+          'lat': lat.toString(),
+          'lon': lng.toString(),
+          'addressdetails': '1',
+          'accept-language': 'vi',
+        },
+        options: Options(
+          headers: {'User-Agent': 'SnakeAid Mobile App'},
+          connectTimeout: Duration(milliseconds: 7000),
+          sendTimeout: Duration(milliseconds: 7000),
+          receiveTimeout: Duration(milliseconds: 7000),
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final displayName = response.data['display_name'] as String?;
+        if (displayName != null && displayName.isNotEmpty) {
+          return displayName;
+        }
+      }
+      return null;
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        debugPrint(
+          '⏱️ OSM reverse geocode timed out (7s). Returning null address',
+        );
+      } else {
+        debugPrint('❌ Failed to reverse geocode: $e');
+      }
+      return null;
+    } catch (e) {
+      debugPrint('❌ Failed to reverse geocode: $e');
+      return null;
     }
   }
 
@@ -74,7 +163,10 @@ class _SnakeSelectionByLocationScreenState
           if (context.canPop()) {
             context.pop();
           } else {
-            context.goNamed('emergency_tracking', extra: {'incidentId': widget.incident?.id});
+            context.goNamed(
+              'emergency_tracking',
+              extra: {'incidentId': widget.incident?.id},
+            );
           }
         },
       ),
@@ -106,10 +198,14 @@ class _SnakeSelectionByLocationScreenState
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.location_on, color: Color(0xFFDC3545), size: 16),
+                const Icon(
+                  Icons.location_on,
+                  color: Color(0xFFDC3545),
+                  size: 16,
+                ),
                 const SizedBox(width: 4),
                 Text(
-                  locationState.data!.region.name,
+                  locationState.placeName ?? locationState.data!.region.name,
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -158,11 +254,7 @@ class _SnakeSelectionByLocationScreenState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Color(0xFFDC3545),
-            ),
+            const Icon(Icons.error_outline, size: 64, color: Color(0xFFDC3545)),
             const SizedBox(height: 16),
             Text(
               error,
@@ -192,71 +284,35 @@ class _SnakeSelectionByLocationScreenState
 
     return Column(
       children: [
-        // Info Banner
-        Container(
-          margin: const EdgeInsets.all(16),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE3F2FD),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFBBDEFB)),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(
-                Icons.info_outline,
-                color: Color(0xFF2196F3),
-                size: 24,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Dựa trên vị trí của bạn tại ${locationData.region.name}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0D47A1),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Tìm thấy ${snakes.length} loài rắn thường gặp',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-
         // Warning Banner
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
           color: const Color(0xFFFFFACD),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Row(
             children: [
-              Text('💡', style: TextStyle(fontSize: 16)),
-              SizedBox(width: 8),
-              Flexible(
+              Container(
+                width: 6,
+                height: 6,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFDAA520),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
                 child: Text(
-                  'Lưu ý: Chọn con GIỐNG NHẤT, không cần chính xác 100%',
+                  'Chọn con giống nhất — không cần chính xác 100%',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF7F6000),
                   ),
-                  textAlign: TextAlign.center,
                 ),
+              ),
+              Text(
+                '${snakes.length} loài',
+                style: const TextStyle(fontSize: 11, color: Color(0xFF999999)),
               ),
             ],
           ),
@@ -343,25 +399,6 @@ class _SnakeSelectionByLocationScreenState
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            
-            // Quay về theo dõi (Secondary action)
-            OutlinedButton.icon(
-              onPressed: () {
-                // Pop back to emergency tracking screen (1 level)
-                Navigator.of(context).pop();
-              },
-              icon: const Icon(Icons.crisis_alert, size: 18),
-              label: const Text('Quay về theo dõi cứu hộ'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF228B22),
-                side: const BorderSide(color: Color(0xFF228B22)),
-                minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
           ],
         ),
       ),
@@ -369,7 +406,10 @@ class _SnakeSelectionByLocationScreenState
   }
 
   /// Handle snake selection with auto-confirm
-  Future<void> _onSnakeSelected(BuildContext context, SnakeInRegionDto snake) async {
+  Future<void> _onSnakeSelected(
+    BuildContext context,
+    SnakeInRegionDto snake,
+  ) async {
     final name = snake.commonName;
     final scientificName = snake.scientificName;
     final isPoisonous = snake.isVenomous;
@@ -388,7 +428,7 @@ class _SnakeSelectionByLocationScreenState
       // Call confirm API (simple confirm by location - no filter data needed)
       if (widget.incident != null) {
         final repository = ref.read(incidentRepositoryProvider);
-        
+
         // For location-based selection, we use simplified confirm
         // No selectedOptionIds (no questions), just the snake species
         await repository.confirmSnakeIdentificationByFilter(
@@ -522,10 +562,7 @@ class _SnakeSelectionByLocationScreenState
             const SizedBox(height: 12),
             Text(
               'Thông tin đã được cập nhật vào yêu cầu SOS của bạn.',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
           ],
         ),
@@ -569,7 +606,9 @@ class _SnakeSelectionByLocationScreenState
             child: OutlinedButton.icon(
               onPressed: () {
                 // Close dialog, then pop back to emergency tracking (2 levels total)
-                Navigator.of(context)..pop()..pop();
+                Navigator.of(context)
+                  ..pop()
+                  ..pop();
               },
               icon: const Icon(Icons.crisis_alert, size: 18),
               label: const Text(
@@ -591,7 +630,10 @@ class _SnakeSelectionByLocationScreenState
     );
   }
 
-  Widget _buildSnakeCard(BuildContext context, {required SnakeInRegionDto snake}) {
+  Widget _buildSnakeCard(
+    BuildContext context, {
+    required SnakeInRegionDto snake,
+  }) {
     final name = snake.commonName;
     final scientificName = snake.scientificName;
     final isPoisonous = snake.isVenomous;
@@ -645,9 +687,14 @@ class _SnakeSelectionByLocationScreenState
                 top: 8,
                 right: 8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: isPoisonous ? const Color(0xFFDC3545) : const Color(0xFF28A745),
+                    color: isPoisonous
+                        ? const Color(0xFFDC3545)
+                        : const Color(0xFF28A745),
                     borderRadius: BorderRadius.circular(6),
                     boxShadow: [
                       BoxShadow(
@@ -700,7 +747,7 @@ class _SnakeSelectionByLocationScreenState
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
-                  
+
                   // Scientific Name
                   Text(
                     scientificName,
@@ -713,20 +760,17 @@ class _SnakeSelectionByLocationScreenState
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 6),
-                  
+
                   // Identification Summary
                   Expanded(
                     child: Text(
                       identificationSummary,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.grey[700],
-                      ),
+                      style: TextStyle(fontSize: 10, color: Colors.grey[700]),
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  
+
                   // Select Button
                   const SizedBox(height: 6),
                   SizedBox(

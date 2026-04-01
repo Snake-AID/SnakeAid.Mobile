@@ -10,6 +10,7 @@ import '../repository/auth_repository.dart'
 import '../models/login_request.dart';
 import '../models/register_request.dart';
 import '../models/refresh_token_request.dart';
+import '../../../core/services/fcm_service.dart';
 
 // ==================== AUTH STATE ====================
 
@@ -49,11 +50,55 @@ class AuthState {
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _authRepository;
+  final FCMService _fcmService = FCMService();
+  bool _fcmInitialized = false;
 
   AuthNotifier({required AuthRepository authRepository})
     : _authRepository = authRepository,
       super(const AuthState(isLoading: true)) {
+    _initializeFcm();
     _loadSavedSession();
+  }
+
+  Future<void> _initializeFcm() async {
+    if (_fcmInitialized) return;
+    try {
+      await _fcmService.initialize(
+        onTokenRefresh: (newToken) async {
+          if (!state.isAuthenticated) return;
+          await _syncDeviceTokenToBackend(force: true, tokenOverride: newToken);
+        },
+      );
+      _fcmInitialized = true;
+    } catch (e) {
+      debugPrint('⚠️ FCM init failed: $e');
+    }
+  }
+
+  Future<void> _syncDeviceTokenToBackend({
+    bool force = false,
+    String? tokenOverride,
+  }) async {
+    if (!state.isAuthenticated) return;
+
+    try {
+      final token = (tokenOverride ?? await _fcmService.getToken())?.trim();
+      if (token == null || token.isEmpty) return;
+
+      await _fcmService.saveToken(token);
+
+      if (!force) {
+        final lastSentToken = await _fcmService.getLastSentToken();
+        if (lastSentToken == token) {
+          return;
+        }
+      }
+
+      await _authRepository.updateDeviceToken(token);
+      await _fcmService.saveLastSentToken(token);
+    } catch (e) {
+      debugPrint('⚠️ Device token sync skipped: $e');
+    }
   }
 
   /// Startup session validation.
@@ -101,6 +146,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         '✅ Session restored from cache: ${cachedUser.email} (${cachedUser.role.name})',
       );
       _initializeRoleBasedServices(cachedUser);
+      await _syncDeviceTokenToBackend();
 
       // Step 2: If offline, unlock navigation with cached data
       if (!await _isNetworkAvailable()) {
@@ -138,6 +184,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _saveUserToCache(freshUser);
       debugPrint('✅ User data refreshed from server');
       _initializeRoleBasedServices(freshUser);
+      await _syncDeviceTokenToBackend();
       return;
     }
 
@@ -171,6 +218,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _saveUserToCache(retryUser);
       debugPrint('✅ User data refreshed after token renewal');
       _initializeRoleBasedServices(retryUser);
+      await _syncDeviceTokenToBackend();
     } else {
       // /auth/me still failing after refresh — keep cached user, allow navigation
       debugPrint('⚠️ /auth/me failed after refresh — keeping cached user');
@@ -238,6 +286,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
         await _saveUserToCache(user);
         _initializeRoleBasedServices(user);
+        await _syncDeviceTokenToBackend(force: true);
         debugPrint('✅ Login successful: ${user.email}');
         return true;
       }
@@ -294,6 +343,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    try {
+      await _authRepository.clearDeviceToken();
+      await _fcmService.clearLastSentToken();
+    } catch (_) {}
+
     try {
       _cleanupRoleBasedServices();
       await _authRepository.logout(); // Best-effort API call
@@ -360,6 +414,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       prefs.remove('user_id'),
       prefs.remove('token_expiry'),
       prefs.remove('cached_user'),
+      prefs.remove('fcm_token_sent'),
     ]);
     debugPrint('🗑️ Session cleared');
   }
