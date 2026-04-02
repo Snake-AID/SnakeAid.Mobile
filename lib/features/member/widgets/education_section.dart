@@ -1,55 +1,101 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../blog/providers/blog_provider.dart';
 
-/// Education/News section with article cards
-class EducationSection extends StatelessWidget {
+/// Education/News section — shows 3 latest published blog posts.
+class EducationSection extends ConsumerWidget {
   const EducationSection({super.key});
 
+  static const _green = Color(0xFF228B22);
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(blogListProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Bài viết mới nhất',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF333333),
-          ),
+        // Header row
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Bài viết mới nhất',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF333333),
+              ),
+            ),
+            TextButton(
+              onPressed: () => context.push('/blogs'),
+              child: const Text(
+                'Xem thêm',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: _green,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
-        _ArticleCard(
-          title: 'Cách phòng tránh rắn mùa mưa',
-          readTime: '5 phút đọc',
-          views: '1,234 lượt xem',
-          badge: 'Mới',
-          badgeColor: Colors.green,
-          imageUrl:
-              'https://images.unsplash.com/photo-1527482797697-8795b05a13fe?w=400',
-          onTap: () {},
-        ),
-        const SizedBox(height: 12),
-        _ArticleCard(
-          title: 'Nhận biết 5 loài rắn độc Việt Nam',
-          readTime: '7 phút đọc',
-          views: '3,456 lượt xem',
-          imageUrl:
-              'https://images.unsplash.com/photo-1531386151447-fd76ad50012f?w=400',
-          onTap: () {},
-        ),
-        const SizedBox(height: 12),
-        _ArticleCard(
-          title: 'Video hướng dẫn băng ép đúng cách',
-          readTime: '3:45 phút',
-          views: '890 lượt xem',
-          badge: 'Video',
-          badgeColor: Colors.blue,
-          imageUrl:
-              'https://images.unsplash.com/photo-1584515933487-779824d29309?w=400',
-          isVideo: true,
-          onTap: () {},
-        ),
+
+        if (state.isLoading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: CircularProgressIndicator(color: _green),
+            ),
+          )
+        else if (state.error != null)
+          _buildError(context, ref)
+        else if (state.blogs.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Text(
+              'Chưa có bài viết nào',
+              style: TextStyle(color: Colors.grey),
+            ),
+          )
+        else
+          ...state.blogs.take(3).map((blog) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _ArticleCard(
+                  title: blog.title,
+                  readTime: '${blog.readingTime} phút đọc',
+                  views: '${blog.viewCount} lượt xem',
+                  imageUrl: blog.thumbnailUrl,
+                  onTap: () => context.push('/blogs/${blog.id}'),
+                ),
+              )),
       ],
+    );
+  }
+
+  Widget _buildError(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, color: Colors.red, size: 20),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Không tải được bài viết',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          TextButton(
+            onPressed: () =>
+                ref.read(blogListProvider.notifier).refresh(),
+            child: const Text('Thử lại',
+                style: TextStyle(color: _green)),
+          ),
+        ],
+      ),
     );
   }
 }

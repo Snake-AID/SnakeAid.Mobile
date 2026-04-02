@@ -86,6 +86,11 @@ import 'package:snakeaid_mobile/features/consultation/screens/experts/expert_con
 import 'package:snakeaid_mobile/features/snake_species/screens/snake_library_screen.dart';
 import 'package:snakeaid_mobile/features/snake_species/screens/snake_detail_screen.dart';
 import 'package:snakeaid_mobile/features/snake_species/screens/snake_first_aid_screen.dart';
+import 'package:snakeaid_mobile/features/blog/screens/member/blog_list_screen.dart';
+import 'package:snakeaid_mobile/features/blog/screens/member/blog_detail_screen.dart';
+import 'package:snakeaid_mobile/features/blog/screens/expert/expert_blog_list_screen.dart';
+import 'package:snakeaid_mobile/features/blog/screens/expert/expert_blog_form_screen.dart';
+import 'package:snakeaid_mobile/features/blog/models/blog_model.dart';
 
 /// App routing configuration using go_router
 final router = GoRouter(
@@ -308,6 +313,41 @@ final router = GoRouter(
           snakeSpeciesId: id,
           commonName: extra?['commonName'] as String?,
         );
+      },
+    ),
+
+    // === BLOG ROUTES (MEMBER) ===
+    GoRoute(
+      path: '/blogs',
+      name: 'blog_list',
+      builder: (context, state) => const BlogListScreen(),
+    ),
+    GoRoute(
+      path: '/blogs/:id',
+      name: 'blog_detail',
+      builder: (context, state) {
+        final id = state.pathParameters['id']!;
+        return BlogDetailScreen(blogId: id);
+      },
+    ),
+
+    // === BLOG ROUTES (EXPERT) ===
+    GoRoute(
+      path: '/expert/blogs',
+      name: 'expert_blog_list',
+      builder: (context, state) => const ExpertBlogListScreen(),
+    ),
+    GoRoute(
+      path: '/expert/blogs/new',
+      name: 'expert_blog_new',
+      builder: (context, state) => const ExpertBlogFormScreen(),
+    ),
+    GoRoute(
+      path: '/expert/blogs/:id/edit',
+      name: 'expert_blog_edit',
+      builder: (context, state) {
+        final blog = state.extra as BlogModel?;
+        return ExpertBlogFormScreen(existingBlog: blog);
       },
     ),
 

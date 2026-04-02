@@ -42,7 +42,7 @@ class PayosRepository {
   PayosRepository(this._httpService);
 
   /// Create a PayOS payment link
-  /// POST /api/v1/payos/create-payment-link
+  /// POST /api/snakecatching/create-link
   Future<PaymentLinkResponse> createPaymentLink({
     required String snakeCatchingRequestId,
     required double amount,
@@ -54,12 +54,12 @@ class PayosRepository {
     try {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       debugPrint('💳 Creating PayOS Payment Link');
-      debugPrint('📍 Endpoint: /api/v1/payos/create-payment-link');
+      debugPrint('📍 Endpoint: /api/snakecatching/create-link');
       debugPrint('📦 requestId: $snakeCatchingRequestId | amount: $amount | type: $transactionType');
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       final response = await _httpService.post(
-        '/api/v1/payos/create-payment-link',
+        '/api/snakecatching/create-link',
         data: {
           'snakeCatchingRequestId': snakeCatchingRequestId,
           'amount': amount.toInt(),
@@ -98,18 +98,18 @@ class PayosRepository {
   }
 
   /// Transfer final payment to rescuer wallet after customer pays
-  /// POST /api/v1/payos/transfer-to-rescuer
+  /// POST /api/snakecatching/transfer-to-rescuer
   /// Non-fatal — logs and returns silently on any error (BE bug should be fixed server-side).
   Future<void> transferToRescuer(String snakeCatchingRequestId) async {
     try {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       debugPrint('💸 Transferring to rescuer wallet');
-      debugPrint('📍 Endpoint: /api/v1/payos/transfer-to-rescuer');
+      debugPrint('📍 Endpoint: /api/snakecatching/transfer-to-rescuer');
       debugPrint('📦 requestId: $snakeCatchingRequestId');
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       final response = await _httpService.post(
-        '/api/v1/payos/transfer-to-rescuer',
+        '/api/snakecatching/transfer-to-rescuer',
         data: {'snakeCatchingRequestId': snakeCatchingRequestId},
       );
 
