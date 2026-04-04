@@ -417,21 +417,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
 
                   const SizedBox(height: 16),
-
-                  // Menu Items
-                  _MenuItem(
-                    icon: Icons.favorite,
-                    title: 'Lịch Sử Sức Khỏe',
-                    subtitle: '',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const HealthHistoryScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
                   _MenuItem(
                     icon: Icons.wallet,
                     title: 'Lịch Sử Thanh Toán',
