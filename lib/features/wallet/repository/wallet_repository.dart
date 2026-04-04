@@ -40,6 +40,14 @@ class WalletInfo {
   }
 }
 
+/// Result from POST /api/wallet/topup — holds the fields needed for subsequent steps.
+class TopupResult {
+  final String transactionId;
+  final String checkoutUrl;
+
+  const TopupResult({required this.transactionId, required this.checkoutUrl});
+}
+
 class WalletRepository {
   final HttpService _httpService;
 
@@ -62,9 +70,9 @@ class WalletRepository {
     }
   }
 
-  /// POST /api/wallet/topup — create PayOS top-up link
-  /// Returns a checkout URL to open in the browser.
-  Future<String> createTopupLink({
+  /// POST /api/wallet/topup — create PayOS top-up link.
+  /// Returns [TopupResult] containing [transactionId] (for confirm-payment) and [checkoutUrl].
+  Future<TopupResult> createTopupLink({
     required int amount,
     String description = 'Nạp tiền ví SnakeAidPay',
   }) async {
@@ -78,11 +86,15 @@ class WalletRepository {
       final data = (response.data as Map<String, dynamic>)['data']
           as Map<String, dynamic>?;
       final url = data?['checkoutUrl'] as String?;
+      final transactionId = data?['transactionId'] as String?;
       if (url == null || url.isEmpty) {
         throw Exception('Không nhận được link thanh toán.');
       }
-      debugPrint('✅ Topup checkout URL: $url');
-      return url;
+      if (transactionId == null || transactionId.isEmpty) {
+        throw Exception('Không nhận được mã giao dịch.');
+      }
+      debugPrint('✅ Topup  transactionId=$transactionId  checkoutUrl=$url');
+      return TopupResult(transactionId: transactionId, checkoutUrl: url);
     } on DioException catch (e) {
       debugPrint('❌ createTopupLink DioException: ${e.message}');
       final msg = e.response?.data?['message'] as String?;
@@ -90,6 +102,26 @@ class WalletRepository {
     } catch (e) {
       if (e is Exception) rethrow;
       throw Exception('Lỗi không xác định: $e');
+    }
+  }
+
+  /// POST /api/v1/PayOs/confirm-payment — confirm PayOS top-up after returning from browser.
+  /// [transactionId] is taken from [TopupResult.transactionId] returned by [createTopupLink].
+  /// Non-fatal: logs on error but does not rethrow so the wallet refresh still runs.
+  Future<void> confirmPayment({required String transactionId}) async {
+    try {
+      debugPrint('——————————————————————————————————————————');
+      debugPrint('✅ Confirm payment: POST /api/v1/PayOs/confirm-payment  transactionId=$transactionId');
+      await _httpService.post(
+        '/api/v1/PayOs/confirm-payment',
+        data: {'transactionId': transactionId},
+      );
+      debugPrint('✅ Payment confirmed');
+    } on DioException catch (e) {
+      debugPrint('❌ confirmPayment DioException: ${e.message}');
+      debugPrint('📥 Response: ${e.response?.data}');
+    } catch (e) {
+      debugPrint('❌ confirmPayment error: $e');
     }
   }
 

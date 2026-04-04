@@ -1,17 +1,54 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../wallet/repository/wallet_repository.dart';
+import '../../member/screens/withdraw_money_screen.dart';
+import '../../member/screens/wallet_history_screen.dart';
+import '../../member/screens/payment_history_screen.dart';
 
 /// Expert Profile Screen - Personal information and statistics for expert
-class ExpertProfileScreen extends StatefulWidget {
+class ExpertProfileScreen extends ConsumerStatefulWidget {
   final VoidCallback? onGoToHistory;
   const ExpertProfileScreen({super.key, this.onGoToHistory});
 
   @override
-  State<ExpertProfileScreen> createState() => _ExpertProfileScreenState();
+  ConsumerState<ExpertProfileScreen> createState() => _ExpertProfileScreenState();
 }
 
-class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
+class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
   bool _isAvailable = true;
+  WalletInfo? _walletInfo;
+  bool _isLoadingWallet = true;
+  Timer? _walletRefreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWallet();
+    _walletRefreshTimer = Timer.periodic(const Duration(minutes: 3), (_) => _loadWallet());
+  }
+
+  @override
+  void dispose() {
+    _walletRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadWallet() async {
+    try {
+      final wallet = await ref.read(walletRepositoryProvider).getWalletInfo();
+      if (mounted) setState(() { _walletInfo = wallet; _isLoadingWallet = false; });
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingWallet = false);
+    }
+  }
+
+  String _formatBalance(double amount) {
+    final f = amount.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+    return '$f đ';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -104,6 +141,13 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
                 ),
                 const SizedBox(height: 20),
 
+                // Wallet Card
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _buildWalletCard(),
+                ),
+                const SizedBox(height: 20),
+
                 // Menu List
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -122,7 +166,19 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
                       _buildMenuItem(
                         icon: Icons.payments,
                         title: 'Quản Lý Doanh Thu',
-                        onTap: () {},
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const PaymentHistoryScreen(
+                              themeColor: Color(0xFF6C47C2),
+                              title: 'Quản Lý Doanh Thu',
+                              filterTypes: [
+                                'consultation',
+                                'system',
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       _buildMenuItem(
@@ -176,6 +232,105 @@ class _ExpertProfileScreenState extends State<ExpertProfileScreen> {
             left: 0,
             right: 0,
             child: _buildAvailabilityToggle(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWalletCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF6C47C2), Color(0xFF4e2fa3)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6C47C2).withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(children: [
+            Icon(Icons.account_balance_wallet, color: Colors.white70, size: 20),
+            SizedBox(width: 8),
+            Text('Ví SnakeAidPay',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white)),
+          ]),
+          const SizedBox(height: 16),
+          const Text('Số dư',
+              style: TextStyle(fontSize: 14, color: Colors.white70)),
+          const SizedBox(height: 4),
+          if (_isLoadingWallet)
+            const SizedBox(
+              height: 40,
+              child: Center(
+                child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white54)),
+              ),
+            )
+          else
+            Text(_formatBalance(_walletInfo?.balance ?? 0),
+                style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white)),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const WithdrawMoneyScreen(
+                                themeColor: Color(0xFF6C47C2),
+                              ))),
+                  icon: const Icon(Icons.remove_circle_outline, size: 20),
+                  label: const Text('Rút tiền'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white, width: 2),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              OutlinedButton(
+                onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const WalletHistoryScreen(
+                              themeColor: Color(0xFF6C47C2),
+                              showTopup: false,
+                            ))),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white70, width: 1.5),
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 12, horizontal: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Icon(Icons.history, size: 20),
+              ),
+            ],
           ),
         ],
       ),

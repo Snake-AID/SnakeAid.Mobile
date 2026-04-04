@@ -143,7 +143,11 @@ class HttpService {
 
   /// Fast-fail health check using cached result (15 s TTL by default).
   /// No-op when [healthCheckService] is null.
-  Future<void> _healthCheck() async {
+ Future<void> _healthCheck() async {
+    // Tạm thời return luôn để bỏ qua bước check mạng, cho phép login thẳng
+    return; 
+
+    /* Code cũ được tạm ẩn đi
     if (healthCheckService == null) return;
     final alive = await healthCheckService!.isServerAlive();
     if (!alive) {
@@ -151,10 +155,10 @@ class HttpService {
         requestOptions: RequestOptions(path: ''),
         type: DioExceptionType.connectionError,
         error: 'HEALTH_CHECK_FAILED',
-        message:
-            'Máy chủ đang bảo trì hoặc không thể kết nối. Vui lòng thử lại sau.',
+        message: 'Máy chủ đang bảo trì hoặc không thể kết nối. Vui lòng thử lại sau.',
       );
     }
+    */
   }
 
   /// Re-throws [original] with a user-readable [message] attached.

@@ -9,7 +9,7 @@ import '../../snake_catching/repository/snake_catching_repository.dart';
 import '../../snake_catching/repository/snake_species_repository.dart';
 import '../../snake_catching/repository/payos_repository.dart';
 import '../../snake_catching/repository/transaction_repository.dart';
-import '../../snake_catching/repository/wallet_repository.dart';
+import '../../wallet/repository/wallet_repository.dart';
 import '../../snake_catching/repository/feedback_repository.dart';
 import '../../snake_catching/models/snake_catching_request.dart';
 import '../../snake_catching/models/snake_species.dart';

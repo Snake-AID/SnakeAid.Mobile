@@ -19,12 +19,16 @@ class AuthState {
   final bool isAuthenticated;
   final bool isLoading;
   final String? error;
+  final bool sessionExpired;
+  final UserRole? sessionExpiredRole;
 
   const AuthState({
     this.user,
     this.isAuthenticated = false,
     this.isLoading = false,
     this.error,
+    this.sessionExpired = false,
+    this.sessionExpiredRole,
   });
 
   AuthState copyWith({
@@ -34,12 +38,17 @@ class AuthState {
     String? error,
     bool clearUser = false,
     bool clearError = false,
+    bool? sessionExpired,
+    UserRole? sessionExpiredRole,
+    bool clearSessionExpired = false,
   }) {
     return AuthState(
       user: clearUser ? null : (user ?? this.user),
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
+      sessionExpired: clearSessionExpired ? false : (sessionExpired ?? this.sessionExpired),
+      sessionExpiredRole: clearSessionExpired ? null : (sessionExpiredRole ?? this.sessionExpiredRole),
     );
   }
 
@@ -52,6 +61,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _authRepository;
   final FCMService _fcmService = FCMService();
   bool _fcmInitialized = false;
+  bool _isForcingLogout = false;
 
   AuthNotifier({required AuthRepository authRepository})
     : _authRepository = authRepository,
@@ -158,6 +168,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Step 3: Online — validate. isLoading=false is set inside
       // _validateAndRefreshSession once the flow fully resolves.
       debugPrint('📶 Online — validating session with server...');
+      // If interceptor already called forceLogout during startup, skip validation
+      if (!state.isAuthenticated) {
+        debugPrint('ℹ️ Session cleared during startup — skipping server validation');
+        return;
+      }
       await _validateAndRefreshSession(
         userId: userId,
         refreshToken: refreshToken,
@@ -257,8 +272,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Called by TokenRefreshInterceptor when mid-session refresh token is rejected.
   Future<void> forceLogout() async {
+    if (_isForcingLogout) {
+      debugPrint('ℹ️ forceLogout already in progress — skipping re-entry');
+      return;
+    }
+    _isForcingLogout = true;
     debugPrint('🚨 forceLogout called by interceptor');
+    final role = state.user?.role;
     await logout();
+    _isForcingLogout = false;
+    // Signal the UI to show session-expired dialog
+    state = state.copyWith(sessionExpired: true, sessionExpiredRole: role);
+  }
+
+  /// Called after the session-expired dialog is dismissed.
+  void clearSessionExpired() {
+    state = state.copyWith(clearSessionExpired: true);
   }
 
   Future<bool> login({required String email, required String password}) async {

@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../emergency/models/detailed_incident_response.dart';
 import '../../emergency/providers/detailed_incident_provider.dart';
 import '../../emergency/repository/incident_repository.dart';
-import '../../snake_catching/repository/wallet_repository.dart';
+import '../../wallet/repository/wallet_repository.dart';
 
 class MemberIncidentFinishedDetailScreen extends ConsumerStatefulWidget {
   final String incidentId;
