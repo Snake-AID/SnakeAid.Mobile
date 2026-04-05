@@ -7,6 +7,8 @@ import '../../../core/services/emergency_consultation_signalr_service.dart';
 import 'expert_profile_screen.dart';
 import '../../consultation/repository/consultation_repository.dart';
 import '../../consultation/models/consultation_booking_response.dart';
+import '../../blog/providers/blog_provider.dart';
+import '../../blog/models/blog_model.dart';
 
 /// FutureProvider for the current expert's bookings from the API.
 final _expertBookingsFutureProvider =
@@ -615,6 +617,11 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                       const SizedBox(height: 12),
                     ];
                   }),
+
+                  // Blog section
+                  const SizedBox(height: 8),
+                  _buildBlogSection(context),
+
                   const SizedBox(height: 88),
                 ]),
               ),
@@ -1680,9 +1687,185 @@ class _HomeTabState extends ConsumerState<_HomeTab>
       ),
     );
   }
+
+  Widget _buildBlogSection(BuildContext context) {
+    final blogState = ref.watch(expertBlogListProvider);
+    final recentBlogs = blogState.blogs.take(3).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Bài Viết Của Tôi',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF6C47C2),
+              ),
+            ),
+            TextButton(
+              onPressed: () => context.push('/expert/blogs'),
+              child: const Text(
+                'Xem tất cả',
+                style: TextStyle(fontSize: 14, color: Color(0xFF999999)),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (blogState.isLoading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: CircularProgressIndicator(
+                  color: Color(0xFF6C47C2), strokeWidth: 2),
+            ),
+          )
+        else if (recentBlogs.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: const Color(0xFF6C47C2).withOpacity(0.2)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.article_outlined,
+                    color: const Color(0xFF6C47C2).withOpacity(0.5),
+                    size: 32),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Bạn chưa có bài viết nào',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 14),
+                      ),
+                      const SizedBox(height: 4),
+                      GestureDetector(
+                        onTap: () async {
+                          await context.push('/expert/blogs/new');
+                          ref
+                              .read(expertBlogListProvider.notifier)
+                              .refresh();
+                        },
+                        child: const Text(
+                          'Viết bài đầu tiên ngay →',
+                          style: TextStyle(
+                              color: Color(0xFF6C47C2), fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          ...recentBlogs.map((blog) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _buildBlogCard(context, blog),
+              )),
+      ],
+    );
+  }
+
+  Widget _buildBlogCard(BuildContext context, BlogModel blog) {
+    Color statusColor;
+    switch (blog.status) {
+      case BlogStatus.draft:
+        statusColor = Colors.grey;
+        break;
+      case BlogStatus.pendingApproval:
+        statusColor = Colors.orange;
+        break;
+      case BlogStatus.published:
+        statusColor = const Color(0xFF228B22);
+        break;
+      case BlogStatus.rejected:
+        statusColor = Colors.red;
+        break;
+    }
+
+    return InkWell(
+      onTap: () => context.push('/expert/blogs'),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                blog.thumbnailUrl,
+                width: 72,
+                height: 72,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 72,
+                  height: 72,
+                  color: Colors.grey[200],
+                  child: const Icon(Icons.image, color: Colors.grey),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    blog.title,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.bold),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      blogStatusLabel(blog.status),
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: statusColor,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.grey),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-// ── Consultations Tab ────────────────────────────────────────────────────────
 
 enum _ExpertConsultationStatus { waiting, upcoming, completed, cancelled }
 

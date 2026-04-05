@@ -6,13 +6,13 @@ import '../../auth/models/user.dart';
 import 'edit_profile_screen.dart';
 import 'health_history_screen.dart';
 import 'payment_history_screen.dart';
-import 'emergency_contacts_screen.dart';
 import 'medical_records_screen.dart';
 import 'id_documents_screen.dart';
 import 'deposit_money_screen.dart';
 import 'withdraw_money_screen.dart';
+import 'wallet_history_screen.dart';
 import 'settings_screen.dart';
-import '../../snake_catching/repository/wallet_repository.dart';
+import '../../wallet/repository/wallet_repository.dart';
 
 /// Member Profile Screen
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -263,41 +263,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                   const SizedBox(height: 16),
 
-                  // Stats Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        _StatItem(number: '5', label: 'Ca khẩn cấp'),
-                        Container(
-                          width: 1,
-                          height: 40,
-                          color: Colors.grey[300],
-                        ),
-                        _StatItem(number: '2', label: 'Lần tư vấn'),
-                        Container(
-                          width: 1,
-                          height: 40,
-                          color: Colors.grey[300],
-                        ),
-                        _StatItem(number: '3', label: 'Cứu hộ'),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
                   // SnakeAidPay Wallet Card
                   Container(
                     padding: const EdgeInsets.all(20),
@@ -401,7 +366,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: OutlinedButton.icon(
                                 onPressed: () {
@@ -423,6 +388,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 ),
                               ),
                             ),
+                            const SizedBox(width: 10),
+                            OutlinedButton(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const WalletHistoryScreen(),
+                                  ),
+                                );
+                              },
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                side: const BorderSide(
+                                    color: Colors.white70, width: 1.5),
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 12, horizontal: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: const Icon(Icons.history, size: 20),
+                            ),
                           ],
                         ),
                       ],
@@ -430,49 +417,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
 
                   const SizedBox(height: 16),
-
-                  // Menu Items
-                  _MenuItem(
-                    icon: Icons.favorite,
-                    title: 'Lịch Sử Sức Khỏe',
-                    subtitle: '5 ca rắn cắn đã ghi nhận',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const HealthHistoryScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
                   _MenuItem(
                     icon: Icons.wallet,
                     title: 'Lịch Sử Thanh Toán',
-                    subtitle: '8 giao dịch',
+                    subtitle: '',
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (context) => const PaymentHistoryScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  _MenuItem(
-                    icon: Icons.location_on,
-                    title: 'Địa Chỉ Đã Lưu',
-                    subtitle: '2 địa chỉ',
-                    onTap: () {},
-                  ),
-                  const SizedBox(height: 8),
-                  _MenuItem(
-                    icon: Icons.contacts,
-                    title: 'Liên Hệ Khẩn Cấp',
-                    subtitle: '3 người liên hệ',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const EmergencyContactsScreen(),
                         ),
                       );
                     },
@@ -510,37 +462,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _StatItem extends StatelessWidget {
-  final String number;
-  final String label;
-
-  const _StatItem({required this.number, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            number,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F1F1F),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
     );
   }
 }
@@ -601,6 +522,7 @@ class _MenuItem extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
+                  if (subtitle.isNotEmpty)
                   Text(
                     subtitle,
                     style: TextStyle(fontSize: 14, color: Colors.grey[600]),
