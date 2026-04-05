@@ -378,9 +378,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout({bool showMessage = false}) async {
-    if (_isLoggingOut) return;
-    _isLoggingOut = true;
-
     try {
       _cleanupRoleBasedServices();
 
@@ -404,7 +401,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       debugPrint('✅ Logged out');
     } finally {
-      _isLoggingOut = false;
+      _isForcingLogout = false;
     }
   }
 
