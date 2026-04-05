@@ -47,8 +47,12 @@ class AuthState {
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
-      sessionExpired: clearSessionExpired ? false : (sessionExpired ?? this.sessionExpired),
-      sessionExpiredRole: clearSessionExpired ? null : (sessionExpiredRole ?? this.sessionExpiredRole),
+      sessionExpired: clearSessionExpired
+          ? false
+          : (sessionExpired ?? this.sessionExpired),
+      sessionExpiredRole: clearSessionExpired
+          ? null
+          : (sessionExpiredRole ?? this.sessionExpiredRole),
     );
   }
 
@@ -170,7 +174,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       debugPrint('📶 Online — validating session with server...');
       // If interceptor already called forceLogout during startup, skip validation
       if (!state.isAuthenticated) {
-        debugPrint('ℹ️ Session cleared during startup — skipping server validation');
+        debugPrint(
+          'ℹ️ Session cleared during startup — skipping server validation',
+        );
         return;
       }
       await _validateAndRefreshSession(
@@ -371,19 +377,32 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> logout() async {
-    try {
-      await _authRepository.clearDeviceToken();
-      await _fcmService.clearLastSentToken();
-    } catch (_) {}
-
+  Future<void> logout({bool showMessage = false}) async {
     try {
       _cleanupRoleBasedServices();
-      await _authRepository.logout(); // Best-effort API call
-    } catch (_) {}
-    await _clearSession();
-    state = AuthState.initial();
-    debugPrint('✅ Logged out');
+
+      // Clear local auth first so any interceptor-triggered retries stop
+      // immediately, even if a network cleanup call fails.
+      await _clearSession();
+
+      try {
+        await _fcmService.clearLastSentToken();
+      } catch (_) {}
+
+      try {
+        await _authRepository.logout(); // Best-effort API call
+      } catch (_) {}
+
+      state = AuthState(
+        isLoading: false,
+        error: showMessage
+            ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
+            : null,
+      );
+      debugPrint('✅ Logged out');
+    } finally {
+      _isForcingLogout = false;
+    }
   }
 
   Future<void> refreshUserData() async {

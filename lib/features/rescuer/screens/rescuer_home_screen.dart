@@ -7,7 +7,6 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:vibration/vibration.dart';
 import 'rescuer_profile_screen.dart';
 import 'rescuer_income_management_screen.dart';
-import 'package:snakeaid_mobile/features/lesson/screens/rescuer_lesson_screen.dart';
 import 'package:snakeaid_mobile/features/lesson/providers/lesson_read_provider.dart';
 import '../../emergency/providers/rescuer_emergency_provider.dart';
 import '../../emergency/providers/mission_hub_provider.dart';
@@ -902,13 +901,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                       children: [
                         IconButton(
                           icon: const Icon(Icons.notifications_outlined),
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Thông báo - Đang phát triển'),
-                              ),
-                            );
-                          },
+                          onPressed: () => context.push('/notifications'),
                         ),
                         Positioned(
                           top: 8,
@@ -1171,7 +1164,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
       final mission = ref.read(activeMissionProvider).mission;
 
       if (!mounted) return;
-      
+
       // Dismiss loading
       Navigator.of(context).pop();
 
@@ -1189,10 +1182,10 @@ class _HomeTabState extends ConsumerState<_HomeTab>
       context.push('/rescuer/mission-detail/${mission.missionId}');
     } catch (e) {
       if (!mounted) return;
-      
+
       // Dismiss loading
       Navigator.of(context).pop();
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Lỗi khi tải nhiệm vụ: ${e.toString()}'),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../emergency/models/detailed_incident_response.dart';
@@ -25,8 +26,14 @@ class _MemberIncidentFinishedDetailScreenState
     extends ConsumerState<MemberIncidentFinishedDetailScreen> {
   bool _isProcessingPayment = false;
   bool _hasPaid = false;
-  bool _isLoadingWallet = false;
-  WalletInfo? _walletInfo;
+
+  void _handleBackNavigation() {
+    if (Navigator.of(context).canPop()) {
+      context.pop();
+      return;
+    }
+    context.goNamed('member_home');
+  }
 
   @override
   void initState() {
@@ -37,22 +44,7 @@ class _MemberIncidentFinishedDetailScreenState
             .read(detailedIncidentProvider.notifier)
             .loadDetailedIncident(widget.incidentId);
       }
-      _loadWallet();
     });
-  }
-
-  Future<void> _loadWallet() async {
-    setState(() => _isLoadingWallet = true);
-    try {
-      final wallet = await ref.read(walletRepositoryProvider).getWalletInfo();
-      if (mounted) {
-        setState(() => _walletInfo = wallet);
-      }
-    } catch (_) {
-      // T ignore và giữ _walletInfo là null
-    } finally {
-      if (mounted) setState(() => _isLoadingWallet = false);
-    }
   }
 
   String _formatCurrency(double value) {
@@ -102,7 +94,9 @@ class _MemberIncidentFinishedDetailScreenState
           .refreshDetailedIncident();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Hoàn tất đơn miễn phí thất bại: ${e.toString()}')),
+        SnackBar(
+          content: Text('Hoàn tất đơn miễn phí thất bại: ${e.toString()}'),
+        ),
       );
     } finally {
       if (!mounted) return;
@@ -117,9 +111,7 @@ class _MemberIncidentFinishedDetailScreenState
 
     if (amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đơn 0đ không cần thanh toán qua PayOS.'),
-        ),
+        const SnackBar(content: Text('Đơn 0đ không cần thanh toán qua PayOS.')),
       );
       return;
     }
@@ -226,124 +218,135 @@ class _MemberIncidentFinishedDetailScreenState
             incident.status == IncidentStatus.completed);
     final showFooter = incident != null && canPay && !alreadyPaid;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F8),
-      appBar: AppBar(
-        title: const Text(
-          'Chi Tiết Sự Cố',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
+    return PopScope(
+      canPop: Navigator.of(context).canPop(),
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBackNavigation();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF4F6F8),
+        appBar: AppBar(
+          title: const Text(
+            'Chi Tiết Sự Cố',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black87,
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          systemOverlayStyle: const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.dark,
+            statusBarBrightness: Brightness.light,
+          ),
+          centerTitle: true,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.black87,
+              size: 20,
+            ),
+            onPressed: _handleBackNavigation,
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Container(color: const Color(0xFFE5E7EB), height: 1),
           ),
         ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
-        shadowColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        systemOverlayStyle: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.dark,
-          statusBarBrightness: Brightness.light,
-        ),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: Colors.black87, size: 20),
-          onPressed: () => Navigator.maybePop(context),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: const Color(0xFFE5E7EB), height: 1),
-        ),
+        bottomNavigationBar: showFooter
+            ? SafeArea(child: _buildPaymentFooter(incident))
+            : null,
+        body: detailedIncidentState.isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: Color(0xFF228B22)),
+              )
+            : detailedIncidentState.error != null
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        size: 56,
+                        color: Color(0xFFDC3545),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Không tải được dữ liệu sự cố.',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        detailedIncidentState.error!,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 14),
+                      ElevatedButton.icon(
+                        onPressed: () => ref
+                            .read(detailedIncidentProvider.notifier)
+                            .loadDetailedIncident(
+                              widget.incidentId,
+                              forceRefresh: true,
+                            ),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Thử lại'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF228B22),
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : incident == null
+            ? const Center(child: Text('Không tìm thấy sự cố.'))
+            : RefreshIndicator(
+                onRefresh: () async {
+                  await ref
+                      .read(detailedIncidentProvider.notifier)
+                      .loadDetailedIncident(
+                        widget.incidentId,
+                        forceRefresh: true,
+                      );
+                },
+                color: const Color(0xFF228B22),
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.only(
+                    top: 16,
+                    bottom: showFooter ? 80 : 32,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildStatusOverview(incident),
+                      const SizedBox(height: 16),
+                      _buildIncidentInfoCard(incident),
+                      const SizedBox(height: 16),
+                      _buildRescuerInfoCard(incident),
+                      const SizedBox(height: 16),
+                      _buildPaymentCard(incident),
+                      const SizedBox(height: 16),
+                      _buildMediaCard(incident),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                ),
+              ),
       ),
-      bottomNavigationBar:
-          showFooter ? SafeArea(child: _buildPaymentFooter(incident!)) : null,
-      body: detailedIncidentState.isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF228B22)),
-            )
-          : detailedIncidentState.error != null
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.error_outline,
-                      size: 56,
-                      color: Color(0xFFDC3545),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Không tải được dữ liệu sự cố.',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      detailedIncidentState.error!,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 14),
-                    ElevatedButton.icon(
-                      onPressed: () => ref
-                          .read(detailedIncidentProvider.notifier)
-                          .loadDetailedIncident(
-                            widget.incidentId,
-                            forceRefresh: true,
-                          ),
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Thử lại'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF228B22),
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : incident == null
-          ? const Center(child: Text('Không tìm thấy sự cố.'))
-          : RefreshIndicator(
-              onRefresh: () async {
-                await ref
-                    .read(detailedIncidentProvider.notifier)
-                    .loadDetailedIncident(
-                      widget.incidentId,
-                      forceRefresh: true,
-                    );
-              },
-              color: const Color(0xFF228B22),
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.only(
-                  top: 16,
-                  bottom: showFooter ? 80 : 32,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildStatusOverview(incident),
-                    const SizedBox(height: 16),
-                    _buildIncidentInfoCard(incident),
-                    const SizedBox(height: 16),
-                    _buildRescuerInfoCard(incident),
-                    const SizedBox(height: 16),
-                    _buildPaymentCard(incident),
-                    const SizedBox(height: 16),
-                    _buildMediaCard(incident),
-                    const SizedBox(height: 24),
-                  ],
-                ),
-              ),
-            ),
     );
   }
 
@@ -363,20 +366,23 @@ class _MemberIncidentFinishedDetailScreenState
         ],
       ),
       child: ElevatedButton.icon(
-        onPressed:
-            _isProcessingPayment ? null : () => _showPaymentSheet(incident),
+        onPressed: _isProcessingPayment
+            ? null
+            : () => _showPaymentSheet(incident),
         icon: _isProcessingPayment
             ? const SizedBox(
                 width: 18,
                 height: 18,
-                child:
-                    CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
               )
-              : Icon(isFreePayment ? Icons.check_circle_outline : Icons.payment),
+            : Icon(isFreePayment ? Icons.check_circle_outline : Icons.payment),
         label: Text(
-            _isProcessingPayment
-                ? 'Đang xử lý...'
-                : (isFreePayment ? 'Hoàn tất đơn miễn phí' : 'Thanh toán ngay'),
+          _isProcessingPayment
+              ? 'Đang xử lý...'
+              : (isFreePayment ? 'Hoàn tất đơn miễn phí' : 'Thanh toán ngay'),
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         style: ElevatedButton.styleFrom(
@@ -392,18 +398,41 @@ class _MemberIncidentFinishedDetailScreenState
   }
 
   void _showPaymentSheet(DetailedIncidentData incident) {
-    _loadWallet();
+    final amount = _getPaymentAmount(incident);
+    final isFreePayment = amount <= 0;
+    var isLoadingWallet = !isFreePayment;
+    WalletInfo? walletInfo;
+    var walletLoadStarted = false;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
-          final amount = _getPaymentAmount(incident);
-          final isFreePayment = amount <= 0;
-          final balance = _walletInfo?.balance ?? 0.0;
+          if (!walletLoadStarted && !isFreePayment) {
+            walletLoadStarted = true;
+            Future<void>(() async {
+              final wallet = await ref
+                  .read(walletRepositoryProvider)
+                  .getWalletInfo();
+              if (!mounted) return;
+              setSheetState(() {
+                walletInfo = wallet;
+                isLoadingWallet = false;
+              });
+            }).catchError((_) {
+              if (!mounted) return;
+              setSheetState(() {
+                walletInfo = null;
+                isLoadingWallet = false;
+              });
+            });
+          }
+
+          final balance = walletInfo?.balance ?? 0.0;
           final hasSufficientBalance =
-              isFreePayment || (_walletInfo != null && balance >= amount);
+              isFreePayment || (walletInfo != null && balance >= amount);
 
           return Container(
             decoration: const BoxDecoration(
@@ -479,8 +508,10 @@ class _MemberIncidentFinishedDetailScreenState
 
                 Container(
                   width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF228B22).withOpacity(0.08),
                     borderRadius: BorderRadius.circular(12),
@@ -509,10 +540,7 @@ class _MemberIncidentFinishedDetailScreenState
                 const SizedBox(height: 20),
 
                 _buildPaymentMethodCard(
-                  headerGradient: const [
-                    Color(0xFF228B22),
-                    Color(0xFF1A6B1A),
-                  ],
+                  headerGradient: const [Color(0xFF228B22), Color(0xFF1A6B1A)],
                   headerIcon: Icons.account_balance_wallet,
                   title: 'Ví SnakeAidPay',
                   subtitle: isFreePayment
@@ -530,7 +558,7 @@ class _MemberIncidentFinishedDetailScreenState
                               color: Colors.grey[600],
                             ),
                           ),
-                          _isLoadingWallet
+                          isLoadingWallet
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
@@ -553,7 +581,9 @@ class _MemberIncidentFinishedDetailScreenState
                                 ),
                         ],
                       ),
-                      if (!isFreePayment && !_isLoadingWallet && _walletInfo == null) ...[
+                      if (!isFreePayment &&
+                          !isLoadingWallet &&
+                          walletInfo == null) ...[
                         const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -585,7 +615,9 @@ class _MemberIncidentFinishedDetailScreenState
                           ),
                         ),
                       ],
-                      if (!isFreePayment && !hasSufficientBalance && _walletInfo != null) ...[
+                      if (!isFreePayment &&
+                          !hasSufficientBalance &&
+                          walletInfo != null) ...[
                         const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -642,8 +674,8 @@ class _MemberIncidentFinishedDetailScreenState
                             isFreePayment
                                 ? 'Hoàn tất đơn miễn phí'
                                 : hasSufficientBalance
-                                    ? 'Thanh toán bằng ví'
-                                    : 'Số dư không đủ',
+                                ? 'Thanh toán bằng ví'
+                                : 'Số dư không đủ',
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
@@ -657,10 +689,7 @@ class _MemberIncidentFinishedDetailScreenState
                 const SizedBox(height: 14),
 
                 _buildPaymentMethodCard(
-                  headerGradient: const [
-                    Color(0xFF1565C0),
-                    Color(0xFF0D47A1),
-                  ],
+                  headerGradient: const [Color(0xFF1565C0), Color(0xFF0D47A1)],
                   headerIcon: Icons.credit_card_rounded,
                   title: 'PayOS',
                   subtitle: isFreePayment
@@ -705,7 +734,10 @@ class _MemberIncidentFinishedDetailScreenState
                           runSpacing: 8,
                           children: [
                             _paymentFeatureChip(Icons.qr_code_2, 'QR Code'),
-                            _paymentFeatureChip(Icons.credit_card, 'ATM / Visa'),
+                            _paymentFeatureChip(
+                              Icons.credit_card,
+                              'ATM / Visa',
+                            ),
                             _paymentFeatureChip(
                               Icons.account_balance,
                               'Internet Banking',
@@ -823,10 +855,7 @@ class _MemberIncidentFinishedDetailScreenState
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: body,
-          ),
+          Padding(padding: const EdgeInsets.all(16), child: body),
         ],
       ),
     );
@@ -865,31 +894,33 @@ class _MemberIncidentFinishedDetailScreenState
 
     final isFinished = incident.status == IncidentStatus.finished;
     final isCompleted = incident.status == IncidentStatus.completed;
-    final isCancelled = incident.status == IncidentStatus.cancelled ||
+    final isCancelled =
+        incident.status == IncidentStatus.cancelled ||
         incident.status == IncidentStatus.falseAlarm ||
         incident.status == IncidentStatus.noRescuerFound;
-    final isAssigned = incident.status == IncidentStatus.assigned ||
+    final isAssigned =
+        incident.status == IncidentStatus.assigned ||
         incident.status == IncidentStatus.inProgress;
 
     final statusColor = isCompleted
         ? const Color(0xFF228B22)
         : isFinished
-            ? const Color(0xFFFF6B35)
-            : isCancelled
-                ? const Color(0xFF9E9E9E)
-                : isAssigned
-                    ? const Color(0xFF2196F3)
-                    : const Color(0xFF1565C0);
+        ? const Color(0xFFFF6B35)
+        : isCancelled
+        ? const Color(0xFF9E9E9E)
+        : isAssigned
+        ? const Color(0xFF2196F3)
+        : const Color(0xFF1565C0);
 
     final statusIcon = isCompleted
         ? Icons.check_circle_rounded
         : isFinished
-            ? Icons.receipt_long_rounded
-            : isCancelled
-                ? Icons.cancel_rounded
-                : isAssigned
-                    ? Icons.directions_run_rounded
-                    : Icons.local_hospital_rounded;
+        ? Icons.receipt_long_rounded
+        : isCancelled
+        ? Icons.cancel_rounded
+        : isAssigned
+        ? Icons.directions_run_rounded
+        : Icons.local_hospital_rounded;
 
     final elapsedText = hours > 0
         ? 'Đã xảy ra $hours giờ $minutes phút trước'
@@ -979,10 +1010,10 @@ class _MemberIncidentFinishedDetailScreenState
                     isCompleted
                         ? 'Hoàn tất'
                         : isFinished
-                            ? 'Chờ TT'
-                            : isCancelled
-                                ? 'Đã đóng'
-                                : 'Đang xử lý',
+                        ? 'Chờ TT'
+                        : isCancelled
+                        ? 'Đã đóng'
+                        : 'Đang xử lý',
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -1242,7 +1273,7 @@ class _MemberIncidentFinishedDetailScreenState
                                 ),
                               ],
                             ),
-                            if (rescuer.phoneNumber != null) ...[  
+                            if (rescuer.phoneNumber != null) ...[
                               const SizedBox(height: 4),
                               Text(
                                 rescuer.phoneNumber!,
@@ -1307,11 +1338,11 @@ class _MemberIncidentFinishedDetailScreenState
     final serviceFee = mission?.price ?? 0.0;
     final actualCost = mission?.actualCost;
     final transportFee = mission?.costFromCenter;
-    final alreadyPaid =
-        _hasPaid || incident.status == IncidentStatus.completed;
+    final alreadyPaid = _hasPaid || incident.status == IncidentStatus.completed;
     final total = actualCost ?? serviceFee + (transportFee ?? 0);
-    final headerColor =
-        alreadyPaid ? const Color(0xFF228B22) : const Color(0xFF228B22);
+    final headerColor = alreadyPaid
+        ? const Color(0xFF228B22)
+        : const Color(0xFF228B22);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -1342,7 +1373,9 @@ class _MemberIncidentFinishedDetailScreenState
             child: Row(
               children: [
                 Icon(
-                  alreadyPaid ? Icons.check_circle : Icons.receipt_long_outlined,
+                  alreadyPaid
+                      ? Icons.check_circle
+                      : Icons.receipt_long_outlined,
                   color: Colors.white,
                   size: 20,
                 ),
@@ -1386,12 +1419,9 @@ class _MemberIncidentFinishedDetailScreenState
               children: [
                 // Fee breakdown
                 _payRow('Giá dịch vụ', _formatCurrency(serviceFee)),
-                if (transportFee != null) ...[  
+                if (transportFee != null) ...[
                   const SizedBox(height: 6),
-                  _payRow(
-                    'Chi phí di chuyển',
-                    _formatCurrency(transportFee),
-                  ),
+                  _payRow('Chi phí di chuyển', _formatCurrency(transportFee)),
                 ],
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 10),
@@ -1418,8 +1448,7 @@ class _MemberIncidentFinishedDetailScreenState
           label,
           style: TextStyle(
             fontSize: isTotal ? 14 : 13,
-            fontWeight:
-                isTotal ? FontWeight.w700 : FontWeight.w500,
+            fontWeight: isTotal ? FontWeight.w700 : FontWeight.w500,
             color: isTotal ? const Color(0xFF111827) : Colors.grey[700],
           ),
         ),
@@ -1428,9 +1457,7 @@ class _MemberIncidentFinishedDetailScreenState
           style: TextStyle(
             fontSize: isTotal ? 16 : 13,
             fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,
-            color: isTotal
-                ? const Color(0xFF2F65E0)
-                : const Color(0xFF374151),
+            color: isTotal ? const Color(0xFF2F65E0) : const Color(0xFF374151),
           ),
         ),
       ],
@@ -1438,6 +1465,23 @@ class _MemberIncidentFinishedDetailScreenState
   }
 
   Widget _buildMediaCard(DetailedIncidentData incident) {
+    final snakeMedia = incident.snakeIdentificationMedia;
+    final evidenceGroups = incident.rescueMissionMedia
+        .map(
+          (group) => _MissionEvidenceGroupView(
+            missionId: group.missionId,
+            missionStatusText: group.missionStatus.displayText,
+            mediaUrls: group.media
+                .where((m) => m.purpose == MediaPurpose.evidence)
+                .map((m) => m.mediaUrl)
+                .where((url) => url.isNotEmpty)
+                .toList(),
+          ),
+        )
+        .where((group) => group.mediaUrls.isNotEmpty)
+        .toList();
+    final hasAnyMedia = snakeMedia.isNotEmpty || evidenceGroups.isNotEmpty;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
@@ -1466,7 +1510,11 @@ class _MemberIncidentFinishedDetailScreenState
             ),
             child: const Row(
               children: [
-                Icon(Icons.photo_library_outlined, color: Colors.white, size: 20),
+                Icon(
+                  Icons.photo_library_outlined,
+                  color: Colors.white,
+                  size: 20,
+                ),
                 SizedBox(width: 8),
                 Text(
                   'Hình Ảnh Minh Chứng',
@@ -1481,54 +1529,95 @@ class _MemberIncidentFinishedDetailScreenState
           ),
           Padding(
             padding: const EdgeInsets.all(16),
-            child: incident.media.isEmpty
-                ? Row(
+            child: !hasAnyMedia
+                ? _buildEmptyMediaState('Chưa có ảnh rắn hoặc ảnh bằng chứng.')
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.image_not_supported_outlined,
-                        color: Colors.grey[400],
-                        size: 22,
+                      _buildMediaSectionTitle(
+                        icon: Icons.pest_control,
+                        color: const Color(0xFF7B1FA2),
+                        title: 'Ảnh rắn từ báo cáo',
+                        count: snakeMedia.length,
                       ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'Chưa cung cấp hình ảnh minh chứng.',
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
-                    ],
-                  )
-                : Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: incident.media.map((m) {
-                      return ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: SizedBox(
-                          width: 110,
-                          height: 82,
-                          child: m.mediaUrl.isNotEmpty
-                              ? Image.network(
-                                  m.mediaUrl,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    color: Colors.grey[100],
-                                    child: const Icon(
-                                      Icons.broken_image,
-                                      size: 28,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                )
-                              : Container(
-                                  color: Colors.grey[100],
-                                  child: const Icon(
-                                    Icons.image_not_supported,
-                                    size: 28,
-                                    color: Colors.grey,
-                                  ),
-                                ),
+                      const SizedBox(height: 10),
+                      snakeMedia.isEmpty
+                          ? _buildEmptyMediaState(
+                              'Chưa có ảnh rắn từ incident.',
+                            )
+                          : _buildMediaGrid(
+                              snakeMedia
+                                  .map((media) => media.mediaUrl)
+                                  .where((url) => url.isNotEmpty)
+                                  .toList(),
+                            ),
+                      const SizedBox(height: 16),
+                      _buildMediaSectionTitle(
+                        icon: Icons.fact_check_outlined,
+                        color: const Color(0xFF1565C0),
+                        title: 'Ảnh bằng chứng cứu hộ',
+                        count: evidenceGroups.fold<int>(
+                          0,
+                          (sum, group) => sum + group.mediaUrls.length,
                         ),
-                      );
-                    }).toList(),
+                      ),
+                      const SizedBox(height: 10),
+                      evidenceGroups.isEmpty
+                          ? _buildEmptyMediaState(
+                              'Chưa có ảnh bằng chứng từ rescue mission.',
+                            )
+                          : Column(
+                              children: evidenceGroups.map((group) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 14),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(
+                                                0xFF1565C0,
+                                              ).withOpacity(0.08),
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                            ),
+                                            child: Text(
+                                              'Mission ${group.shortMissionId}',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFF1565C0),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              group.missionStatusText,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[600],
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      _buildMediaGrid(group.mediaUrls),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                    ],
                   ),
           ),
         ],
@@ -1536,12 +1625,93 @@ class _MemberIncidentFinishedDetailScreenState
     );
   }
 
-  Widget _infoRowIcon(
-    IconData icon,
-    String label,
-    String value,
-    Color color,
-  ) {
+  Widget _buildMediaSectionTitle({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required int count,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF111827),
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyMediaState(String text) {
+    return Row(
+      children: [
+        Icon(
+          Icons.image_not_supported_outlined,
+          color: Colors.grey[400],
+          size: 18,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMediaGrid(List<String> urls) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: urls.map((url) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: SizedBox(
+            width: 110,
+            height: 82,
+            child: Image.network(
+              url,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                color: Colors.grey[100],
+                child: const Icon(
+                  Icons.broken_image,
+                  size: 28,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _infoRowIcon(IconData icon, String label, String value, Color color) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
@@ -1584,17 +1754,24 @@ class _MemberIncidentFinishedDetailScreenState
       ),
     );
   }
+}
 
-  Widget _infoRow(String title, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('$title: ', style: const TextStyle(fontWeight: FontWeight.w600)),
-          Expanded(child: Text(value)),
-        ],
-      ),
-    );
+class _MissionEvidenceGroupView {
+  final String missionId;
+  final String missionStatusText;
+  final List<String> mediaUrls;
+
+  _MissionEvidenceGroupView({
+    required this.missionId,
+    required this.missionStatusText,
+    required this.mediaUrls,
+  });
+
+  String get shortMissionId {
+    final compact = missionId.replaceAll('-', '');
+    if (compact.isEmpty) return 'N/A';
+    return compact.length > 6
+        ? compact.substring(compact.length - 6).toUpperCase()
+        : compact.toUpperCase();
   }
 }

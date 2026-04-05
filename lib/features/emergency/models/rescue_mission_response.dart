@@ -1,6 +1,7 @@
 import 'package:json_annotation/json_annotation.dart';
 import 'package:snakeaid_mobile/features/emergency/models/snake_identification_response.dart';
 import 'detailed_incident_response.dart';
+import 'report_media_response.dart';
 import 'sos_incident_response.dart';
 
 part 'rescue_mission_response.g.dart';
@@ -101,6 +102,9 @@ class DetailRescueMissionResponse {
   @JsonKey(name: 'user')
   final BriefMemberProfile user;
 
+  @JsonKey(name: 'missionMedia')
+  final List<ReportMediaResponse> missionMedia;
+
   DetailRescueMissionResponse({
     required this.id,
     required this.incidentId,
@@ -121,6 +125,7 @@ class DetailRescueMissionResponse {
     required this.incident,
     required this.rescuer,
     required this.user,
+    required this.missionMedia,
   });
 
   factory DetailRescueMissionResponse.fromJson(Map<String, dynamic> json) =>

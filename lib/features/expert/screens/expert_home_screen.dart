@@ -13,11 +13,13 @@ import '../../blog/models/blog_model.dart';
 /// FutureProvider for the current expert's bookings from the API.
 final _expertBookingsFutureProvider =
     FutureProvider<List<ConsultationBookingResponse>>((ref) {
-  return ref.read(consultationRepositoryProvider).getExpertBookings();
-});
+      return ref.read(consultationRepositoryProvider).getExpertBookings();
+    });
 
 /// Map a [ConsultationBookingResponse] to the internal [_ExpertConsultation].
-_ExpertConsultation _bookingToExpertConsultation(ConsultationBookingResponse b) {
+_ExpertConsultation _bookingToExpertConsultation(
+  ConsultationBookingResponse b,
+) {
   // now dùng UTC+7 để khớp với giờ VN wall-clock của backend
   final now = DateTime.now().toUtc().add(const Duration(hours: 7));
   final scheduled = b.slotStartTime ?? b.scheduledTime;
@@ -42,8 +44,7 @@ _ExpertConsultation _bookingToExpertConsultation(ConsultationBookingResponse b) 
     id: b.consultationId ?? b.id,
     patientName: b.userName ?? 'Bệnh nhân',
     patientPhone: '',
-    consultationType:
-        b.consultationType == 'Instant' ? 'Khẩn Cấp' : 'Đặt Lịch',
+    consultationType: b.consultationType == 'Instant' ? 'Khẩn Cấp' : 'Đặt Lịch',
     snakeSuspect: 'Chưa xác định',
     hasSnakeImage: false,
     scheduledTime: scheduled,
@@ -92,7 +93,10 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final screens = [
-      _HomeTab(key: _homeKey, onSeeAll: () => setState(() => _selectedIndex = 1)),
+      _HomeTab(
+        key: _homeKey,
+        onSeeAll: () => setState(() => _selectedIndex = 1),
+      ),
       _ConsultationsTab(key: _consultationsKey),
       const _IncomeTab(),
       _ProfileTab(onGoToHistory: _goToConsultationHistory),
@@ -140,7 +144,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
         setState(() {
           _selectedIndex = index;
         });
-        
+
         // Reload data when switching to tab
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (index == 0) {
@@ -181,7 +185,8 @@ class _HomeTab extends ConsumerStatefulWidget {
   ConsumerState<_HomeTab> createState() => _HomeTabState();
 }
 
-class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderStateMixin {
+class _HomeTabState extends ConsumerState<_HomeTab>
+    with SingleTickerProviderStateMixin {
   bool _isAvailable = true;
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnimation;
@@ -222,7 +227,7 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
 
     _pulseController.repeat(reverse: true);
     // Handled globally at app root so popup can appear on every expert screen.
-    
+
     // Reload data mỗi khi vào màn hình
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.invalidate(_expertBookingsFutureProvider);
@@ -239,41 +244,45 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
   Future<void> _initEmergencyInboxRealtime() async {
     try {
       final baseUrl = ref.read(httpServiceProvider).baseUrl;
-      _emergencyInboxService =
-          EmergencyConsultationSignalRService(baseUrl: baseUrl);
-
-      _emergencyRequestSub = _emergencyInboxService!.requestStream.listen(
-        (event) {
-          if (!mounted) return;
-
-          final expiresAtUtc = event.expiresAt?.toUtc();
-          if (expiresAtUtc == null) {
-            debugPrint('EmergencyConsultationRequest thiếu expiresAt: ${event.requestId}');
-            return;
-          }
-
-          final remainingSeconds =
-              expiresAtUtc.difference(DateTime.now().toUtc()).inSeconds;
-          if (remainingSeconds <= 0) {
-            setState(() {
-              _showInstantRequest = false;
-              _activeEmergencyRequest = null;
-              _countdownExpiresAtUtc = null;
-              _countdownSeconds = 0;
-            });
-            return;
-          }
-
-          setState(() {
-            _activeEmergencyRequest = event;
-            _showInstantRequest = true;
-            _isInstantMinimized = true;
-            _countdownExpiresAtUtc = expiresAtUtc;
-            _countdownSeconds = remainingSeconds;
-          });
-          _startCountdown();
-        },
+      _emergencyInboxService = EmergencyConsultationSignalRService(
+        baseUrl: baseUrl,
       );
+
+      _emergencyRequestSub = _emergencyInboxService!.requestStream.listen((
+        event,
+      ) {
+        if (!mounted) return;
+
+        final expiresAtUtc = event.expiresAt?.toUtc();
+        if (expiresAtUtc == null) {
+          debugPrint(
+            'EmergencyConsultationRequest thiếu expiresAt: ${event.requestId}',
+          );
+          return;
+        }
+
+        final remainingSeconds = expiresAtUtc
+            .difference(DateTime.now().toUtc())
+            .inSeconds;
+        if (remainingSeconds <= 0) {
+          setState(() {
+            _showInstantRequest = false;
+            _activeEmergencyRequest = null;
+            _countdownExpiresAtUtc = null;
+            _countdownSeconds = 0;
+          });
+          return;
+        }
+
+        setState(() {
+          _activeEmergencyRequest = event;
+          _showInstantRequest = true;
+          _isInstantMinimized = true;
+          _countdownExpiresAtUtc = expiresAtUtc;
+          _countdownSeconds = remainingSeconds;
+        });
+        _startCountdown();
+      });
 
       await _emergencyInboxService!.connectAsExpert();
     } catch (e) {
@@ -421,22 +430,25 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
   }
 
   void _openDetailFromHome(BuildContext context, _ExpertConsultation c) {
-    context.push('/expert-consultation-detail', extra: {
-      'id': c.id,
-      'patientName': c.patientName,
-      'patientPhone': c.patientPhone,
-      'consultationType': c.consultationType,
-      'snakeSuspect': c.snakeSuspect,
-      'scheduledTime': c.scheduledTime.millisecondsSinceEpoch,
-      'statusIndex': c.status.index,
-      'feeCost': c.feeCost,
-      'rating': c.rating,
-      'durationSeconds': c.durationSeconds,
-      'durationMinutes': c.durationMinutes,
-      'consultationMethod': c.consultationMethod,
-      'problemDescription': c.problemDescription,
-      'questions': c.questions,
-    });
+    context.push(
+      '/expert-consultation-detail',
+      extra: {
+        'id': c.id,
+        'patientName': c.patientName,
+        'patientPhone': c.patientPhone,
+        'consultationType': c.consultationType,
+        'snakeSuspect': c.snakeSuspect,
+        'scheduledTime': c.scheduledTime.millisecondsSinceEpoch,
+        'statusIndex': c.status.index,
+        'feeCost': c.feeCost,
+        'rating': c.rating,
+        'durationSeconds': c.durationSeconds,
+        'durationMinutes': c.durationMinutes,
+        'consultationMethod': c.consultationMethod,
+        'problemDescription': c.problemDescription,
+        'questions': c.questions,
+      },
+    );
   }
 
   @override
@@ -491,7 +503,7 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
                         Icons.notifications,
                         color: Color(0xFF2D2D2D),
                       ),
-                      onPressed: () {},
+                      onPressed: () => context.push('/notifications'),
                     ),
                     Positioned(
                       right: 8,
@@ -642,7 +654,10 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
                         ],
                       ),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
                             colors: [Color(0xFF6C47C2), Color(0xFF9F7AEA)],
@@ -660,7 +675,11 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
                                 color: Colors.white.withOpacity(0.2),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.video_call, color: Colors.white, size: 20),
+                              child: const Icon(
+                                Icons.video_call,
+                                color: Colors.white,
+                                size: 20,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             Column(
@@ -669,11 +688,20 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
                               children: [
                                 const Text(
                                   'Yêu Cầu Mới',
-                                  style: TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.w600),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.white70,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                                 Text(
                                   'Cần Tư Vấn Ngay  $_countdownLabel',
-                                  style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 0.3),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.3,
+                                  ),
                                 ),
                               ],
                             ),
@@ -718,22 +746,36 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
                             child: Column(
                               children: [
                                 Container(
-                                  width: 64, height: 64,
+                                  width: 64,
+                                  height: 64,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF6C47C2).withOpacity(0.1),
+                                    color: const Color(
+                                      0xFF6C47C2,
+                                    ).withOpacity(0.1),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(Icons.check_circle, size: 40, color: Color(0xFF6C47C2)),
+                                  child: const Icon(
+                                    Icons.check_circle,
+                                    size: 40,
+                                    color: Color(0xFF6C47C2),
+                                  ),
                                 ),
                                 const SizedBox(height: 12),
                                 const Text(
                                   'Xác Nhận Bắt Đầu Tư Vấn',
-                                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF6C47C2)),
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF6C47C2),
+                                  ),
                                   textAlign: TextAlign.center,
                                 ),
                                 const SizedBox(height: 6),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 6,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFFFF3CD),
                                     borderRadius: BorderRadius.circular(20),
@@ -741,11 +783,19 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      const Icon(Icons.timer, size: 16, color: Color(0xFFD97706)),
+                                      const Icon(
+                                        Icons.timer,
+                                        size: 16,
+                                        color: Color(0xFFD97706),
+                                      ),
                                       const SizedBox(width: 6),
                                       Text(
                                         'Tự từ chối sau $_countdownLabel',
-                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFD97706)),
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFFD97706),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -764,31 +814,58 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFFAF8FC),
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.grey.shade200),
+                                    border: Border.all(
+                                      color: Colors.grey.shade200,
+                                    ),
                                   ),
                                   child: Row(
                                     children: [
                                       Container(
-                                        width: 48, height: 48,
+                                        width: 48,
+                                        height: 48,
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFF6C47C2).withOpacity(0.1),
+                                          color: const Color(
+                                            0xFF6C47C2,
+                                          ).withOpacity(0.1),
                                           shape: BoxShape.circle,
-                                          border: Border.all(color: Colors.grey.shade200),
+                                          border: Border.all(
+                                            color: Colors.grey.shade200,
+                                          ),
                                         ),
-                                        child: const Icon(Icons.person, color: Color(0xFF6C47C2)),
+                                        child: const Icon(
+                                          Icons.person,
+                                          color: Color(0xFF6C47C2),
+                                        ),
                                       ),
                                       const SizedBox(width: 14),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
-                                            Text(_instantPatientName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF160D1B))),
+                                            Text(
+                                              _instantPatientName,
+                                              style: const TextStyle(
+                                                fontSize: 17,
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF160D1B),
+                                              ),
+                                            ),
                                             const SizedBox(height: 4),
                                             Text(
                                               'Tư vấn $_instantDurationMinutes phút · ${_instantConsultationMethod == 'video' ? 'Video Call' : 'Nhắn Tin'}',
-                                              style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                color: Color(0xFF6B7280),
+                                              ),
                                             ),
-                                            Text(_instantSnakeSuspect, style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+                                            Text(
+                                              _instantSnakeSuspect,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Color(0xFF6B7280),
+                                              ),
+                                            ),
                                           ],
                                         ),
                                       ),
@@ -804,55 +881,109 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFECFDF5),
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: const Color(0xFFD1FAE5)),
+                                    border: Border.all(
+                                      color: const Color(0xFFD1FAE5),
+                                    ),
                                   ),
                                   child: Column(
                                     children: [
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
-                                          const Text('Phí tư vấn', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF160D1B))),
+                                          const Text(
+                                            'Phí tư vấn',
+                                            style: TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF160D1B),
+                                            ),
+                                          ),
                                           Text(
                                             _formatInstantFeeK(_instantFeeCost),
-                                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF160D1B)),
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF160D1B),
+                                            ),
                                           ),
                                         ],
                                       ),
                                       const SizedBox(height: 6),
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.end,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.end,
                                         children: [
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 3,
+                                            ),
                                             decoration: BoxDecoration(
                                               color: const Color(0xFF10B981),
-                                              borderRadius: BorderRadius.circular(20),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
                                             ),
                                             child: const Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                Icon(Icons.check, size: 12, color: Colors.white),
+                                                Icon(
+                                                  Icons.check,
+                                                  size: 12,
+                                                  color: Colors.white,
+                                                ),
                                                 SizedBox(width: 4),
-                                                Text('Đã thanh toán', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                                                Text(
+                                                  'Đã thanh toán',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
                                               ],
                                             ),
                                           ),
                                         ],
                                       ),
-                                      const Divider(color: Color(0xFFD1FAE5), height: 20),
+                                      const Divider(
+                                        color: Color(0xFFD1FAE5),
+                                        height: 20,
+                                      ),
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
                                           const Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
-                                              Text('Bạn sẽ nhận', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF047857))),
-                                              Text('(sau phí nền tảng 10%)', style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+                                              Text(
+                                                'Bạn sẽ nhận',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Color(0xFF047857),
+                                                ),
+                                              ),
+                                              Text(
+                                                '(sau phí nền tảng 10%)',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Color(0xFF6B7280),
+                                                ),
+                                              ),
                                             ],
                                           ),
                                           Text(
-                                            _formatInstantFeeK((_instantFeeCost * 0.9).toInt()),
-                                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                                            _formatInstantFeeK(
+                                              (_instantFeeCost * 0.9).toInt(),
+                                            ),
+                                            style: const TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF059669),
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -872,13 +1003,19 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
                                   width: double.infinity,
                                   height: 52,
                                   child: ElevatedButton(
-                                    onPressed: _isHandlingInstantAction ? null : _acceptInstant,
+                                    onPressed: _isHandlingInstantAction
+                                        ? null
+                                        : _acceptInstant,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF6C47C2),
                                       foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
                                       elevation: 4,
-                                      shadowColor: const Color(0xFF6C47C2).withOpacity(0.4),
+                                      shadowColor: const Color(
+                                        0xFF6C47C2,
+                                      ).withOpacity(0.4),
                                     ),
                                     child: _isHandlingInstantAction
                                         ? const SizedBox(
@@ -889,7 +1026,13 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
                                               color: Colors.white,
                                             ),
                                           )
-                                        : const Text('Bắt Đầu Ngay', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                                        : const Text(
+                                            'Bắt Đầu Ngay',
+                                            style: TextStyle(
+                                              fontSize: 17,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
                                   ),
                                 ),
                                 const SizedBox(height: 10),
@@ -897,19 +1040,39 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
                                   width: double.infinity,
                                   height: 44,
                                   child: OutlinedButton(
-                                    onPressed: () => setState(() => _isInstantMinimized = true),
+                                    onPressed: () => setState(
+                                      () => _isInstantMinimized = true,
+                                    ),
                                     style: OutlinedButton.styleFrom(
-                                      side: BorderSide(color: Colors.grey.shade300),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      side: BorderSide(
+                                        color: Colors.grey.shade300,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
                                       foregroundColor: Colors.grey.shade600,
                                     ),
-                                    child: const Text('Thu Nhỏ', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                                    child: const Text(
+                                      'Thu Nhỏ',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
                                 TextButton(
-                                  onPressed: _isHandlingInstantAction ? null : _declineInstant,
-                                  child: const Text('Từ Chối', style: TextStyle(fontSize: 13, color: Color(0xFF999999))),
+                                  onPressed: _isHandlingInstantAction
+                                      ? null
+                                      : _declineInstant,
+                                  child: const Text(
+                                    'Từ Chối',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF999999),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
@@ -1117,16 +1280,21 @@ class _HomeTabState extends ConsumerState<_HomeTab> with SingleTickerProviderSta
 
   List<_ExpertConsultation> get _upcomingConsultations {
     final now = DateTime.now().toUtc().add(const Duration(hours: 7));
-    final consultations = ref
+    final consultations =
+        ref
             .watch(_expertBookingsFutureProvider)
-            .whenOrNull(data: (bookings) =>
-                bookings.map(_bookingToExpertConsultation).toList()) ??
+            .whenOrNull(
+              data: (bookings) =>
+                  bookings.map(_bookingToExpertConsultation).toList(),
+            ) ??
         [];
     return consultations
-        .where((c) =>
-            (c.status == _ExpertConsultationStatus.upcoming ||
-                c.status == _ExpertConsultationStatus.waiting) &&
-            !now.isAfter(c.scheduledTime.add(const Duration(minutes: 5))))
+        .where(
+          (c) =>
+              (c.status == _ExpertConsultationStatus.upcoming ||
+                  c.status == _ExpertConsultationStatus.waiting) &&
+              !now.isAfter(c.scheduledTime.add(const Duration(minutes: 5))),
+        )
         .toList()
       ..sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
   }
@@ -1765,16 +1933,18 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
         return false;
       }
       return true;
-    }).toList()
-      ..sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
+    }).toList()..sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
   }
 
-  List<_ExpertConsultation> get _historyList => _consultations
-      .where((c) =>
-          c.status == _ExpertConsultationStatus.completed ||
-          c.status == _ExpertConsultationStatus.cancelled)
-      .toList()
-    ..sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
+  List<_ExpertConsultation> get _historyList =>
+      _consultations
+          .where(
+            (c) =>
+                c.status == _ExpertConsultationStatus.completed ||
+                c.status == _ExpertConsultationStatus.cancelled,
+          )
+          .toList()
+        ..sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
 
   Timer? _refreshTimer;
 
@@ -1790,7 +1960,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
     _refreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
     });
-    
+
     // Reload data mỗi khi vào màn hình
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadConsultations();
@@ -1829,22 +1999,25 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
 
   // Navigate to detail screen
   void _openDetail(BuildContext context, _ExpertConsultation c) {
-    context.push('/expert-consultation-detail', extra: {
-      'id': c.id,
-      'patientName': c.patientName,
-      'patientPhone': c.patientPhone,
-      'consultationType': c.consultationType,
-      'snakeSuspect': c.snakeSuspect,
-      'scheduledTime': c.scheduledTime.millisecondsSinceEpoch,
-      'statusIndex': c.status.index,
-      'feeCost': c.feeCost,
-      'rating': c.rating,
-      'durationSeconds': c.durationSeconds,
-      'durationMinutes': c.durationMinutes,
-      'consultationMethod': c.consultationMethod,
-      'problemDescription': c.problemDescription,
-      'questions': c.questions,
-    });
+    context.push(
+      '/expert-consultation-detail',
+      extra: {
+        'id': c.id,
+        'patientName': c.patientName,
+        'patientPhone': c.patientPhone,
+        'consultationType': c.consultationType,
+        'snakeSuspect': c.snakeSuspect,
+        'scheduledTime': c.scheduledTime.millisecondsSinceEpoch,
+        'statusIndex': c.status.index,
+        'feeCost': c.feeCost,
+        'rating': c.rating,
+        'durationSeconds': c.durationSeconds,
+        'durationMinutes': c.durationMinutes,
+        'consultationMethod': c.consultationMethod,
+        'problemDescription': c.problemDescription,
+        'questions': c.questions,
+      },
+    );
   }
 
   @override
@@ -1877,7 +2050,8 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                 builder: (ctx, child) => Theme(
                   data: ThemeData.light().copyWith(
                     colorScheme: const ColorScheme.light(
-                        primary: Color(0xFF6C47C2)),
+                      primary: Color(0xFF6C47C2),
+                    ),
                   ),
                   child: child!,
                 ),
@@ -1898,8 +2072,14 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
           unselectedLabelColor: const Color(0xFF999999),
           indicatorColor: _purple,
           indicatorWeight: 3,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-          tabs: const [Tab(text: 'Lịch Tư Vấn'), Tab(text: 'Lịch Sử')],
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
+          tabs: const [
+            Tab(text: 'Lịch Tư Vấn'),
+            Tab(text: 'Lịch Sử'),
+          ],
         ),
       ),
       body: TabBarView(
@@ -1920,8 +2100,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
   Widget _buildScheduleTab(BuildContext context) {
     final dayConsultations = _consultationsForDay(_selectedDay);
     final today = DateTime.now();
-    final todayNorm =
-        DateTime(today.year, today.month, today.day);
+    final todayNorm = DateTime(today.year, today.month, today.day);
 
     return Column(
       children: [
@@ -1949,12 +2128,14 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                     duration: const Duration(milliseconds: 200),
                     width: 60,
                     decoration: BoxDecoration(
-                      color: isSelected
-                          ? _purple
-                          : Colors.white,
+                      color: isSelected ? _purple : Colors.white,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: isSelected ? _purple : (isToday ? _purple.withOpacity(0.4) : const Color(0xFFE8E8E8)),
+                        color: isSelected
+                            ? _purple
+                            : (isToday
+                                  ? _purple.withOpacity(0.4)
+                                  : const Color(0xFFE8E8E8)),
                         width: isToday && !isSelected ? 1.5 : 1,
                       ),
                       boxShadow: isSelected
@@ -1963,7 +2144,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                                 color: _purple.withOpacity(0.3),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
-                              )
+                              ),
                             ]
                           : [],
                     ),
@@ -2000,9 +2181,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                                   height: 6,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : _purple,
+                                    color: isSelected ? Colors.white : _purple,
                                     boxShadow: [
                                       BoxShadow(
                                         color: isSelected
@@ -2043,8 +2222,11 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
               if (dayConsultations.isNotEmpty)
                 Row(
                   children: [
-                    const Icon(Icons.assignment,
-                        size: 16, color: Color(0xFF6C47C2)),
+                    const Icon(
+                      Icons.assignment,
+                      size: 16,
+                      color: Color(0xFF6C47C2),
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       '${dayConsultations.length} Tư Vấn',
@@ -2080,9 +2262,11 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.event_available,
-              size: 56,
-              color: _purple.withOpacity(0.25)),
+          Icon(
+            Icons.event_available,
+            size: 56,
+            color: _purple.withOpacity(0.25),
+          ),
           const SizedBox(height: 14),
           const Text(
             'Không có lịch tư vấn',
@@ -2100,7 +2284,9 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
   Widget _buildDayList(BuildContext context, List<_ExpertConsultation> list) {
     // Group by time of day
     final morning = list.where((c) => c.scheduledTime.hour < 12).toList();
-    final afternoon = list.where((c) => c.scheduledTime.hour >= 12 && c.scheduledTime.hour < 17).toList();
+    final afternoon = list
+        .where((c) => c.scheduledTime.hour >= 12 && c.scheduledTime.hour < 17)
+        .toList();
     final evening = list.where((c) => c.scheduledTime.hour >= 17).toList();
 
     return ListView(
@@ -2140,8 +2326,9 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
   Widget _buildScheduleCard(BuildContext context, _ExpertConsultation c) {
     final isWaiting = c.status == _ExpertConsultationStatus.waiting;
     // Cho phép expert vào video call bất cứ lúc nào (không cần chờ đến giờ)
-    final canStart = c.status == _ExpertConsultationStatus.waiting ||
-                     c.status == _ExpertConsultationStatus.upcoming;
+    final canStart =
+        c.status == _ExpertConsultationStatus.waiting ||
+        c.status == _ExpertConsultationStatus.upcoming;
     final hour = c.scheduledTime.hour;
     final minute = c.scheduledTime.minute.toString().padLeft(2, '0');
     final amPm = hour < 12 ? 'AM' : 'PM';
@@ -2212,7 +2399,9 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                   Text(
                     amPm,
                     style: const TextStyle(
-                        fontSize: 10, color: Color(0xFF999999)),
+                      fontSize: 10,
+                      color: Color(0xFF999999),
+                    ),
                   ),
                 ],
               ),
@@ -2235,7 +2424,9 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                               // Status badge
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
                                 decoration: BoxDecoration(
                                   color: statusBg,
                                   borderRadius: BorderRadius.circular(20),
@@ -2262,8 +2453,11 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                               const SizedBox(height: 4),
                               Row(
                                 children: [
-                                  const Icon(Icons.pest_control,
-                                      size: 14, color: Color(0xFF999999)),
+                                  const Icon(
+                                    Icons.pest_control,
+                                    size: 14,
+                                    color: Color(0xFF999999),
+                                  ),
                                   const SizedBox(width: 4),
                                   Text(
                                     c.snakeSuspect,
@@ -2289,10 +2483,16 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: c.hasSnakeImage
-                              ? const Icon(Icons.dangerous,
-                                  color: Color(0xFFDC3545), size: 28)
-                              : const Icon(Icons.image_not_supported,
-                                  color: Color(0xFFCCCCCC), size: 24),
+                              ? const Icon(
+                                  Icons.dangerous,
+                                  color: Color(0xFFDC3545),
+                                  size: 28,
+                                )
+                              : const Icon(
+                                  Icons.image_not_supported,
+                                  color: Color(0xFFCCCCCC),
+                                  size: 24,
+                                ),
                         ),
                       ],
                     ),
@@ -2303,7 +2503,9 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: c.consultationMethod == 'video'
                                 ? _purple.withOpacity(0.08)
@@ -2342,9 +2544,10 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                         Text(
                           '${c.durationMinutes} phút',
                           style: const TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF999999),
-                              fontWeight: FontWeight.w500),
+                            fontSize: 11,
+                            color: Color(0xFF999999),
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ],
                     ),
@@ -2358,16 +2561,22 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                             onPressed: () => _openDetail(context, c),
                             style: OutlinedButton.styleFrom(
                               side: const BorderSide(
-                                  color: Color(0xFF6C47C2), width: 1.2),
+                                color: Color(0xFF6C47C2),
+                                width: 1.2,
+                              ),
                               foregroundColor: _purple,
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10)),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
-                            child: const Text('Chi Tiết',
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold)),
+                            child: const Text(
+                              'Chi Tiết',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -2388,23 +2597,28 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                             style: ElevatedButton.styleFrom(
                               backgroundColor: isWaiting
                                   ? const Color(0xFFDC3545)
-                                  : (canStart ? _purple : const Color(0xFFE0E0E0)),
-                              foregroundColor:
-                                  canStart ? Colors.white : const Color(0xFF999999),
+                                  : (canStart
+                                        ? _purple
+                                        : const Color(0xFFE0E0E0)),
+                              foregroundColor: canStart
+                                  ? Colors.white
+                                  : const Color(0xFF999999),
                               disabledBackgroundColor: const Color(0xFFE8E8E8),
                               disabledForegroundColor: const Color(0xFF999999),
                               elevation: 0,
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10)),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
                             child: Text(
                               isWaiting
                                   ? 'Vào Ngay'
                                   : (canStart ? 'Bắt Đầu' : 'Chưa Đến Giờ'),
                               style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold),
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
@@ -2429,11 +2643,12 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.history,
-                size: 56, color: _purple.withOpacity(0.25)),
+            Icon(Icons.history, size: 56, color: _purple.withOpacity(0.25)),
             const SizedBox(height: 14),
-            const Text('Chưa có lịch sử tư vấn',
-                style: TextStyle(fontSize: 15, color: Color(0xFF999999))),
+            const Text(
+              'Chưa có lịch sử tư vấn',
+              style: TextStyle(fontSize: 15, color: Color(0xFF999999)),
+            ),
           ],
         ),
       );
@@ -2482,7 +2697,11 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                   color: _purple.withOpacity(0.08),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.person, color: Color(0xFF6C47C2), size: 22),
+                child: const Icon(
+                  Icons.person,
+                  color: Color(0xFF6C47C2),
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -2502,7 +2721,9 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: isDone
                                 ? const Color(0xFF28A745).withOpacity(0.1)
@@ -2526,7 +2747,9 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                     Text(
                       _formatFullDateTime(item.scheduledTime),
                       style: const TextStyle(
-                          fontSize: 12, color: Color(0xFF999999)),
+                        fontSize: 12,
+                        color: Color(0xFF999999),
+                      ),
                     ),
                   ],
                 ),
@@ -2547,7 +2770,9 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                       Text(
                         _formatDuration(item.durationSeconds!),
                         style: const TextStyle(
-                            fontSize: 11, color: Color(0xFF999999)),
+                          fontSize: 11,
+                          color: Color(0xFF999999),
+                        ),
                       ),
                   ],
                 ),
@@ -2556,12 +2781,15 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.pest_control, size: 13, color: Color(0xFF999999)),
+              const Icon(
+                Icons.pest_control,
+                size: 13,
+                color: Color(0xFF999999),
+              ),
               const SizedBox(width: 4),
               Text(
                 item.snakeSuspect,
-                style: const TextStyle(
-                    fontSize: 12, color: Color(0xFF666666)),
+                style: const TextStyle(fontSize: 12, color: Color(0xFF666666)),
               ),
             ],
           ),
@@ -2573,7 +2801,9 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                   final full = i < item.rating!.floor();
                   final half = !full && i < item.rating!;
                   return Icon(
-                    full ? Icons.star : (half ? Icons.star_half : Icons.star_border),
+                    full
+                        ? Icons.star
+                        : (half ? Icons.star_half : Icons.star_border),
                     size: 15,
                     color: const Color(0xFFFFC107),
                   );
@@ -2582,7 +2812,9 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                 Text(
                   '${item.rating!.toStringAsFixed(1)} / 5.0',
                   style: const TextStyle(
-                      fontSize: 11, color: Color(0xFF999999)),
+                    fontSize: 11,
+                    color: Color(0xFF999999),
+                  ),
                 ),
               ],
             ),
@@ -2597,10 +2829,13 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                 side: const BorderSide(color: Color(0xFF6C47C2), width: 1.2),
                 foregroundColor: _purple,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-              child: const Text('Xem Chi Tiết',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Xem Chi Tiết',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],
@@ -2612,10 +2847,30 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
 
   String _formatFullDate(DateTime d) {
     const months = [
-      '', 'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
-      'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'
+      '',
+      'Tháng 1',
+      'Tháng 2',
+      'Tháng 3',
+      'Tháng 4',
+      'Tháng 5',
+      'Tháng 6',
+      'Tháng 7',
+      'Tháng 8',
+      'Tháng 9',
+      'Tháng 10',
+      'Tháng 11',
+      'Tháng 12',
     ];
-    const days = ['', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
+    const days = [
+      '',
+      'Thứ Hai',
+      'Thứ Ba',
+      'Thứ Tư',
+      'Thứ Năm',
+      'Thứ Sáu',
+      'Thứ Bảy',
+      'Chủ Nhật',
+    ];
     return '${days[d.weekday]}, ${d.day} ${months[d.month]}, ${d.year}';
   }
 
@@ -2727,9 +2982,18 @@ class _IncomeTabState extends State<_IncomeTab> {
   @override
   Widget build(BuildContext context) {
     const months = [
-      'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4',
-      'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8',
-      'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12',
+      'Tháng 1',
+      'Tháng 2',
+      'Tháng 3',
+      'Tháng 4',
+      'Tháng 5',
+      'Tháng 6',
+      'Tháng 7',
+      'Tháng 8',
+      'Tháng 9',
+      'Tháng 10',
+      'Tháng 11',
+      'Tháng 12',
     ];
     return Scaffold(
       backgroundColor: const Color(0xFFF8F6F8),
@@ -2793,9 +3057,13 @@ class _IncomeTabState extends State<_IncomeTab> {
                           ),
                           const Padding(
                             padding: EdgeInsets.only(bottom: 6, left: 8),
-                            child: Text('VNĐ',
-                                style: TextStyle(
-                                    fontSize: 16, color: Colors.white70)),
+                            child: Text(
+                              'VNĐ',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white70,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -2804,23 +3072,31 @@ class _IncomeTabState extends State<_IncomeTab> {
                         padding: const EdgeInsets.only(top: 16),
                         decoration: const BoxDecoration(
                           border: Border(
-                              top: BorderSide(color: Colors.white24)),
+                            top: BorderSide(color: Colors.white24),
+                          ),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.check_circle,
-                                color: Colors.white, size: 16),
+                            const Icon(
+                              Icons.check_circle,
+                              color: Colors.white,
+                              size: 16,
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               '${_transactions.where((t) => !t.isPending).length} tư vấn hoàn thành',
                               style: const TextStyle(
-                                  fontSize: 13, color: Colors.white),
+                                fontSize: 13,
+                                color: Colors.white,
+                              ),
                             ),
                             const Spacer(),
                             if (_pendingIncome > 0)
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 4),
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.2),
                                   borderRadius: BorderRadius.circular(12),
@@ -2828,15 +3104,19 @@ class _IncomeTabState extends State<_IncomeTab> {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.hourglass_top,
-                                        color: Colors.white70, size: 13),
+                                    const Icon(
+                                      Icons.hourglass_top,
+                                      color: Colors.white70,
+                                      size: 13,
+                                    ),
                                     const SizedBox(width: 4),
                                     Text(
                                       'Chờ: ${_formatAmount(_pendingIncome)} ₫',
                                       style: const TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w500),
+                                        fontSize: 12,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -2852,7 +3132,9 @@ class _IncomeTabState extends State<_IncomeTab> {
                 // Month / Year filter
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
@@ -2860,42 +3142,53 @@ class _IncomeTabState extends State<_IncomeTab> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.calendar_month,
-                          size: 18, color: Color(0xFF6C47C2)),
+                      const Icon(
+                        Icons.calendar_month,
+                        size: 18,
+                        color: Color(0xFF6C47C2),
+                      ),
                       const SizedBox(width: 8),
-                      const Text('Lọc theo tháng:',
-                          style: TextStyle(
-                              fontSize: 13, color: Color(0xFF666666))),
+                      const Text(
+                        'Lọc theo tháng:',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF666666),
+                        ),
+                      ),
                       const Spacer(),
                       DropdownButton<int>(
                         value: _selectedMonth,
                         underline: const SizedBox(),
                         style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF6C47C2)),
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF6C47C2),
+                        ),
                         items: List.generate(
                           12,
                           (i) => DropdownMenuItem(
-                              value: i + 1, child: Text(months[i])),
+                            value: i + 1,
+                            child: Text(months[i]),
+                          ),
                         ),
-                        onChanged: (v) =>
-                            setState(() => _selectedMonth = v!),
+                        onChanged: (v) => setState(() => _selectedMonth = v!),
                       ),
                       const SizedBox(width: 8),
                       DropdownButton<int>(
                         value: _selectedYear,
                         underline: const SizedBox(),
                         style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF6C47C2)),
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF6C47C2),
+                        ),
                         items: [2024, 2025, 2026]
-                            .map((y) => DropdownMenuItem(
-                                value: y, child: Text('$y')))
+                            .map(
+                              (y) =>
+                                  DropdownMenuItem(value: y, child: Text('$y')),
+                            )
                             .toList(),
-                        onChanged: (v) =>
-                            setState(() => _selectedYear = v!),
+                        onChanged: (v) => setState(() => _selectedYear = v!),
                       ),
                     ],
                   ),
@@ -2929,7 +3222,8 @@ class _IncomeTabState extends State<_IncomeTab> {
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content: Text('Yêu cầu rút tiền - Đang phát triển')),
+                      content: Text('Yêu cầu rút tiền - Đang phát triển'),
+                    ),
                   );
                 },
                 icon: const Icon(Icons.account_balance_wallet, size: 20),
@@ -2942,7 +3236,8 @@ class _IncomeTabState extends State<_IncomeTab> {
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
               ),
             ),
@@ -2998,7 +3293,9 @@ class _IncomeTabState extends State<_IncomeTab> {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 5, vertical: 1),
+                        horizontal: 5,
+                        vertical: 1,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF6C47C2).withOpacity(0.08),
                         borderRadius: BorderRadius.circular(4),
@@ -3016,7 +3313,9 @@ class _IncomeTabState extends State<_IncomeTab> {
                     Text(
                       _formatDate(t.date),
                       style: const TextStyle(
-                          fontSize: 11, color: Color(0xFF999999)),
+                        fontSize: 11,
+                        color: Color(0xFF999999),
+                      ),
                     ),
                   ],
                 ),
@@ -3037,9 +3336,10 @@ class _IncomeTabState extends State<_IncomeTab> {
                 ),
               ),
               if (t.isPending)
-                const Text('Đang xử lý',
-                    style:
-                        TextStyle(fontSize: 10, color: Color(0xFF999999))),
+                const Text(
+                  'Đang xử lý',
+                  style: TextStyle(fontSize: 10, color: Color(0xFF999999)),
+                ),
             ],
           ),
         ],
@@ -3695,4 +3995,3 @@ class _UrgentRequestSheet extends StatelessWidget {
     );
   }
 }
-
