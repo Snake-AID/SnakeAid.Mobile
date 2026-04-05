@@ -40,6 +40,11 @@ DetailRescueMissionResponse _$DetailRescueMissionResponseFromJson(
     json['rescuer'] as Map<String, dynamic>,
   ),
   user: BriefMemberProfile.fromJson(json['user'] as Map<String, dynamic>),
+  missionMedia:
+      (json['missionMedia'] as List<dynamic>?)
+          ?.map((e) => ReportMediaResponse.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      [],
 );
 
 Map<String, dynamic> _$DetailRescueMissionResponseToJson(
@@ -64,6 +69,7 @@ Map<String, dynamic> _$DetailRescueMissionResponseToJson(
   'incident': instance.incident.toJson(),
   'rescuer': instance.rescuer.toJson(),
   'user': instance.user.toJson(),
+  'missionMedia': instance.missionMedia.map((e) => e.toJson()).toList(),
 };
 
 BriefIncidentForMission _$BriefIncidentForMissionFromJson(

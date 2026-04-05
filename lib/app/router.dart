@@ -38,6 +38,7 @@ import 'package:snakeaid_mobile/features/member/screens/messages_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/message_detail_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/activity_detail_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/member_history_screen.dart';
+import 'package:snakeaid_mobile/features/notifications/screens/notification_inbox_screen.dart';
 import 'package:snakeaid_mobile/features/community_report/screens/community_alert_map_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_home_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_settings_screen.dart';
@@ -316,6 +317,11 @@ final router = GoRouter(
       path: '/member-home',
       name: 'member_home',
       builder: (context, state) => const MainScaffold(initialIndex: 0),
+    ),
+    GoRoute(
+      path: '/notifications',
+      name: 'notifications',
+      builder: (context, state) => const NotificationInboxScreen(),
     ),
 
     // === CONSULTATION ROUTES ===

@@ -52,6 +52,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _authRepository;
   final FCMService _fcmService = FCMService();
   bool _fcmInitialized = false;
+  bool _isLoggingOut = false;
 
   AuthNotifier({required AuthRepository authRepository})
     : _authRepository = authRepository,
@@ -258,7 +259,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Called by TokenRefreshInterceptor when mid-session refresh token is rejected.
   Future<void> forceLogout() async {
     debugPrint('🚨 forceLogout called by interceptor');
-    await logout();
+    await logout(showMessage: true);
   }
 
   Future<bool> login({required String email, required String password}) async {
@@ -342,19 +343,35 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> logout() async {
-    try {
-      await _authRepository.clearDeviceToken();
-      await _fcmService.clearLastSentToken();
-    } catch (_) {}
+  Future<void> logout({bool showMessage = false}) async {
+    if (_isLoggingOut) return;
+    _isLoggingOut = true;
 
     try {
       _cleanupRoleBasedServices();
-      await _authRepository.logout(); // Best-effort API call
-    } catch (_) {}
-    await _clearSession();
-    state = AuthState.initial();
-    debugPrint('✅ Logged out');
+
+      // Clear local auth first so any interceptor-triggered retries stop
+      // immediately, even if a network cleanup call fails.
+      await _clearSession();
+
+      try {
+        await _fcmService.clearLastSentToken();
+      } catch (_) {}
+
+      try {
+        await _authRepository.logout(); // Best-effort API call
+      } catch (_) {}
+
+      state = AuthState(
+        isLoading: false,
+        error: showMessage
+            ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
+            : null,
+      );
+      debugPrint('✅ Logged out');
+    } finally {
+      _isLoggingOut = false;
+    }
   }
 
   Future<void> refreshUserData() async {

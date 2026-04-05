@@ -918,7 +918,7 @@ class _MissionCompletionScreenState
                                     ),
                                   ),
                                   Text(
-                                    mission?.formattedPrice ?? '-',
+                                    mission?.formattedActualCost ?? '-',
                                     style: const TextStyle(
                                       fontSize: 22,
                                       fontWeight: FontWeight.bold,

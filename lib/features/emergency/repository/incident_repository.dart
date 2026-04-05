@@ -202,7 +202,10 @@ class IncidentRepository {
         '✅ Has rescuer data: ${response.data['data']?['assignedRescuer'] != null}',
       );
       debugPrint(
-        '✅ Has mission data: ${response.data['data']?['rescueMission'] != null}',
+        '✅ Has mission data: ${response.data['data']?['activeMission'] != null}',
+      );
+      debugPrint(
+        '✅ Has rescue mission media: ${response.data['data']?['rescueMissionMedia'] != null}',
       );
       debugPrint(
         '✅ Media count: ${(response.data['data']?['media'] as List?)?.length ?? 0}',
@@ -318,7 +321,9 @@ class IncidentRepository {
     } catch (e, stackTrace) {
       debugPrint('❌ PayOS incident payment error: $e');
       debugPrint('❌ Stack trace: $stackTrace');
-      throw Exception('Không thể tạo đường dẫn thanh toán. Vui lòng thử lại sau.');
+      throw Exception(
+        'Không thể tạo đường dẫn thanh toán. Vui lòng thử lại sau.',
+      );
     }
   }
 

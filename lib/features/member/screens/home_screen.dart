@@ -82,13 +82,7 @@ class MemberHomeScreen extends ConsumerWidget {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.notifications_outlined),
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Thông báo - Đang phát triển'),
-                            ),
-                          );
-                        },
+                        onPressed: () => context.push('/notifications'),
                       ),
                       Positioned(
                         top: 8,

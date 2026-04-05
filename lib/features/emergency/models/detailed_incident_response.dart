@@ -58,6 +58,7 @@ class DetailedIncidentData {
   final BriefRescuerProfile? assignedRescuer;
   final RescueMission? activeMission;
   final List<SnakeAIDetectMedia> media;
+  final List<RescueMissionMediaGroup> rescueMissionMedia;
 
   // Identification results
   final DetectedSnakeSpecies? identifiedSnakeSpecies;
@@ -80,6 +81,7 @@ class DetailedIncidentData {
     this.assignedRescuer,
     this.activeMission,
     required this.media,
+    required this.rescueMissionMedia,
     this.identifiedSnakeSpecies,
     this.identificationContext,
   });
@@ -118,6 +120,11 @@ class DetailedIncidentData {
               ?.map((m) => SnakeAIDetectMedia.fromJson(m))
               .toList() ??
           [],
+      rescueMissionMedia:
+          (json['rescueMissionMedia'] as List<dynamic>?)
+              ?.map((m) => RescueMissionMediaGroup.fromJson(m))
+              .toList() ??
+          [],
       // Backend returns 'identifiedSnake' not 'identified_snake_species'
       identifiedSnakeSpecies: json['identifiedSnake'] != null
           ? DetectedSnakeSpecies.fromJson(json['identifiedSnake'])
@@ -146,6 +153,7 @@ class DetailedIncidentData {
     'assignedRescuer': assignedRescuer?.toJson(),
     'activeMission': activeMission?.toJson(),
     'media': media.map((m) => m.toJson()).toList(),
+    'rescueMissionMedia': rescueMissionMedia.map((m) => m.toJson()).toList(),
     'identifiedSnake': identifiedSnakeSpecies?.toJson(),
     'identificationContext': identificationContext?.toJson(),
   };
@@ -162,6 +170,13 @@ class DetailedIncidentData {
     if (severityLevel >= 50) return 'Cao';
     if (severityLevel >= 30) return 'Trung bình';
     return 'Thấp';
+  }
+
+  /// Snake photos uploaded at incident stage.
+  List<SnakeAIDetectMedia> get snakeIdentificationMedia {
+    return media
+        .where((m) => m.purpose == MediaPurpose.snakeIdentification)
+        .toList();
   }
 }
 
@@ -508,6 +523,86 @@ class SnakeAIDetectMedia {
   /// Get first detected species (highest confidence)
   DetectedSnakeSpecies? get primarySpecies =>
       detectedSpecies.isNotEmpty ? detectedSpecies.first : null;
+}
+
+/// Grouped media uploaded by each rescue mission.
+class RescueMissionMediaGroup {
+  final String missionId;
+  final MissionStatus missionStatus;
+  final List<RescueMissionMediaItem> media;
+
+  RescueMissionMediaGroup({
+    required this.missionId,
+    required this.missionStatus,
+    required this.media,
+  });
+
+  factory RescueMissionMediaGroup.fromJson(Map<String, dynamic> json) {
+    return RescueMissionMediaGroup(
+      missionId: json['missionId'] ?? '',
+      missionStatus: MissionStatus.fromString(json['missionStatus'] ?? ''),
+      media:
+          (json['media'] as List<dynamic>?)
+              ?.map((m) => RescueMissionMediaItem.fromJson(m))
+              .toList() ??
+          [],
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'missionId': missionId,
+    'missionStatus': missionStatus.value,
+    'media': media.map((m) => m.toJson()).toList(),
+  };
+}
+
+/// Media details uploaded from rescue mission flow.
+class RescueMissionMediaItem {
+  final String id;
+  final String mediaUrl;
+  final String fileName;
+  final String contentType;
+  final int fileSize;
+  final MediaReferenceType referenceType;
+  final MediaPurpose purpose;
+  final bool requiresAIProcessing;
+
+  RescueMissionMediaItem({
+    required this.id,
+    required this.mediaUrl,
+    required this.fileName,
+    required this.contentType,
+    required this.fileSize,
+    required this.referenceType,
+    required this.purpose,
+    required this.requiresAIProcessing,
+  });
+
+  factory RescueMissionMediaItem.fromJson(Map<String, dynamic> json) {
+    return RescueMissionMediaItem(
+      id: json['id'] ?? '',
+      mediaUrl: json['mediaUrl'] ?? '',
+      fileName: json['fileName'] ?? '',
+      contentType: json['contentType'] ?? '',
+      fileSize: json['fileSize'] ?? 0,
+      referenceType: MediaReferenceType.fromString(
+        json['referenceType'] ?? 'RescueMission',
+      ),
+      purpose: MediaPurpose.fromString(json['purpose'] ?? 'Evidence'),
+      requiresAIProcessing: json['requiresAIProcessing'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'mediaUrl': mediaUrl,
+    'fileName': fileName,
+    'contentType': contentType,
+    'fileSize': fileSize,
+    'referenceType': referenceType.value,
+    'purpose': purpose.value,
+    'requiresAIProcessing': requiresAIProcessing,
+  };
 }
 
 /// Detected Snake Species (from AI recognition)
