@@ -14,12 +14,14 @@ final payosRepositoryProvider = Provider<PayosRepository>((ref) {
 class PaymentLinkResponse {
   final String paymentLinkId;
   final String checkoutUrl;
+  final String? transactionId;
   final String? qrCode;
   final int? orderCode;
 
   PaymentLinkResponse({
     required this.paymentLinkId,
     required this.checkoutUrl,
+    this.transactionId,
     this.qrCode,
     this.orderCode,
   });
@@ -30,6 +32,7 @@ class PaymentLinkResponse {
     return PaymentLinkResponse(
       paymentLinkId: data['paymentLinkId'] as String? ?? '',
       checkoutUrl: data['checkoutUrl'] as String? ?? '',
+      transactionId: data['transactionId'] as String?,
       qrCode: data['qrCode'] as String?,
       orderCode: data['orderCode'] as int?,
     );

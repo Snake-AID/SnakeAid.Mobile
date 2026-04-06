@@ -26,7 +26,6 @@ class _RescuerAcceptRequestScreenState
     extends ConsumerState<RescuerAcceptRequestScreen> {
   final List<bool> _equipmentChecked = [false, false, false, false];
 
-  TransactionInfo? _transaction;
   bool _isCheckingPayment = true;
   bool _paymentConfirmed = false;
   Timer? _pollingTimer;
@@ -46,7 +45,6 @@ class _RescuerAcceptRequestScreenState
     _loadSnakeSpecies();
     _fetchFullRequest();
     _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (!_paymentConfirmed) _checkPayment(silent: true);
       _pollRequestStatus();
     });
   }
@@ -63,6 +61,7 @@ class _RescuerAcceptRequestScreenState
       final response = await repo.getRequestById(widget.requestData.id);
       if (mounted && response.data != null) {
         setState(() => _fullRequest = response.data);
+        _checkPayment(silent: true);
       }
     } catch (e) {
       debugPrint('⚠️ Could not fetch full request details: $e');
@@ -78,6 +77,7 @@ class _RescuerAcceptRequestScreenState
       final data = response.data;
       if (data != null) {
         setState(() => _fullRequest = data);
+        if (!_paymentConfirmed) _checkPayment(silent: true);
         if (data.status == 'Cancelled' && !_cancelledByCustomerHandled) {
           _cancelledByCustomerHandled = true;
           _pollingTimer?.cancel();
@@ -244,22 +244,43 @@ class _RescuerAcceptRequestScreenState
     }));
   }
 
+  /// Check payment via GET /api/transactions?referenceId={requestId} (CatchingDeposit isPaid).
+  /// Fast-path: if mission already present or status already past deposit, skip API call.
   Future<void> _checkPayment({bool silent = false}) async {
     if (!silent) setState(() => _isCheckingPayment = true);
     try {
-      final repo = ref.read(transactionRepositoryProvider);
-      final tx = await repo.getTransactionByRequestId(widget.requestData.id);
+      final req = _fullRequest;
+      const paidStatuses = {
+        'deposited', 'en_route', 'enroute', 'arrived',
+        'finished', 'paid', 'completed',
+      };
+      final status = (req?.status ?? widget.requestData.status).toLowerCase();
+      // Fast-path: mission created only after deposit confirmed.
+      if (req?.mission != null || paidStatuses.contains(status)) {
+        setState(() {
+          _paymentConfirmed = true;
+          _isCheckingPayment = false;
+          _pollCount++;
+        });
+        _pollingTimer?.cancel();
+        return;
+      }
+      // Query transaction list by referenceId=requestId, filtered to CatchingDeposit + isPaid.
+      final txRepo = ref.read(transactionRepositoryProvider);
+      final tx = await txRepo.getDepositTransactionByRequestId(
+        widget.requestData.id,
+      );
       if (!mounted) return;
+      // Repository already guarantees tx is CatchingDeposit && isPaid; non-null means confirmed.
+      final confirmed = tx != null;
       setState(() {
-        _transaction = tx;
-        _paymentConfirmed = tx != null && tx.isDeposited;
+        _paymentConfirmed = confirmed;
         _isCheckingPayment = false;
         _pollCount++;
       });
-      if (_paymentConfirmed) _pollingTimer?.cancel();
+      if (confirmed) _pollingTimer?.cancel();
     } catch (_) {
-      if (!mounted) return;
-      setState(() => _isCheckingPayment = false);
+      if (mounted) setState(() => _isCheckingPayment = false);
     }
   }
 
