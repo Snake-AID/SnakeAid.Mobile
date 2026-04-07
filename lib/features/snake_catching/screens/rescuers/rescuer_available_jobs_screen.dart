@@ -13,7 +13,6 @@ import '../../models/snake_catching_request.dart';
 import '../../models/snake_species.dart';
 import '../../repository/snake_catching_repository.dart';
 import '../../repository/snake_species_repository.dart';
-import '../../repository/transaction_repository.dart';
 import '../../../emergency/providers/rescuer_emergency_provider.dart';
 
 /// Màn hình hiển thị danh sách các đơn cứu hộ có thể nhận
@@ -42,9 +41,6 @@ class _RescuerAvailableJobsScreenState
 
   // Cache for snake species details
   final Map<int, SnakeSpecies> _speciesCache = {};
-
-  // Cache for deposit transactions keyed by requestId
-  final Map<String, TransactionInfo?> _transactionCache = {};
 
   // Cache for mission data keyed by requestId (refreshed on every load so status stays fresh)
   final Map<String, MissionData?> _missionCache = {};
@@ -229,7 +225,6 @@ class _RescuerAvailableJobsScreenState
           _isLoading = false;
         });
         await _loadSnakeSpeciesDetails();
-        await _loadTransactionsForAssigned();
         await _loadMissionStatusForAssigned();
       } else {
         setState(() {
@@ -258,7 +253,6 @@ class _RescuerAvailableJobsScreenState
         setState(() {
           _allRequests = response.data;
         });
-        await _loadTransactionsForAssigned();
         await _loadMissionStatusForAssigned();
       }
     } catch (e) {
@@ -286,29 +280,6 @@ class _RescuerAvailableJobsScreenState
           }
         } catch (e) {
           debugPrint('⚠️ Could not fetch mission status for ${request.id}: $e');
-        }
-      }),
-    );
-  }
-
-  /// Fetch deposit transaction for every Assigned request (if not cached)
-  Future<void> _loadTransactionsForAssigned() async {
-    final repo = ref.read(transactionRepositoryProvider);
-    final assignedRequests = _allRequests
-        .where(
-          (r) => r.status == 'Assigned' && !_transactionCache.containsKey(r.id),
-        )
-        .toList();
-    if (assignedRequests.isEmpty) return;
-
-    await Future.wait(
-      assignedRequests.map((request) async {
-        try {
-          final tx = await repo.getTransactionByRequestId(request.id);
-          if (mounted) setState(() => _transactionCache[request.id] = tx);
-        } catch (_) {
-          // Cache null so we don't retry on every refresh
-          if (mounted) setState(() => _transactionCache[request.id] = null);
         }
       }),
     );
@@ -1794,8 +1765,12 @@ class _RescuerAvailableJobsScreenState
           if (request.status == 'Assigned') ...[
             Builder(
               builder: (_) {
-                final tx = _transactionCache[request.id];
-                final depositPaid = tx != null && tx.isDeposited;
+                const paidStatuses = {
+                  'deposited', 'en_route', 'enroute', 'arrived',
+                  'finished', 'paid', 'completed',
+                };
+                final depositPaid =
+                    paidStatuses.contains(request.status.toLowerCase());
                 if (!depositPaid) return const SizedBox.shrink();
                 return Container(
                   margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
@@ -1848,7 +1823,9 @@ class _RescuerAvailableJobsScreenState
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Sẵn sàng xuất phát · ${_formatCurrency(tx!.amount)}',
+                              request.estimatedPrice != null
+                                  ? 'Sẵn sàng xuất phát · ${_formatCurrency(request.estimatedPrice!)}'
+                                  : 'Sẵn sàng xuất phát',
                               style: const TextStyle(
                                 fontSize: 11,
                                 color: Colors.white70,

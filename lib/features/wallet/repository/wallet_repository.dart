@@ -127,7 +127,8 @@ class WalletRepository {
 
   /// POST /api/wallet/payment
   /// [transactionType] is 'CatchingDeposit' (đợt 1) or 'CatchingPayment' (đợt 2)
-  Future<void> payWithWallet({
+  /// Returns the [transactionId] from the response for subsequent status checks.
+  Future<String> payWithWallet({
     required String snakeCatchingRequestId,
     required double amount,
     required String transactionType,
@@ -154,6 +155,17 @@ class WalletRepository {
       if (response.statusCode != 200 && response.statusCode != 201) {
         throw Exception('Thanh toán thất bại');
       }
+
+      // Extract transactionId from response
+      final respData = response.data as Map<String, dynamic>?;
+      final dataMap = respData?['data'] as Map<String, dynamic>?;
+      final transactionId = dataMap?['transactionId'] as String? ??
+          dataMap?['id'] as String?;
+      if (transactionId == null || transactionId.isEmpty) {
+        throw Exception('Không nhận được mã giao dịch từ máy chủ.');
+      }
+      debugPrint('✅ Wallet payment transactionId=$transactionId');
+      return transactionId;
     } on DioException catch (e) {
       debugPrint('❌ Wallet Payment DioException: ${e.message}');
       debugPrint('📥 Response: ${e.response?.data}');
@@ -170,3 +182,4 @@ class WalletRepository {
     }
   }
 }
+

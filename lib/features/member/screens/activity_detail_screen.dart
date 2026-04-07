@@ -39,15 +39,20 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
 
   // Deposit payment state (status == Assigned)
   TransactionInfo? _transaction;
+  String? _depositTransactionId;   // set from wallet/PayOS response
   bool _isCheckingPayment = false;
   bool _isCreatingPayment = false;
   Timer? _paymentTimer;
 
   // Final payment state (status == Finished)
   TransactionInfo? _finalTransaction;
+  String? _finalTransactionId;     // set from wallet/PayOS response
   bool _isCreatingFinalPayment = false;
   Timer? _finalPaymentTimer;
   bool _hasTransferredToRescuer = false;
+
+  // True when round-1 CatchingDeposit is confirmed (set from mission presence or transaction check)
+  bool _depositPaid = false;
 
   // Wallet
   WalletInfo? _walletInfo;
@@ -149,18 +154,12 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         setState(() {
           _request = response.data;
           _isLoading = false;
+          // Mission only exists after deposit is confirmed — use as proxy for paid state
+          if (response.data!.mission != null) _depositPaid = true;
         });
 
         // Load species details for each species in the request
         _loadSpeciesDetails();
-
-        // If deposit status, check payment status and scroll to payment card
-        const depositStatuses = {'Pending', 'Confirmed', 'Assigned'};
-        if (depositStatuses.contains(_request!.status)) {
-          _checkPaymentStatus(scrollIfUnpaid: true);
-        } else if (_request!.status == 'Finished') {
-          _checkFinalPaymentStatus(scrollIfUnpaid: true);
-        }
 
         // Load wallet balance for payment options
         _loadWallet();
@@ -226,6 +225,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         setState(() {
           _request = response.data;
           _errorMessage = null;
+          if (response.data!.mission != null) _depositPaid = true;
         });
 
         // Load any new species details
@@ -248,28 +248,31 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     }
   }
 
-  /// Check and poll deposit payment status
+  /// Check deposit payment status via GET /api/transactions/{id}.
+  /// Only runs when [_depositTransactionId] has been set from a payment response.
   Future<void> _checkPaymentStatus({bool silent = false, bool scrollIfUnpaid = false}) async {
     if (!mounted) return;
+    final tid = _depositTransactionId;
+    if (tid == null) return;
     if (!silent) setState(() => _isCheckingPayment = true);
     try {
       final repo = ref.read(transactionRepositoryProvider);
-      final tx = await repo.getTransactionByRequestId(widget.requestId);
+      final tx = await repo.getTransactionById(tid);
       if (!mounted) return;
       setState(() {
         _transaction = tx;
         _isCheckingPayment = false;
+        if (tx != null && tx.isPaid) _depositPaid = true;
       });
-      // Scroll to payment card only when not yet paid
-      if (scrollIfUnpaid && (tx == null || !tx.isDeposited)) {
+      if (scrollIfUnpaid && (tx == null || !tx.isPaid)) {
         _scrollToPaymentCard();
       }
-      // If not yet paid, poll every 5 seconds
-      if (tx == null || !tx.isDeposited) {
+      // Poll until BE confirms payment
+      if (tx == null || !tx.isPaid) {
         _paymentTimer?.cancel();
         _paymentTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-          const depositStatuses = {'Pending', 'Confirmed', 'Assigned'};
-          if (depositStatuses.contains(_request?.status)) {
+          if (_depositTransactionId != null &&
+              {'Pending', 'Confirmed', 'Assigned'}.contains(_request?.status)) {
             _checkPaymentStatus(silent: true);
           } else {
             _paymentTimer?.cancel();
@@ -949,14 +952,18 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     }
     setState(() => _isPayingWithWallet = true);
     try {
-      await ref.read(walletRepositoryProvider).payWithWallet(
+      final transactionId = await ref.read(walletRepositoryProvider).payWithWallet(
         snakeCatchingRequestId: _request!.id,
         amount: amount,
         transactionType: 'CatchingDeposit',
         description: 'Catching deposit 1',
       );
       if (!mounted) return;
-      setState(() => _isPayingWithWallet = false);
+      setState(() {
+        _isPayingWithWallet = false;
+        _depositTransactionId = transactionId;
+        _depositPaid = true;
+      });
       final depositAmount = _request!.estimatedPrice ?? _request!.mission?.estimatedCost ?? 0;
       await _showPaymentSuccessDialog(
         title: 'Thanh Toán Thành Công!',
@@ -987,14 +994,17 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     }
     setState(() => _isPayingFinalWithWallet = true);
     try {
-      await ref.read(walletRepositoryProvider).payWithWallet(
+      final transactionId = await ref.read(walletRepositoryProvider).payWithWallet(
         snakeCatchingRequestId: _request!.id,
         amount: finalAmount,
         transactionType: 'CatchingPayment',
         description: 'Catching payment',
       );
       if (!mounted) return;
-      setState(() => _isPayingFinalWithWallet = false);
+      setState(() {
+        _isPayingFinalWithWallet = false;
+        _finalTransactionId = transactionId;
+      });
       await _showPaymentSuccessDialog(
         title: 'Thanh Toán Thành Công!',
         subtitle: 'Thanh toán dịch vụ bắt rắn đã được xác nhận.',
@@ -1040,7 +1050,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         description: 'Catching deposit 1',
       );
       if (!mounted) return;
-      setState(() => _isCreatingPayment = false);
+      setState(() {
+        _isCreatingPayment = false;
+        if (link.transactionId != null) _depositTransactionId = link.transactionId;
+      });
 
       final uri = Uri.parse(link.checkoutUrl);
       // externalApplication + App Links (assetlinks.json on server) = auto-return to app.
@@ -1057,15 +1070,17 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     }
   }
 
-  /// Check and poll final (CatchingPayment) status
+  /// Check final payment (CatchingPayment) status via GET /api/transactions/{id}.
+  /// Only runs when [_finalTransactionId] has been set from a payment response.
   Future<void> _checkFinalPaymentStatus({bool silent = false, bool scrollIfUnpaid = false}) async {
     if (!mounted) return;
+    final tid = _finalTransactionId;
+    if (tid == null) return;
     try {
       final repo = ref.read(transactionRepositoryProvider);
-      final tx = await repo.getTransactionByRequestId(widget.requestId);
+      final tx = await repo.getTransactionById(tid);
       if (!mounted) return;
 
-      // Consider paid if: explicit CatchingPayment tx, OR request already moved to Completed
       final requestIsPaid = (_request?.status == 'Completed');
       final txIsFinalPayment = (tx?.isCatchingPayment == true);
 
@@ -1076,10 +1091,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       if (scrollIfUnpaid && _finalTransaction == null) _scrollToPaymentCard();
 
       if (_finalTransaction == null) {
-        // No payment yet — poll every 5s
+        // Transaction not yet a confirmed CatchingPayment — poll every 5s
         _finalPaymentTimer?.cancel();
         _finalPaymentTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-          if (_request?.status == 'Finished') {
+          if (_finalTransactionId != null && _request?.status == 'Finished') {
             _checkFinalPaymentStatus(silent: true);
           } else {
             _finalPaymentTimer?.cancel();
@@ -1088,7 +1103,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       } else if (requestIsPaid || (txIsFinalPayment && _finalTransaction!.isPaid)) {
         // Payment confirmed
         _finalPaymentTimer?.cancel();
-        _hasTransferredToRescuer = true; // mark so no re-transfer logic fires
+        _hasTransferredToRescuer = true;
       } else {
         // Transaction exists but not confirmed yet — poll every 3s
         _finalPaymentTimer?.cancel();
@@ -1122,7 +1137,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         transactionType: 'CatchingPayment',
       );
       if (!mounted) return;
-      setState(() => _isCreatingFinalPayment = false);
+      setState(() {
+        _isCreatingFinalPayment = false;
+        if (link.transactionId != null) _finalTransactionId = link.transactionId;
+      });
       await launchUrl(Uri.parse(link.checkoutUrl), mode: LaunchMode.externalApplication);
       if (mounted) _checkFinalPaymentStatus();
     } catch (e) {
@@ -1450,8 +1468,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
             _buildRescuerInfoCard(request),
           ],
 
-          // ── Payment Banner (only when Assigned) ──
-          if (request.status == 'Assigned') ...[            
+          // ── Payment Card (Pending / Confirmed / Assigned — unpaid or already paid) ──
+          if (const {'Pending', 'Confirmed', 'Assigned'}.contains(request.status)) ...[            
             const SizedBox(height: 16),
             _buildPaymentCard(request),
           ],
@@ -1650,8 +1668,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   Widget _buildStickyFooter(SnakeCatchingRequestData request) {
     // Deposit payment is allowed at Pending, Confirmed, Assigned statuses
     const depositStatuses = {'Pending', 'Confirmed', 'Assigned'};
-    final bool needPayment = depositStatuses.contains(request.status) &&
-        (_transaction == null || !_transaction!.isDeposited);
+    final bool needPayment = depositStatuses.contains(request.status) && !_depositPaid;
     final bool needFinalPayment = request.status == 'Finished' &&
         _finalTransaction == null;
     final bool isAnyLoading = _isCreatingPayment || _isCreatingFinalPayment ||
@@ -2187,7 +2204,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   // Payment Card
   // ──────────────────────────────────────────────────────────────────
   Widget _buildPaymentCard(SnakeCatchingRequestData request) {
-    final paid = _transaction != null && _transaction!.isDeposited;
+    final paid = _depositPaid;
     final amount = request.estimatedPrice ?? request.mission?.estimatedCost;
 
     return Container(
@@ -3869,7 +3886,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         if (ms == 'arrived') return 'arrived';
       }
       // Deposit paid (regardless of whether mission object is present yet)
-      if (_transaction != null && _transaction!.isDeposited) return 'deposited';
+      if (_depositPaid) return 'deposited';
     }
     return request.status;
   }
