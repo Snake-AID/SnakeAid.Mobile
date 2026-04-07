@@ -31,12 +31,16 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   if (message.notification == null && message.data.isNotEmpty) {
     final title = (message.data['title'] ?? '').toString().trim();
     final body = (message.data['body'] ?? '').toString().trim();
+    final channel = (message.data['channel'] ?? '').toString().toLowerCase();
+    final targetChannelId = channel == 'payment'
+        ? NotificationService.paymentChannelId
+        : NotificationService.generalChannelId;
     if (title.isNotEmpty || body.isNotEmpty) {
       await notificationService.showCustomNotification(
         id: message.messageId.hashCode,
         title: title.isEmpty ? 'Notification' : title,
         body: body,
-        channelId: NotificationService.generalChannelId,
+        channelId: targetChannelId,
         payload: message.data,
       );
     }
