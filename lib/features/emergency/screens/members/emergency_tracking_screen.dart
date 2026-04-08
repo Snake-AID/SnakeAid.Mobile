@@ -149,8 +149,12 @@ class _EmergencyTrackingScreenState
       debugPrint(
         '⚠️ Skipping rescuer position restore: cached mission belongs to different incident (cached: ${missionStatus.incidentId}, current: $currentIncidentId)',
       );
-      // Clear stale mission status
-      ref.read(missionStatusProvider.notifier).reset();
+      // Clear stale mission status after current frame to avoid
+      // Riverpod "modify provider while building" assertion.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(missionStatusProvider.notifier).reset();
+      });
     }
 
     _startMemberGps();
