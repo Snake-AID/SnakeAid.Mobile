@@ -2,13 +2,37 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../repository/expert_analytics_repository.dart';
+import '../models/expert_daily_stats.dart';
 import '../../../core/providers/http_provider.dart';
 import '../../../core/services/emergency_consultation_signalr_service.dart';
 import 'expert_profile_screen.dart';
+import 'expert_withdraw_money_screen.dart';
 import '../../consultation/repository/consultation_repository.dart';
 import '../../consultation/models/consultation_booking_response.dart';
 import '../../blog/providers/blog_provider.dart';
 import '../../blog/models/blog_model.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../notifications/providers/notification_inbox_provider.dart';
+import '../../wallet/repository/transaction_repository.dart';
+
+/// FutureProvider for today's expert statistics (used in stats grid).
+/// Not autoDispose so data is cached for the session (avoids re-spinner on tab switch).
+final _expertDailyStatsProvider =
+    FutureProvider<ExpertStats>((ref) {
+  return ref
+      .watch(expertAnalyticsRepositoryProvider)
+      .getStatistics(period: 'day');
+});
+
+/// FutureProvider for this month's expert statistics (used in earnings card).
+/// Not autoDispose so data is cached for the session (avoids re-spinner on tab switch).
+final _expertMonthlyStatsProvider =
+    FutureProvider<ExpertStats>((ref) {
+  return ref
+      .watch(expertAnalyticsRepositoryProvider)
+      .getStatistics(period: 'month');
+});
 
 /// FutureProvider for the current expert's bookings from the API.
 final _expertBookingsFutureProvider =
@@ -77,10 +101,22 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
   final _homeKey = GlobalKey<_HomeTabState>();
   final _consultationsKey = GlobalKey<_ConsultationsTabState>();
 
+  // Screens are created once and kept alive via IndexedStack.
+  late final List<Widget> _screens;
+
   @override
   void initState() {
     super.initState();
     _selectedIndex = widget.initialTab;
+    _screens = [
+      _HomeTab(
+        key: _homeKey,
+        onSeeAll: () => setState(() => _selectedIndex = 1),
+      ),
+      _ConsultationsTab(key: _consultationsKey),
+      const _IncomeTab(),
+      _ProfileTab(onGoToHistory: _goToConsultationHistory),
+    ];
   }
 
   void _goToConsultationHistory() {
@@ -92,18 +128,9 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screens = [
-      _HomeTab(
-        key: _homeKey,
-        onSeeAll: () => setState(() => _selectedIndex = 1),
-      ),
-      _ConsultationsTab(key: _consultationsKey),
-      const _IncomeTab(),
-      _ProfileTab(onGoToHistory: _goToConsultationHistory),
-    ];
     return Scaffold(
       backgroundColor: Colors.white,
-      body: screens[_selectedIndex],
+      body: IndexedStack(index: _selectedIndex, children: _screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -505,30 +532,19 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                       ),
                       onPressed: () => context.push('/notifications'),
                     ),
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFDC3545),
-                          shape: BoxShape.circle,
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 16,
-                          minHeight: 16,
-                        ),
-                        child: const Text(
-                          '3',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                    if (ref.watch(notificationInboxProvider).unreadCount > 0)
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFDC3545),
+                            shape: BoxShape.circle,
                           ),
-                          textAlign: TextAlign.center,
                         ),
                       ),
-                    ),
                   ],
                 ),
                 Padding(
@@ -1300,6 +1316,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
   }
 
   Widget _buildEarningsCard() {
+    final statsAsync = ref.watch(_expertMonthlyStatsProvider);
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -1329,26 +1346,49 @@ class _HomeTabState extends ConsumerState<_HomeTab>
             ),
           ),
           const SizedBox(height: 8),
-          const Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '12.5M',
-                style: TextStyle(
-                  fontSize: 36,
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
+          statsAsync.when(
+            loading: () => const SizedBox(
+              height: 44,
+              child: Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: Colors.white54,
+                  ),
                 ),
               ),
-              SizedBox(width: 8),
-              Padding(
-                padding: EdgeInsets.only(bottom: 6),
-                child: Text(
-                  'VNĐ',
-                  style: TextStyle(fontSize: 18, color: Colors.white70),
-                ),
+            ),
+            error: (_, __) => const Text(
+              '--',
+              style: TextStyle(
+                fontSize: 36,
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
               ),
-            ],
+            ),
+            data: (stats) => Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  _formatIncome(stats.totalIncome),
+                  style: const TextStyle(
+                    fontSize: 36,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    stats.currency,
+                    style: const TextStyle(fontSize: 18, color: Colors.white70),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 20),
           Container(
@@ -1356,65 +1396,60 @@ class _HomeTabState extends ConsumerState<_HomeTab>
             decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: Colors.white24, width: 1)),
             ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.medical_services,
-                  color: Colors.white,
-                  size: 18,
-                ),
-                const SizedBox(width: 6),
-                const Text(
-                  '18 Tư Vấn',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
+            child: statsAsync.when(
+              loading: () => const Row(
+                children: [
+                  Icon(Icons.check_circle_outline,
+                      color: Colors.white38, size: 18),
+                  SizedBox(width: 6),
+                  Text('— Tư Vấn Hoàn Thành',
+                      style: TextStyle(fontSize: 14, color: Colors.white38)),
+                  SizedBox(width: 16),
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 1.5, color: Colors.white38),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Container(width: 1, height: 16, color: Colors.white30),
-                const SizedBox(width: 16),
-                const Icon(Icons.star, color: Color(0xFFFFC107), size: 18),
-                const SizedBox(width: 6),
-                const Text(
-                  '4.8',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
+                ],
+              ),
+              error: (_, __) => const Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.white38, size: 16),
+                  SizedBox(width: 6),
+                  Text('Không thể tải dữ liệu',
+                      style: TextStyle(fontSize: 13, color: Colors.white54)),
+                ],
+              ),
+              data: (stats) => Row(
+                children: [
+                  const Icon(Icons.check_circle_outline,
+                      color: Colors.white, size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${stats.completedConsultations} Tư Vấn Hoàn Thành',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
+                  const SizedBox(width: 16),
+                  Container(width: 1, height: 16, color: Colors.white30),
+                  const SizedBox(width: 16),
+                  const Icon(Icons.inbox_outlined,
+                      color: Colors.white70, size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${stats.consultationRequests} Yêu Cầu',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(
-                        Icons.trending_up,
-                        color: Color(0xFF28A745),
-                        size: 14,
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        '+15%',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF28A745),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -1422,40 +1457,93 @@ class _HomeTabState extends ConsumerState<_HomeTab>
     );
   }
 
+  /// Format income: 1500000 → "1.5M", 500000 → "500K", etc.
+  String _formatIncome(int amount) {
+    if (amount >= 1000000) {
+      final m = amount / 1000000;
+      return m == m.truncateToDouble()
+          ? '${m.toInt()}M'
+          : '${m.toStringAsFixed(1)}M';
+    } else if (amount >= 1000) {
+      final k = amount / 1000;
+      return k == k.truncateToDouble()
+          ? '${k.toInt()}K'
+          : '${k.toStringAsFixed(1)}K';
+    }
+    return '$amount';
+  }
+
   Widget _buildStatsGrid() {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.6,
-      children: [
-        _buildStatCard(
-          'Đang Chờ',
-          '5',
-          Icons.hourglass_top,
-          const Color(0xFFFFC107),
+    final statsAsync = ref.watch(_expertDailyStatsProvider);
+    return statsAsync.when(
+      loading: () => Row(
+        children: List.generate(
+          2,
+          (_) => Expanded(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              height: 88,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFF0F0F0)),
+              ),
+              child: const Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFF6C47C2),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
-        _buildStatCard(
-          'Hoàn Thành',
-          '3',
-          Icons.check_circle,
-          const Color(0xFF28A745),
-        ),
-        _buildStatCard(
-          'Lịch Hẹn',
-          '12',
-          Icons.calendar_month,
-          const Color(0xFF6C47C2),
-        ),
-        _buildStatCard(
-          'Phản Hồi',
-          '95%',
-          Icons.thumb_up,
-          const Color(0xFF6C47C2),
-        ),
-      ],
+      ),
+      error: (_, __) => Row(
+        children: [
+          Expanded(
+            child: _buildStatCard(
+              'Yêu Cầu',
+              '--',
+              Icons.inbox_outlined,
+              const Color(0xFF6C47C2),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildStatCard(
+              'Hoàn Thành',
+              '--',
+              Icons.check_circle_outline,
+              const Color(0xFF28A745),
+            ),
+          ),
+        ],
+      ),
+      data: (stats) => Row(
+        children: [
+          Expanded(
+            child: _buildStatCard(
+              'Yêu Cầu Hôm Nay',
+              '${stats.consultationRequests}',
+              Icons.inbox_outlined,
+              const Color(0xFF6C47C2),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildStatCard(
+              'Hoàn Thành Hôm Nay',
+              '${stats.completedConsultations}',
+              Icons.check_circle_outline,
+              const Color(0xFF28A745),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1496,7 +1584,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
               Icon(icon, color: iconColor, size: 20),
             ],
           ),
-          const Spacer(),
+          const SizedBox(height: 8),
           Text(
             value,
             style: const TextStyle(
@@ -2892,83 +2980,104 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
 
 // ── Income Tab ────────────────────────────────────────────────────────────────
 
-class _IncomeTransaction {
-  final String id;
-  final String patientName;
-  final String consultationType;
-  final DateTime date;
-  final int amount;
-  final bool isPending;
-
-  const _IncomeTransaction({
-    required this.id,
-    required this.patientName,
-    required this.consultationType,
-    required this.date,
-    required this.amount,
-    this.isPending = false,
-  });
-}
-
-class _IncomeTab extends StatefulWidget {
+class _IncomeTab extends ConsumerStatefulWidget {
   const _IncomeTab();
 
   @override
-  State<_IncomeTab> createState() => _IncomeTabState();
+  ConsumerState<_IncomeTab> createState() => _IncomeTabState();
 }
 
-class _IncomeTabState extends State<_IncomeTab> {
+class _IncomeTabState extends ConsumerState<_IncomeTab> {
   int _selectedMonth = DateTime.now().month;
   int _selectedYear = DateTime.now().year;
 
-  final _transactions = [
-    _IncomeTransaction(
-      id: 't1',
-      patientName: 'Phạm Đức D',
-      consultationType: 'Đặt Lịch',
-      date: DateTime(2025, 12, 10),
-      amount: 200000,
-    ),
-    _IncomeTransaction(
-      id: 't2',
-      patientName: 'Hoàng Thị E',
-      consultationType: 'Khẩn Cấp',
-      date: DateTime(2025, 12, 8),
-      amount: 350000,
-    ),
-    _IncomeTransaction(
-      id: 't3',
-      patientName: 'Lê Văn G',
-      consultationType: 'Tái Khám',
-      date: DateTime(2025, 12, 5),
-      amount: 180000,
-    ),
-    _IncomeTransaction(
-      id: 't4',
-      patientName: 'Nguyễn Thị H',
-      consultationType: 'Đặt Lịch',
-      date: DateTime(2025, 12, 3),
-      amount: 200000,
-    ),
-    _IncomeTransaction(
-      id: 't5',
-      patientName: 'Trần Văn I',
-      consultationType: 'Khẩn Cấp',
-      date: DateTime(2025, 12, 1),
-      amount: 350000,
-      isPending: true,
-    ),
-  ];
+  final List<TransactionInfo> _allTransactions = [];
+  bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  String? _error;
+  int _page = 1;
+  static const int _pageSize = 50;
 
-  int get _totalIncome => _transactions
-      .where((t) => !t.isPending)
-      .fold(0, (sum, t) => sum + t.amount);
+  late final ScrollController _scrollController;
 
-  int get _pendingIncome => _transactions
-      .where((t) => t.isPending)
-      .fold(0, (sum, t) => sum + t.amount);
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController()..addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initialLoad());
+  }
 
-  String _formatAmount(int amount) {
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200 &&
+        !_isLoadingMore &&
+        _hasMore) {
+      _fetchPage(_page);
+    }
+  }
+
+  Future<void> _initialLoad() async {
+    setState(() {
+      _allTransactions.clear();
+      _isLoading = true;
+      _error = null;
+      _page = 1;
+      _hasMore = true;
+    });
+    await _fetchPage(1);
+  }
+
+  Future<void> _fetchPage(int page) async {
+    if (!_hasMore) return;
+    if (page == 1) {
+      setState(() => _isLoading = true);
+    } else {
+      setState(() => _isLoadingMore = true);
+    }
+
+    try {
+      final userId = ref.read(authProvider).user?.id;
+      final results = await ref.read(transactionRepositoryProvider).getTransactions(
+            userId: userId,
+            transType: 'ExpertPayout',
+            pageNumber: page,
+            pageSize: _pageSize,
+          );
+      if (!mounted) return;
+      setState(() {
+        if (page == 1) _allTransactions.clear();
+        _allTransactions.addAll(results);
+        _hasMore = results.length >= _pageSize;
+        _page = page + 1;
+        _isLoading = false;
+        _isLoadingMore = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _isLoadingMore = false;
+        if (page == 1) _error = e.toString();
+      });
+    }
+  }
+
+  List<TransactionInfo> get _filtered => _allTransactions
+      .where((t) => t.createdAt.month == _selectedMonth && t.createdAt.year == _selectedYear)
+      .toList();
+
+  double get _filteredTotal =>
+      _filtered.fold(0.0, (sum, t) => sum + t.amount);
+
+  String _formatAmount(double amount) {
     if (amount >= 1000000) {
       return '${(amount / 1000000).toStringAsFixed(1)}M';
     }
@@ -2979,22 +3088,16 @@ class _IncomeTabState extends State<_IncomeTab> {
       '${dt.day.toString().padLeft(2, '0')}/'
       '${dt.month.toString().padLeft(2, '0')}/${dt.year}';
 
+  static const _months = [
+    'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4',
+    'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8',
+    'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12',
+  ];
+
   @override
   Widget build(BuildContext context) {
-    const months = [
-      'Tháng 1',
-      'Tháng 2',
-      'Tháng 3',
-      'Tháng 4',
-      'Tháng 5',
-      'Tháng 6',
-      'Tháng 7',
-      'Tháng 8',
-      'Tháng 9',
-      'Tháng 10',
-      'Tháng 11',
-      'Tháng 12',
-    ];
+    final filtered = _filtered;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F6F8),
       appBar: AppBar(
@@ -3011,243 +3114,338 @@ class _IncomeTabState extends State<_IncomeTab> {
             color: Color(0xFF2D2D2D),
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Color(0xFF6C47C2)),
+            tooltip: 'Tải lại',
+            onPressed: _isLoading ? null : _initialLoad,
+          ),
+        ],
       ),
       body: Column(
         children: [
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                // Monthly Summary Card
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF6C47C2), Color(0xFF9F7AEA)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF6C47C2),
                     ),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF6C47C2).withOpacity(0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Thu Nhập Đã Nhận',
-                        style: TextStyle(fontSize: 13, color: Colors.white70),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            _formatAmount(_totalIncome),
-                            style: const TextStyle(
-                              fontSize: 38,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 6, left: 8),
-                            child: Text(
-                              'VNĐ',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.white70,
+                  )
+                : _error != null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.cloud_off_outlined,
+                                size: 56,
+                                color: Color(0xFFCCCCCC),
                               ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.only(top: 16),
-                        decoration: const BoxDecoration(
-                          border: Border(
-                            top: BorderSide(color: Colors.white24),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Không thể tải dữ liệu',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF555555),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _error!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF999999),
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              TextButton.icon(
+                                onPressed: _initialLoad,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Thử lại'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: const Color(0xFF6C47C2),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.check_circle,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '${_transactions.where((t) => !t.isPending).length} tư vấn hoàn thành',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Colors.white,
+                      )
+                    : ListView(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(16),
+                        children: [
+                          // ── Summary Card ───────────────────────────────────
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF6C47C2), Color(0xFF9F7AEA)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
                               ),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF6C47C2).withOpacity(0.3),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
                             ),
-                            const Spacer(),
-                            if (_pendingIncome > 0)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
                                   children: [
                                     const Icon(
-                                      Icons.hourglass_top,
+                                      Icons.wallet,
                                       color: Colors.white70,
-                                      size: 13,
+                                      size: 16,
                                     ),
-                                    const SizedBox(width: 4),
+                                    const SizedBox(width: 6),
                                     Text(
-                                      'Chờ: ${_formatAmount(_pendingIncome)} ₫',
+                                      'Thu Nhập — ${_months[_selectedMonth - 1]} $_selectedYear',
                                       style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w500,
+                                        fontSize: 13,
+                                        color: Colors.white70,
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Month / Year filter
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFEEEEEE)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.calendar_month,
-                        size: 18,
-                        color: Color(0xFF6C47C2),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Lọc theo tháng:',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF666666),
-                        ),
-                      ),
-                      const Spacer(),
-                      DropdownButton<int>(
-                        value: _selectedMonth,
-                        underline: const SizedBox(),
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF6C47C2),
-                        ),
-                        items: List.generate(
-                          12,
-                          (i) => DropdownMenuItem(
-                            value: i + 1,
-                            child: Text(months[i]),
+                                const SizedBox(height: 8),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      _formatAmount(_filteredTotal),
+                                      style: const TextStyle(
+                                        fontSize: 40,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        height: 1.1,
+                                      ),
+                                    ),
+                                    const Padding(
+                                      padding: EdgeInsets.only(bottom: 6, left: 8),
+                                      child: Text(
+                                        'VNĐ',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                Container(
+                                  padding: const EdgeInsets.only(top: 14),
+                                  decoration: const BoxDecoration(
+                                    border: Border(
+                                      top: BorderSide(color: Colors.white24),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.receipt_long,
+                                        color: Colors.white70,
+                                        size: 15,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '${filtered.length} giao dịch',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      if (_allTransactions.length > filtered.length)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(0.15),
+                                            borderRadius: BorderRadius.circular(20),
+                                          ),
+                                          child: Text(
+                                            'Tổng: ${_allTransactions.length} giao dịch',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.white70,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        onChanged: (v) => setState(() => _selectedMonth = v!),
-                      ),
-                      const SizedBox(width: 8),
-                      DropdownButton<int>(
-                        value: _selectedYear,
-                        underline: const SizedBox(),
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF6C47C2),
-                        ),
-                        items: [2024, 2025, 2026]
-                            .map(
-                              (y) =>
-                                  DropdownMenuItem(value: y, child: Text('$y')),
+                          const SizedBox(height: 16),
+
+                          // ── Month / Year Filter ────────────────────────────
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFEEEEEE)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.calendar_month,
+                                  size: 18,
+                                  color: Color(0xFF6C47C2),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Lọc theo tháng:',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF666666),
+                                  ),
+                                ),
+                                const Spacer(),
+                                DropdownButton<int>(
+                                  value: _selectedMonth,
+                                  underline: const SizedBox(),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF6C47C2),
+                                  ),
+                                  items: List.generate(
+                                    12,
+                                    (i) => DropdownMenuItem(
+                                      value: i + 1,
+                                      child: Text(_months[i]),
+                                    ),
+                                  ),
+                                  onChanged: (v) =>
+                                      setState(() => _selectedMonth = v!),
+                                ),
+                                const SizedBox(width: 8),
+                                DropdownButton<int>(
+                                  value: _selectedYear,
+                                  underline: const SizedBox(),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF6C47C2),
+                                  ),
+                                  items: [2024, 2025, 2026]
+                                      .map((y) => DropdownMenuItem(
+                                            value: y,
+                                            child: Text('$y'),
+                                          ))
+                                      .toList(),
+                                  onChanged: (v) =>
+                                      setState(() => _selectedYear = v!),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // ── Transaction List ───────────────────────────────
+                          Row(
+                            children: [
+                              const Text(
+                                'Lịch Sử Giao Dịch',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF2D2D2D),
+                                ),
+                              ),
+                              const Spacer(),
+                              if (filtered.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF6C47C2).withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    '${filtered.length}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF6C47C2),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+
+                          if (filtered.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 40),
+                              child: Column(
+                                children: [
+                                  Icon(
+                                    Icons.inbox_outlined,
+                                    size: 52,
+                                    color: Colors.grey.shade300,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'Không có giao dịch\ntrong ${_months[_selectedMonth - 1]} $_selectedYear',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Color(0xFF999999),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             )
-                            .toList(),
-                        onChanged: (v) => setState(() => _selectedYear = v!),
+                          else
+                            ...filtered.map(_buildTransactionItem),
+
+                          if (_isLoadingMore)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: Center(
+                                child: SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFF6C47C2),
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                          const SizedBox(height: 80),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Transactions
-                const Text(
-                  'Lịch Sử Giao Dịch',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D2D2D),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                ..._transactions.map(_buildTransactionItem),
-                const SizedBox(height: 80),
-              ],
-            ),
-          ),
-
-          // Withdraw button
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-            child: SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Yêu cầu rút tiền - Đang phát triển'),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.account_balance_wallet, size: 20),
-                label: const Text(
-                  'Yêu Cầu Rút Tiền',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6C47C2),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-              ),
-            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTransactionItem(_IncomeTransaction t) {
+  Widget _buildTransactionItem(TransactionInfo t) {
+    final label = kTransTypeLabels[t.transactionType] ?? t.transactionType;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -3259,20 +3457,16 @@ class _IncomeTabState extends State<_IncomeTab> {
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-              color: t.isPending
-                  ? const Color(0xFFFFC107).withOpacity(0.1)
-                  : const Color(0xFF28A745).withOpacity(0.1),
+              color: const Color(0xFF28A745).withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              t.isPending ? Icons.hourglass_top : Icons.check_circle,
+            child: const Icon(
+              Icons.arrow_downward_rounded,
               size: 20,
-              color: t.isPending
-                  ? const Color(0xFFFFC107)
-                  : const Color(0xFF28A745),
+              color: Color(0xFF28A745),
             ),
           ),
           const SizedBox(width: 12),
@@ -3281,27 +3475,33 @@ class _IncomeTabState extends State<_IncomeTab> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  t.patientName,
+                  t.fullName.isNotEmpty
+                      ? t.fullName
+                      : (t.description.isNotEmpty
+                          ? t.description
+                          : 'Giao dịch'),
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF2D2D2D),
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 1,
+                        horizontal: 6,
+                        vertical: 2,
                       ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF6C47C2).withOpacity(0.08),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        t.consultationType,
+                        label,
                         style: const TextStyle(
                           fontSize: 10,
                           color: Color(0xFF6C47C2),
@@ -3311,7 +3511,7 @@ class _IncomeTabState extends State<_IncomeTab> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      _formatDate(t.date),
+                      _formatDate(t.createdAt),
                       style: const TextStyle(
                         fontSize: 11,
                         color: Color(0xFF999999),
@@ -3322,25 +3522,14 @@ class _IncomeTabState extends State<_IncomeTab> {
               ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '+${_formatAmount(t.amount)} ₫',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: t.isPending
-                      ? const Color(0xFFFFC107)
-                      : const Color(0xFF28A745),
-                ),
-              ),
-              if (t.isPending)
-                const Text(
-                  'Đang xử lý',
-                  style: TextStyle(fontSize: 10, color: Color(0xFF999999)),
-                ),
-            ],
+          const SizedBox(width: 8),
+          Text(
+            '+${_formatAmount(t.amount)} ₫',
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF28A745),
+            ),
           ),
         ],
       ),
