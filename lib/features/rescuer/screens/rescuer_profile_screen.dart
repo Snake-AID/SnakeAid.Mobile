@@ -60,43 +60,7 @@ class _RescuerProfileScreenState extends ConsumerState<RescuerProfileScreen> {
             color: Color(0xFF2D2D2D),
           ),
         ),
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 8),
-          child: GestureDetector(
-            onTap: () {
-              setState(() {
-                _isOnline = !_isOnline;
-              });
-            },
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    color: _isOnline ? const Color(0xFF10B981) : Colors.grey,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check,
-                    color: Colors.white,
-                    size: 12,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  _isOnline ? 'On' : 'Off',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: _isOnline ? const Color(0xFF10B981) : Colors.grey,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+      
         actions: [
           IconButton(
             icon: const Icon(Icons.settings, color: Color(0xFF2D2D2D)),
@@ -118,10 +82,6 @@ class _RescuerProfileScreenState extends ConsumerState<RescuerProfileScreen> {
             _buildRatingCard(),
             const SizedBox(height: 16),
 
-            // Stats Card
-            _buildStatsCard(),
-            const SizedBox(height: 16),
-
             // Menu Items
             _buildMenuItem(
               icon: Icons.checklist,
@@ -129,51 +89,13 @@ class _RescuerProfileScreenState extends ConsumerState<RescuerProfileScreen> {
               subtitle: '${_profile?.completedMissions ?? 0} nhiệm vụ đã hoàn thành',
               onTap: () => context.pushNamed('rescuer_history'),
             ),
-            const SizedBox(height: 12),
-            _buildMenuItem(
-              icon: Icons.wallet,
-              title: 'Quản Lý Thu Nhập',
-              subtitle: 'Xem báo cáo tài chính',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const PaymentHistoryScreen(
-                    themeColor: Color(0xFFFF6B35),
-                    title: 'Quản Lý Thu Nhập',
-                    filterTypes: [
-                      'snakebite incident',
-                      'snake catching',
-                      'system',
-                    ],
-                  ),
-                ),
-              ),
-            ),
+           
             const SizedBox(height: 12),
             _buildMenuItem(
               icon: Icons.star,
               title: 'Đánh Giá & Phản Hồi',
               subtitle: '${_profile?.ratingCount ?? 0} đánh giá từ khách hàng',
               onTap: () => context.pushNamed('rescuer_feedback'),
-            ),
-            const SizedBox(height: 12),
-            _buildMenuItem(
-              icon: Icons.construction,
-              title: 'Trang Thiết Bị',
-              subtitle: 'Danh sách dụng cụ cứu hộ',
-            ),
-            const SizedBox(height: 12),
-            _buildMenuItem(
-              icon: Icons.badge,
-              title: 'Chứng Chỉ & Giấy Tờ',
-              subtitle: 'CMND, BHYT',
-              onTap: () => context.pushNamed('rescuer_id_documents'),
-            ),
-            const SizedBox(height: 12),
-            _buildMenuItem(
-              icon: Icons.pin_drop,
-              title: 'Khu Vực Hoạt Động',
-              subtitle: '',
             ),
             const SizedBox(height: 16),
 
@@ -505,113 +427,6 @@ class _RescuerProfileScreenState extends ConsumerState<RescuerProfileScreen> {
                         ),
                       ),
                     ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatsCard() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              children: [
-                Text(
-                  _profile?.completedMissions?.toString() ?? '--',
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D2D2D),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Ca hoàn thành',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF999999),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 40,
-            color: const Color(0xFFF0F0F0),
-          ),
-          Expanded(
-            child: Column(
-              children: const [
-                Text(
-                  '12',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D2D2D),
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Ca tháng này',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF999999),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 40,
-            color: const Color(0xFFF0F0F0),
-          ),
-          Expanded(
-            child: Column(
-              children: [
-                Text(
-                  _profile != null && (_profile!.totalMissions ?? 0) > 0
-                      ? '${((_profile!.completedMissions ?? 0) / _profile!.totalMissions! * 100).round()}%'
-                      : '--',
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF10B981),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    'Thành công',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF10B981),
-                    ),
                   ),
                 ),
               ],

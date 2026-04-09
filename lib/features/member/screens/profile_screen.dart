@@ -301,81 +301,87 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ],
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Rating
-                        if (_profile?.rating != null) ...[
-                          Row(
-                            children: [
-                              const Icon(Icons.star,
-                                  size: 18, color: Color(0xFFFFA500)),
-                              const SizedBox(width: 6),
-                              Text(
-                                _profile!.rating!.toStringAsFixed(1),
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1F1F1F),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '(${_profile?.ratingCount ?? 0} đánh giá)',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                        // Điểm uy tín
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: _reputationColor(_profile?.reputationStatus).withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: _reputationColor(_profile?.reputationStatus).withOpacity(0.3)),
-                          ),
+                        // Rating + Reputation row
+                        IntrinsicHeight(
                           child: Row(
-                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.workspace_premium, size: 16, color: _reputationColor(_profile?.reputationStatus)),
-                              const SizedBox(width: 6),
-                              Text(
-                                '${_profile?.reputationPoints ?? 0} điểm uy tín',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _reputationColor(_profile?.reputationStatus)),
-                              ),
-                              if (_profile?.reputationStatus != null) ...[  
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: _reputationColor(_profile?.reputationStatus),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    _translateReputationStatus(_profile!.reputationStatus!),
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-                                  ),
+                              // Rating
+                              Expanded(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.star_rounded, size: 20, color: Color(0xFFFFA500)),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          (_profile?.rating ?? 0.0).toStringAsFixed(1),
+                                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1F1F1F)),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${_profile?.ratingCount ?? 0} đánh giá',
+                                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                                    ),
+                                  ],
                                 ),
-                              ],
+                              ),
+                              // Divider
+                              VerticalDivider(color: Colors.grey[200], thickness: 1, width: 1),
+                              // Reputation
+                              Expanded(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.workspace_premium_rounded, size: 20, color: _reputationColor(_profile?.reputationStatus)),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '${_profile?.reputationPoints ?? 0}',
+                                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _reputationColor(_profile?.reputationStatus)),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    if (_profile?.reputationStatus != null)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: _reputationColor(_profile?.reputationStatus),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          _translateReputationStatus(_profile!.reputationStatus!),
+                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                        ),
+                                      )
+                                    else
+                                      Text('Uy tín', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
                         ),
                         // Has Underlying Disease
                         if (_profile?.hasUnderlyingDisease == true) ...[
-                          const SizedBox(height: 12),
+                          const Divider(height: 24),
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               const Icon(Icons.medical_services,
-                                  size: 18, color: Color(0xFFD32F2F)),
+                                  size: 16, color: Color(0xFFD32F2F)),
                               const SizedBox(width: 6),
                               const Text(
                                 'Có bệnh nền',
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 13,
                                   color: Color(0xFFD32F2F),
                                   fontWeight: FontWeight.w500,
                                 ),

@@ -297,6 +297,11 @@ final router = GoRouter(
       builder: (context, state) => const SnakeLibraryScreen(),
     ),
     GoRoute(
+      path: '/snake-first-aid-guide',
+      name: 'snake_first_aid_guide',
+      builder: (context, state) => const SnakeLibraryScreen(firstAidMode: true),
+    ),
+    GoRoute(
       path: '/snake-species/:id',
       name: 'snake_detail',
       builder: (context, state) {

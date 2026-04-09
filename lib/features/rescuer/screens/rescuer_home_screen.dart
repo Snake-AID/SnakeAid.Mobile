@@ -17,6 +17,34 @@ import '../providers/tracking_provider.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_accept_request_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_available_jobs_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/repository/snake_catching_repository.dart';
+import 'package:snakeaid_mobile/features/snake_catching/models/snake_catching_request.dart';
+import '../../notifications/providers/notification_inbox_provider.dart';
+import '../../notifications/screens/notification_inbox_screen.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../repository/rescuer_analytics_repository.dart';
+import '../models/rescuer_daily_stats.dart';
+
+// ── Rescuer daily statistics provider ────────────────────────────────────────
+final _rescuerDailyStatsProvider =
+    FutureProvider.autoDispose<RescuerDailyStats>((ref) async {
+  final repo = ref.watch(rescuerAnalyticsRepositoryProvider);
+  return repo.getStatistics(period: 'day');
+});
+
+// ── Active snake catching job provider ──────────────────────────────────
+final _activeCatchingJobProvider =
+    FutureProvider.autoDispose<SnakeCatchingRequestData?>((ref) async {
+  final currentUser = ref.watch(currentUserProvider);
+  if (currentUser == null) return null;
+  final repo = ref.watch(snakeCatchingRepositoryProvider);
+  final response = await repo.getRequests(assignedRescuerId: currentUser.id);
+  const terminalStatuses = {
+    'completed', 'cancelled', 'expired', 'rejected', 'failed', 'finished',
+  };
+  return response.data
+      .where((r) => !terminalStatuses.contains(r.status.toLowerCase()))
+      .firstOrNull;
+});
 
 /// Rescuer Home Screen - Dashboard for rescue team members
 class RescuerHomeScreen extends ConsumerStatefulWidget {
@@ -33,7 +61,7 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
   final List<Widget> _screens = [
     const _HomeTab(),
     const RescuerAvailableJobsScreen(),
-    const _IncomeTab(),
+    const NotificationInboxScreen(),
     const _ProfileTab(),
   ];
 
@@ -177,7 +205,12 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
               children: [
                 _buildNavItem(0, Icons.home, 'Trang Chủ'),
                 _buildNavItem(1, Icons.task_alt, 'Nhiệm Vụ'),
-                _buildNavItem(2, Icons.account_balance_wallet, 'Thu Nhập'),
+                _buildNavItem(
+                  2,
+                  Icons.notifications_outlined,
+                  'Thông Báo',
+                  unreadCount: ref.watch(notificationInboxProvider).unreadCount,
+                ),
                 _buildNavItem(3, Icons.person, 'Cá Nhân'),
               ],
             ),
@@ -593,7 +626,7 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, String label) {
+  Widget _buildNavItem(int index, IconData icon, String label, {int unreadCount = 0}) {
     final isSelected = _selectedIndex == index;
     final color = isSelected
         ? const Color(0xFFFF6B35)
@@ -610,7 +643,25 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 28, weight: isSelected ? 700 : 400),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(icon, color: color, size: 28, weight: isSelected ? 700 : 400),
+                if (unreadCount > 0)
+                  Positioned(
+                    top: -2,
+                    right: -4,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFDC3545),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 4),
             Text(
               label,
@@ -897,32 +948,31 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                       ),
                     ),
                     const Spacer(),
-                    Stack(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.notifications_outlined),
-                          onPressed: () => context.push('/notifications'),
-                        ),
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFDC3545),
-                              shape: BoxShape.circle,
+                    Builder(
+                      builder: (context) {
+                        final unread = ref.watch(notificationInboxProvider).unreadCount;
+                        return Stack(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.notifications_outlined),
+                              onPressed: () => context.push('/notifications'),
                             ),
-                            child: const Text(
-                              '2',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
+                            if (unread > 0)
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFDC3545),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        ),
-                      ],
+                          ],
+                        );
+                      },
                     ),
                     Container(
                       width: 40,
@@ -980,19 +1030,6 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                       ),
                       const SizedBox(height: 16),
                       _buildCurrentMission(),
-                      const SizedBox(height: 24),
-
-                      // Recent Requests
-                      const Text(
-                        'Yêu Cầu Gần Đây',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF333333),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildRecentRequests(),
                       const SizedBox(height: 24),
 
                       // Quick Access
@@ -1356,20 +1393,71 @@ class _HomeTabState extends ConsumerState<_HomeTab>
   }
 
   Widget _buildStatsGrid() {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildStatCard('12', 'Yêu cầu', const Color(0xFF333333)),
+    final statsAsync = ref.watch(_rescuerDailyStatsProvider);
+    return statsAsync.when(
+      loading: () => Row(
+        children: List.generate(
+          3,
+          (_) => Expanded(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFFFF6B35),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatCard('8', 'Hoàn thành', const Color(0xFF10B981)),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatCard('1.2M', 'Thu nhập', const Color(0xFFFF6B35)),
-        ),
-      ],
+      ),
+      error: (_, __) => Row(
+        children: [
+          Expanded(child: _buildStatCard('--', 'Yêu cầu', const Color(0xFF333333))),
+          const SizedBox(width: 12),
+          Expanded(child: _buildStatCard('--', 'Hoàn thành', const Color(0xFF10B981))),
+          const SizedBox(width: 12),
+          Expanded(child: _buildStatCard('--', 'Rắn cắn', const Color(0xFFE53935))),
+        ],
+      ),
+      data: (stats) {
+        return Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                '${stats.totalRequests}',
+                'Yêu cầu',
+                const Color(0xFF333333),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                '${stats.totalCompleted}',
+                'Hoàn thành',
+                const Color(0xFF10B981),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                '${stats.snakebiteRequests}',
+                'Rắn cắn',
+                const Color(0xFFE53935),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -1413,6 +1501,58 @@ class _HomeTabState extends ConsumerState<_HomeTab>
   }
 
   Widget _buildCurrentMission() {
+    // Priority 1: active snakebite rescue mission
+    final activeMissionState = ref.watch(activeMissionProvider);
+    if (activeMissionState.hasActiveMission) {
+      final mission = activeMissionState.mission!;
+      return _buildMissionCard(
+        typeLabel: 'CỨU HỘ',
+        typeLabelColor: const Color(0xFFDC3545),
+        icon: Icons.emergency_outlined,
+        title: 'Nhiệm vụ cứu hộ rắn cắn',
+        subtitle:
+            'Đang xử lý • Mã: ...${mission.missionId.length >= 6 ? mission.missionId.substring(mission.missionId.length - 6) : mission.missionId}',
+        onContinue: () =>
+            context.push('/rescuer/mission-detail/${mission.missionId}'),
+      );
+    }
+
+    // Priority 2: active snake catching job
+    final catchingAsync = ref.watch(_activeCatchingJobProvider);
+    return catchingAsync.when(
+      loading: () => const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: CircularProgressIndicator(color: Color(0xFFFF6B35)),
+        ),
+      ),
+      error: (_, __) => _buildNoActiveMissionCard(),
+      data: (job) {
+        if (job == null) return _buildNoActiveMissionCard();
+        return _buildMissionCard(
+          typeLabel: 'BẮT RẮN',
+          typeLabelColor: const Color(0xFF228B22),
+          icon: Icons.catching_pokemon,
+          title: 'Yêu cầu bắt rắn',
+          subtitle: job.address.isNotEmpty ? job.address : 'Địa chỉ không có',
+          onContinue: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => RescuerAcceptRequestScreen(requestData: job),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMissionCard({
+    required String typeLabel,
+    required Color typeLabelColor,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onContinue,
+  }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1429,64 +1569,73 @@ class _HomeTabState extends ConsumerState<_HomeTab>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFDC3545).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: const Text(
-              'ĐANG XỬ LÝ',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFFDC3545),
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: typeLabelColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  typeLabel,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: typeLabelColor,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDC3545).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'ĐANG XỬ LÝ',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFDC3545),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
-          const Text(
-            'Cứu hộ rắn hổ mang',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF333333),
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Row(
+          Row(
             children: [
-              Icon(Icons.location_on, size: 16, color: Color(0xFF999999)),
-              SizedBox(width: 4),
-              Text(
-                '123 Nguyễn Huệ, Q.1',
-                style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
+              Icon(icon, size: 20, color: typeLabelColor),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF333333),
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          const Row(
-            children: [
-              Icon(Icons.schedule, size: 16, color: Color(0xFF999999)),
-              SizedBox(width: 4),
-              Text(
-                'Thời gian: 18 phút',
-                style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
-              ),
-            ],
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            style: const TextStyle(fontSize: 13, color: Color(0xFF666666)),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
-            height: 48,
+            height: 44,
             child: ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Tiếp tục nhiệm vụ - Đang phát triển'),
-                  ),
-                );
-              },
+              onPressed: onContinue,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFF6B35),
                 foregroundColor: Colors.white,
@@ -1497,11 +1646,40 @@ class _HomeTabState extends ConsumerState<_HomeTab>
               ),
               child: const Text(
                 'Tiếp Tục',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildNoActiveMissionCard() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(Icons.check_circle_outline, size: 48, color: Colors.grey[300]),
+            const SizedBox(height: 10),
+            Text(
+              'Không có nhiệm vụ đang hoạt động',
+              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1662,21 +1840,11 @@ class _HomeTabState extends ConsumerState<_HomeTab>
           },
         ),
         _buildQuickAccessItem(
-          icon: Icons.account_balance_wallet,
-          label: 'Thu Nhập',
-          color: const Color(0xFF666666),
-          onTap: () {
-            context.pushNamed('rescuer_income_management');
-          },
-        ),
-        _buildQuickAccessItem(
           icon: Icons.settings,
           label: 'Cài Đặt',
           color: const Color(0xFF666666),
           onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Cài đặt - Đang phát triển')),
-            );
+            context.pushNamed('rescuer_settings');
           },
         ),
       ],

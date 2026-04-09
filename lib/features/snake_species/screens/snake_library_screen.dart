@@ -5,7 +5,8 @@ import '../providers/snake_species_provider.dart';
 import '../models/snake_species_model.dart';
 
 class SnakeLibraryScreen extends ConsumerStatefulWidget {
-  const SnakeLibraryScreen({super.key});
+  final bool firstAidMode;
+  const SnakeLibraryScreen({super.key, this.firstAidMode = false});
 
   @override
   ConsumerState<SnakeLibraryScreen> createState() =>
@@ -165,15 +166,16 @@ class _SnakeLibraryScreenState
       itemCount: state.filtered.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) =>
-          _SnakeCard(snake: state.filtered[index]),
+          _SnakeCard(snake: state.filtered[index], firstAidMode: widget.firstAidMode),
     );
   }
 }
 
 class _SnakeCard extends StatelessWidget {
   final SnakeSpeciesModel snake;
+  final bool firstAidMode;
 
-  const _SnakeCard({required this.snake});
+  const _SnakeCard({required this.snake, this.firstAidMode = false});
 
   @override
   Widget build(BuildContext context) {
@@ -186,7 +188,9 @@ class _SnakeCard extends StatelessWidget {
       shadowColor: Colors.black12,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => context.push('/snake-species/${snake.id}'),
+        onTap: () => firstAidMode
+            ? context.push('/snake-first-aid/${snake.id}', extra: {'commonName': snake.commonName})
+            : context.push('/snake-species/${snake.id}'),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(

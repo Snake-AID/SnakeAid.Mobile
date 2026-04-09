@@ -3,11 +3,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../widgets/sos_button.dart';
 import '../widgets/quick_action_buttons.dart';
-import '../widgets/quick_action_cards.dart';
 import '../widgets/secondary_menu_grid.dart';
-import '../widgets/notification_bar.dart';
 import '../widgets/education_section.dart';
 import '../../shared/widgets/custom_dialog.dart';
 import '../../emergency/repository/incident_repository.dart';
@@ -15,6 +14,7 @@ import '../../emergency/models/sos_incident_request.dart';
 import '../../emergency/models/sos_incident_response.dart';
 import '../../emergency/providers/incident_provider.dart';
 import '../../emergency/providers/mission_hub_provider.dart';
+import '../../notifications/providers/notification_inbox_provider.dart';
 
 /// Member Home Screen - Entry point with emergency-first design
 /// This is a content-only widget, Scaffold is provided by MainScaffold
@@ -78,25 +78,31 @@ class MemberHomeScreen extends ConsumerWidget {
                         ),
                       ),
                     ),
-                  Stack(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.notifications_outlined),
-                        onPressed: () => context.push('/notifications'),
-                      ),
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFDC3545),
-                            shape: BoxShape.circle,
+                  Builder(
+                    builder: (context) {
+                      final unread = ref.watch(notificationInboxProvider).unreadCount;
+                      return Stack(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.notifications_outlined),
+                            onPressed: () => context.push('/notifications'),
                           ),
-                        ),
-                      ),
-                    ],
+                          if (unread > 0)
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFDC3545),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
@@ -139,161 +145,26 @@ class MemberHomeScreen extends ConsumerWidget {
                       onCameraPressed: () {
                         context.push('/snake-quantity-selection');
                       },
-                      onCall115Pressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Đang gọi 115 - Đang phát triển'),
-                          ),
-                        );
+                      onCall115Pressed: () async {
+                        final uri = Uri(scheme: 'tel', path: '115');
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri);
+                        }
                       },
                     ),
                   ),
 
                   const SizedBox(height: 8),
 
-                  // Alert notification bar
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: NotificationBar(
-                      message:
-                          'Cảnh báo: Có 3 người gặp rắn độc trong khu vực của bạn trong 24h qua',
-                      onViewDetails: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Chi tiết cảnh báo - Đang phát triển',
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Quick Action Cards
-                  QuickActionCards(
-                    onFirstAidPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Sơ cứu - Đang phát triển'),
-                        ),
-                      );
-                    },
-                    onHospitalPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Vui lòng dùng tab Bệnh viện ở thanh điều hướng',
-                          ),
-                        ),
-                      );
-                    },
-                    onTrackRescuerPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Cứu hộ - Đang phát triển'),
-                        ),
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Secondary Menu Grid
+                  // Menu Grid
                   const SecondaryMenuGrid(),
 
                   const SizedBox(height: 24),
 
-                  // Education Section
+                  // Blog / Education Section
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: EducationSection(),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Developer Tools Section (for testing)
-                  Container(
-                    color: Colors.grey[50],
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          '🛠️ Developer Tools',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () => context.go('/signalr-test'),
-                                icon: const Icon(Icons.chat),
-                                label: const Text('SignalR Test'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue,
-                                  foregroundColor: Colors.white,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () =>
-                                    context.go('/location-tracker'),
-                                icon: const Icon(Icons.location_on),
-                                label: const Text('Location Tracker'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-                  Container(
-                    color: Colors.purple.shade50,
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          '🎥 Video Call Demonstration',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.purple,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () => context.push('/demo-video-call'),
-                            icon: const Icon(Icons.video_camera_front),
-                            label: const Text(
-                              'Mở màn hình Video Call Demonstration',
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.purple,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
 
                   const SizedBox(height: 90), // Space for bottom nav
