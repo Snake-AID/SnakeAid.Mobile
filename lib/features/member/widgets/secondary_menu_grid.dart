@@ -85,6 +85,8 @@ class _MenuItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.of(context).size.width < 360;
+
     return Expanded(
       child: Material(
         color: Colors.white,
@@ -94,8 +96,11 @@ class _MenuItem extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            height: 110,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            height: compact ? 100 : 110,
+            padding: EdgeInsets.symmetric(
+              horizontal: compact ? 6 : 8,
+              vertical: compact ? 8 : 10,
+            ),
             decoration: BoxDecoration(
               border: Border.all(
                 color: Colors.grey[200]!,
@@ -121,7 +126,7 @@ class _MenuItem extends StatelessWidget {
                         child: Center(
                           child: Icon(
                             icon,
-                            size: 22,
+                            size: compact ? 20 : 22,
                             color: const Color(0xFF228B22),
                           ),
                         ),
@@ -133,7 +138,7 @@ class _MenuItem extends StatelessWidget {
                       child: Text(
                         label,
                         style: TextStyle(
-                          fontSize: 10.5,
+                          fontSize: compact ? 10 : 10.5,
                           fontWeight: FontWeight.w600,
                           color: Colors.grey[800],
                           height: 1.2,

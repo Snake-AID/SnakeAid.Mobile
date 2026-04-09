@@ -10,6 +10,7 @@ enum ConsultationBookingStatus {
 /// Maps backend `ConsultationBookingResponse`
 class ConsultationBookingResponse {
   final String id;
+  final String? userId;
   final String expertId;
   final String expertName;
   final String? expertAvatarUrl;
@@ -28,9 +29,11 @@ class ConsultationBookingResponse {
   final DateTime? paymentDeadline;
   final String? userName;             // Patient name (from expert's view)
   final String? problemDescription;  // Problem submitted by patient
+  final DateTime? bookedAt;
 
   const ConsultationBookingResponse({
     required this.id,
+    this.userId,
     required this.expertId,
     required this.expertName,
     this.expertAvatarUrl,
@@ -48,25 +51,48 @@ class ConsultationBookingResponse {
     this.paymentDeadline,
     this.userName,
     this.problemDescription,
+    this.bookedAt,
   });
 
+  static DateTime? _parseBackendDate(dynamic value) {
+    if (value == null) return null;
+    final raw = value.toString();
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return null;
+
+    // Backend currently sends VN wall-clock timestamps with UTC suffix (Z).
+    // Keep the clock fields as-is to avoid +7h shift on mobile UI.
+    final isUtcTagged = raw.endsWith('Z') || raw.contains('+00:00');
+    if (isUtcTagged) {
+      final utc = parsed.toUtc();
+      return DateTime(
+        utc.year,
+        utc.month,
+        utc.day,
+        utc.hour,
+        utc.minute,
+        utc.second,
+        utc.millisecond,
+        utc.microsecond,
+      );
+    }
+
+    return parsed;
+  }
+
   factory ConsultationBookingResponse.fromJson(Map<String, dynamic> json) {
-    DateTime? slotStart = json['slotStartTime'] != null
-        ? DateTime.parse(json['slotStartTime'] as String)
-        : null;
+    DateTime? slotStart = _parseBackendDate(json['slotStartTime']);
     return ConsultationBookingResponse(
       id: (json['id'] ?? '').toString(),
+      userId: json['userId'] as String?,
       expertId: (json['expertId'] ?? '').toString(),
       expertName: (json['expertName'] as String?) ?? 'Chuyên gia',
       expertAvatarUrl: json['expertAvatarUrl'] as String?,
       expertSpecialty: (json['expertSpecialty'] ?? json['specialization']) as String?,
       consultationType: (json['consultationType'] as String?) ?? 'Scheduled',
       scheduledTime: slotStart ??
-          (json['bookedAt'] != null
-              ? DateTime.parse(json['bookedAt'] as String)
-              : (json['scheduledTime'] != null
-                  ? DateTime.parse(json['scheduledTime'] as String)
-                  : DateTime.now())),
+          (_parseBackendDate(json['bookedAt']) ??
+              (_parseBackendDate(json['scheduledTime']) ?? DateTime.now())),
       status: _parseStatus(json['status'] as String?),
       feeCost: (json['price'] as num?)?.toInt() ??
           (json['feeCost'] as num?)?.toInt() ??
@@ -77,14 +103,11 @@ class ConsultationBookingResponse {
       consultationId: json['consultationId'] as String?,
       roomId: json['roomId'] as String?,
       slotStartTime: slotStart,
-      slotEndTime: json['slotEndTime'] != null
-          ? DateTime.parse(json['slotEndTime'] as String)
-          : null,
-      paymentDeadline: json['paymentDeadline'] != null
-          ? DateTime.parse(json['paymentDeadline'] as String)
-          : null,
+      slotEndTime: _parseBackendDate(json['slotEndTime']),
+      paymentDeadline: _parseBackendDate(json['paymentDeadline']),
       userName: json['userName'] as String?,
       problemDescription: json['problemDescription'] as String?,
+      bookedAt: _parseBackendDate(json['bookedAt']),
     );
   }
 
@@ -105,7 +128,7 @@ class ConsultationBookingResponse {
 }
 
 /// Request DTO for creating a new consultation booking
-/// API: POST /api/v1/consultation-bookings
+/// API: POST /api/consultations/scheduled
 class CreateConsultationBookingRequest {
   final String timeSlotId;
   final String problemDescription;

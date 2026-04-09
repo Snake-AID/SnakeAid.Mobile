@@ -10,6 +10,8 @@ import '../models/expert_detail_model.dart';
 import '../models/review_model.dart';
 import '../models/availability_model.dart';
 import '../models/consultation_booking_response.dart';
+import '../models/my_consultation_response.dart';
+import '../models/consultation_review_response.dart';
 import '../models/emergency_consultation_request.dart';
 import '../models/consultation_payment_response.dart';
 
@@ -27,15 +29,16 @@ class ConsultationRepository {
   ConsultationRepository({required this.httpService});
 
   /// Get list of experts with optional filters
-  /// 
+  ///
   /// Parameters:
   /// - specialty: Filter by specialty/expertise
   /// - onlineOnly: Show only online experts
   /// - sortBy: Sort by 'rating', 'fee', 'reviews'
-  /// 
+  ///
   /// Returns [ExpertListResponse] with list of experts
   Future<ExpertListResponse> getExperts({
     String? specialty,
+
     /// null = tất cả, true = chỉ online, false = chỉ offline
     bool? isOnlineFilter,
     String? sortBy,
@@ -90,7 +93,9 @@ class ConsultationRepository {
       // Return error response
       return ExpertListResponse(
         statusCode: e.response?.statusCode ?? 500,
-        message: e.response?.data?['message'] ?? 'Không thể tải danh sách chuyên gia',
+        message:
+            e.response?.data?['message'] ??
+            'Không thể tải danh sách chuyên gia',
         isSuccess: false,
         error: e.message,
       );
@@ -167,8 +172,7 @@ class ConsultationRepository {
       '/api/experts/$expertId/reviews',
       queryParameters: {'pageNumber': 1, 'pageSize': 10},
     );
-    final slotsFuture =
-        httpService.get('/api/experts/$expertId/time-slots');
+    final slotsFuture = httpService.get('/api/experts/$expertId/time-slots');
 
     // Await results (all running in parallel)
     final profileResponse = await profileFuture;
@@ -215,12 +219,12 @@ class ConsultationRepository {
     // Parse stats from profile data (backend may return int/double/string)
     final avgMinutesRaw = profileData['averageResponseTimeMinutes'];
     final avgMinutes = avgMinutesRaw is num
-      ? avgMinutesRaw.round()
-      : int.tryParse(avgMinutesRaw?.toString() ?? '');
+        ? avgMinutesRaw.round()
+        : int.tryParse(avgMinutesRaw?.toString() ?? '');
     final totalConsultationsRaw = profileData['totalConsultations'];
     final totalConsultations = totalConsultationsRaw is num
-      ? totalConsultationsRaw.toInt()
-      : int.tryParse(totalConsultationsRaw?.toString() ?? '') ?? 0;
+        ? totalConsultationsRaw.toInt()
+        : int.tryParse(totalConsultationsRaw?.toString() ?? '') ?? 0;
     final avgResponseStr = avgMinutes == null ? '< 5 phút' : '$avgMinutes phút';
 
     return ExpertDetailModel.fromExpertModel(
@@ -229,7 +233,11 @@ class ConsultationRepository {
       totalConsultations: totalConsultations,
       averageResponseTime: avgResponseStr,
       successRate: ((profileData['successRate'] ?? 0) as num).toDouble(),
-      consultationFees: {30: expert.scheduledConsultationFee > 0 ? expert.scheduledConsultationFee : expert.consultationFee},
+      consultationFees: {
+        30: expert.scheduledConsultationFee > 0
+            ? expert.scheduledConsultationFee
+            : expert.consultationFee,
+      },
       availability: availability,
       reviews: reviews,
     );
@@ -276,8 +284,9 @@ class ConsultationRepository {
     try {
       debugPrint('📋 Fetching time slots for expert: $expertId');
 
-      final response =
-          await httpService.get('/api/experts/$expertId/time-slots');
+      final response = await httpService.get(
+        '/api/experts/$expertId/time-slots',
+      );
 
       final body = response.data as Map<String, dynamic>;
       if (body['is_success'] == true && body['data'] != null) {
@@ -301,8 +310,7 @@ class ConsultationRepository {
   /// Group flat time-slot list into [AvailabilityDay] objects grouped by date.
   ///
   /// Each slot from backend: `{ id, expertId, startTime (ISO UTC), endTime (ISO UTC) }`
-  List<AvailabilityDay> _groupSlotsToAvailabilityDays(
-      List<dynamic> slotsJson) {
+  List<AvailabilityDay> _groupSlotsToAvailabilityDays(List<dynamic> slotsJson) {
     const weekDayLabels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
     final Map<String, DateTime> dayToDate = {};
     final Map<String, List<TimeSlotEntry>> dayToEntries = {};
@@ -319,12 +327,24 @@ class ConsultationRepository {
       // Backend stores VN wall-clock time tagged as +00 (no real UTC conversion on backend)
       // So use UTC components directly as VN time — no offset needed
       final startUtc = DateTime.parse(startTimeStr).toUtc();
-      final startTime = DateTime.utc(startUtc.year, startUtc.month, startUtc.day, startUtc.hour, startUtc.minute);
+      final startTime = DateTime.utc(
+        startUtc.year,
+        startUtc.month,
+        startUtc.day,
+        startUtc.hour,
+        startUtc.minute,
+      );
       final endTimeStr = slot['endTime'] as String?;
       DateTime endTime;
       if (endTimeStr != null) {
         final endUtc = DateTime.parse(endTimeStr).toUtc();
-        endTime = DateTime.utc(endUtc.year, endUtc.month, endUtc.day, endUtc.hour, endUtc.minute);
+        endTime = DateTime.utc(
+          endUtc.year,
+          endUtc.month,
+          endUtc.day,
+          endUtc.hour,
+          endUtc.minute,
+        );
       } else {
         endTime = startTime.add(const Duration(minutes: 30));
       }
@@ -341,11 +361,14 @@ class ConsultationRepository {
           '${endTime.hour.toString().padLeft(2, '0')}:'
           '${endTime.minute.toString().padLeft(2, '0')}';
 
-      dayToDate[dateKey] =
-          DateTime.utc(startTime.year, startTime.month, startTime.day);
-      dayToEntries.putIfAbsent(dateKey, () => []).add(
-            TimeSlotEntry(id: slotId, startTime: startStr, endTime: endStr),
-          );
+      dayToDate[dateKey] = DateTime.utc(
+        startTime.year,
+        startTime.month,
+        startTime.day,
+      );
+      dayToEntries
+          .putIfAbsent(dateKey, () => [])
+          .add(TimeSlotEntry(id: slotId, startTime: startStr, endTime: endStr));
     }
 
     final days = dayToDate.entries.map((entry) {
@@ -358,8 +381,7 @@ class ConsultationRepository {
         isAvailable: true,
         timeSlots: slots,
       );
-    }).toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
+    }).toList()..sort((a, b) => a.date.compareTo(b.date));
 
     return days;
   }
@@ -370,20 +392,23 @@ class ConsultationRepository {
 
   /// Get all bookings for the current logged-in member
   ///
-  /// API: `GET /api/users/me/consultation-bookings`
+  /// API: `GET /api/users/me/consultations/scheduled`
   Future<List<ConsultationBookingResponse>> getMyBookings() async {
     try {
       debugPrint('📋 Fetching my bookings');
-      final response =
-          await httpService.get('/api/users/me/consultation-bookings');
+      final response = await httpService.get(
+        '/api/users/me/consultations/scheduled',
+      );
 
       final body = response.data as Map<String, dynamic>;
       if (body['is_success'] == true && body['data'] != null) {
         final list = body['data'] as List<dynamic>;
         return list
-            .map((e) => ConsultationBookingResponse.fromJson(
-                  e as Map<String, dynamic>,
-                ))
+            .map(
+              (e) => ConsultationBookingResponse.fromJson(
+                e as Map<String, dynamic>,
+              ),
+            )
             .toList();
       }
       return [];
@@ -396,20 +421,69 @@ class ConsultationRepository {
     }
   }
 
+  /// Get consultations for current user (scheduled + emergency).
+  ///
+  /// API: `GET /api/users/me/consultations`
+  Future<List<MyConsultationResponse>> getMyConsultations({
+    String? status,
+    String? type,
+    int pageNumber = 1,
+    int pageSize = 10,
+  }) async {
+    try {
+      debugPrint(
+        '📋 Fetching my consultations: status=$status, type=$type, page=$pageNumber, size=$pageSize',
+      );
+      final query = <String, dynamic>{
+        'pageNumber': pageNumber,
+        'pageSize': pageSize,
+      };
+      if (status != null && status.isNotEmpty) {
+        query['status'] = status;
+      }
+      if (type != null && type.isNotEmpty) {
+        query['type'] = type;
+      }
+
+      final response = await httpService.get(
+        '/api/users/me/consultations',
+        queryParameters: query,
+      );
+
+      final body = response.data as Map<String, dynamic>;
+      if (body['is_success'] == true && body['data'] != null) {
+        final data = body['data'] as Map<String, dynamic>;
+        final items = (data['items'] as List<dynamic>? ?? const []);
+        return items
+            .whereType<Map<String, dynamic>>()
+            .map(MyConsultationResponse.fromJson)
+            .toList();
+      }
+      return [];
+    } on DioException catch (e) {
+      debugPrint('❌ Failed to fetch consultations: ${e.message}');
+      return [];
+    } catch (e) {
+      debugPrint('❌ Unexpected error fetching consultations: $e');
+      return [];
+    }
+  }
+
   /// Create a new consultation booking
   ///
-  /// API: `POST /api/consultation-bookings`
+  /// API: `POST /api/consultations/scheduled`
   ///
   /// Throws:
   /// - `409` when the slot has already been booked (race condition)
   /// - `404` when expert or slot not found
   /// - `400/422` for invalid payload
   Future<ConsultationBookingResponse> createBooking(
-      CreateConsultationBookingRequest request) async {
+    CreateConsultationBookingRequest request,
+  ) async {
     debugPrint('📋 Creating booking for slot: ${request.timeSlotId}');
 
     final response = await httpService.post(
-      '/api/consultation-bookings',
+      '/api/consultations/scheduled',
       data: request.toJson(),
     );
 
@@ -429,14 +503,16 @@ class ConsultationRepository {
 
   /// Create an emergency consultation request for a specific expert.
   ///
-  /// API: `POST /api/consultations/emergency-requests`
+  /// API: `POST /api/consultations/instant`
   Future<EmergencyConsultationRequest> createEmergencyRequest({
     required String expertId,
   }) async {
-    debugPrint('🚨 Creating emergency consultation request for expert: $expertId');
+    debugPrint(
+      '🚨 Creating emergency consultation request for expert: $expertId',
+    );
 
     final response = await httpService.post(
-      '/api/consultations/emergency-requests',
+      '/api/consultations/instant',
       data: {'expertId': expertId},
     );
 
@@ -452,11 +528,12 @@ class ConsultationRepository {
 
   /// Expert accepts an emergency consultation request.
   ///
-  /// API: `POST /api/consultations/emergency-requests/{requestId}/accept`
+  /// API: `POST /api/consultations/instant/{requestId}/accept`
   Future<EmergencyConsultationRequest> acceptEmergencyRequest(
-      String requestId) async {
+    String requestId,
+  ) async {
     final response = await httpService.post(
-      '/api/consultations/emergency-requests/$requestId/accept',
+      '/api/consultations/instant/$requestId/accept',
     );
 
     final body = response.data as Map<String, dynamic>;
@@ -466,16 +543,19 @@ class ConsultationRepository {
       );
     }
 
-    throw Exception(body['message'] ?? 'Không thể chấp nhận yêu cầu tư vấn ngay');
+    throw Exception(
+      body['message'] ?? 'Không thể chấp nhận yêu cầu tư vấn ngay',
+    );
   }
 
   /// Expert rejects an emergency consultation request.
   ///
-  /// API: `POST /api/consultations/emergency-requests/{requestId}/reject`
+  /// API: `POST /api/consultations/instant/{requestId}/reject`
   Future<EmergencyConsultationRequest> rejectEmergencyRequest(
-      String requestId) async {
+    String requestId,
+  ) async {
     final response = await httpService.post(
-      '/api/consultations/emergency-requests/$requestId/reject',
+      '/api/consultations/instant/$requestId/reject',
     );
 
     final body = response.data as Map<String, dynamic>;
@@ -500,8 +580,10 @@ class ConsultationRepository {
     final fileName = filePath.split(RegExp(r'[\\/]')).last;
     Future<Response<dynamic>> sendUpload({required bool uppercaseKeys}) async {
       final formData = FormData.fromMap({
-        uppercaseKeys ? 'File' : 'file':
-            await MultipartFile.fromFile(filePath, filename: fileName),
+        uppercaseKeys ? 'File' : 'file': await MultipartFile.fromFile(
+          filePath,
+          filename: fileName,
+        ),
         uppercaseKeys ? 'Domain' : 'domain': 'chat-media',
       });
 
@@ -516,7 +598,9 @@ class ConsultationRepository {
     try {
       response = await sendUpload(uppercaseKeys: true);
     } catch (e) {
-      debugPrint('⚠️ Upload chat image with File/Domain failed, retrying file/domain: $e');
+      debugPrint(
+        '⚠️ Upload chat image with File/Domain failed, retrying file/domain: $e',
+      );
       response = await sendUpload(uppercaseKeys: false);
     }
 
@@ -524,11 +608,12 @@ class ConsultationRepository {
     if (body['is_success'] == true && body['data'] != null) {
       final data = body['data'];
       if (data is Map<String, dynamic>) {
-        final secureUrl = (data['secureUrl'] ??
-                data['SecureUrl'] ??
-                data['url'] ??
-                data['Url'])
-            ?.toString();
+        final secureUrl =
+            (data['secureUrl'] ??
+                    data['SecureUrl'] ??
+                    data['url'] ??
+                    data['Url'])
+                ?.toString();
         if (secureUrl != null && secureUrl.isNotEmpty) {
           debugPrint('✅ Chat image uploaded: $secureUrl');
           return secureUrl;
@@ -541,14 +626,9 @@ class ConsultationRepository {
 
   /// Search snake species by keyword for in-room expert assistance.
   ///
-  /// API: `GET /api/v1/snakes/search?q={query}`
+  /// API: `GET /api/snake-species`
   Future<List<Map<String, dynamic>>> searchSnakeSpecies(String query) async {
-    if (query.trim().isEmpty) return [];
-
-    final response = await httpService.get(
-      '/api/v1/snakes/search',
-      queryParameters: {'q': query.trim()},
-    );
+    final response = await httpService.get('/api/snake-species');
 
     final body = response.data as Map<String, dynamic>;
     if (body['is_success'] == true && body['data'] is List) {
@@ -560,22 +640,36 @@ class ConsultationRepository {
     return [];
   }
 
+  /// Get snake species detail by id.
+  ///
+  /// API: `GET /api/snake-species/{id}`
+  Future<Map<String, dynamic>?> getSnakeSpeciesDetail(int id) async {
+    final response = await httpService.get('/api/snake-species/$id');
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] == true && body['data'] is Map<String, dynamic>) {
+      return body['data'] as Map<String, dynamic>;
+    }
+    return null;
+  }
+
   // ---------------------------------------------------------------------------
   // Video call methods
   // ---------------------------------------------------------------------------
 
   /// Get a LiveKit access token for a consultation room.
   ///
-  /// API: `POST /api/videocall/livekit-token/{consultationId}`
+  /// API: `POST /api/consultations/{consultationId}/video-token`
   ///
   /// Returns `({String token, String wsUrl})` from `data.token` + `data.wsUrl`.
   /// Falls back to `LIVEKIT_URL` env var if `wsUrl` is absent in response.
   /// Throws on 401 (unauthenticated), 403 (not a participant), 404 (not found).
-  Future<({String token, String wsUrl})> getLivekitToken(String consultationId) async {
+  Future<({String token, String wsUrl})> getLivekitToken(
+    String consultationId,
+  ) async {
     debugPrint('🎥 Getting LiveKit token for consultation: $consultationId');
 
     final response = await httpService.post(
-      '/api/videocall/livekit-token/$consultationId',
+      '/api/consultations/$consultationId/video-token',
     );
 
     final body = response.data as Map<String, dynamic>;
@@ -586,7 +680,8 @@ class ConsultationRepository {
       final wsUrl = (wsUrlFromApi != null && wsUrlFromApi.isNotEmpty)
           ? wsUrlFromApi
           : (dotenv.env['LIVEKIT_URL'] ?? '');
-      if (token != null && token.isNotEmpty) return (token: token, wsUrl: wsUrl);
+      if (token != null && token.isNotEmpty)
+        return (token: token, wsUrl: wsUrl);
     }
 
     final statusCode = body['status_code'] as int? ?? 0;
@@ -623,16 +718,82 @@ class ConsultationRepository {
   /// Throws Exception if API call fails.
   Future<Map<String, dynamic>> getMyWallet() async {
     debugPrint('💰 Fetching wallet information');
-    
+
     final response = await httpService.get('/api/wallet/me');
     final body = response.data as Map<String, dynamic>;
-    
+
     if (body['is_success'] == true && body['data'] != null) {
       debugPrint('✅ Wallet fetched: ${body['data']}');
       return body['data'] as Map<String, dynamic>;
     }
-    
+
     throw Exception(body['message'] ?? 'Không thể lấy thông tin ví');
+  }
+
+  /// Create a PayOS top-up payment link for current user's wallet.
+  ///
+  /// API: `POST /api/wallet/topup`
+  Future<Map<String, dynamic>> createWalletTopup({
+    required double amount,
+    String? description,
+  }) async {
+    final sanitizedDescription = description?.trim();
+
+    if (amount < 1000 || amount > 10000000) {
+      throw Exception('Số tiền nạp phải từ 1.000 đến 10.000.000 VND');
+    }
+    if (sanitizedDescription != null && sanitizedDescription.length > 200) {
+      throw Exception('Mô tả tối đa 200 ký tự');
+    }
+
+    try {
+      final response = await httpService.post(
+        '/api/wallet/topup',
+        data: {
+          'amount': amount,
+          if (sanitizedDescription != null && sanitizedDescription.isNotEmpty)
+            'description': sanitizedDescription,
+        },
+      );
+
+      final body = response.data as Map<String, dynamic>;
+      if (body['is_success'] == true && body['data'] != null) {
+        return body['data'] as Map<String, dynamic>;
+      }
+      throw Exception(body['message'] ?? 'Không thể tạo giao dịch nạp ví');
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      final errorBody = e.response?.data;
+      String backendMessage = '';
+      if (errorBody is Map<String, dynamic>) {
+        backendMessage = (errorBody['message'] ?? '').toString().trim();
+      }
+
+      if (statusCode == 404) {
+        throw Exception('Ví chưa tồn tại cho tài khoản này');
+      }
+      if (statusCode == 400) {
+        final normalized = backendMessage.toLowerCase();
+        if (normalized.contains('pending') ||
+            normalized.contains('chưa hoàn thành') ||
+            normalized.contains('dang cho')) {
+          throw Exception(
+            'Bạn đang có giao dịch nạp tiền chờ xử lý. Vui lòng hoàn tất hoặc hủy giao dịch trước.',
+          );
+        }
+        if (normalized.contains('amount') ||
+            normalized.contains('số tiền') ||
+            normalized.contains('so tien')) {
+          throw Exception('Số tiền nạp phải từ 1.000 đến 10.000.000 VND');
+        }
+      }
+
+      throw Exception(
+        backendMessage.isNotEmpty
+            ? backendMessage
+            : 'Không thể tạo giao dịch nạp ví',
+      );
+    }
   }
 
   /// Submit a review for a completed consultation.
@@ -645,20 +806,42 @@ class ConsultationRepository {
     required int rating,
     String comment = '',
   }) async {
-    debugPrint('⭐ Submitting review for consultation: $consultationId, rating: $rating');
+    debugPrint(
+      '⭐ Submitting review for consultation: $consultationId, rating: $rating',
+    );
 
     final response = await httpService.post(
       '/api/consultations/$consultationId/reviews',
-      data: {
-        'rating': rating,
-        'comments': comment,
-      },
+      data: {'rating': rating, 'comments': comment},
     );
 
     final body = response.data as Map<String, dynamic>;
     if (body['is_success'] != true) {
       throw Exception(body['message'] ?? 'Không thể gửi đánh giá');
     }
+  }
+
+  /// Get review details for a specific consultation.
+  ///
+  /// API: `GET /api/consultations/{consultationId}/reviews`
+  /// Returns null when no review exists.
+  Future<ConsultationReviewResponse?> getConsultationReview(
+    String consultationId,
+  ) async {
+    final response = await httpService.get(
+      '/api/consultations/$consultationId/reviews',
+    );
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] == true) {
+      final data = body['data'];
+      if (data is Map<String, dynamic>) {
+        return ConsultationReviewResponse.fromJson(data);
+      }
+      return null;
+    }
+
+    throw Exception(body['message'] ?? 'Không thể lấy đánh giá buổi tư vấn');
   }
 
   // ---------------------------------------------------------------------------
@@ -718,14 +901,13 @@ class ConsultationRepository {
     required String weekStartDate,
     required List<Map<String, dynamic>> days,
   }) async {
-    debugPrint('📅 Submitting bulk time slots for week $weekStartDate (${days.length} days)');
+    debugPrint(
+      '📅 Submitting bulk time slots for week $weekStartDate (${days.length} days)',
+    );
 
     final response = await httpService.post(
       '/api/experts/me/time-slots/bulk',
-      data: {
-        'weekStartDate': weekStartDate,
-        'days': days,
-      },
+      data: {'weekStartDate': weekStartDate, 'days': days},
     );
 
     final body = response.data as Map<String, dynamic>;
@@ -876,7 +1058,7 @@ class ConsultationRepository {
 
   /// Pay for a scheduled consultation booking.
   ///
-  /// API: `POST /api/consultation-bookings/{bookingId}/payments`
+  /// API: `POST /api/consultations/scheduled/{bookingId}/payments`
   ///
   /// Throws:
   /// - 409 when booking already paid or not in `PendingPayment`
@@ -888,7 +1070,7 @@ class ConsultationRepository {
     debugPrint('💳 Paying booking: $bookingId');
 
     return _postConsultationPaymentWithFallback(
-      path: '/api/consultation-bookings/$bookingId/payments',
+      path: '/api/consultations/scheduled/$bookingId/payments',
       paymentMethod: paymentMethod,
       defaultErrorMessage: 'Không thể thanh toán',
     );
@@ -896,7 +1078,7 @@ class ConsultationRepository {
 
   /// Pay for an emergency consultation request.
   ///
-  /// API: `POST /api/consultations/emergency-requests/{requestId}/payments`
+  /// API: `POST /api/consultations/instant/{requestId}/payments`
   ///
   /// This moves request status from `PendingPayment` to `PendingExpertResponse`.
   Future<ConsultationPaymentResponse> payEmergencyRequest(
@@ -906,7 +1088,7 @@ class ConsultationRepository {
     debugPrint('💳 Paying emergency request: $requestId');
 
     return _postConsultationPaymentWithFallback(
-      path: '/api/consultations/emergency-requests/$requestId/payments',
+      path: '/api/consultations/instant/$requestId/payments',
       paymentMethod: paymentMethod,
       defaultErrorMessage: 'Không thể thanh toán tư vấn ngay',
     );
@@ -914,12 +1096,12 @@ class ConsultationRepository {
 
   /// Manual fallback confirm for consultation PayOS payment.
   ///
-  /// API: `POST /api/consultation-payments/confirm-payment`
+  /// API: `POST /api/consultations/payments/confirm`
   Future<ConsultationPaymentResponse> confirmConsultationPayment(
     String transactionId,
   ) async {
     final response = await httpService.post(
-      '/api/consultation-payments/confirm-payment',
+      '/api/consultations/payments/confirm',
       data: {'transactionId': transactionId},
     );
 
@@ -939,21 +1121,80 @@ class ConsultationRepository {
 
   /// Get all bookings for the current logged-in expert.
   ///
-  /// API: `GET /api/experts/me/consultation-bookings`
-  Future<List<ConsultationBookingResponse>> getExpertBookings() async {
+  /// API: `GET /api/experts/me/consultations`
+  Future<List<ConsultationBookingResponse>> getExpertBookings({
+    String? status,
+    String? type,
+    int pageNumber = 1,
+    int pageSize = 10,
+  }) async {
     try {
-      debugPrint('📋 Fetching expert bookings');
-      final response =
-          await httpService.get('/api/experts/me/consultation-bookings');
+      debugPrint(
+        '📋 Fetching expert consultations: status=$status, type=$type, page=$pageNumber, size=$pageSize',
+      );
+      final query = <String, dynamic>{
+        'pageNumber': pageNumber,
+        'pageSize': pageSize,
+      };
+      if (status != null && status.isNotEmpty) {
+        query['status'] = status;
+      }
+      if (type != null && type.isNotEmpty) {
+        query['type'] = type;
+      }
+
+      final response = await httpService.get(
+        '/api/experts/me/consultations',
+        queryParameters: query,
+      );
 
       final body = response.data as Map<String, dynamic>;
       if (body['is_success'] == true && body['data'] != null) {
-        final list = body['data'] as List<dynamic>;
-        return list
-            .map((e) => ConsultationBookingResponse.fromJson(
-                  e as Map<String, dynamic>,
-                ))
-            .toList();
+        final data = body['data'] as Map<String, dynamic>;
+        final items = (data['items'] as List<dynamic>? ?? const []);
+        return items.whereType<Map<String, dynamic>>().map((e) {
+          final endpointType = (e['type'] ?? '').toString().toLowerCase();
+          final endpointStatus = (e['status'] ?? '').toString().toLowerCase();
+
+          String normalizedStatus;
+          switch (endpointStatus) {
+            case 'completed':
+              normalizedStatus = 'Completed';
+              break;
+            case 'cancelled':
+            case 'canceled':
+              normalizedStatus = 'Cancelled';
+              break;
+            case 'scheduled':
+            case 'ongoing':
+            default:
+              normalizedStatus = 'Confirmed';
+              break;
+          }
+
+          final normalized = <String, dynamic>{
+            'id': (e['bookingId'] ?? e['consultationId'] ?? '').toString(),
+            'consultationId': e['consultationId'],
+            'roomId': e['roomId'],
+            'userId': e['userId'],
+            'userName': e['userName'],
+            'expertId': '',
+            'expertName': 'Chuyên gia',
+            'consultationType': endpointType == 'emergency'
+                ? 'Instant'
+                : 'Scheduled',
+            'scheduledTime': e['startTime'],
+            'slotStartTime': e['slotStartTime'] ?? e['startTime'],
+            'slotEndTime': e['slotEndTime'] ?? e['endTime'],
+            'status': normalizedStatus,
+            'feeCost': e['price'],
+            'price': e['price'],
+            'bookedAt': e['startTime'],
+            'problemDescription': e['problemDescription'],
+          };
+
+          return ConsultationBookingResponse.fromJson(normalized);
+        }).toList();
       }
       return [];
     } on DioException catch (e) {

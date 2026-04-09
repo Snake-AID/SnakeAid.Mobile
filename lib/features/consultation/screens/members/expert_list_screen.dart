@@ -330,7 +330,9 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
       alignment: Alignment.centerLeft,
       child: Text(
-        '$totalCount chuyên gia - $onlineCount đang online',
+        state.searchQuery.isEmpty
+            ? '$totalCount chuyên gia - $onlineCount đang online'
+            : '$totalCount kết quả cho "${state.searchQuery}" - $onlineCount đang online',
         style: const TextStyle(
           fontSize: 14,
           color: Color(0xFF6B7280),
@@ -486,6 +488,8 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
                   // Name
                   Text(
                     expert.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -525,13 +529,17 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        expert.reviewCount > 0
-                            ? '(${expert.reviewCount} đánh giá)'
-                            : 'đánh giá',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF6B7280),
+                      Expanded(
+                        child: Text(
+                          expert.reviewCount > 0
+                              ? '(${expert.reviewCount} đánh giá)'
+                              : 'đánh giá',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF6B7280),
+                          ),
                         ),
                       ),
                     ],
@@ -541,6 +549,8 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
                   // Fee
                   Text(
                     expert.formattedFee,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -614,6 +624,12 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
 
   /// Show search dialog
   void _showSearchDialog(BuildContext context) {
+    final current = ref.read(expertListProvider).searchQuery;
+    _searchController.text = current;
+    _searchController.selection = TextSelection.fromPosition(
+      TextPosition(offset: _searchController.text.length),
+    );
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -633,13 +649,9 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              // TODO: Implement search
+              final query = _searchController.text.trim();
+              ref.read(expertListProvider.notifier).setSearchQuery(query);
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Tính năng tìm kiếm đang phát triển'),
-                ),
-              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF228B22),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../auth/repository/auth_repository.dart';
+import '../../consultation/repository/consultation_repository.dart';
 
 /// Settings Screen - App settings and preferences
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -15,6 +16,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _emergencyAlertsEnabled = true;
   bool _appUpdatesEnabled = false;
   bool _shareLocationEnabled = true;
+  bool _isLoadingWallet = true;
+  String? _walletError;
+  double? _walletBalance;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchWalletBalance());
+  }
+
+  Future<void> _fetchWalletBalance() async {
+    setState(() {
+      _isLoadingWallet = true;
+      _walletError = null;
+    });
+
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      final wallet = await repo.getMyWallet();
+      if (!mounted) return;
+      setState(() {
+        _walletBalance = (wallet['balance'] as num?)?.toDouble() ?? 0;
+        _isLoadingWallet = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingWallet = false;
+        _walletError = 'Không thể tải số dư ví';
+      });
+    }
+  }
+
+  String _formatCurrency(double value) {
+    final amount = value.round().toString();
+    final withSeparator = amount.replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]},',
+    );
+    return '$withSeparator VNĐ';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -99,6 +141,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               const SnackBar(content: Text('Đổi mật khẩu - Đang phát triển')),
                             );
                           },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Ví SnakeAid Section
+                  _SectionHeader(title: 'Ví SnakeAid'),
+                  const SizedBox(height: 8),
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        _SettingsItem(
+                          icon: Icons.account_balance_wallet_outlined,
+                          title: 'Số dư ví hiện tại',
+                          trailing: _isLoadingWallet
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : Text(
+                                  _walletError ??
+                                      _formatCurrency(_walletBalance ?? 0),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: _walletError != null
+                                        ? Colors.red
+                                        : const Color(0xFF228B22),
+                                  ),
+                                ),
+                          onTap: _fetchWalletBalance,
                         ),
                       ],
                     ),

@@ -566,12 +566,16 @@ class _ConsultationWaitingRoomScreenState
       children: [
         const Icon(Icons.check_circle, size: 20, color: Color(0xFF22C55E)),
         const SizedBox(width: 10),
-        Text(
-          text,
-          style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF160D1B)),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF160D1B)),
+          ),
         ),
       ],
     );

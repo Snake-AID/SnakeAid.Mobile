@@ -66,6 +66,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     } catch (_) {}
   }
 
+  Future<void> _refreshProfile() async {
+    await Future.wait([
+      _loadUserInfo(),
+      _loadWallet(),
+    ]);
+  }
+
   Color _reputationColor(String? status) {
     switch (status?.toLowerCase()) {
       case 'excellent': return const Color(0xFFFFB300);
@@ -146,10 +153,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         Expanded(
           child: Container(
             color: Colors.white,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
+            child: RefreshIndicator(
+              color: const Color(0xFF228B22),
+              onRefresh: _refreshProfile,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
                   // Profile Header Card
                   Container(
                     padding: const EdgeInsets.all(24),
@@ -247,7 +258,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 MaterialPageRoute(
                                   builder: (context) => const EditProfileScreen(),
                                 ),
-                              ).then((_) => _loadUserInfo());
+                              ).then((_) => _refreshProfile());
                             },
                             style: OutlinedButton.styleFrom(
                               side: const BorderSide(
@@ -622,7 +633,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     },
                   ),
                   const SizedBox(height: 16), // Space for bottom nav
-                ],
+                  ],
+                ),
               ),
             ),
           ),

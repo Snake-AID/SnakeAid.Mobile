@@ -62,6 +62,17 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
     return '$d/$m/${dt.year}  $h:$min';
   }
 
+  String _formatDateTimePlus7(int ms) {
+    final dt = DateTime.fromMillisecondsSinceEpoch(
+      ms,
+    ).add(const Duration(hours: 7));
+    final d = dt.day.toString().padLeft(2, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    final h = dt.hour.toString().padLeft(2, '0');
+    final min = dt.minute.toString().padLeft(2, '0');
+    return '$d/$m/${dt.year}  $h:$min';
+  }
+
   String _formatCurrency(int amount) {
     if (amount >= 1000000) {
       return '${(amount / 1000000).toStringAsFixed(1)}M ₫';
@@ -73,18 +84,21 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final id = data['id'] as String? ?? '';
+    final consultationId =
+        (data['consultationId'] as String?) ?? (data['id'] as String?) ?? '';
     final patientName = data['patientName'] as String? ?? '';
     final patientPhone = data['patientPhone'] as String? ?? '';
     final consultationType = data['consultationType'] as String? ?? '';
-    final snakeSuspect = data['snakeSuspect'] as String? ?? 'Chưa xác định';
     final scheduledMs = (data['scheduledTime'] as int?) ?? 0;
+    final bookedAtMs = data['bookedAt'] as int?;
+    final paymentDeadlineMs = data['paymentDeadline'] as int?;
+    final slotStartMs = data['slotStartTime'] as int?;
+    final slotEndMs = data['slotEndTime'] as int?;
     final feeCost = (data['feeCost'] as int?) ?? 0;
     final rating = data['rating'] as double?;
     final durationSeconds = data['durationSeconds'] as int?;
     final durationMinutes = (data['durationMinutes'] as int?) ?? 45;
     final consultationMethod = data['consultationMethod'] as String? ?? 'video';
-    final problemDescription = data['problemDescription'] as String?;
     final questions = data['questions'] as String?;
 
     return Scaffold(
@@ -94,8 +108,11 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new,
-              size: 20, color: Color(0xFF2D2D2D)),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            size: 20,
+            color: Color(0xFF2D2D2D),
+          ),
           onPressed: () => context.pop(),
         ),
         centerTitle: true,
@@ -111,8 +128,7 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
                 color: _statusColor.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(20),
@@ -146,8 +162,11 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
                           color: _purple.withOpacity(0.12),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.person,
-                            color: _purple, size: 30),
+                        child: const Icon(
+                          Icons.person,
+                          color: _purple,
+                          size: 30,
+                        ),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -163,28 +182,23 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(Icons.phone,
-                                    size: 14, color: Color(0xFF999999)),
-                                const SizedBox(width: 5),
-                                Text(
-                                  patientPhone.isEmpty
-                                      ? 'Chưa có số điện thoại'
-                                      : patientPhone,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFF666666),
-                                  ),
-                                ),
-                              ],
+                            Text(
+                              patientPhone.isEmpty
+                                  ? 'Khách hàng'
+                                  : patientPhone,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF666666),
+                              ),
                             ),
                           ],
                         ),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: consultationType == 'Khẩn Cấp'
                               ? _red.withOpacity(0.1)
@@ -227,7 +241,9 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
                         value: '',
                         trailing: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: _purple.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(20),
@@ -245,7 +261,7 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
                               const SizedBox(width: 5),
                               Text(
                                 consultationMethod == 'video'
-                                    ? 'Video Call'
+                                    ? 'Gọi video'
                                     : 'Chat',
                                 style: const TextStyle(
                                   fontSize: 12,
@@ -276,20 +292,46 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // ── Problem description ─────────────────────────────────────
                 _SectionCard(
-                  label: 'Mô Tả Vấn Đề',
-                  child: Text(
-                    problemDescription?.isNotEmpty == true
-                        ? problemDescription!
-                        : 'Chưa có mô tả.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: problemDescription?.isNotEmpty == true
-                          ? const Color(0xFF2D2D2D)
-                          : const Color(0xFFAAAAAA),
-                      height: 1.5,
-                    ),
+                  label: 'Thông Tin Phiên Tư Vấn',
+                  child: Column(
+                    children: [
+                      if (bookedAtMs != null)
+                        _DetailRow(
+                          icon: Icons.event_available_outlined,
+                          label: 'Đặt lúc',
+                          value: _formatDateTimePlus7(bookedAtMs),
+                        ),
+                      if (bookedAtMs != null &&
+                          (paymentDeadlineMs != null ||
+                              slotStartMs != null ||
+                              slotEndMs != null))
+                        const _Divider(),
+                      if (paymentDeadlineMs != null) ...[
+                        _DetailRow(
+                          icon: Icons.timer_outlined,
+                          label: 'Hạn thanh toán',
+                          value: _formatDateTimePlus7(paymentDeadlineMs),
+                        ),
+                        if (slotStartMs != null || slotEndMs != null)
+                          const _Divider(),
+                      ],
+                      if (slotStartMs != null) ...[
+                        _DetailRow(
+                          icon: Icons.schedule_outlined,
+                          label: 'Bắt đầu khung giờ',
+                          value: _formatDateTime(slotStartMs),
+                        ),
+                        if (slotEndMs != null) const _Divider(),
+                      ],
+                      if (slotEndMs != null) ...[
+                        _DetailRow(
+                          icon: Icons.schedule,
+                          label: 'Kết thúc khung giờ',
+                          value: _formatDateTime(slotEndMs),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -310,44 +352,12 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                 ],
 
-                // ── Snake suspect ───────────────────────────────────────────
-                _SectionCard(
-                  label: 'Nghi Vấn Rắn Cắn',
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: _red.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.dangerous,
-                            color: _red, size: 24),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          snakeSuspect,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF2D2D2D),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
                 // ── Rating (completed only) ─────────────────────────────────
                 if (_isCompleted && durationSeconds != null) ...[
                   _SectionCard(
                     child: Row(
                       children: [
-                        const Icon(Icons.check_circle,
-                            color: _green, size: 20),
+                        const Icon(Icons.check_circle, color: _green, size: 20),
                         const SizedBox(width: 10),
                         Text(
                           'Thời Lượng Thực Tế: ${_fmtSec(durationSeconds!)}',
@@ -413,13 +423,18 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.cancel_outlined,
-                            color: Colors.grey, size: 20),
+                        Icon(
+                          Icons.cancel_outlined,
+                          color: Colors.grey,
+                          size: 20,
+                        ),
                         SizedBox(width: 10),
                         Text(
                           'Lịch tư vấn này đã bị hủy.',
                           style: TextStyle(
-                              fontSize: 14, color: Color(0xFF999999)),
+                            fontSize: 14,
+                            color: Color(0xFF999999),
+                          ),
                         ),
                       ],
                     ),
@@ -443,9 +458,9 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: () {
                     context.push(
-                      '/expert-video-waiting/$id',
+                      '/expert-video-waiting/$consultationId',
                       extra: {
-                        'consultationId': id,
+                        'consultationId': consultationId,
                         'patientName': patientName,
                         'consultationType': consultationType,
                         'feeCost': feeCost,
@@ -455,12 +470,10 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
                   icon: const Icon(Icons.videocam, size: 22),
                   label: const Text(
                     'Bắt Đầu Tư Vấn',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        _isWaiting ? _red : _purple,
+                    backgroundColor: _isWaiting ? _red : _purple,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
@@ -550,6 +563,7 @@ class _DetailRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, size: 18, color: const Color(0xFF6C47C2)),
           const SizedBox(width: 12),
@@ -560,13 +574,17 @@ class _DetailRow extends StatelessWidget {
             ),
           ),
           trailing ??
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight:
-                      valueBold ? FontWeight.bold : FontWeight.w500,
-                  color: valueColor ?? const Color(0xFF2D2D2D),
+              Flexible(
+                child: Text(
+                  value,
+                  textAlign: TextAlign.right,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: valueBold ? FontWeight.bold : FontWeight.w500,
+                    color: valueColor ?? const Color(0xFF2D2D2D),
+                  ),
                 ),
               ),
         ],

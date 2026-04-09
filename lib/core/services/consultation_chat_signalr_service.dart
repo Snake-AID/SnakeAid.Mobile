@@ -28,8 +28,8 @@ class ConsultationChatMessage {
     Map<String, dynamic> payload, {
     required String? currentUserId,
   }) {
-    final senderId =
-        (payload['senderId'] ?? payload['SenderId'] ?? '').toString();
+    final senderId = (payload['senderId'] ?? payload['SenderId'] ?? '')
+        .toString();
     final sentAtRaw = payload['sentAt'] ?? payload['SentAt'];
 
     return ConsultationChatMessage(
@@ -42,13 +42,24 @@ class ConsultationChatMessage {
           ?.toString(),
       sentAt: sentAtRaw != null
           ? (DateTime.tryParse(sentAtRaw.toString())?.toLocal() ??
-              DateTime.now())
+                DateTime.now())
           : DateTime.now(),
-      isMine: currentUserId != null &&
+      isMine:
+          currentUserId != null &&
           currentUserId.isNotEmpty &&
           senderId == currentUserId,
     );
   }
+}
+
+class ConsultationRoomExpiringEvent {
+  final String consultationId;
+  final String reason;
+
+  const ConsultationRoomExpiringEvent({
+    required this.consultationId,
+    required this.reason,
+  });
 }
 
 class ConsultationChatSignalRService {
@@ -64,14 +75,33 @@ class ConsultationChatSignalRService {
       StreamController<ConsultationChatMessage>.broadcast();
   final _signalController =
       StreamController<({String eventType, String payload})>.broadcast();
+  final _roomExpiringController =
+      StreamController<ConsultationRoomExpiringEvent>.broadcast();
   final _connectionStateController =
       StreamController<HubConnectionState>.broadcast();
 
-  Stream<ConsultationChatMessage> get messageStream => _messageController.stream;
+  Stream<ConsultationChatMessage> get messageStream =>
+      _messageController.stream;
   Stream<({String eventType, String payload})> get signalStream =>
       _signalController.stream;
+  Stream<ConsultationRoomExpiringEvent> get roomExpiringStream =>
+      _roomExpiringController.stream;
   Stream<HubConnectionState> get connectionStateStream =>
       _connectionStateController.stream;
+
+  void _emitRoomExpiringFromMap(Map<String, dynamic> map) {
+    final consultationId =
+        (map['ConsultationId'] ?? map['consultationId'] ?? '').toString();
+    final reason = (map['Reason'] ?? map['reason'] ?? '').toString();
+    if (consultationId.isEmpty) return;
+
+    _roomExpiringController.add(
+      ConsultationRoomExpiringEvent(
+        consultationId: consultationId,
+        reason: reason,
+      ),
+    );
+  }
 
   bool get isConnected => _hubConnection?.state == HubConnectionState.Connected;
 
@@ -99,7 +129,13 @@ class ConsultationChatSignalRService {
     final direct = _tryParseMap(arguments[0]);
     if (direct != null) {
       // Some backends wrap chat message inside one of common envelope keys.
-      final envelopeKeys = ['data', 'message', 'chatMessage', 'payload', 'item'];
+      final envelopeKeys = [
+        'data',
+        'message',
+        'chatMessage',
+        'payload',
+        'item',
+      ];
       for (final key in envelopeKeys) {
         final nested = _tryParseMap(direct[key]);
         if (nested != null) return nested;
@@ -115,7 +151,9 @@ class ConsultationChatSignalRService {
         'attachmentUrl': arguments.length > 1 ? arguments[1] : null,
         'senderId': arguments.length > 2 ? arguments[2] : '',
         'senderName': arguments.length > 3 ? arguments[3] : 'Ẩn danh',
-        'sentAt': arguments.length > 4 ? arguments[4] : DateTime.now().toUtc().toIso8601String(),
+        'sentAt': arguments.length > 4
+            ? arguments[4]
+            : DateTime.now().toUtc().toIso8601String(),
         'id': arguments.length > 5 ? arguments[5] : '',
       };
     }
@@ -129,7 +167,8 @@ class ConsultationChatSignalRService {
     }
 
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token') ?? prefs.getString('auth_token');
+    final token =
+        prefs.getString('access_token') ?? prefs.getString('auth_token');
     _currentUserId = prefs.getString('user_id');
 
     if (token == null || token.isEmpty) {
@@ -147,9 +186,7 @@ class ConsultationChatSignalRService {
             transport: HttpTransportType.WebSockets,
           ),
         )
-        .withAutomaticReconnect(
-          retryDelays: [0, 2000, 5000, 10000, 30000],
-        )
+        .withAutomaticReconnect(retryDelays: [0, 2000, 5000, 10000, 30000])
         .build();
 
     _registerEvents();
@@ -193,10 +230,7 @@ class ConsultationChatSignalRService {
     } catch (_) {}
 
     try {
-      await _hubConnection!.invoke(
-        'JoinRoom',
-        args: <Object>[consultationId],
-      );
+      await _hubConnection!.invoke('JoinRoom', args: <Object>[consultationId]);
       return;
     } catch (_) {}
 
@@ -216,10 +250,33 @@ class ConsultationChatSignalRService {
         if (arguments == null || arguments.isEmpty) return;
         final payload = _normalizeMessagePayload(arguments);
         if (payload == null) return;
-        payload.putIfAbsent('content', () => payload['message'] ?? payload['messageText'] ?? payload['body'] ?? '');
-        payload.putIfAbsent('Content', () => payload['Message'] ?? payload['MessageText'] ?? payload['Body'] ?? '');
-        payload.putIfAbsent('attachmentUrl', () => payload['attachmentURL'] ?? payload['imageUrl'] ?? payload['mediaUrl']);
-        payload.putIfAbsent('senderName', () => payload['senderFullName'] ?? payload['fullName']);
+        payload.putIfAbsent(
+          'content',
+          () =>
+              payload['message'] ??
+              payload['messageText'] ??
+              payload['body'] ??
+              '',
+        );
+        payload.putIfAbsent(
+          'Content',
+          () =>
+              payload['Message'] ??
+              payload['MessageText'] ??
+              payload['Body'] ??
+              '',
+        );
+        payload.putIfAbsent(
+          'attachmentUrl',
+          () =>
+              payload['attachmentURL'] ??
+              payload['imageUrl'] ??
+              payload['mediaUrl'],
+        );
+        payload.putIfAbsent(
+          'senderName',
+          () => payload['senderFullName'] ?? payload['fullName'],
+        );
         final msg = ConsultationChatMessage.fromHubPayload(
           payload,
           currentUserId: _currentUserId,
@@ -246,15 +303,32 @@ class ConsultationChatSignalRService {
       _hubConnection!.on(eventName, messageHandler);
     }
 
+    _hubConnection!.on('RoomExpiring', (arguments) {
+      try {
+        if (arguments == null || arguments.isEmpty) return;
+        final map = _tryParseMap(arguments[0]);
+        if (map == null) return;
+        _emitRoomExpiringFromMap(map);
+      } catch (e) {
+        debugPrint('Failed to parse RoomExpiring: $e');
+      }
+    });
+
     _hubConnection!.on('SignalReceived', (arguments) {
       try {
         if (arguments == null || arguments.isEmpty) return;
 
         if (arguments.length >= 2) {
-          _signalController.add((
-            eventType: arguments[0].toString(),
-            payload: arguments[1].toString(),
-          ));
+          final eventType = arguments[0].toString();
+          final payload = arguments[1].toString();
+          _signalController.add((eventType: eventType, payload: payload));
+
+          if (eventType.trim().toLowerCase() == 'roomexpiring') {
+            final map = _tryParseMap(payload);
+            if (map != null) {
+              _emitRoomExpiringFromMap(map);
+            }
+          }
           return;
         }
 
@@ -294,10 +368,7 @@ class ConsultationChatSignalRService {
     required String payload,
   }) async {
     if (!isConnected) return;
-    await _hubConnection!.invoke(
-      'Signal',
-      args: <Object>[eventType, payload],
-    );
+    await _hubConnection!.invoke('Signal', args: <Object>[eventType, payload]);
   }
 
   Future<void> disconnect() async {
@@ -316,6 +387,7 @@ class ConsultationChatSignalRService {
     await disconnect();
     await _messageController.close();
     await _signalController.close();
+    await _roomExpiringController.close();
     await _connectionStateController.close();
   }
 }

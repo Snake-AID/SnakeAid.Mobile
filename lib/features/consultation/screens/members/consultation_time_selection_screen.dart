@@ -64,69 +64,13 @@ class _ConsultationTimeSelectionScreenState
   DateTime? _selectedDateObj;
   TimeSlot? _selectedSlotObj;
 
-  // Fallback mock dates when provider has no availability yet
-  late List<AvailableDate> _mockDates;
-
-  // Fallback mock time slots per day (used only during initial load)
-  static const List<TimeSlot> _mockTimeSlots = [
-    TimeSlot(startTime: '09:00', endTime: '09:30', isAvailable: true),
-    TimeSlot(startTime: '09:30', endTime: '10:00', isAvailable: true),
-    TimeSlot(startTime: '10:00', endTime: '10:30', isAvailable: true),
-    TimeSlot(startTime: '10:30', endTime: '11:00', isAvailable: true),
-    TimeSlot(startTime: '11:00', endTime: '11:30', isAvailable: false),
-    TimeSlot(startTime: '11:30', endTime: '12:00', isAvailable: true),
-    TimeSlot(startTime: '14:00', endTime: '14:30', isAvailable: true),
-    TimeSlot(startTime: '14:30', endTime: '15:00', isAvailable: false),
-  ];
-
-  // Whether backend data has been received (not just loading)
-  bool _dataLoaded = false;
-
   @override
   void initState() {
     super.initState();
-    _initializeMockDates();
     // Force fresh fetch every time screen opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.invalidate(expertDetailProvider(widget.expertId));
     });
-  }
-
-  void _initializeMockDates() {
-    final now = DateTime.now();
-    _mockDates = List.generate(7, (index) {
-      final date = now.add(Duration(days: index));
-      final dayLabel = _getDayLabel(date);
-      final hasAvailability = index != 2 && index != 5;
-
-      return AvailableDate(
-        date: date,
-        dayLabel: dayLabel,
-        hasAvailability: hasAvailability,
-      );
-    });
-  }
-
-  String _getDayLabel(DateTime date) {
-    final weekday = date.weekday;
-    switch (weekday) {
-      case DateTime.monday:
-        return 'T.HAI';
-      case DateTime.tuesday:
-        return 'T.BA';
-      case DateTime.wednesday:
-        return 'T.TƯ';
-      case DateTime.thursday:
-        return 'T.NĂM';
-      case DateTime.friday:
-        return 'T.SÁU';
-      case DateTime.saturday:
-        return 'T.BẢY';
-      case DateTime.sunday:
-        return 'CN';
-      default:
-        return '';
-    }
   }
 
   String _getFullDayLabel(DateTime date) {
@@ -197,48 +141,69 @@ class _ConsultationTimeSelectionScreenState
     final state = ref.watch(expertDetailProvider(widget.expertId));
     final theme = Theme.of(context);
 
-    // Track whether real data has been received
-    if (!state.isLoading && state.expert != null && !_dataLoaded) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _dataLoaded = true);
-      });
-    }
-
     // Derive display dates and slots from provider when available
     final availability = state.expert?.availability ?? const <AvailabilityDay>[];
-    // now dùng UTC+7 để khớp với giờ VN thực tế (device timezone có thể khác)
-    final now = DateTime.now().toUtc().add(const Duration(hours: 7));
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    DateTime _normalizeDayToLocal(DateTime day) {
+      final localDay = day.toLocal();
+      return DateTime(localDay.year, localDay.month, localDay.day);
+    }
+
+    DateTime _slotDateTime(DateTime date, String timeStr) {
+      final normalized = _normalizeDayToLocal(date);
+      final parts = timeStr.trim().split(':');
+      final hour = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 0 : 0;
+      final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+      return DateTime(
+        normalized.year,
+        normalized.month,
+        normalized.day,
+        hour,
+        minute,
+      );
+    }
+
     // Chỉ giữ ngày mà còn ít nhất 1 slot chưa qua
     final futureAvailability = availability.where((d) {
+      final dayDate = _normalizeDayToLocal(d.date);
+      if (dayDate.isBefore(today)) {
+        return false;
+      }
+
       // Nếu không có slot data, giữ lại nếu ngày chưa hết
       if (d.timeSlots == null || d.timeSlots!.isEmpty) {
-        final dayEnd = DateTime.utc(d.date.year, d.date.month, d.date.day, 23, 59, 59);
+        final dayEnd = DateTime(
+          dayDate.year,
+          dayDate.month,
+          dayDate.day,
+          23,
+          59,
+          59,
+        );
         return !dayEnd.isBefore(now);
       }
-      // Có slot data: chỉ giữ nếu còn ít nhất 1 slot trong tương lai
+
+      // Ngày tương lai: giữ nguyên tất cả slot backend trả về
+      if (dayDate.isAfter(today)) {
+        return true;
+      }
+
+      // Ngày hôm nay: chỉ giữ slot chưa qua
       return d.timeSlots!.any((e) {
-        final parts = e.startTime.split(':');
-        final slotStart = DateTime.utc(d.date.year, d.date.month, d.date.day,
-            int.parse(parts[0]), int.parse(parts[1]));
+        final slotStart = _slotDateTime(d.date, e.startTime);
         return slotStart.isAfter(now);
       });
     }).toList();
 
-    // Use mock dates only while data hasn't loaded yet
     final displayDates = futureAvailability.isNotEmpty
         ? futureAvailability.map((d) => AvailableDate(
               date: d.date,
               dayLabel: d.dayOfWeek,
               hasAvailability: d.isAvailable,
-            )).toList()
-        : (_dataLoaded ? const <AvailableDate>[] : _mockDates);
-
-    // Helper: parse "HH:mm" thành DateTime UTC (= giờ VN wall-clock) của ngày được chọn
-    DateTime _slotDateTime(DateTime date, String timeStr) {
-      final parts = timeStr.split(':');
-      return DateTime.utc(date.year, date.month, date.day,
-          int.parse(parts[0]), int.parse(parts[1]));
-    }
+        )).toList()
+      : const <AvailableDate>[];
 
     final List<TimeSlot> displaySlots;
     final List<TimeSlotEntry> rawSlotsForSelected;
@@ -247,11 +212,18 @@ class _ConsultationTimeSelectionScreenState
         _selectedDateIndex! < futureAvailability.length) {
       final selectedDay = futureAvailability[_selectedDateIndex!];
       final allSlots = selectedDay.timeSlots ?? const <TimeSlotEntry>[];
-      // Lọc bỏ slot đã qua (so sánh startTime với thời điểm hiện tại)
-      rawSlotsForSelected = allSlots.where((e) {
-        final slotStart = _slotDateTime(selectedDay.date, e.startTime);
-        return slotStart.isAfter(now);
-      }).toList();
+      final selectedDayDate = _normalizeDayToLocal(selectedDay.date);
+
+      // Chỉ lọc slot đã qua khi ngày được chọn là hôm nay
+      if (selectedDayDate.isAtSameMomentAs(today)) {
+        rawSlotsForSelected = allSlots.where((e) {
+          final slotStart = _slotDateTime(selectedDay.date, e.startTime);
+          return slotStart.isAfter(now);
+        }).toList();
+      } else {
+        rawSlotsForSelected = allSlots;
+      }
+
       displaySlots = rawSlotsForSelected
           .map((e) => TimeSlot(startTime: e.startTime, endTime: e.endTime, isAvailable: true))
           .toList();
@@ -261,12 +233,7 @@ class _ConsultationTimeSelectionScreenState
           if (mounted) setState(() { _selectedTimeSlotIndex = null; _selectedSlotId = null; });
         });
       }
-    } else if (!_dataLoaded) {
-      // Still loading — show mock slots so UI isn't empty
-      rawSlotsForSelected = const [];
-      displaySlots = _selectedDateIndex != null ? _mockTimeSlots : const [];
     } else {
-      // Data loaded but no availability
       rawSlotsForSelected = const [];
       displaySlots = const [];
     }
@@ -294,7 +261,7 @@ class _ConsultationTimeSelectionScreenState
           ? const Center(child: CircularProgressIndicator())
           : state.expert == null
               ? const Center(child: Text('Không tìm thấy chuyên gia'))
-              : (_dataLoaded && availability.isEmpty)
+            : (availability.isEmpty)
                   ? _buildNoAvailability(theme)
                   : Column(
                   children: [
