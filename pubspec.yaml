@@ -38,8 +38,6 @@ dependencies:
   firebase_core: ^3.0.0
   firebase_messaging: ^15.0.0
   flutter_local_notifications: ^18.0.1
-  flutter_background_service: ^5.0.10
-  flutter_background_service_android: ^6.2.4
 
   # Networking
   dio: ^5.4.0
@@ -88,6 +86,9 @@ dependencies:
   # Audio & Haptic
   audioplayers: ^5.2.0
   vibration: ^3.1.6
+
+  # Rich content
+  flutter_markdown: ^0.7.4
 
   # Environment
   flutter_dotenv: ^5.1.0

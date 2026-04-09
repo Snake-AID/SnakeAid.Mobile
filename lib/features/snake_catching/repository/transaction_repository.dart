@@ -56,17 +56,50 @@ class TransactionRepository {
 
   TransactionRepository(this._httpService);
 
-  /// Check if the customer has paid for a snake catching request
-  /// GET /api/transactions/snakecatchingrequest/{snakeCatchingRequestId}
-  /// Returns null if no transaction found (customer hasn't paid yet)
-  Future<TransactionInfo?> getTransactionByRequestId(String requestId) async {
+  /// GET /api/transactions?referenceId={requestId}
+  /// Returns the paid CatchingDeposit transaction for a snake catching request.
+  /// Returns null if none found or not yet paid.
+  Future<TransactionInfo?> getDepositTransactionByRequestId(String requestId) async {
     try {
+      debugPrint('🔍 GET /api/transactions?referenceId=$requestId');
       final response = await _httpService.get(
-        '/api/transactions/snakecatchingrequest/$requestId',
+        '/api/transactions',
+        queryParameters: {'referenceId': requestId},
       );
+      debugPrint('✅ Transactions list response: ${response.statusCode}');
+      if (response.statusCode == 200 && response.data != null) {
+        final raw = response.data['data'];
+        List<dynamic> items = [];
+        if (raw is List) {
+          items = raw;
+        } else if (raw is Map && raw['items'] is List) {
+          items = raw['items'] as List;
+        }
+        // Only return a CatchingDeposit that has been confirmed paid by BE.
+        final paidDeposit = items
+            .map((e) => TransactionInfo.fromJson(e as Map<String, dynamic>))
+            .where((tx) => tx.transactionType == 'CatchingDeposit' && tx.isPaid)
+            .toList();
+        debugPrint('🔍 CatchingDeposit paid count: ${paidDeposit.length}');
+        if (paidDeposit.isNotEmpty) return paidDeposit.first;
+      }
+      return null;
+    } on DioException catch (e) {
+      debugPrint('❌ Transactions DioException: ${e.message}');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Transactions Exception: $e');
+      return null;
+    }
+  }
 
+  /// GET /api/transactions/{transactionId}
+  /// Returns null if 404 (transaction not found).
+  Future<TransactionInfo?> getTransactionById(String transactionId) async {
+    try {
+      debugPrint('🔍 GET /api/transactions/$transactionId');
+      final response = await _httpService.get('/api/transactions/$transactionId');
       debugPrint('✅ Transaction Response: ${response.statusCode}');
-
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data['data'];
         if (data != null) {
@@ -75,9 +108,8 @@ class TransactionRepository {
       }
       return null;
     } on DioException catch (e) {
-      // 404 means no transaction found => customer hasn't paid
       if (e.response?.statusCode == 404) {
-        debugPrint('ℹ️ No transaction found for request $requestId');
+        debugPrint('ℹ️ Transaction $transactionId not found');
         return null;
       }
       debugPrint('❌ Transaction DioException: ${e.message}');

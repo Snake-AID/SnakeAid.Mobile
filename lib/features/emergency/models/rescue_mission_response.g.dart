@@ -31,7 +31,8 @@ DetailRescueMissionResponse _$DetailRescueMissionResponseFromJson(
   cancellationReason: json['cancellationReason'] as String?,
   estimatedCost: (json['estimatedCost'] as num?)?.toDouble(),
   actualCost: (json['actualCost'] as num?)?.toDouble(),
-  distanceKm: (json['distanceKm'] as num?)?.toDouble(),
+  distanceFromCenterKm: (json['distanceFromCenterKm'] as num?)?.toDouble(),
+  costFromCenter: (json['costFromCenter'] as num?)?.toDouble(),
   incident: BriefIncidentForMission.fromJson(
     json['incident'] as Map<String, dynamic>,
   ),
@@ -39,6 +40,11 @@ DetailRescueMissionResponse _$DetailRescueMissionResponseFromJson(
     json['rescuer'] as Map<String, dynamic>,
   ),
   user: BriefMemberProfile.fromJson(json['user'] as Map<String, dynamic>),
+  missionMedia:
+      (json['missionMedia'] as List<dynamic>?)
+          ?.map((e) => ReportMediaResponse.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      [],
 );
 
 Map<String, dynamic> _$DetailRescueMissionResponseToJson(
@@ -58,10 +64,12 @@ Map<String, dynamic> _$DetailRescueMissionResponseToJson(
   'cancellationReason': instance.cancellationReason,
   'estimatedCost': instance.estimatedCost,
   'actualCost': instance.actualCost,
-  'distanceKm': instance.distanceKm,
+  'distanceFromCenterKm': instance.distanceFromCenterKm,
+  'costFromCenter': instance.costFromCenter,
   'incident': instance.incident.toJson(),
   'rescuer': instance.rescuer.toJson(),
   'user': instance.user.toJson(),
+  'missionMedia': instance.missionMedia.map((e) => e.toJson()).toList(),
 };
 
 BriefIncidentForMission _$BriefIncidentForMissionFromJson(

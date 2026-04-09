@@ -27,7 +27,8 @@ class SosIncidentResponse {
   }
 
   @override
-  String toString() => 'SosIncidentResponse(isSuccess: $isSuccess, message: $message)';
+  String toString() =>
+      'SosIncidentResponse(isSuccess: $isSuccess, message: $message)';
 }
 
 /// Report Symptom Model
@@ -73,7 +74,6 @@ class IncidentData {
   final String? cancellationReason;
   final int severityLevel;
   final DateTime incidentOccurredAt;
-  final List<IncidentSession> sessions;
 
   IncidentData({
     required this.id,
@@ -89,14 +89,15 @@ class IncidentData {
     this.cancellationReason,
     required this.severityLevel,
     required this.incidentOccurredAt,
-    required this.sessions,
   });
 
   factory IncidentData.fromJson(Map<String, dynamic> json) {
     return IncidentData(
       id: json['id'] ?? '',
       userId: json['userId'] ?? '',
-      locationCoordinates: LocationCoordinates.fromJson(json['locationCoordinates'] ?? {}),
+      locationCoordinates: LocationCoordinates.fromJson(
+        json['locationCoordinates'] ?? {},
+      ),
       symptomsReport: (json['symptomsReport'] as List<dynamic>?)
           ?.map((s) => ReportSymptom.fromJson(s))
           .toList(),
@@ -115,10 +116,6 @@ class IncidentData {
       incidentOccurredAt: json['incidentOccurredAt'] != null
           ? DateTime.parse(json['incidentOccurredAt'])
           : DateTime.now(),
-      sessions: (json['sessions'] as List<dynamic>?)
-              ?.map((s) => IncidentSession.fromJson(s))
-              .toList() ??
-          [],
     );
   }
 
@@ -136,7 +133,6 @@ class IncidentData {
     'cancellationReason': cancellationReason,
     'severityLevel': severityLevel,
     'incidentOccurredAt': incidentOccurredAt.toIso8601String(),
-    'sessions': sessions.map((s) => s.toJson()).toList(),
   };
 }
 
@@ -145,10 +141,7 @@ class LocationCoordinates {
   final double latitude;
   final double longitude;
 
-  LocationCoordinates({
-    required this.latitude,
-    required this.longitude,
-  });
+  LocationCoordinates({required this.latitude, required this.longitude});
 
   factory LocationCoordinates.fromJson(Map<String, dynamic> json) {
     return LocationCoordinates(

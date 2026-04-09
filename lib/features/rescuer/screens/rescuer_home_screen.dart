@@ -7,7 +7,6 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:vibration/vibration.dart';
 import 'rescuer_profile_screen.dart';
 import 'rescuer_income_management_screen.dart';
-import 'package:snakeaid_mobile/features/lesson/screens/rescuer_lesson_screen.dart';
 import 'package:snakeaid_mobile/features/lesson/providers/lesson_read_provider.dart';
 import '../../emergency/providers/rescuer_emergency_provider.dart';
 import '../../emergency/providers/mission_hub_provider.dart';
@@ -902,13 +901,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                       children: [
                         IconButton(
                           icon: const Icon(Icons.notifications_outlined),
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Thông báo - Đang phát triển'),
-                              ),
-                            );
-                          },
+                          onPressed: () => context.push('/notifications'),
                         ),
                         Positioned(
                           top: 8,
@@ -1151,27 +1144,55 @@ class _HomeTabState extends ConsumerState<_HomeTab>
 
   /// Navigate to active mission
   Future<void> _navigateToActiveMission() async {
-    final activeMissionNotifier = ref.read(activeMissionProvider.notifier);
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFFFF8800)),
+      ),
+    );
 
-    // Keep mission state in sync with server when the user taps the banner.
-    if (ref.read(activeMissionProvider).hasActiveMission) {
-      await activeMissionNotifier.refreshMission();
-    }
+    try {
+      final activeMissionNotifier = ref.read(activeMissionProvider.notifier);
 
-    final mission = ref.read(activeMissionProvider).mission;
+      // Keep mission state in sync with server when the user taps the banner.
+      if (ref.read(activeMissionProvider).hasActiveMission) {
+        await activeMissionNotifier.refreshMission();
+      }
 
-    if (mission == null) {
+      final mission = ref.read(activeMissionProvider).mission;
+
+      if (!mounted) return;
+
+      // Dismiss loading
+      Navigator.of(context).pop();
+
+      if (mission == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Không tìm thấy thông tin nhiệm vụ'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Navigate to mission detail
+      context.push('/rescuer/mission-detail/${mission.missionId}');
+    } catch (e) {
+      if (!mounted) return;
+
+      // Dismiss loading
+      Navigator.of(context).pop();
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Không tìm thấy thông tin nhiệm vụ'),
+        SnackBar(
+          content: Text('Lỗi khi tải nhiệm vụ: ${e.toString()}'),
           backgroundColor: Colors.red,
         ),
       );
-      return;
     }
-
-    // Navigate to mission detail
-    context.push('/rescuer/mission-detail/${mission.missionId}');
   }
 
   Widget _buildStatusCard() {

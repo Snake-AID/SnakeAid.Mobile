@@ -8,7 +8,9 @@ class FCMService {
   final NotificationService _notificationService = NotificationService();
 
   /// Initialize FCM and request permissions
-  Future<void> initialize() async {
+  Future<void> initialize({
+    Future<void> Function(String token)? onTokenRefresh,
+  }) async {
     // Initialize notification service first
     await _notificationService.initialize();
 
@@ -26,7 +28,9 @@ class FCMService {
     _firebaseMessaging.onTokenRefresh.listen((newToken) async {
       debugPrint('FCM Token refreshed: $newToken');
       await saveToken(newToken);
-      // Token will be updated on next app launch or can be handled separately
+      if (onTokenRefresh != null) {
+        await onTokenRefresh(newToken);
+      }
     });
   }
 
@@ -113,7 +117,8 @@ class FCMService {
     required Function(RemoteMessage) onMessageReceived,
     required Function(RemoteMessage) onMessageOpenedApp,
   }) {
-    // Foreground messages - Display notification using local notifications
+    // Foreground messages are displayed as system notifications
+    // to keep the same UX as background/terminated states.
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       debugPrint('Got a message whilst in the foreground!');
       debugPrint('Message data: ${message.data}');
@@ -123,8 +128,28 @@ class FCMService {
           'Message notification: ${message.notification!.title} - ${message.notification!.body}',
         );
 
-        // Display notification in foreground using local notifications
+        // Show local notification even in foreground for unified behavior.
         _notificationService.showNotificationFromFCM(message);
+      } else if (message.data.isNotEmpty) {
+        // Data-only fallback for foreground.
+        final title = (message.data['title'] ?? '').toString().trim();
+        final body = (message.data['body'] ?? '').toString().trim();
+        final channel = (message.data['channel'] ?? '')
+            .toString()
+            .toLowerCase();
+        final targetChannelId = channel == 'payment'
+            ? NotificationService.paymentChannelId
+            : NotificationService.generalChannelId;
+
+        if (title.isNotEmpty || body.isNotEmpty) {
+          _notificationService.showCustomNotification(
+            id: message.messageId.hashCode,
+            title: title.isEmpty ? 'Notification' : title,
+            body: body,
+            channelId: targetChannelId,
+            payload: message.data,
+          );
+        }
       }
 
       // Call custom handler

@@ -18,7 +18,6 @@ import 'package:snakeaid_mobile/features/auth/screens/forgot_password_screen.dar
 import 'package:snakeaid_mobile/features/auth/screens/forgot_password_otp_screen.dart';
 import 'package:snakeaid_mobile/features/auth/screens/reset_password_screen.dart';
 import 'package:snakeaid_mobile/features/auth/screens/password_reset_success_screen.dart';
-import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_alert_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_identification_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_selection_by_location_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_identification_questions_screen.dart';
@@ -26,6 +25,7 @@ import 'package:snakeaid_mobile/features/emergency/screens/members/snake_filtere
 import 'package:snakeaid_mobile/features/emergency/screens/members/snake_confirmation_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/first_aid_steps_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/models/sos_incident_response.dart';
+import 'package:snakeaid_mobile/features/emergency/models/filtered_snake.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/symptom_report_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/severity_assessment_screen.dart';
 import 'package:snakeaid_mobile/features/emergency/screens/members/emergency_tracking_screen.dart';
@@ -38,6 +38,7 @@ import 'package:snakeaid_mobile/features/member/screens/messages_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/message_detail_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/activity_detail_screen.dart';
 import 'package:snakeaid_mobile/features/member/screens/member_history_screen.dart';
+import 'package:snakeaid_mobile/features/notifications/screens/notification_inbox_screen.dart';
 import 'package:snakeaid_mobile/features/community_report/screens/community_alert_map_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_home_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_settings_screen.dart';
@@ -83,6 +84,14 @@ import 'package:snakeaid_mobile/features/consultation/screens/members/emergency_
 import 'package:snakeaid_mobile/features/consultation/screens/experts/expert_waiting_room_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/experts/expert_consultation_detail_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/experts/expert_consultation_completion_screen.dart';
+import 'package:snakeaid_mobile/features/snake_species/screens/snake_library_screen.dart';
+import 'package:snakeaid_mobile/features/snake_species/screens/snake_detail_screen.dart';
+import 'package:snakeaid_mobile/features/snake_species/screens/snake_first_aid_screen.dart';
+import 'package:snakeaid_mobile/features/blog/screens/member/blog_list_screen.dart';
+import 'package:snakeaid_mobile/features/blog/screens/member/blog_detail_screen.dart';
+import 'package:snakeaid_mobile/features/blog/screens/expert/expert_blog_list_screen.dart';
+import 'package:snakeaid_mobile/features/blog/screens/expert/expert_blog_form_screen.dart';
+import 'package:snakeaid_mobile/features/blog/models/blog_model.dart';
 
 /// App routing configuration using go_router
 final router = GoRouter(
@@ -281,11 +290,78 @@ final router = GoRouter(
       },
     ),
 
+    // === SNAKE SPECIES ROUTES ===
+    GoRoute(
+      path: '/snake-species',
+      name: 'snake_library',
+      builder: (context, state) => const SnakeLibraryScreen(),
+    ),
+    GoRoute(
+      path: '/snake-species/:id',
+      name: 'snake_detail',
+      builder: (context, state) {
+        final id = int.parse(state.pathParameters['id']!);
+        return SnakeDetailScreen(snakeId: id);
+      },
+    ),
+    GoRoute(
+      path: '/snake-first-aid/:id',
+      name: 'snake_first_aid',
+      builder: (context, state) {
+        final id = int.parse(state.pathParameters['id']!);
+        final extra = state.extra as Map<String, dynamic>?;
+        return SnakeFirstAidScreen(
+          snakeSpeciesId: id,
+          commonName: extra?['commonName'] as String?,
+        );
+      },
+    ),
+
+    // === BLOG ROUTES (MEMBER) ===
+    GoRoute(
+      path: '/blogs',
+      name: 'blog_list',
+      builder: (context, state) => const BlogListScreen(),
+    ),
+    GoRoute(
+      path: '/blogs/:id',
+      name: 'blog_detail',
+      builder: (context, state) {
+        final id = state.pathParameters['id']!;
+        return BlogDetailScreen(blogId: id);
+      },
+    ),
+
+    // === BLOG ROUTES (EXPERT) ===
+    GoRoute(
+      path: '/expert/blogs',
+      name: 'expert_blog_list',
+      builder: (context, state) => const ExpertBlogListScreen(),
+    ),
+    GoRoute(
+      path: '/expert/blogs/new',
+      name: 'expert_blog_new',
+      builder: (context, state) => const ExpertBlogFormScreen(),
+    ),
+    GoRoute(
+      path: '/expert/blogs/:id/edit',
+      name: 'expert_blog_edit',
+      builder: (context, state) {
+        final blog = state.extra as BlogModel?;
+        return ExpertBlogFormScreen(existingBlog: blog);
+      },
+    ),
+
     // === MEMBER APP ROUTES ===
     GoRoute(
       path: '/member-home',
       name: 'member_home',
       builder: (context, state) => const MainScaffold(initialIndex: 0),
+    ),
+    GoRoute(
+      path: '/notifications',
+      name: 'notifications',
+      builder: (context, state) => const NotificationInboxScreen(),
     ),
 
     // === CONSULTATION ROUTES ===
@@ -700,16 +776,6 @@ final router = GoRouter(
 
     // === EMERGENCY ROUTES ===
     GoRoute(
-      path: '/emergency-alert',
-      name: 'emergency_alert',
-      builder: (context, state) {
-        final extra = state.extra as Map<String, dynamic>?;
-        return EmergencyAlertScreen(
-          incident: extra?['incident'] as IncidentData?,
-        );
-      },
-    ),
-    GoRoute(
       path: '/snake-identification',
       name: 'snake_identification',
       builder: (context, state) {
@@ -734,14 +800,25 @@ final router = GoRouter(
     GoRoute(
       path: '/snake-identification-questions',
       name: 'snake_identification_questions',
-      builder: (context, state) => const SnakeIdentificationQuestionsScreen(),
+      builder: (context, state) {
+        final data = state.extra as Map<String, dynamic>?;
+        return SnakeIdentificationQuestionsScreen(
+          incidentId: data?['incidentId'] as String?,
+        );
+      },
     ),
     GoRoute(
       path: '/snake-filtered-results',
       name: 'snake_filtered_results',
       builder: (context, state) {
-        final answers = state.extra as Map<int, String>;
-        return SnakeFilteredResultsScreen(answers: answers);
+        final data = state.extra as Map<String, dynamic>;
+        final filteredSnakes = data['filteredSnakes'] as List<dynamic>;
+        final selectedOptionIds = data['selectedOptionIds'] as List<dynamic>;
+        return SnakeFilteredResultsScreen(
+          filteredSnakes: filteredSnakes.cast<FilteredSnake>(),
+          selectedOptionIds: selectedOptionIds.cast<int>(),
+          incidentId: data['incidentId'] as String?,
+        );
       },
     ),
     GoRoute(
@@ -758,6 +835,13 @@ final router = GoRouter(
           features: (data['features'] as List<dynamic>)
               .cast<IdentificationFeature>(),
           matchedFeaturesCount: data['matchedFeaturesCount'] as int,
+          // API call data
+          snakeId: data['snakeId'] as int?,
+          selectedOptionIds: (data['selectedOptionIds'] as List<dynamic>?)
+              ?.cast<int>(),
+          matchScore: data['matchScore'] as int?,
+          matchPercentage: data['matchPercentage'] as double?,
+          incidentId: data['incidentId'] as String?,
         );
       },
     ),
@@ -777,6 +861,7 @@ final router = GoRouter(
         return SymptomReportScreen(
           incidentId: data['incidentId'] as String,
           recognitionResultId: data['recognitionResultId'] as String?,
+          isDirectEntry: data['isDirectEntry'] as bool? ?? false,
         );
       },
     ),
@@ -788,6 +873,7 @@ final router = GoRouter(
         return SeverityAssessmentScreen(
           incidentId: data?['incidentId'] as String? ?? '',
           recognitionResultId: data?['recognitionResultId'] as String?,
+          isDirectEntry: data?['isDirectEntry'] as bool? ?? false,
         );
       },
     ),
@@ -831,14 +917,22 @@ final router = GoRouter(
       name: 'member_incident_finished_detail',
       builder: (context, state) {
         final data = state.extra as Map<String, dynamic>?;
-        final incidentId = data?['incidentId'] as String?;
-        return MemberIncidentFinishedDetailScreen(incidentId: incidentId ?? '');
+        final incidentId =
+            data?['incidentId'] as String? ??
+            state.uri.queryParameters['incidentId'] ??
+            '';
+        return MemberIncidentFinishedDetailScreen(incidentId: incidentId);
       },
     ),
     GoRoute(
       path: '/member-rescuer-arrived',
       name: 'member_rescuer_arrived',
-      builder: (context, state) => const member_screens.RescuerArrivedScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return member_screens.RescuerArrivedScreen(
+          incidentId: extra?['incidentId'] as String?,
+        );
+      },
     ),
     GoRoute(
       path: '/emergency-completion',

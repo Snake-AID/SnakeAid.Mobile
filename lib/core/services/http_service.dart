@@ -143,7 +143,11 @@ class HttpService {
 
   /// Fast-fail health check using cached result (15 s TTL by default).
   /// No-op when [healthCheckService] is null.
-  Future<void> _healthCheck() async {
+ Future<void> _healthCheck() async {
+    // Tạm thời return luôn để bỏ qua bước check mạng, cho phép login thẳng
+    return; 
+
+    /* Code cũ được tạm ẩn đi
     if (healthCheckService == null) return;
     final alive = await healthCheckService!.isServerAlive();
     if (!alive) {
@@ -151,10 +155,10 @@ class HttpService {
         requestOptions: RequestOptions(path: ''),
         type: DioExceptionType.connectionError,
         error: 'HEALTH_CHECK_FAILED',
-        message:
-            'Máy chủ đang bảo trì hoặc không thể kết nối. Vui lòng thử lại sau.',
+        message: 'Máy chủ đang bảo trì hoặc không thể kết nối. Vui lòng thử lại sau.',
       );
     }
+    */
   }
 
   /// Re-throws [original] with a user-readable [message] attached.
@@ -206,18 +210,55 @@ class HttpService {
 
   /// Extract message from backend ApiResponse envelope, then fall back to
   /// HTTP status code description.
+  ///
+  /// Priority order:
+  /// 1. ValidationErrors (formatted as bullet list)
+  /// 2. ApiResponse.Message
+  /// 3. Error.Message
+  /// 4. Status code fallback
   String _messageFromResponse(Response? response) {
     if (response?.data is Map) {
       final data = response!.data as Map;
 
-      if (data['message'] != null) return data['message'].toString();
-
+      // Priority 1: Check for validation errors (most specific)
       if (data['error'] is Map) {
         final err = data['error'] as Map;
-        if (err['message'] != null) return err['message'].toString();
+        
+        // Format: error.validationErrors (Dictionary<string, string[]>)
+        if (err['validationErrors'] is Map) {
+          final validationErrors = err['validationErrors'] as Map;
+          final errorMessages = <String>[];
+          
+          validationErrors.forEach((field, messages) {
+            if (messages is List && messages.isNotEmpty) {
+              // Format: "Field: error1, error2"
+              errorMessages.add('${field}: ${messages.join(', ')}');
+            } else if (messages != null) {
+              errorMessages.add('${field}: $messages');
+            }
+          });
+          
+          if (errorMessages.isNotEmpty) {
+            return errorMessages.join('\n');
+          }
+        }
+      }
+
+      // Priority 2: Main message from ApiResponse
+      if (data['message'] != null && data['message'].toString().isNotEmpty) {
+        return data['message'].toString();
+      }
+
+      // Priority 3: Error message (if exists)
+      if (data['error'] is Map) {
+        final err = data['error'] as Map;
+        if (err['message'] != null && err['message'].toString().isNotEmpty) {
+          return err['message'].toString();
+        }
       }
     }
 
+    // Priority 4: Fallback to status code
     return _messageFromStatusCode(response?.statusCode);
   }
 

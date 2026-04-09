@@ -1,10 +1,9 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../auth/repository/auth_repository.dart';
 import '../../auth/models/user.dart';
-import '../../snake_catching/repository/wallet_repository.dart';
+import '../../member/screens/payment_history_screen.dart';
 
 /// Rescuer Profile Screen - Personal information and statistics for rescuer
 class RescuerProfileScreen extends ConsumerStatefulWidget {
@@ -16,24 +15,16 @@ class RescuerProfileScreen extends ConsumerStatefulWidget {
 
 class _RescuerProfileScreenState extends ConsumerState<RescuerProfileScreen> {
   bool _isOnline = true;
-  WalletInfo? _walletInfo;
-  bool _isLoadingWallet = true;
-  Timer? _walletRefreshTimer;
   User? _userInfo;
 
   @override
   void initState() {
     super.initState();
     _loadUserInfo();
-    _loadWallet();
-    _walletRefreshTimer = Timer.periodic(const Duration(minutes: 3), (_) {
-      _silentRefreshWallet();
-    });
   }
 
   @override
   void dispose() {
-    _walletRefreshTimer?.cancel();
     super.dispose();
   }
 
@@ -44,29 +35,7 @@ class _RescuerProfileScreenState extends ConsumerState<RescuerProfileScreen> {
     } catch (_) {}
   }
 
-  Future<void> _loadWallet() async {
-    try {
-      final wallet = await ref.read(walletRepositoryProvider).getWalletInfo();
-      if (mounted) setState(() { _walletInfo = wallet; _isLoadingWallet = false; });
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingWallet = false);
-    }
-  }
 
-  Future<void> _silentRefreshWallet() async {
-    try {
-      final wallet = await ref.read(walletRepositoryProvider).getWalletInfo();
-      if (mounted) setState(() => _walletInfo = wallet);
-    } catch (_) {}
-  }
-
-  String _formatBalance(double amount) {
-    final formatted = amount.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-      (m) => '${m[1]}.',
-    );
-    return '$formatted đ';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -152,10 +121,6 @@ class _RescuerProfileScreenState extends ConsumerState<RescuerProfileScreen> {
             _buildRevenueCard(),
             const SizedBox(height: 16),
 
-            // SnakeAidPay Wallet Card
-            _buildSnakeAidPayCard(),
-            const SizedBox(height: 16),
-
             // Menu Items
             _buildMenuItem(
               icon: Icons.checklist,
@@ -168,7 +133,20 @@ class _RescuerProfileScreenState extends ConsumerState<RescuerProfileScreen> {
               icon: Icons.wallet,
               title: 'Quản Lý Thu Nhập',
               subtitle: 'Xem báo cáo tài chính',
-              onTap: () => context.pushNamed('rescuer_income_management'),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PaymentHistoryScreen(
+                    themeColor: Color(0xFFFF6B35),
+                    title: 'Quản Lý Thu Nhập',
+                    filterTypes: [
+                      'snakebite incident',
+                      'snake catching',
+                      'system',
+                    ],
+                  ),
+                ),
+              ),
             ),
             const SizedBox(height: 12),
             _buildMenuItem(
@@ -583,123 +561,6 @@ class _RescuerProfileScreenState extends ConsumerState<RescuerProfileScreen> {
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSnakeAidPayCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFF6B35), Color(0xFFe0541f)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFFF6B35).withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.account_balance_wallet,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Ví SnakeAidPay',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Số dư',
-            style: TextStyle(fontSize: 14, color: Colors.white70),
-          ),
-          const SizedBox(height: 4),
-          _isLoadingWallet
-              ? const SizedBox(
-                  height: 40,
-                  child: Center(
-                    child: SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white54,
-                      ),
-                    ),
-                  ),
-                )
-              : Text(
-                  _formatBalance(_walletInfo?.balance ?? 0),
-                  style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.add_circle_outline, size: 20),
-                  label: const Text('Nạp tiền'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFFFF6B35),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.remove_circle_outline, size: 20),
-                  label: const Text('Rút tiền'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white, width: 2),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ),
         ],
       ),

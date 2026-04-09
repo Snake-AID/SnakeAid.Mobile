@@ -111,7 +111,7 @@ class NotificationService {
           paymentChannelId,
           paymentChannelName,
           description: paymentChannelDescription,
-          importance: Importance.high,
+          importance: Importance.max,
           playSound: true,
           enableVibration: true,
           enableLights: true,
@@ -119,13 +119,13 @@ class NotificationService {
           showBadge: true,
         );
 
-    // General notifications channel - Default priority
+    // General notifications channel - High priority for heads-up behavior
     const AndroidNotificationChannel generalChannel =
         AndroidNotificationChannel(
           generalChannelId,
           generalChannelName,
           description: generalChannelDescription,
-          importance: Importance.defaultImportance,
+          importance: Importance.max,
           playSound: true,
           enableVibration: true,
           showBadge: true,
@@ -173,12 +173,8 @@ class NotificationService {
           channelDescription: channelId == paymentChannelId
               ? paymentChannelDescription
               : generalChannelDescription,
-          importance: channelId == paymentChannelId
-              ? Importance.high
-              : Importance.defaultImportance,
-          priority: channelId == paymentChannelId
-              ? Priority.high
-              : Priority.defaultPriority,
+          importance: Importance.max,
+          priority: Priority.max,
           showWhen: true,
           styleInformation: BigTextStyleInformation(
             notification.body ?? '',
@@ -190,6 +186,10 @@ class NotificationService {
           enableVibration: true,
           playSound: true,
           ticker: notification.title,
+          visibility: NotificationVisibility.public,
+          category: AndroidNotificationCategory.message,
+          autoCancel: true,
+          channelShowBadge: true,
         );
 
     // iOS notification details
@@ -241,9 +241,15 @@ class NotificationService {
           channelDescription: selectedChannelId == paymentChannelId
               ? paymentChannelDescription
               : generalChannelDescription,
-          importance: Importance.high,
-          priority: Priority.high,
+          importance: Importance.max,
+          priority: Priority.max,
           icon: '@mipmap/ic_launcher',
+          visibility: NotificationVisibility.public,
+          category: AndroidNotificationCategory.message,
+          autoCancel: true,
+          channelShowBadge: true,
+          ticker: title,
+          styleInformation: BigTextStyleInformation(body, contentTitle: title),
         );
 
     const DarwinNotificationDetails iOSDetails = DarwinNotificationDetails(

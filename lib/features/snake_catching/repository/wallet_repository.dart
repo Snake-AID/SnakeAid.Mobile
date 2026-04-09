@@ -62,6 +62,37 @@ class WalletRepository {
     }
   }
 
+  /// POST /api/wallet/topup — create PayOS top-up link
+  /// Returns a checkout URL to open in the browser.
+  Future<String> createTopupLink({
+    required int amount,
+    String description = 'Nạp tiền ví SnakeAidPay',
+  }) async {
+    try {
+      debugPrint('——————————————————————————————————————————');
+      debugPrint('💰 Topup: POST /api/wallet/topup  amount=$amount');
+      final response = await _httpService.post(
+        '/api/wallet/topup',
+        data: {'amount': amount, 'description': description},
+      );
+      final data = (response.data as Map<String, dynamic>)['data']
+          as Map<String, dynamic>?;
+      final url = data?['checkoutUrl'] as String?;
+      if (url == null || url.isEmpty) {
+        throw Exception('Không nhận được link thanh toán.');
+      }
+      debugPrint('✅ Topup checkout URL: $url');
+      return url;
+    } on DioException catch (e) {
+      debugPrint('❌ createTopupLink DioException: ${e.message}');
+      final msg = e.response?.data?['message'] as String?;
+      throw Exception(msg ?? 'Không thể tạo yêu cầu nạp tiền. Vui lòng thử lại.');
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Lỗi không xác định: $e');
+    }
+  }
+
   /// POST /api/wallet/payment
   /// [transactionType] is 'CatchingDeposit' (đợt 1) or 'CatchingPayment' (đợt 2)
   Future<void> payWithWallet({

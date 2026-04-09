@@ -8,7 +8,10 @@ import 'package:latlong2/latlong.dart';
 import 'package:signalr_netcore/signalr_client.dart';
 import '../../../shared/widgets/chat_screen.dart';
 import '../../providers/mission_hub_provider.dart';
+import '../../providers/active_mission_provider.dart';
 import '../../providers/incident_provider.dart';
+import '../../providers/detailed_incident_provider.dart';
+import '../../models/detailed_incident_response.dart' as incident_models;
 import '../../../../core/services/openroute_service.dart' as ors;
 import '../../../../core/services/mission_hub_service.dart';
 import '../../../../core/providers/openroute_provider.dart';
@@ -45,7 +48,8 @@ class _EmergencyTrackingScreenState
   String? _effectiveMissionId;
   // ignore: unused_field  – kept for future rescuer-profile fetch / call action
   String? _effectiveRescuerId;
-  bool get _hasRescuer => _effectiveMissionId != null;
+  bool get _hasRescuer =>
+      _effectiveMissionId != null || _rescuerPosition != null;
 
   // ── GPS stream ────────────────────────────────────────────────────────────
   StreamSubscription<Position>? _gpsSubscription;
@@ -56,6 +60,12 @@ class _EmergencyTrackingScreenState
   bool _isMemberBroadcastThrottled = false;
   bool _hasInitialLocationBroadcast =
       false; // Track if we've sent first location
+  LatLng? _lastBroadcastPosition;
+
+  static const Duration _memberBroadcastThrottleDuration = Duration(
+    seconds: 12,
+  ); // aligned with rescuer logic
+  static const double _memberBroadcastDistanceThreshold = 10.0; // meters
 
   // ── SOS origin (static pin — where SOS was first pressed) ────────────────
   LatLng? _sosOriginPosition;
@@ -70,16 +80,19 @@ class _EmergencyTrackingScreenState
   List<LatLng>? _remainingRoutePoints; // orange/normal
   static const double _routeDeviationThreshold = 100.0; // meters
 
+  // ── Route request rate-limiting
+  DateTime? _lastRouteFetchAt;
+  LatLng? _lastRouteFetchFrom;
+  static const Duration _routeFetchMinInterval = Duration(seconds: 20);
+  static const Duration _routeFetchTTL = Duration(minutes: 2);
+  static const double _routeFetchDistanceThreshold = 50.0; // meters
+
   // ── MissionHub subscriptions ──────────────────────────────────────────────
   final List<StreamSubscription> _missionHubSubscriptions = [];
 
   // ── ETA / distance display ────────────────────────────────────────────────
   double? _distanceKm;
   int? _etaMinutes; // estimated at 30 km/h
-
-  // ── SOS countdown ─────────────────────────────────────────────────────────
-  int _remainingSeconds = 330;
-  Timer? _countdownTimer;
 
   // ── Member blue-dot pulse (also used for rescuer & SOS origin) ───────────
   late AnimationController _pulseController;
@@ -115,8 +128,16 @@ class _EmergencyTrackingScreenState
     }
 
     // ── Restore rescuer position from provider (in case user backed and returned)
+    // ⚠️ CRITICAL: Only restore if missionId matches current incident to avoid stale data
     final missionStatus = ref.read(missionStatusProvider);
-    if (missionStatus.rescuerLat != null && missionStatus.rescuerLng != null) {
+    final currentIncidentId = widget.incidentId ?? incident?.id;
+
+    // Validate that cached mission belongs to current incident
+    final isSameIncident = missionStatus.incidentId == currentIncidentId;
+
+    if (isSameIncident &&
+        missionStatus.rescuerLat != null &&
+        missionStatus.rescuerLng != null) {
       _rescuerPosition = LatLng(
         missionStatus.rescuerLat!,
         missionStatus.rescuerLng!,
@@ -124,12 +145,20 @@ class _EmergencyTrackingScreenState
       debugPrint(
         '✅ Restored rescuer position from provider: ${_rescuerPosition!.latitude}, ${_rescuerPosition!.longitude}',
       );
+    } else if (!isSameIncident && missionStatus.hasRescuer) {
+      debugPrint(
+        '⚠️ Skipping rescuer position restore: cached mission belongs to different incident (cached: ${missionStatus.incidentId}, current: $currentIncidentId)',
+      );
+      // Clear stale mission status
+      ref.read(missionStatusProvider.notifier).reset();
     }
 
-    _startCountdown();
     _startMemberGps();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // 🔍 Check if incident is already in advanced state (user returned after app restart)
+      await _checkIncidentStateAndNavigate();
+
       await _ensureMissionHubConnected();
       _setupMissionHubListeners();
       // Rescuer may have accepted while member was navigating to this screen
@@ -147,6 +176,75 @@ class _EmergencyTrackingScreenState
         }
       }
     });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Check incident state on init and auto-navigate if needed
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Check if incident is already in RescuerArrived/Finished/Completed state
+  /// If yes, auto-navigate to appropriate screen (handles app restart scenario)
+  Future<void> _checkIncidentStateAndNavigate() async {
+    final incidentId =
+        widget.incidentId ?? ref.read(activeIncidentProvider).incident?.id;
+
+    if (incidentId == null) {
+      debugPrint('⚠️ No incidentId available for state check');
+      return;
+    }
+
+    try {
+      debugPrint('🔍 Checking incident state for auto-navigation...');
+      await ref
+          .read(detailedIncidentProvider.notifier)
+          .loadDetailedIncident(incidentId, forceRefresh: true);
+
+      final incident = ref.read(detailedIncidentProvider).incident;
+      if (incident == null) {
+        debugPrint('⚠️ Failed to load incident for state check');
+        return;
+      }
+
+      final status = incident.status.value.toLowerCase();
+      debugPrint('📊 Current incident status: $status');
+
+      // If incident is Finished or Completed → go to payment screen
+      if (status == 'finished' || status == 'completed') {
+        debugPrint('🔄 Auto-navigating to finished detail (status: $status)');
+        if (mounted) {
+          context.go(
+            '/member-incident-finished-detail',
+            extra: {'incidentId': incidentId},
+          );
+        }
+        return;
+      }
+
+      // If mission is RescuerArrived → go to rescuer arrived screen
+      final mission = incident.activeMission;
+      if (mission != null) {
+        final missionStatus = mission.status;
+        debugPrint('📊 Current mission status: ${missionStatus.value}');
+
+        if (missionStatus == incident_models.MissionStatus.rescuerArrived) {
+          debugPrint('🔄 Auto-navigating to rescuer arrived screen');
+          if (mounted) {
+            context.push(
+              '/member-rescuer-arrived',
+              extra: {'incidentId': incidentId},
+            );
+          }
+          return;
+        }
+      }
+
+      debugPrint(
+        '✅ Incident in tracking-appropriate state, staying on tracking screen',
+      );
+    } catch (e) {
+      debugPrint('⚠️ Error checking incident state: $e');
+      // Continue to tracking screen on error
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -202,35 +300,19 @@ class _EmergencyTrackingScreenState
       _mapController.move(ll, _mapController.camera.zoom);
     }
 
-    // Broadcast member live GPS to MissionHub (rescuer sees it on their map)
-    // ✅ Special case: Initial broadcast happens immediately when MissionHub ready
-    if (!_hasInitialLocationBroadcast && widget.incidentId != null) {
-      final svc = ref.read(missionHubServiceProvider);
-      if (svc.isConnected) {
-        debugPrint(
-          '📍 Broadcasting INITIAL member location: ${pos.latitude}, ${pos.longitude}',
-        );
-        svc.updateLocation(widget.incidentId!, pos.latitude, pos.longitude);
-        _hasInitialLocationBroadcast = true;
-        _isMemberBroadcastThrottled = true;
-        _memberBroadcastThrottle = Timer(const Duration(seconds: 15), () {
-          _isMemberBroadcastThrottled = false;
-        });
-      }
+    // 🛑 Stop broadcasting location if rescuer already arrived
+    // (no need to send location updates after rescuer is at scene)
+    final missionStatus = ref.read(missionStatusProvider);
+    if (missionStatus.rescuerArrived || missionStatus.missionCompleted) {
+      debugPrint(
+        '🛑 Skipping location broadcast: rescuer already arrived/completed',
+      );
+      return;
     }
-    // ✅ Subsequent broadcasts use throttle
-    else if (!_isMemberBroadcastThrottled && widget.incidentId != null) {
-      final svc = ref.read(missionHubServiceProvider);
-      if (svc.isConnected) {
-        debugPrint(
-          '📍 Broadcasting member location (periodic): ${pos.latitude}, ${pos.longitude}',
-        );
-        svc.updateLocation(widget.incidentId!, pos.latitude, pos.longitude);
-        _isMemberBroadcastThrottled = true;
-        _memberBroadcastThrottle = Timer(const Duration(seconds: 15), () {
-          _isMemberBroadcastThrottled = false;
-        });
-      }
+
+    // Broadcast member live GPS to MissionHub (rescuer sees it on their map)
+    if (!_hasInitialLocationBroadcast || _shouldBroadcastMemberLocation(ll)) {
+      _broadcastMemberLocation(ll);
     }
   }
 
@@ -245,10 +327,30 @@ class _EmergencyTrackingScreenState
     final status = ref.read(missionStatusProvider);
     if (status.hasRescuer) {
       debugPrint('✅ TrackingScreen: rescuer already cached → updating state');
-      setState(() {
-        _effectiveMissionId = status.missionId;
-        _effectiveRescuerId = status.rescuerId;
-      });
+      _syncWithMissionStatus(status);
+    }
+  }
+
+  void _syncWithMissionStatus(MissionStatus status) {
+    if (status.hasRescuer && !_hasRescuer) {
+      _effectiveMissionId = status.missionId;
+      _effectiveRescuerId = status.rescuerId;
+    }
+
+    if (status.rescuerLat != null && status.rescuerLng != null) {
+      final restoredPos = LatLng(status.rescuerLat!, status.rescuerLng!);
+      if (_rescuerPosition == null ||
+          _rescuerPosition!.latitude != restoredPos.latitude ||
+          _rescuerPosition!.longitude != restoredPos.longitude) {
+        setState(() {
+          _rescuerPosition = restoredPos;
+        });
+
+        _recalcEta();
+        if (_sosOriginPosition != null) {
+          _fetchRoute();
+        }
+      }
     }
   }
 
@@ -313,15 +415,59 @@ class _EmergencyTrackingScreenState
     debugPrint(
       '📍 Broadcasting INITIAL member location (missed during GPS startup): ${_memberPosition!.latitude}, ${_memberPosition!.longitude}',
     );
-    svc.updateLocation(
-      widget.incidentId!,
-      _memberPosition!.latitude,
-      _memberPosition!.longitude,
+    _broadcastMemberLocation(_memberPosition!);
+  }
+
+  bool _shouldBroadcastMemberLocation(LatLng candidate) {
+    if (widget.incidentId == null) return false;
+    if (_isMemberBroadcastThrottled) return false;
+    if (ref.read(missionHubServiceProvider).isConnected == false) return false;
+
+    if (_lastBroadcastPosition == null) return true;
+
+    final distance = Geolocator.distanceBetween(
+      candidate.latitude,
+      candidate.longitude,
+      _lastBroadcastPosition!.latitude,
+      _lastBroadcastPosition!.longitude,
     );
+
+    return distance >= _memberBroadcastDistanceThreshold;
+  }
+
+  void _broadcastMemberLocation(LatLng pos) {
+    if (widget.incidentId == null) return;
+    final svc = ref.read(missionHubServiceProvider);
+    if (!svc.isConnected) return;
+
+    // Avoid redundant sends when the position is effectively the same.
+    if (_lastBroadcastPosition != null) {
+      final distance = Geolocator.distanceBetween(
+        pos.latitude,
+        pos.longitude,
+        _lastBroadcastPosition!.latitude,
+        _lastBroadcastPosition!.longitude,
+      );
+      if (distance < _memberBroadcastDistanceThreshold) {
+        debugPrint(
+          '📍 Member location update ignored (distance ${distance.toStringAsFixed(1)}m < $_memberBroadcastDistanceThreshold m)',
+        );
+        return;
+      }
+    }
+
+    debugPrint(
+      '📍 Broadcasting member location: ${pos.latitude}, ${pos.longitude}',
+    );
+    svc.updateLocation(widget.incidentId!, pos.latitude, pos.longitude);
+
     _hasInitialLocationBroadcast = true;
     _isMemberBroadcastThrottled = true;
-    _memberBroadcastThrottle = Timer(const Duration(seconds: 15), () {
+    _lastBroadcastPosition = pos;
+    _memberBroadcastThrottle?.cancel();
+    _memberBroadcastThrottle = Timer(_memberBroadcastThrottleDuration, () {
       _isMemberBroadcastThrottled = false;
+      debugPrint('🔓 [TrackingScreen] Member location throttle released');
     });
   }
 
@@ -382,7 +528,12 @@ class _EmergencyTrackingScreenState
             duration: Duration(seconds: 4),
           ),
         );
-        context.pushNamed('member_rescuer_arrived');
+        final incidentId =
+            widget.incidentId ?? ref.read(activeIncidentProvider).incident?.id;
+        context.push(
+          '/member-rescuer-arrived',
+          extra: {'incidentId': incidentId},
+        );
       }),
     );
 
@@ -390,17 +541,49 @@ class _EmergencyTrackingScreenState
     _missionHubSubscriptions.add(
       svc.missionCompletedStream.listen((_) async {
         if (!mounted) return;
-        // Clean up member-side state so a future SOS starts fresh.
+
+        // Get incident ID before clearing state
+        final incidentId =
+            widget.incidentId ?? ref.read(activeIncidentProvider).incident?.id;
+
+        if (incidentId == null) {
+          debugPrint('⚠️ MissionCompleted: No incidentId available');
+          context.go('/member-home');
+          return;
+        }
+
+        // 🔄 Load detailed incident data BEFORE clearing state
+        // This ensures the finished detail screen has data in cache
+        debugPrint('🔄 Pre-loading incident data before navigation...');
+        try {
+          await ref
+              .read(detailedIncidentProvider.notifier)
+              .loadDetailedIncident(incidentId, forceRefresh: true);
+          debugPrint('✅ Incident data pre-loaded successfully');
+        } catch (e) {
+          debugPrint('⚠️ Failed to pre-load incident data: $e');
+          // Continue anyway - the finished screen will try to load it
+        }
+
+        if (!mounted) return;
+
+        // Navigate to finished detail screen for payment
+        context.go(
+          '/member-incident-finished-detail',
+          extra: {'incidentId': incidentId},
+        );
+
+        // Clean up member-side state AFTER navigation
+        // This ensures data is available during screen transition
+        await Future.delayed(const Duration(milliseconds: 500));
         await ref.read(missionHubConnectionProvider.notifier).disconnect();
         ref.read(missionStatusProvider.notifier).reset();
         await ref.read(activeIncidentProvider.notifier).clearActiveIncident();
-        if (!mounted) return;
-        // go() resets the entire nav stack – no way to swipe back to tracking.
-        context.go('/emergency-completion');
+        debugPrint('✅ Member state cleaned up after navigation');
       }),
     );
 
-    // ❌ Mission cancelled
+    // ❌ Mission cancelled (by member)
     _missionHubSubscriptions.add(
       svc.missionCancelledStream.listen((reason) {
         if (!mounted) return;
@@ -410,6 +593,45 @@ class _EmergencyTrackingScreenState
             backgroundColor: const Color(0xFFDC3545),
             duration: const Duration(seconds: 5),
           ),
+        );
+      }),
+    );
+
+    // 🚫 Mission aborted (by rescuer) → incident reset to Pending, need to find new rescuer
+    _missionHubSubscriptions.add(
+      svc.missionAbortedStream.listen((reason) {
+        if (!mounted) return;
+        debugPrint(
+          '🚫 [TrackingScreen] MissionAborted event received: $reason',
+        );
+
+        // Reset rescuer state to show "searching" UI again
+        setState(() {
+          _effectiveMissionId = null;
+          _effectiveRescuerId = null;
+          _rescuerPosition = null;
+          _routeData = null;
+          _distanceKm = null;
+          _etaMinutes = null;
+        });
+
+        // Clear mission status in provider
+        ref.read(missionStatusProvider.notifier).reset();
+        ref.read(activeMissionProvider.notifier).clearActiveMission();
+
+        // Show notification to member
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '🚫 Đội cứu hộ đã hủy nhiệm vụ${reason.isNotEmpty ? ": $reason" : ""}. Đang tìm đội cứu hộ khác...',
+            ),
+            backgroundColor: const Color(0xFFFF9800),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+
+        debugPrint(
+          '✅ [TrackingScreen] Reset to searching state after rescuer abort',
         );
       }),
     );
@@ -425,24 +647,45 @@ class _EmergencyTrackingScreenState
       _recalcEta();
     });
 
-    // Smart route optimization: only refetch if off-route or first time
+    // Smart route optimization: only refetch if off-route, initial, or stale
     final bool isOnRoute = _isRescuerOnRoute();
     final bool isFirstTime = _routeData == null;
+    final now = DateTime.now();
 
-    if (isFirstTime || !isOnRoute) {
-      // Rescuer deviated from route or no route yet → refetch
+    final bool routeStale =
+        _lastRouteFetchAt == null ||
+        now.difference(_lastRouteFetchAt!) >= _routeFetchTTL;
+
+    final bool movedFarSinceLastFetch =
+        _lastRouteFetchFrom == null ||
+        Geolocator.distanceBetween(
+              _lastRouteFetchFrom!.latitude,
+              _lastRouteFetchFrom!.longitude,
+              _rescuerPosition!.latitude,
+              _rescuerPosition!.longitude,
+            ) >=
+            _routeFetchDistanceThreshold;
+
+    if (isFirstTime || !isOnRoute || routeStale || movedFarSinceLastFetch) {
+      final sinceLastFetch = _lastRouteFetchAt == null
+          ? _routeFetchMinInterval
+          : now.difference(_lastRouteFetchAt!);
+      final delay = sinceLastFetch >= _routeFetchMinInterval
+          ? Duration.zero
+          : _routeFetchMinInterval - sinceLastFetch;
+
       _routeDebounce?.cancel();
-      _routeDebounce = Timer(
-        isFirstTime ? Duration.zero : const Duration(seconds: 20),
-        _fetchRoute,
-      );
+      _routeDebounce = Timer(delay, () async {
+        await _fetchRoute();
+      });
+
       debugPrint(
-        '🔄 Route fetch scheduled (first: $isFirstTime, off-route: ${!isOnRoute})',
+        '🔄 Route fetch scheduled (first: $isFirstTime, off-route: ${!isOnRoute}, stale: $routeStale, movedFar: $movedFarSinceLastFetch, delay: ${delay.inSeconds}s)',
       );
     } else {
-      // Rescuer still on route → just update traveled/remaining segments
+      // Rescuer still on route and route is fresh → just update traveled/remaining segments
       _splitRouteByProgress();
-      debugPrint('✅ Rescuer on-route, reusing existing route (no API call)');
+      debugPrint('✅ Rescuer on-route and route fresh; using existing route.');
     }
   }
 
@@ -476,6 +719,8 @@ class _EmergencyTrackingScreenState
       if (mounted) {
         setState(() {
           _routeData = routeData;
+          _lastRouteFetchAt = DateTime.now();
+          _lastRouteFetchFrom = _rescuerPosition;
           _splitRouteByProgress(); // Initialize traveled/remaining segments
         });
         debugPrint(
@@ -572,26 +817,6 @@ class _EmergencyTrackingScreenState
     _etaMinutes = ((_distanceKm! / 30) * 60).ceil();
   }
 
-  void _startCountdown() {
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) {
-        t.cancel();
-        return;
-      }
-      if (_remainingSeconds > 0) {
-        setState(() => _remainingSeconds--);
-      } else {
-        t.cancel();
-      }
-    });
-  }
-
-  String _formatTime(int s) {
-    final m = s ~/ 60;
-    final sec = s % 60;
-    return '${m.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
-  }
-
   /// Fit camera to show both member and rescuer simultaneously.
   void _centerOnBoth() {
     if (_memberPosition == null && _rescuerPosition == null) return;
@@ -631,7 +856,6 @@ class _EmergencyTrackingScreenState
     _gpsSubscription?.cancel();
     _memberBroadcastThrottle?.cancel();
     _routeDebounce?.cancel();
-    _countdownTimer?.cancel();
 
     // Cancel local subscriptions (will be re-setup when screen is reopened)
     for (final s in _missionHubSubscriptions) {
@@ -657,6 +881,11 @@ class _EmergencyTrackingScreenState
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<dynamic>(missionStatusProvider, (previous, next) {
+      if (!mounted) return;
+      _syncWithMissionStatus(next);
+    });
+
     return Scaffold(
       body: Stack(
         children: [
@@ -910,6 +1139,225 @@ class _EmergencyTrackingScreenState
     );
   }
 
+  bool _canCancelIncident() {
+    final incident = ref.watch(activeIncidentProvider).incident;
+    final missionStatus = ref.watch(missionStatusProvider);
+
+    if (incident == null) return false;
+
+    // If mission already en-route / arrived / completed / cancelled on real-time hub,
+    // prevent cancellation and rely on mission lifecycle instead.
+    if (missionStatus.missionStarted ||
+        missionStatus.rescuerArrived ||
+        missionStatus.missionCompleted ||
+        missionStatus.missionCancelled ||
+        missionStatus.sessionExpired) {
+      return false;
+    }
+
+    final status = incident.status.toLowerCase().trim();
+    if (status == 'pending' || status == 'verified') {
+      return true;
+    }
+
+    if (status == 'assigned') {
+      final activeMission = ref.watch(activeMissionProvider).mission;
+      if (activeMission == null) {
+        return true;
+      }
+      return activeMission.status.toLowerCase().trim() == 'preparing';
+    }
+
+    return false;
+  }
+
+  Future<void> _cancelIncident() async {
+    final incident = ref.read(activeIncidentProvider).incident;
+    if (incident == null) return;
+
+    final reason = await _showCancelReasonDialog(context);
+    if (reason == null || reason.isEmpty) {
+      // User cancelled dialog or did not select a reason.
+      return;
+    }
+
+    try {
+      await ref
+          .read(activeIncidentProvider.notifier)
+          .cancelActiveIncident(reason);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('🚫 Yêu cầu SOS đã được hủy.')),
+      );
+      if (context.mounted) context.goNamed('member_home');
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('❌ Hủy SOS thất bại: ${e.toString()}')),
+      );
+    }
+  }
+
+  Future<String?> _showCancelReasonDialog(BuildContext context) async {
+    String? selectedReason;
+
+    final reasons = <Map<String, String>>[
+      {'value': 'location_unreachable', 'label': 'Không thể đến vị trí'},
+      {'value': 'resolved_by_self', 'label': 'Đã tự xử lý xong'},
+      {'value': 'not_needed', 'label': 'Không cần cứu hộ nữa'},
+      {'value': 'wrong_location', 'label': 'Nhập sai địa điểm'},
+      {'value': 'other', 'label': 'Lý do khác'},
+    ];
+
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: const [
+                  Icon(Icons.cancel, color: Color(0xFFDC3545), size: 24),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Chọn lý do hủy SOS',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Vui lòng chọn lý do hủy để cải thiện dịch vụ.'),
+                  const SizedBox(height: 12),
+                  ...reasons.map(
+                    (reason) => _buildReasonOption(
+                      reason['label']!,
+                      reason['value']!,
+                      selectedReason,
+                      (value) => setState(() => selectedReason = value),
+                    ),
+                  ),
+                  if (selectedReason == 'other') ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      onChanged: (value) {
+                        selectedReason = value.trim().isEmpty
+                            ? 'other'
+                            : value.trim();
+                      },
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'Ghi chú lý do',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(null),
+                  child: const Text(
+                    'Hủy',
+                    style: TextStyle(color: Color(0xFF999999)),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (selectedReason == null || selectedReason!.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Vui lòng chọn lý do hủy.'),
+                          backgroundColor: Color(0xFFDC3545),
+                        ),
+                      );
+                      return;
+                    }
+                    Navigator.of(dialogContext).pop(selectedReason);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF6B35),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Xác nhận hủy'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    return result;
+  }
+
+  Widget _buildReasonOption(
+    String label,
+    String value,
+    String? selectedReason,
+    Function(String) onSelect,
+  ) {
+    final isSelected = selectedReason == value;
+    return InkWell(
+      onTap: () => onSelect(value),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFFFF8800).withOpacity(0.15)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFFFF8800)
+                : const Color(0xFFE5E5E5),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected
+                      ? const Color(0xFFFF8800)
+                      : const Color(0xFFCCCCCC),
+                  width: 2,
+                ),
+                color: isSelected ? const Color(0xFFFF8800) : Colors.white,
+              ),
+              child: isSelected
+                  ? const Icon(Icons.check, size: 14, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Top bar
   // ─────────────────────────────────────────────────────────────────────────
@@ -988,25 +1436,6 @@ class _EmergencyTrackingScreenState
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
                           letterSpacing: 0.5,
-                        ),
-                      ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          _formatTime(_remainingSeconds),
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
                         ),
                       ),
                     ],
@@ -1200,11 +1629,6 @@ class _EmergencyTrackingScreenState
   // ── Searching state bottom sheet (no rescuer yet – Grab/Be style) ─────────
 
   Widget _buildSearchingRescuerSheet() {
-    final radiusKm = _remainingSeconds > 270
-        ? '5'
-        : _remainingSeconds > 150
-        ? '10'
-        : '20';
     return Column(
       children: [
         const SizedBox(height: 8),
@@ -1241,38 +1665,6 @@ class _EmergencyTrackingScreenState
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          'Bán kính tìm kiếm: $radiusKm km',
-          style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-        ),
-        const SizedBox(height: 20),
-        // Countdown pill
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF3F4F6),
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.timer_outlined,
-                size: 16,
-                color: Color(0xFF6B7280),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                'Hết giờ sau ${_formatTime(_remainingSeconds)}',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF6B7280),
-                ),
-              ),
-            ],
-          ),
-        ),
         const SizedBox(height: 28),
         const Divider(color: Color(0xFFF3F4F6)),
         const SizedBox(height: 16),
@@ -1498,7 +1890,7 @@ class _EmergencyTrackingScreenState
             ),
             const SizedBox(width: 6),
             Text(
-              connected ? 'MissionHub đã kết nối' : 'Đang kết nối lại...',
+              connected ? 'Đã kết nối' : 'Đang kết nối lại...',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -1588,9 +1980,13 @@ class _EmergencyTrackingScreenState
                 color: const Color(0xFFFFA500),
                 onTap: () {
                   if (incident == null) return;
+                  // Mark as direct entry from quick actions
                   context.push(
                     '/symptom-report',
-                    extra: {'incidentId': incident.id},
+                    extra: {
+                      'incidentId': incident.id,
+                      'isDirectEntry': true, // Direct from quick actions
+                    },
                   );
                 },
               ),
@@ -1603,7 +1999,15 @@ class _EmergencyTrackingScreenState
                 subtitle: 'Đánh giá',
                 color: const Color(0xFFFF6B00),
                 onTap: () {
-                  context.push('/severity-assessment');
+                  if (incident == null) return;
+                  // Mark as direct entry from quick actions
+                  context.push(
+                    '/severity-assessment',
+                    extra: {
+                      'incidentId': incident.id,
+                      'isDirectEntry': true, // Direct from quick actions
+                    },
+                  );
                 },
               ),
             ),
@@ -1657,6 +2061,35 @@ class _EmergencyTrackingScreenState
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 14),
+        Builder(
+          builder: (context) {
+            final canCancel = _canCancelIncident();
+            return SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: canCancel ? _cancelIncident : null,
+                icon: const Icon(Icons.cancel, color: Colors.white),
+                label: Text(
+                  canCancel ? 'Hủy yêu cầu SOS' : 'Không thể hủy',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: canCancel
+                      ? const Color(0xFFD32F2F)
+                      : Colors.grey,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            );
+          },
         ),
       ],
     );

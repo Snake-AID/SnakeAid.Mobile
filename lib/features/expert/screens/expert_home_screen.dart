@@ -7,31 +7,14 @@ import '../../../core/services/emergency_consultation_signalr_service.dart';
 import 'expert_profile_screen.dart';
 import '../../consultation/repository/consultation_repository.dart';
 import '../../consultation/models/consultation_booking_response.dart';
+import '../../blog/providers/blog_provider.dart';
+import '../../blog/models/blog_model.dart';
 
 /// FutureProvider for the current expert's bookings from the API.
 final _expertBookingsFutureProvider =
     FutureProvider<List<ConsultationBookingResponse>>((ref) {
-      final repo = ref.read(consultationRepositoryProvider);
-      return Future.wait([
-        repo.getExpertBookings(
-          status: 'Scheduled',
-          pageNumber: 1,
-          pageSize: 10,
-        ),
-        repo.getExpertBookings(status: 'Ongoing', pageNumber: 1, pageSize: 10),
-      ]).then((results) {
-        final merged = <String, ConsultationBookingResponse>{
-          for (final list in results)
-            for (final item in list) (item.consultationId ?? item.id): item,
-        };
-        return merged.values.toList();
-      });
+      return ref.read(consultationRepositoryProvider).getExpertBookings();
     });
-
-final _expertWalletBalanceProvider = FutureProvider<double>((ref) async {
-  final wallet = await ref.read(consultationRepositoryProvider).getMyWallet();
-  return (wallet['balance'] as num?)?.toDouble() ?? 0;
-});
 
 /// Map a [ConsultationBookingResponse] to the internal [_ExpertConsultation].
 _ExpertConsultation _bookingToExpertConsultation(
@@ -59,24 +42,12 @@ _ExpertConsultation _bookingToExpertConsultation(
   }
   return _ExpertConsultation(
     id: b.consultationId ?? b.id,
-    bookingId: b.id,
-    consultationId: b.consultationId,
-    roomId: b.roomId,
-    userId: b.userId,
-    expertId: b.expertId,
     patientName: b.userName ?? 'Bệnh nhân',
     patientPhone: '',
-    consultationType:
-        (b.consultationType == 'Instant' || b.consultationType == 'Emergency')
-        ? 'Khẩn Cấp'
-        : 'Đặt Lịch',
+    consultationType: b.consultationType == 'Instant' ? 'Khẩn Cấp' : 'Đặt Lịch',
     snakeSuspect: 'Chưa xác định',
     hasSnakeImage: false,
     scheduledTime: scheduled,
-    bookedAt: b.bookedAt,
-    paymentDeadline: b.paymentDeadline,
-    slotStartTime: b.slotStartTime,
-    slotEndTime: b.slotEndTime,
     status: status,
     feeCost: b.feeCost,
     rating: b.rating,
@@ -216,6 +187,7 @@ class _HomeTab extends ConsumerStatefulWidget {
 
 class _HomeTabState extends ConsumerState<_HomeTab>
     with SingleTickerProviderStateMixin {
+  bool _isAvailable = true;
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnimation;
 
@@ -457,48 +429,16 @@ class _HomeTabState extends ConsumerState<_HomeTab>
     return '${k.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}K VNĐ';
   }
 
-  String _formatConsultationStartLabel(DateTime dt) {
-    final now = DateTime.now();
-    final diff = dt.difference(now);
-    final totalMinutes = diff.inMinutes;
-
-    if (totalMinutes <= 0) {
-      return 'Đã đến giờ tư vấn';
-    }
-    if (totalMinutes < 60) {
-      return 'Bắt đầu sau $totalMinutes phút';
-    }
-    if (diff.inHours < 24) {
-      final hours = diff.inHours;
-      final minutes = totalMinutes % 60;
-      if (minutes == 0) return 'Bắt đầu sau $hours giờ';
-      return 'Bắt đầu sau $hours giờ $minutes phút';
-    }
-    if (diff.inDays == 1) {
-      return 'Ngày mai ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-    }
-    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} - ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  }
-
   void _openDetailFromHome(BuildContext context, _ExpertConsultation c) {
     context.push(
       '/expert-consultation-detail',
       extra: {
         'id': c.id,
-        'bookingId': c.bookingId,
-        'consultationId': c.consultationId,
-        'roomId': c.roomId,
-        'userId': c.userId,
-        'expertId': c.expertId,
         'patientName': c.patientName,
         'patientPhone': c.patientPhone,
         'consultationType': c.consultationType,
         'snakeSuspect': c.snakeSuspect,
         'scheduledTime': c.scheduledTime.millisecondsSinceEpoch,
-        'bookedAt': c.bookedAt?.millisecondsSinceEpoch,
-        'paymentDeadline': c.paymentDeadline?.millisecondsSinceEpoch,
-        'slotStartTime': c.slotStartTime?.millisecondsSinceEpoch,
-        'slotEndTime': c.slotEndTime?.millisecondsSinceEpoch,
         'statusIndex': c.status.index,
         'feeCost': c.feeCost,
         'rating': c.rating,
@@ -563,7 +503,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                         Icons.notifications,
                         color: Color(0xFF2D2D2D),
                       ),
-                      onPressed: () {},
+                      onPressed: () => context.push('/notifications'),
                     ),
                     Positioned(
                       right: 8,
@@ -623,6 +563,10 @@ class _HomeTabState extends ConsumerState<_HomeTab>
               padding: const EdgeInsets.all(20),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
+                  // Availability Toggle Card
+                  _buildAvailabilityCard(),
+                  const SizedBox(height: 20),
+
                   // Hero Earnings Card
                   _buildEarningsCard(),
                   const SizedBox(height: 20),
@@ -658,9 +602,9 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                   const SizedBox(height: 12),
 
                   ..._upcomingConsultations.take(3).expand((c) {
-                    final dateStr = _formatConsultationStartLabel(
-                      c.scheduledTime,
-                    );
+                    final dt = c.scheduledTime;
+                    final dateStr =
+                        '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} - ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
                     return [
                       _buildConsultationCard(
                         name: c.patientName,
@@ -673,6 +617,11 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                       const SizedBox(height: 12),
                     ];
                   }),
+
+                  // Blog section
+                  const SizedBox(height: 8),
+                  _buildBlogSection(context),
+
                   const SizedBox(height: 88),
                 ]),
               ),
@@ -1225,6 +1174,110 @@ class _HomeTabState extends ConsumerState<_HomeTab>
     );
   }
 
+  Widget _buildAvailabilityCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF6C47C2).withOpacity(0.2),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: _isAvailable
+                          ? const Color(0xFF28A745)
+                          : Colors.grey,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color:
+                              (_isAvailable
+                                      ? const Color(0xFF28A745)
+                                      : Colors.grey)
+                                  .withOpacity(0.5),
+                          blurRadius: 8,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'TRẠNG THÁI',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Color(0xFF999999),
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _isAvailable
+                            ? 'Sẵn Sàng Nhận Tư Vấn'
+                            : 'Không Khả Dụng',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Color(0xFF6C47C2),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Switch(
+                value: _isAvailable,
+                onChanged: (value) {
+                  setState(() {
+                    _isAvailable = value;
+                  });
+                },
+                activeThumbColor: const Color(0xFF6C47C2),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.only(left: 12),
+            decoration: const BoxDecoration(
+              border: Border(
+                left: BorderSide(color: Color(0xFFF0F0F0), width: 2),
+              ),
+            ),
+            child: const Text(
+              'Bạn sẽ nhận thông báo khi có yêu cầu khẩn cấp từ Rescuer',
+              style: TextStyle(fontSize: 13, color: Color(0xFF666666)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   List<_ExpertConsultation> get _upcomingConsultations {
     final now = DateTime.now().toUtc().add(const Duration(hours: 7));
     final consultations =
@@ -1247,14 +1300,6 @@ class _HomeTabState extends ConsumerState<_HomeTab>
   }
 
   Widget _buildEarningsCard() {
-    final walletState = ref.watch(_expertWalletBalanceProvider);
-
-    final balanceText = walletState.when(
-      data: (balance) => _formatCompactVnd(balance),
-      loading: () => 'Đang tải...',
-      error: (_, __) => 'Không có dữ liệu',
-    );
-
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -1276,7 +1321,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Số Dư Ví',
+            'Thu Nhập Tháng Này',
             style: TextStyle(
               fontSize: 14,
               color: Colors.white70,
@@ -1284,19 +1329,23 @@ class _HomeTabState extends ConsumerState<_HomeTab>
             ),
           ),
           const SizedBox(height: 8),
-          Row(
+          const Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Flexible(
+              Text(
+                '12.5M',
+                style: TextStyle(
+                  fontSize: 36,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(width: 8),
+              Padding(
+                padding: EdgeInsets.only(bottom: 6),
                 child: Text(
-                  balanceText,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 36,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  'VNĐ',
+                  style: TextStyle(fontSize: 18, color: Colors.white70),
                 ),
               ),
             ],
@@ -1310,13 +1359,26 @@ class _HomeTabState extends ConsumerState<_HomeTab>
             child: Row(
               children: [
                 const Icon(
-                  Icons.account_balance_wallet,
+                  Icons.medical_services,
                   color: Colors.white,
                   size: 18,
                 ),
                 const SizedBox(width: 6),
                 const Text(
-                  'Ví SnakeAid',
+                  '18 Tư Vấn',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Container(width: 1, height: 16, color: Colors.white30),
+                const SizedBox(width: 16),
+                const Icon(Icons.star, color: Color(0xFFFFC107), size: 18),
+                const SizedBox(width: 6),
+                const Text(
+                  '4.8',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.white,
@@ -1324,29 +1386,32 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                   ),
                 ),
                 const Spacer(),
-                TextButton.icon(
-                  onPressed: () => ref.invalidate(_expertWalletBalanceProvider),
-                  icon: const Icon(
-                    Icons.refresh,
-                    size: 14,
-                    color: Colors.white,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
                   ),
-                  label: const Text(
-                    'Làm mới',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  child: const Row(
+                    children: [
+                      Icon(
+                        Icons.trending_up,
+                        color: Color(0xFF28A745),
+                        size: 14,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        '+15%',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF28A745),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -1355,20 +1420,6 @@ class _HomeTabState extends ConsumerState<_HomeTab>
         ],
       ),
     );
-  }
-
-  String _formatCompactVnd(double amount) {
-    final value = amount.round();
-    if (value >= 1000000000) {
-      return '${(value / 1000000000).toStringAsFixed(1)}B VNĐ';
-    }
-    if (value >= 1000000) {
-      return '${(value / 1000000).toStringAsFixed(1)}M VNĐ';
-    }
-    if (value >= 1000) {
-      return '${(value / 1000).toStringAsFixed(0)}K VNĐ';
-    }
-    return '$value VNĐ';
   }
 
   Widget _buildStatsGrid() {
@@ -1636,29 +1687,196 @@ class _HomeTabState extends ConsumerState<_HomeTab>
       ),
     );
   }
+
+  Widget _buildBlogSection(BuildContext context) {
+    final blogState = ref.watch(expertBlogListProvider);
+    final recentBlogs = blogState.blogs.take(3).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Bài Viết Của Tôi',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF6C47C2),
+              ),
+            ),
+            TextButton(
+              onPressed: () => context.push('/expert/blogs'),
+              child: const Text(
+                'Xem tất cả',
+                style: TextStyle(fontSize: 14, color: Color(0xFF999999)),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (blogState.isLoading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: CircularProgressIndicator(
+                  color: Color(0xFF6C47C2), strokeWidth: 2),
+            ),
+          )
+        else if (recentBlogs.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: const Color(0xFF6C47C2).withOpacity(0.2)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.article_outlined,
+                    color: const Color(0xFF6C47C2).withOpacity(0.5),
+                    size: 32),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Bạn chưa có bài viết nào',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 14),
+                      ),
+                      const SizedBox(height: 4),
+                      GestureDetector(
+                        onTap: () async {
+                          await context.push('/expert/blogs/new');
+                          ref
+                              .read(expertBlogListProvider.notifier)
+                              .refresh();
+                        },
+                        child: const Text(
+                          'Viết bài đầu tiên ngay →',
+                          style: TextStyle(
+                              color: Color(0xFF6C47C2), fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          ...recentBlogs.map((blog) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _buildBlogCard(context, blog),
+              )),
+      ],
+    );
+  }
+
+  Widget _buildBlogCard(BuildContext context, BlogModel blog) {
+    Color statusColor;
+    switch (blog.status) {
+      case BlogStatus.draft:
+        statusColor = Colors.grey;
+        break;
+      case BlogStatus.pendingApproval:
+        statusColor = Colors.orange;
+        break;
+      case BlogStatus.published:
+        statusColor = const Color(0xFF228B22);
+        break;
+      case BlogStatus.rejected:
+        statusColor = Colors.red;
+        break;
+    }
+
+    return InkWell(
+      onTap: () => context.push('/expert/blogs'),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                blog.thumbnailUrl,
+                width: 72,
+                height: 72,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 72,
+                  height: 72,
+                  color: Colors.grey[200],
+                  child: const Icon(Icons.image, color: Colors.grey),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    blog.title,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.bold),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      blogStatusLabel(blog.status),
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: statusColor,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.grey),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-// ── Consultations Tab ────────────────────────────────────────────────────────
 
 enum _ExpertConsultationStatus { waiting, upcoming, completed, cancelled }
 
 class _ExpertConsultation {
   final String id;
-  final String bookingId;
-  final String? consultationId;
-  final String? roomId;
-  final String? userId;
-  final String expertId;
   final String patientName;
   final String patientPhone;
   final String consultationType;
   final String snakeSuspect;
   final bool hasSnakeImage;
   final DateTime scheduledTime;
-  final DateTime? bookedAt;
-  final DateTime? paymentDeadline;
-  final DateTime? slotStartTime;
-  final DateTime? slotEndTime;
   final _ExpertConsultationStatus status;
   final int feeCost;
   final double? rating;
@@ -1670,21 +1888,12 @@ class _ExpertConsultation {
 
   const _ExpertConsultation({
     required this.id,
-    required this.bookingId,
-    this.consultationId,
-    this.roomId,
-    this.userId,
-    required this.expertId,
     required this.patientName,
     this.patientPhone = '',
     required this.consultationType,
     required this.snakeSuspect,
     this.hasSnakeImage = false,
     required this.scheduledTime,
-    this.bookedAt,
-    this.paymentDeadline,
-    this.slotStartTime,
-    this.slotEndTime,
     required this.status,
     required this.feeCost,
     this.rating,
@@ -1711,17 +1920,10 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
 
   static const Color _purple = Color(0xFF6C47C2);
 
-  static const int _historyPageSize = 10;
-
-  List<_ExpertConsultation> _upcomingConsultations = [];
-  List<_ExpertConsultation> _historyConsultations = [];
-  int _historyCurrentPage = 1;
-  bool _hasMoreHistory = true;
-  bool _isLoadingHistoryMore = false;
-  bool _isLoadingConsultations = true;
+  List<_ExpertConsultation> _consultations = [];
 
   List<_ExpertConsultation> _consultationsForDay(DateTime day) {
-    return _upcomingConsultations.where((c) {
+    return _consultations.where((c) {
       final d = c.scheduledTime;
       if (!(d.year == day.year && d.month == day.month && d.day == day.day)) {
         return false;
@@ -1734,7 +1936,15 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
     }).toList()..sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
   }
 
-  List<_ExpertConsultation> get _historyList => _historyConsultations;
+  List<_ExpertConsultation> get _historyList =>
+      _consultations
+          .where(
+            (c) =>
+                c.status == _ExpertConsultationStatus.completed ||
+                c.status == _ExpertConsultationStatus.cancelled,
+          )
+          .toList()
+        ..sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
 
   Timer? _refreshTimer;
 
@@ -1773,97 +1983,17 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
 
   Future<void> _loadConsultations() async {
     if (!mounted) return;
-    setState(() => _isLoadingConsultations = true);
+    setState(() {});
     try {
       final repo = ref.read(consultationRepositoryProvider);
-      final results = await Future.wait([
-        repo.getExpertBookings(
-          status: 'Ongoing',
-          pageNumber: 1,
-          pageSize: _historyPageSize,
-        ),
-        repo.getExpertBookings(
-          status: 'Scheduled',
-          pageNumber: 1,
-          pageSize: _historyPageSize,
-        ),
-        repo.getExpertBookings(
-          status: 'Completed',
-          pageNumber: 1,
-          pageSize: _historyPageSize,
-        ),
-      ]);
-
-      final mergedUpcoming = <String, ConsultationBookingResponse>{
-        for (final list in [results[0], results[1]])
-          for (final item in list) (item.consultationId ?? item.id): item,
-      };
-
-      final historyFirstPage =
-          results[2].map(_bookingToExpertConsultation).toList()
-            ..sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
-
+      final bookings = await repo.getExpertBookings();
       if (!mounted) return;
       setState(() {
-        _upcomingConsultations = mergedUpcoming.values
-            .map(_bookingToExpertConsultation)
-            .toList();
-        _historyConsultations = historyFirstPage;
-        _historyCurrentPage = 1;
-        _hasMoreHistory = results[2].length >= _historyPageSize;
-        _isLoadingHistoryMore = false;
-        _isLoadingConsultations = false;
+        _consultations = bookings.map(_bookingToExpertConsultation).toList();
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _isLoadingConsultations = false);
-    }
-  }
-
-  Future<void> _loadMoreHistory() async {
-    if (_isLoadingHistoryMore || !_hasMoreHistory || !mounted) return;
-    setState(() => _isLoadingHistoryMore = true);
-
-    try {
-      final nextPage = _historyCurrentPage + 1;
-      final repo = ref.read(consultationRepositoryProvider);
-      final nextItems = await repo.getExpertBookings(
-        status: 'Completed',
-        pageNumber: nextPage,
-        pageSize: _historyPageSize,
-      );
-
-      if (!mounted) return;
-
-      if (nextItems.isEmpty) {
-        setState(() {
-          _hasMoreHistory = false;
-          _isLoadingHistoryMore = false;
-        });
-        return;
-      }
-
-      final dedup = <String, _ExpertConsultation>{
-        for (final item in _historyConsultations)
-          (item.consultationId ?? item.id): item,
-      };
-
-      for (final item in nextItems.map(_bookingToExpertConsultation)) {
-        dedup[item.consultationId ?? item.id] = item;
-      }
-
-      final merged = dedup.values.toList()
-        ..sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
-
-      setState(() {
-        _historyConsultations = merged;
-        _historyCurrentPage = nextPage;
-        _hasMoreHistory = nextItems.length >= _historyPageSize;
-        _isLoadingHistoryMore = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _isLoadingHistoryMore = false);
+      setState(() {});
     }
   }
 
@@ -1873,20 +2003,11 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
       '/expert-consultation-detail',
       extra: {
         'id': c.id,
-        'bookingId': c.bookingId,
-        'consultationId': c.consultationId,
-        'roomId': c.roomId,
-        'userId': c.userId,
-        'expertId': c.expertId,
         'patientName': c.patientName,
         'patientPhone': c.patientPhone,
         'consultationType': c.consultationType,
         'snakeSuspect': c.snakeSuspect,
         'scheduledTime': c.scheduledTime.millisecondsSinceEpoch,
-        'bookedAt': c.bookedAt?.millisecondsSinceEpoch,
-        'paymentDeadline': c.paymentDeadline?.millisecondsSinceEpoch,
-        'slotStartTime': c.slotStartTime?.millisecondsSinceEpoch,
-        'slotEndTime': c.slotEndTime?.millisecondsSinceEpoch,
         'statusIndex': c.status.index,
         'feeCost': c.feeCost,
         'rating': c.rating,
@@ -2518,26 +2639,6 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
   Widget _buildHistoryTab(BuildContext context) {
     final list = _historyList;
     if (list.isEmpty) {
-      if (_isLoadingConsultations) {
-        return const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2.5),
-              ),
-              SizedBox(height: 12),
-              Text(
-                'Đang tải lịch sử tư vấn...',
-                style: TextStyle(fontSize: 14, color: Color(0xFF8A8A8A)),
-              ),
-            ],
-          ),
-        );
-      }
-
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -2554,228 +2655,186 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
     }
     return RefreshIndicator(
       onRefresh: _loadConsultations,
-      child: NotificationListener<ScrollNotification>(
-        onNotification: (notification) {
-          if (notification.metrics.pixels >=
-              notification.metrics.maxScrollExtent - 180) {
-            _loadMoreHistory();
-          }
-          return false;
-        },
-        child: ListView.separated(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-          itemCount: list.length + (_isLoadingHistoryMore ? 1 : 0),
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (_, i) {
-            if (i >= list.length) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: Center(
-                  child: SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              );
-            }
-            return _buildHistoryCard(context, list[i]);
-          },
-        ),
+      child: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: list.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (_, i) => _buildHistoryCard(context, list[i]),
       ),
     );
   }
 
   Widget _buildHistoryCard(BuildContext context, _ExpertConsultation item) {
     final isDone = item.status == _ExpertConsultationStatus.completed;
-    final typeLabel = item.consultationType;
-    final isEmergencyType = typeLabel == 'Khẩn Cấp';
-
     return Container(
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: Border(
+          left: BorderSide(
+            color: isDone ? const Color(0xFF28A745) : const Color(0xFFAAAAAA),
+            width: 4,
+          ),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF6C47C2).withOpacity(0.08),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.person,
-                    color: Color(0xFF6C47C2),
-                    size: 22,
-                  ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: _purple.withOpacity(0.08),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.patientName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1F2937),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isEmergencyType
-                              ? const Color(0xFFFEE2E2)
-                              : const Color(0xFFEDE9FE),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          typeLabel,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: isEmergencyType
-                                ? const Color(0xFFDC2626)
-                                : const Color(0xFF6C47C2),
+                child: const Icon(
+                  Icons.person,
+                  color: Color(0xFF6C47C2),
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          item.patientName,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2D2D2D),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isDone
-                        ? const Color(0xFF28A745).withOpacity(0.1)
-                        : const Color(0xFF9CA3AF).withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    isDone ? 'HOÀN THÀNH' : 'ĐÃ HỦY',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: isDone
-                          ? const Color(0xFF28A745)
-                          : const Color(0xFF6B7280),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isDone
+                                ? const Color(0xFF28A745).withOpacity(0.1)
+                                : Colors.grey.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            isDone ? 'HOÀN THÀNH' : 'ĐÃ HỦY',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: isDone
+                                  ? const Color(0xFF28A745)
+                                  : const Color(0xFF999999),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _formatFullDateTime(item.scheduledTime),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF999999),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isDone)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '+${_formatFee(item.feeCost)}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF28A745),
+                      ),
+                    ),
+                    if (item.durationSeconds != null)
+                      Text(
+                        _formatDuration(item.durationSeconds!),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF999999),
+                        ),
+                      ),
+                  ],
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(
+                Icons.pest_control,
+                size: 13,
+                color: Color(0xFF999999),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                item.snakeSuspect,
+                style: const TextStyle(fontSize: 12, color: Color(0xFF666666)),
+              ),
+            ],
+          ),
+          if (isDone && item.rating != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                ...List.generate(5, (i) {
+                  final full = i < item.rating!.floor();
+                  final half = !full && i < item.rating!;
+                  return Icon(
+                    full
+                        ? Icons.star
+                        : (half ? Icons.star_half : Icons.star_border),
+                    size: 15,
+                    color: const Color(0xFFFFC107),
+                  );
+                }),
+                const SizedBox(width: 5),
+                Text(
+                  '${item.rating!.toStringAsFixed(1)} / 5.0',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF999999),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
-            const Divider(color: Color(0xFFF3F4F6), height: 1),
-            const SizedBox(height: 14),
-
-            _buildDetailRow(
-              Icons.medical_services_outlined,
-              'Tư vấn $typeLabel',
-            ),
-            const SizedBox(height: 8),
-            _buildDetailRow(
-              Icons.calendar_today_outlined,
-              _formatFullDateTime(item.scheduledTime),
-            ),
-            const SizedBox(height: 8),
-            _buildDetailRow(
-              Icons.payments_outlined,
-              isDone ? _formatFee(item.feeCost) : 'Phiên đã hủy',
-            ),
-
-            if (isDone && item.rating != null) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.star, size: 16, color: Color(0xFFFBBF24)),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Đánh giá: ${item.rating!.toStringAsFixed(1)}/5',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF4B5563),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () => _openDetail(context, item),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFD1D5DB)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                child: const Text(
-                  'Xem Chi Tiết',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF4B5563),
-                  ),
-                ),
-              ),
-            ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHistoryMetaChip({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: const Color(0xFF6B7280)),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              '$label: $value',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 11,
-                color: Color(0xFF2D2D2D),
-                fontWeight: FontWeight.w600,
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 38,
+            child: OutlinedButton(
+              onPressed: () => _openDetail(context, item),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFF6C47C2), width: 1.2),
+                foregroundColor: _purple,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                'Xem Chi Tiết',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
               ),
             ),
           ),
@@ -2784,35 +2843,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
     );
   }
 
-  Widget _buildDetailRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: const Color(0xFF6B7280)),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 13, color: Color(0xFF4B5563)),
-          ),
-        ),
-      ],
-    );
-  }
-
   // ── Helpers ───────────────────────────────────────────────────────────────
-
-  String _formatSlotRange(_ExpertConsultation c) {
-    final start = c.slotStartTime ?? c.scheduledTime;
-    final end = c.slotEndTime;
-    final startText =
-        '${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}';
-    if (end == null) return startText;
-    final endText =
-        '${end.hour.toString().padLeft(2, '0')}:${end.minute.toString().padLeft(2, '0')}';
-    return '$startText - $endText';
-  }
 
   String _formatFullDate(DateTime d) {
     const months = [
@@ -2847,17 +2878,9 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}'
       ' lúc ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
-  String _formatFullDateTimePlus7(DateTime d) {
-    final localPlus7 = d.add(const Duration(hours: 7));
-    return _formatFullDateTime(localPlus7);
-  }
-
   String _formatFee(int fee) {
-    final value = fee.toString().replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-      (m) => '${m[1]}.',
-    );
-    return '$value VNĐ';
+    if (fee >= 1000000) return '${(fee / 1000000).toStringAsFixed(1)}M ₫';
+    return '${(fee / 1000).toStringAsFixed(0)}K ₫';
   }
 
   String _formatDuration(int seconds) {

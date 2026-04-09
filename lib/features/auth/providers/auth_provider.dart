@@ -10,6 +10,7 @@ import '../repository/auth_repository.dart'
 import '../models/login_request.dart';
 import '../models/register_request.dart';
 import '../models/refresh_token_request.dart';
+import '../../../core/services/fcm_service.dart';
 
 // ==================== AUTH STATE ====================
 
@@ -18,12 +19,16 @@ class AuthState {
   final bool isAuthenticated;
   final bool isLoading;
   final String? error;
+  final bool sessionExpired;
+  final UserRole? sessionExpiredRole;
 
   const AuthState({
     this.user,
     this.isAuthenticated = false,
     this.isLoading = false,
     this.error,
+    this.sessionExpired = false,
+    this.sessionExpiredRole,
   });
 
   AuthState copyWith({
@@ -33,12 +38,21 @@ class AuthState {
     String? error,
     bool clearUser = false,
     bool clearError = false,
+    bool? sessionExpired,
+    UserRole? sessionExpiredRole,
+    bool clearSessionExpired = false,
   }) {
     return AuthState(
       user: clearUser ? null : (user ?? this.user),
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
+      sessionExpired: clearSessionExpired
+          ? false
+          : (sessionExpired ?? this.sessionExpired),
+      sessionExpiredRole: clearSessionExpired
+          ? null
+          : (sessionExpiredRole ?? this.sessionExpiredRole),
     );
   }
 
@@ -49,11 +63,56 @@ class AuthState {
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _authRepository;
+  final FCMService _fcmService = FCMService();
+  bool _fcmInitialized = false;
+  bool _isForcingLogout = false;
 
   AuthNotifier({required AuthRepository authRepository})
     : _authRepository = authRepository,
       super(const AuthState(isLoading: true)) {
+    _initializeFcm();
     _loadSavedSession();
+  }
+
+  Future<void> _initializeFcm() async {
+    if (_fcmInitialized) return;
+    try {
+      await _fcmService.initialize(
+        onTokenRefresh: (newToken) async {
+          if (!state.isAuthenticated) return;
+          await _syncDeviceTokenToBackend(force: true, tokenOverride: newToken);
+        },
+      );
+      _fcmInitialized = true;
+    } catch (e) {
+      debugPrint('⚠️ FCM init failed: $e');
+    }
+  }
+
+  Future<void> _syncDeviceTokenToBackend({
+    bool force = false,
+    String? tokenOverride,
+  }) async {
+    if (!state.isAuthenticated) return;
+
+    try {
+      final token = (tokenOverride ?? await _fcmService.getToken())?.trim();
+      if (token == null || token.isEmpty) return;
+
+      await _fcmService.saveToken(token);
+
+      if (!force) {
+        final lastSentToken = await _fcmService.getLastSentToken();
+        if (lastSentToken == token) {
+          return;
+        }
+      }
+
+      await _authRepository.updateDeviceToken(token);
+      await _fcmService.saveLastSentToken(token);
+    } catch (e) {
+      debugPrint('⚠️ Device token sync skipped: $e');
+    }
   }
 
   /// Startup session validation.
@@ -101,6 +160,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         '✅ Session restored from cache: ${cachedUser.email} (${cachedUser.role.name})',
       );
       _initializeRoleBasedServices(cachedUser);
+      await _syncDeviceTokenToBackend();
 
       // Step 2: If offline, unlock navigation with cached data
       if (!await _isNetworkAvailable()) {
@@ -112,6 +172,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Step 3: Online — validate. isLoading=false is set inside
       // _validateAndRefreshSession once the flow fully resolves.
       debugPrint('📶 Online — validating session with server...');
+      // If interceptor already called forceLogout during startup, skip validation
+      if (!state.isAuthenticated) {
+        debugPrint(
+          'ℹ️ Session cleared during startup — skipping server validation',
+        );
+        return;
+      }
       await _validateAndRefreshSession(
         userId: userId,
         refreshToken: refreshToken,
@@ -138,6 +205,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _saveUserToCache(freshUser);
       debugPrint('✅ User data refreshed from server');
       _initializeRoleBasedServices(freshUser);
+      await _syncDeviceTokenToBackend();
       return;
     }
 
@@ -171,6 +239,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _saveUserToCache(retryUser);
       debugPrint('✅ User data refreshed after token renewal');
       _initializeRoleBasedServices(retryUser);
+      await _syncDeviceTokenToBackend();
     } else {
       // /auth/me still failing after refresh — keep cached user, allow navigation
       debugPrint('⚠️ /auth/me failed after refresh — keeping cached user');
@@ -209,8 +278,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Called by TokenRefreshInterceptor when mid-session refresh token is rejected.
   Future<void> forceLogout() async {
+    if (_isForcingLogout) {
+      debugPrint('ℹ️ forceLogout already in progress — skipping re-entry');
+      return;
+    }
+    _isForcingLogout = true;
     debugPrint('🚨 forceLogout called by interceptor');
+    final role = state.user?.role;
     await logout();
+    _isForcingLogout = false;
+    // Signal the UI to show session-expired dialog
+    state = state.copyWith(sessionExpired: true, sessionExpiredRole: role);
+  }
+
+  /// Called after the session-expired dialog is dismissed.
+  void clearSessionExpired() {
+    state = state.copyWith(clearSessionExpired: true);
   }
 
   Future<bool> login({required String email, required String password}) async {
@@ -238,6 +321,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
         await _saveUserToCache(user);
         _initializeRoleBasedServices(user);
+        await _syncDeviceTokenToBackend(force: true);
         debugPrint('✅ Login successful: ${user.email}');
         return true;
       }
@@ -293,14 +377,32 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> logout() async {
+  Future<void> logout({bool showMessage = false}) async {
     try {
       _cleanupRoleBasedServices();
-      await _authRepository.logout(); // Best-effort API call
-    } catch (_) {}
-    await _clearSession();
-    state = AuthState.initial();
-    debugPrint('✅ Logged out');
+
+      // Clear local auth first so any interceptor-triggered retries stop
+      // immediately, even if a network cleanup call fails.
+      await _clearSession();
+
+      try {
+        await _fcmService.clearLastSentToken();
+      } catch (_) {}
+
+      try {
+        await _authRepository.logout(); // Best-effort API call
+      } catch (_) {}
+
+      state = AuthState(
+        isLoading: false,
+        error: showMessage
+            ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
+            : null,
+      );
+      debugPrint('✅ Logged out');
+    } finally {
+      _isForcingLogout = false;
+    }
   }
 
   Future<void> refreshUserData() async {
@@ -360,6 +462,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       prefs.remove('user_id'),
       prefs.remove('token_expiry'),
       prefs.remove('cached_user'),
+      prefs.remove('fcm_token_sent'),
     ]);
     debugPrint('🗑️ Session cleared');
   }

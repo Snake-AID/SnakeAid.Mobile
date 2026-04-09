@@ -19,6 +19,7 @@ class SplashScreen extends ConsumerStatefulWidget {
 class _SplashScreenState extends ConsumerState<SplashScreen> {
   double _progress = 0.0;
   Timer? _progressTimer;
+  Timer? _fallbackTimer;
   bool _progressDone = false;
   bool _hasNavigated = false;
 
@@ -31,6 +32,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void dispose() {
     _progressTimer?.cancel();
+    _fallbackTimer?.cancel();
     super.dispose();
   }
 
@@ -46,6 +48,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           timer.cancel();
           _progressDone = true;
           _tryNavigate();
+          // Safety fallback: if auth is still loading after 4s, go to role-selection
+          _fallbackTimer = Timer(const Duration(seconds: 4), () {
+            if (!_hasNavigated && mounted) {
+              debugPrint('⚠️ Splash fallback: auth still loading after timeout, forcing role-selection');
+              _hasNavigated = true;
+              context.go('/role-selection');
+            }
+          });
         }
       });
     });
