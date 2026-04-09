@@ -3044,6 +3044,15 @@ class _IncomeTabState extends ConsumerState<_IncomeTab> {
 
     try {
       final userId = ref.read(authProvider).user?.id;
+      if (userId == null || userId.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _isLoadingMore = false;
+          if (page == 1) _error = 'Không xác định được người dùng';
+        });
+        return;
+      }
       final results = await ref.read(transactionRepositoryProvider).getTransactions(
             userId: userId,
             transType: 'ExpertPayout',
