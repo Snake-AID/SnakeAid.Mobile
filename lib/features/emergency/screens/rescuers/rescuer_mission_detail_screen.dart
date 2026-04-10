@@ -20,6 +20,7 @@ import '../../../../core/providers/openroute_provider.dart';
 import '../../../../core/services/nominatim_service.dart';
 import '../../../../core/services/openroute_service.dart';
 import '../../providers/mission_hub_provider.dart' hide MissionStatus;
+import '../../widgets/rescuer_abort_reason_dialog.dart';
 import '../../../rescuer/providers/tracking_provider.dart';
 
 class RescuerMissionDetailScreen extends ConsumerStatefulWidget {
@@ -1664,173 +1665,19 @@ class _RescuerMissionDetailScreenState
         mission.missionStatus != MissionStatus.enRoute)
       return;
 
-    String? selectedReason;
-    final customController = TextEditingController();
-    bool showCustom = false;
-    final reasons = [
-      'Phương tiện gặp sự cố',
-      'Có việc khẩn cấp',
-      'Không thể tiếp cận địa điểm',
-      'Bệnh nhân hủy yêu cầu',
-      'Điều kiện thời tiết nguy hiểm',
-      'Lý do khác',
-    ];
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          title: const Text(
-            'Hủy nhiệm vụ?',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Chọn lý do hủy nhiệm vụ:',
-                  style: TextStyle(fontSize: 13, color: _textSecondary),
-                ),
-                const SizedBox(height: 12),
-                ...reasons.map((r) {
-                  final isSelected = selectedReason == r;
-                  final isOther = r == 'Lý do khác';
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: InkWell(
-                      onTap: () => setState(() {
-                        selectedReason = r;
-                        showCustom = isOther;
-                        if (!isOther) customController.clear();
-                      }),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? _accent.withOpacity(0.06)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: isSelected ? _accent : _divider,
-                            width: isSelected ? 1.5 : 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 18,
-                              height: 18,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: isSelected ? _accent : _textSecondary,
-                                  width: 2,
-                                ),
-                              ),
-                              child: isSelected
-                                  ? Center(
-                                      child: Container(
-                                        width: 8,
-                                        height: 8,
-                                        decoration: const BoxDecoration(
-                                          color: _accent,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              r,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: isSelected
-                                    ? _textPrimary
-                                    : _textSecondary,
-                                fontWeight: isSelected
-                                    ? FontWeight.w500
-                                    : FontWeight.normal,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-                if (showCustom) ...[
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: customController,
-                    decoration: const InputDecoration(
-                      hintText: 'Nhập lý do cụ thể...',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                    ),
-                    maxLines: 3,
-                    maxLength: 500,
-                  ),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text(
-                'Quay lại',
-                style: TextStyle(color: _textSecondary),
-              ),
-            ),
-            FilledButton(
-              onPressed: () async {
-                if (selectedReason == null) return;
-                String finalReason = selectedReason!;
-                if (showCustom) {
-                  final custom = customController.text.trim();
-                  if (custom.isEmpty) return;
-                  finalReason = custom;
-                }
-                Navigator.pop(ctx);
-                final success = await ref
-                    .read(missionDetailProvider.notifier)
-                    .abortMission(finalReason);
-                if (!mounted) return;
-                if (success) {
-                  await _handleMissionTermination(
-                    'Đã hủy nhiệm vụ.',
-                    restartIdle: false,
-                  );
-                } else {
-                  final error = ref.read(missionDetailProvider).error;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(error ?? 'Lỗi khi hủy'),
-                      backgroundColor: _danger,
-                    ),
-                  );
-                }
-              },
-              style: FilledButton.styleFrom(backgroundColor: _danger),
-              child: const Text('Xác nhận hủy'),
-            ),
-          ],
-        ),
-      ),
-    );
+    showRescuerAbortReasonDialog(
+      context,
+      onSubmit: (reason) async {
+        final success = await ref
+            .read(missionDetailProvider.notifier)
+            .abortMission(reason);
+        if (success) return null;
+        return ref.read(missionDetailProvider).error ?? 'Lỗi khi hủy';
+      },
+    ).then((reason) async {
+      if (reason == null || !mounted) return;
+      await _handleMissionTermination('Đã hủy nhiệm vụ.', restartIdle: false);
+    });
   }
 }
 
