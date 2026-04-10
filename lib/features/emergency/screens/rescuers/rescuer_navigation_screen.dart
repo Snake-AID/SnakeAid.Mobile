@@ -9,7 +9,10 @@ import '../../../shared/widgets/custom_dialog.dart';
 import '../../models/rescue_mission_response.dart';
 import '../../models/route_navigation_data.dart';
 import '../../providers/mission_detail_provider.dart';
+import '../../providers/active_mission_provider.dart';
 import '../../providers/mission_hub_provider.dart';
+import '../../widgets/rescuer_abort_reason_dialog.dart';
+import '../../../rescuer/providers/tracking_provider.dart';
 import '../../../../core/services/mission_hub_service.dart'
     show MemberLocationData;
 
@@ -1309,140 +1312,34 @@ class _RescuerNavigationScreenState
   }
 
   void _showCancelTripDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        String? selectedReason;
-
-        return StatefulBuilder(
-          builder: (context, setState) => CustomDialog(
-            icon: Icons.cancel_outlined,
-            iconBackgroundColor: const Color(0xFFFFEBEE),
-            iconColor: const Color(0xFFDC3545),
-            title: 'Hủy Chuyến Cứu Hộ?',
-            description:
-                'Vui lòng chọn lý do hủy chuyến để chúng tôi cải thiện dịch vụ',
-            extraContent: [
-              _buildReasonOption(
-                'Không thể đến địa điểm',
-                'location',
-                selectedReason,
-                (value) {
-                  setState(() => selectedReason = value);
-                },
-              ),
-              _buildReasonOption(
-                'Bệnh nhân không liên lạc được',
-                'contact',
-                selectedReason,
-                (value) {
-                  setState(() => selectedReason = value);
-                },
-              ),
-              _buildReasonOption(
-                'Có việc khẩn cấp khác',
-                'urgent',
-                selectedReason,
-                (value) {
-                  setState(() => selectedReason = value);
-                },
-              ),
-              _buildReasonOption(
-                'Tình trạng không nghiêm trọng',
-                'not_serious',
-                selectedReason,
-                (value) {
-                  setState(() => selectedReason = value);
-                },
-              ),
-              _buildReasonOption('Lý do khác', 'other', selectedReason, (
-                value,
-              ) {
-                setState(() => selectedReason = value);
-              }),
-            ],
-            actions: [
-              DialogAction(
-                label: 'Quay lại',
-                isOutlined: true,
-                onPressed: () => context.pop(),
-              ),
-              DialogAction(
-                label: 'Xác nhận hủy',
-                backgroundColor: const Color(0xFFDC3545),
-                onPressed: () {
-                  if (selectedReason != null) {
-                    Navigator.of(dialogContext).pop();
-                    context.pop();
-                  }
-                },
-              ),
-            ],
-          ),
-        );
+    showRescuerAbortReasonDialog(
+      context,
+      onSubmit: (reason) async {
+        final success = await ref
+            .read(missionDetailProvider.notifier)
+            .abortMission(reason);
+        if (success) return null;
+        return ref.read(missionDetailProvider).error ?? 'Lỗi khi hủy';
       },
-    );
+    ).then((reason) async {
+      if (reason == null || !mounted) return;
+      await _handleMissionTermination('Đã hủy nhiệm vụ.');
+    });
   }
 
-  Widget _buildReasonOption(
-    String label,
-    String value,
-    String? selectedReason,
-    Function(String) onSelect,
-  ) {
-    final isSelected = selectedReason == value;
-    return InkWell(
-      onTap: () => onSelect(value),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFFFF8800).withOpacity(0.1)
-              : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected
-                ? const Color(0xFFFF8800)
-                : const Color(0xFFE5E5E5),
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected
-                      ? const Color(0xFFFF8800)
-                      : const Color(0xFFCCCCCC),
-                  width: 2,
-                ),
-                color: isSelected ? const Color(0xFFFF8800) : Colors.white,
-              ),
-              child: isSelected
-                  ? const Icon(Icons.check, size: 14, color: Colors.white)
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                  color: const Color(0xFF1C100D),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  Future<void> _handleMissionTermination(String message) async {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.orange),
+      );
+    }
+
+    ref.read(locationManagerProvider).stopMissionTracking();
+    await ref.read(missionHubConnectionProvider.notifier).disconnect();
+    await ref.read(activeMissionProvider.notifier).clearActiveMission();
+
+    if (!mounted) return;
+    context.goNamed('rescuer_home');
   }
 
   void _showArrivedConfirmation(BuildContext context) {

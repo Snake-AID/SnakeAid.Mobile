@@ -242,12 +242,14 @@ Future<void> _navigateToActiveIncident(
         }
 
         final status = ref.read(missionStatusProvider);
+        final hasMatchingMission =
+            status.hasRescuer && status.incidentId == response.data!.id;
         context.pushNamed(
           'emergency_tracking',
           extra: {
             'incidentId': response.data!.id,
-            if (status.hasRescuer) 'missionId': status.missionId!,
-            if (status.hasRescuer) 'rescuerId': status.rescuerId!,
+            if (hasMatchingMission) 'missionId': status.missionId!,
+            if (hasMatchingMission) 'rescuerId': status.rescuerId!,
           },
         );
       }
