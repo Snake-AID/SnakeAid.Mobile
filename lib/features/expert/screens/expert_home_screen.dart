@@ -66,12 +66,21 @@ _ExpertConsultation _bookingToExpertConsultation(
   }
   return _ExpertConsultation(
     id: b.consultationId ?? b.id,
+    bookingId: b.id,
+    consultationId: b.consultationId,
+    roomId: b.roomId,
+    userId: b.userId,
+    expertId: b.expertId,
     patientName: b.userName ?? 'Bệnh nhân',
     patientPhone: '',
     consultationType: b.consultationType == 'Instant' ? 'Khẩn Cấp' : 'Đặt Lịch',
     snakeSuspect: 'Chưa xác định',
     hasSnakeImage: false,
     scheduledTime: scheduled,
+    bookedAt: b.bookedAt,
+    paymentDeadline: b.paymentDeadline,
+    slotStartTime: b.slotStartTime,
+    slotEndTime: b.slotEndTime,
     status: status,
     feeCost: b.feeCost,
     rating: b.rating,
@@ -461,11 +470,20 @@ class _HomeTabState extends ConsumerState<_HomeTab>
       '/expert-consultation-detail',
       extra: {
         'id': c.id,
+        'bookingId': c.bookingId,
+        'consultationId': c.consultationId,
+        'roomId': c.roomId,
+        'userId': c.userId,
+        'expertId': c.expertId,
         'patientName': c.patientName,
         'patientPhone': c.patientPhone,
         'consultationType': c.consultationType,
         'snakeSuspect': c.snakeSuspect,
         'scheduledTime': c.scheduledTime.millisecondsSinceEpoch,
+        'bookedAt': c.bookedAt?.millisecondsSinceEpoch,
+        'paymentDeadline': c.paymentDeadline?.millisecondsSinceEpoch,
+        'slotStartTime': c.slotStartTime?.millisecondsSinceEpoch,
+        'slotEndTime': c.slotEndTime?.millisecondsSinceEpoch,
         'statusIndex': c.status.index,
         'feeCost': c.feeCost,
         'rating': c.rating,
@@ -2018,12 +2036,21 @@ enum _ExpertConsultationStatus { waiting, upcoming, completed, cancelled }
 
 class _ExpertConsultation {
   final String id;
+  final String bookingId;
+  final String? consultationId;
+  final String? roomId;
+  final String? userId;
+  final String expertId;
   final String patientName;
   final String patientPhone;
   final String consultationType;
   final String snakeSuspect;
   final bool hasSnakeImage;
   final DateTime scheduledTime;
+  final DateTime? bookedAt;
+  final DateTime? paymentDeadline;
+  final DateTime? slotStartTime;
+  final DateTime? slotEndTime;
   final _ExpertConsultationStatus status;
   final int feeCost;
   final double? rating;
@@ -2035,12 +2062,21 @@ class _ExpertConsultation {
 
   const _ExpertConsultation({
     required this.id,
+    required this.bookingId,
+    this.consultationId,
+    this.roomId,
+    this.userId,
+    required this.expertId,
     required this.patientName,
     this.patientPhone = '',
     required this.consultationType,
     required this.snakeSuspect,
     this.hasSnakeImage = false,
     required this.scheduledTime,
+    this.bookedAt,
+    this.paymentDeadline,
+    this.slotStartTime,
+    this.slotEndTime,
     required this.status,
     required this.feeCost,
     this.rating,
@@ -2150,11 +2186,20 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
       '/expert-consultation-detail',
       extra: {
         'id': c.id,
+        'bookingId': c.bookingId,
+        'consultationId': c.consultationId,
+        'roomId': c.roomId,
+        'userId': c.userId,
+        'expertId': c.expertId,
         'patientName': c.patientName,
         'patientPhone': c.patientPhone,
         'consultationType': c.consultationType,
         'snakeSuspect': c.snakeSuspect,
         'scheduledTime': c.scheduledTime.millisecondsSinceEpoch,
+        'bookedAt': c.bookedAt?.millisecondsSinceEpoch,
+        'paymentDeadline': c.paymentDeadline?.millisecondsSinceEpoch,
+        'slotStartTime': c.slotStartTime?.millisecondsSinceEpoch,
+        'slotEndTime': c.slotEndTime?.millisecondsSinceEpoch,
         'statusIndex': c.status.index,
         'feeCost': c.feeCost,
         'rating': c.rating,
@@ -2925,19 +2970,22 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                 ),
             ],
           ),
-          const SizedBox(height: 8),
-          Row(
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              const Icon(
-                Icons.pest_control,
-                size: 13,
-                color: Color(0xFF999999),
+              _buildHistoryMetaChip(
+                icon: Icons.access_time_outlined,
+                label: 'Khung giờ',
+                value: _formatSlotRange(item),
               ),
-              const SizedBox(width: 4),
-              Text(
-                item.snakeSuspect,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF666666)),
-              ),
+              if (item.bookedAt != null)
+                _buildHistoryMetaChip(
+                  icon: Icons.event_available_outlined,
+                  label: 'Đặt lúc',
+                  value: _formatFullDateTimePlus7(item.bookedAt!),
+                ),
             ],
           ),
           if (isDone && item.rating != null) ...[
@@ -2990,7 +3038,51 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
     );
   }
 
+  Widget _buildHistoryMetaChip({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F8FA),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: const Color(0xFF6B7280)),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              '$label: $value',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                color: Color(0xFF2D2D2D),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────
+
+  String _formatSlotRange(_ExpertConsultation c) {
+    final start = c.slotStartTime ?? c.scheduledTime;
+    final end = c.slotEndTime;
+    final startText =
+        '${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}';
+    if (end == null) return startText;
+    final endText =
+        '${end.hour.toString().padLeft(2, '0')}:${end.minute.toString().padLeft(2, '0')}';
+    return '$startText - $endText';
+  }
 
   String _formatFullDate(DateTime d) {
     const months = [
@@ -3024,6 +3116,11 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
   String _formatFullDateTime(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}'
       ' lúc ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+
+  String _formatFullDateTimePlus7(DateTime d) {
+    final localPlus7 = d.add(const Duration(hours: 7));
+    return _formatFullDateTime(localPlus7);
+  }
 
   String _formatFee(int fee) {
     final formatted = fee.toString().replaceAllMapped(
