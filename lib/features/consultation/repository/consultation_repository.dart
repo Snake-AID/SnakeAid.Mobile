@@ -372,12 +372,12 @@ class ConsultationRepository {
 
   /// Get all bookings for the current logged-in member
   ///
-  /// API: `GET /api/users/me/consultation-bookings`
+  /// API: `GET /api/users/me/consultations/scheduled`
   Future<List<ConsultationBookingResponse>> getMyBookings() async {
     try {
       debugPrint('📋 Fetching my bookings');
       final response =
-          await httpService.get('/api/users/me/consultation-bookings');
+          await httpService.get('/api/users/me/consultations/scheduled');
 
       final body = response.data as Map<String, dynamic>;
       if (body['is_success'] == true && body['data'] != null) {
@@ -446,7 +446,7 @@ class ConsultationRepository {
 
   /// Create a new consultation booking
   ///
-  /// API: `POST /api/consultation-bookings`
+  /// API: `POST /api/consultations/scheduled`
   ///
   /// Throws:
   /// - `409` when the slot has already been booked (race condition)
@@ -457,7 +457,7 @@ class ConsultationRepository {
     debugPrint('📋 Creating booking for slot: ${request.timeSlotId}');
 
     final response = await httpService.post(
-      '/api/consultation-bookings',
+      '/api/consultations/scheduled',
       data: request.toJson(),
     );
 
@@ -477,14 +477,14 @@ class ConsultationRepository {
 
   /// Create an emergency consultation request for a specific expert.
   ///
-  /// API: `POST /api/consultations/emergency-requests`
+  /// API: `POST /api/consultations/instant`
   Future<EmergencyConsultationRequest> createEmergencyRequest({
     required String expertId,
   }) async {
     debugPrint('🚨 Creating emergency consultation request for expert: $expertId');
 
     final response = await httpService.post(
-      '/api/consultations/emergency-requests',
+      '/api/consultations/instant',
       data: {'expertId': expertId},
     );
 
@@ -500,11 +500,11 @@ class ConsultationRepository {
 
   /// Expert accepts an emergency consultation request.
   ///
-  /// API: `POST /api/consultations/emergency-requests/{requestId}/accept`
+  /// API: `POST /api/consultations/instant/{requestId}/accept`
   Future<EmergencyConsultationRequest> acceptEmergencyRequest(
       String requestId) async {
     final response = await httpService.post(
-      '/api/consultations/emergency-requests/$requestId/accept',
+      '/api/consultations/instant/$requestId/accept',
     );
 
     final body = response.data as Map<String, dynamic>;
@@ -519,11 +519,11 @@ class ConsultationRepository {
 
   /// Expert rejects an emergency consultation request.
   ///
-  /// API: `POST /api/consultations/emergency-requests/{requestId}/reject`
+  /// API: `POST /api/consultations/instant/{requestId}/reject`
   Future<EmergencyConsultationRequest> rejectEmergencyRequest(
       String requestId) async {
     final response = await httpService.post(
-      '/api/consultations/emergency-requests/$requestId/reject',
+      '/api/consultations/instant/$requestId/reject',
     );
 
     final body = response.data as Map<String, dynamic>;
@@ -621,7 +621,7 @@ class ConsultationRepository {
 
   /// Get a LiveKit access token for a consultation room.
   ///
-  /// API: `POST /api/videocall/livekit-token/{consultationId}`
+  /// API: `POST /api/consultations/{consultationId}/video-token`
   ///
   /// Returns `({String token, String wsUrl})` from `data.token` + `data.wsUrl`.
   /// Falls back to `LIVEKIT_URL` env var if `wsUrl` is absent in response.
@@ -630,7 +630,7 @@ class ConsultationRepository {
     debugPrint('🎥 Getting LiveKit token for consultation: $consultationId');
 
     final response = await httpService.post(
-      '/api/videocall/livekit-token/$consultationId',
+      '/api/consultations/$consultationId/video-token',
     );
 
     final body = response.data as Map<String, dynamic>;
@@ -977,7 +977,7 @@ class ConsultationRepository {
 
   /// Pay for a scheduled consultation booking.
   ///
-  /// API: `POST /api/consultation-bookings/{bookingId}/payments`
+  /// API: `POST /api/consultations/scheduled/{bookingId}/payments`
   ///
   /// Throws:
   /// - 409 when booking already paid or not in `PendingPayment`
@@ -989,7 +989,7 @@ class ConsultationRepository {
     debugPrint('💳 Paying booking: $bookingId');
 
     return _postConsultationPaymentWithFallback(
-      path: '/api/consultation-bookings/$bookingId/payments',
+      path: '/api/consultations/scheduled/$bookingId/payments',
       paymentMethod: paymentMethod,
       defaultErrorMessage: 'Không thể thanh toán',
     );
@@ -997,7 +997,7 @@ class ConsultationRepository {
 
   /// Pay for an emergency consultation request.
   ///
-  /// API: `POST /api/consultations/emergency-requests/{requestId}/payments`
+  /// API: `POST /api/consultations/instant/{requestId}/payments`
   ///
   /// This moves request status from `PendingPayment` to `PendingExpertResponse`.
   Future<ConsultationPaymentResponse> payEmergencyRequest(
@@ -1007,7 +1007,7 @@ class ConsultationRepository {
     debugPrint('💳 Paying emergency request: $requestId');
 
     return _postConsultationPaymentWithFallback(
-      path: '/api/consultations/emergency-requests/$requestId/payments',
+      path: '/api/consultations/instant/$requestId/payments',
       paymentMethod: paymentMethod,
       defaultErrorMessage: 'Không thể thanh toán tư vấn ngay',
     );
@@ -1015,12 +1015,12 @@ class ConsultationRepository {
 
   /// Manual fallback confirm for consultation PayOS payment.
   ///
-  /// API: `POST /api/consultation-payments/confirm-payment`
+  /// API: `POST /api/consultations/payments/confirm`
   Future<ConsultationPaymentResponse> confirmConsultationPayment(
     String transactionId,
   ) async {
     final response = await httpService.post(
-      '/api/consultation-payments/confirm-payment',
+      '/api/consultations/payments/confirm',
       data: {'transactionId': transactionId},
     );
 
@@ -1040,12 +1040,27 @@ class ConsultationRepository {
 
   /// Get all bookings for the current logged-in expert.
   ///
-  /// API: `GET /api/experts/me/consultation-bookings`
+  /// API: `GET /api/experts/me/consultations/scheduled`
   Future<List<ConsultationBookingResponse>> getExpertBookings() async {
     try {
       debugPrint('📋 Fetching expert bookings');
-      final response =
-          await httpService.get('/api/experts/me/consultation-bookings');
+      Response<dynamic> response;
+      try {
+        response =
+            await httpService.get('/api/experts/me/consultations/scheduled');
+      } on DioException catch (e) {
+        final status = e.response?.statusCode;
+        // Backward compatibility during backend rollout.
+        if (status == 404 || status == 405) {
+          debugPrint(
+            '⚠️ New scheduled endpoint unavailable ($status), fallback to legacy consultation-bookings',
+          );
+          response =
+              await httpService.get('/api/experts/me/consultation-bookings');
+        } else {
+          rethrow;
+        }
+      }
 
       final body = response.data as Map<String, dynamic>;
       if (body['is_success'] == true && body['data'] != null) {
@@ -1058,7 +1073,10 @@ class ConsultationRepository {
       }
       return [];
     } on DioException catch (e) {
-      debugPrint('❌ Failed to fetch expert bookings: ${e.message}');
+      debugPrint(
+        '❌ Failed to fetch expert bookings: ${e.message} '
+        '(status=${e.response?.statusCode}, path=${e.requestOptions.path})',
+      );
       return [];
     } catch (e) {
       debugPrint('❌ Unexpected error fetching expert bookings: $e');

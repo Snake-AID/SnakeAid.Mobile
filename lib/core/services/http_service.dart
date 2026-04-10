@@ -147,13 +147,9 @@ class HttpService {
     if (healthCheckService == null) return;
     final alive = await healthCheckService!.isServerAlive();
     if (!alive) {
-      throw DioException(
-        requestOptions: RequestOptions(path: ''),
-        type: DioExceptionType.connectionError,
-        error: 'HEALTH_CHECK_FAILED',
-        message:
-            'Máy chủ đang bảo trì hoặc không thể kết nối. Vui lòng thử lại sau.',
-      );
+      // Soft-check only: avoid blocking real requests due to false negatives
+      // from /health endpoint or transient ping failures.
+      debugPrint('⚠️ Health check ping failed, continue with real request');
     }
   }
 
