@@ -1,4 +1,4 @@
-/// Blog status matching backend enum BlogStatus
+  /// Blog status matching backend enum BlogStatus
 enum BlogStatus {
   draft,          // 0
   pendingApproval, // 1

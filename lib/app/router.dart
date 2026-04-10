@@ -297,6 +297,11 @@ final router = GoRouter(
       builder: (context, state) => const SnakeLibraryScreen(),
     ),
     GoRoute(
+      path: '/snake-first-aid-guide',
+      name: 'snake_first_aid_guide',
+      builder: (context, state) => const SnakeLibraryScreen(firstAidMode: true),
+    ),
+    GoRoute(
       path: '/snake-species/:id',
       name: 'snake_detail',
       builder: (context, state) {
@@ -372,7 +377,11 @@ final router = GoRouter(
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>?;
         final highlightedId = extra?['newConsultationId'] as String?;
-        return ConsultationHomeScreen(highlightedId: highlightedId);
+        final initialTab = extra?['initialTab'] as int? ?? 0;
+        return ConsultationHomeScreen(
+          highlightedId: highlightedId,
+          initialTab: initialTab,
+        );
       },
     ),
 
@@ -407,6 +416,7 @@ final router = GoRouter(
         final initialMicOn = extra?['initialMicOn'] as bool? ?? true;
         final initialCameraOn = extra?['initialCameraOn'] as bool? ?? true;
         final afterCallRoute = extra?['afterCallRoute'] as String?;
+        final isExpertMode = extra?['isExpertMode'] as bool? ?? false;
         return VideoConsultationScreen(
           consultationId: id,
           expertName: expertName,
@@ -414,6 +424,7 @@ final router = GoRouter(
           initialMicOn: initialMicOn,
           initialCameraOn: initialCameraOn,
           afterCallRoute: afterCallRoute,
+          isExpertMode: isExpertMode,
           livekitToken: extra?['livekitToken'] as String? ?? '',
           wsUrl: extra?['wsUrl'] as String? ?? '',
         );
@@ -487,6 +498,7 @@ final router = GoRouter(
           expertSpecialty: extra?['expertSpecialty'] as String? ?? '',
           durationSeconds: extra?['durationSeconds'] as int? ?? 0,
           consultationId: extra?['consultationId'] as String? ?? '',
+          consultationTime: extra?['consultationTime'] as DateTime?,
         );
       },
     ),
@@ -578,8 +590,6 @@ final router = GoRouter(
           selectedTime: extraData?['selectedTime'],
           duration: extraData?['duration'],
           price: extraData?['price'],
-          hasDocuments: extraData?['hasDocuments'] ?? false,
-          uploadedImagesCount: extraData?['uploadedImagesCount'] ?? 0,
           problemDescription: extraData?['problemDescription'],
           questions: extraData?['questions'],
           bookingId: extraData?['bookingId'] as String?,

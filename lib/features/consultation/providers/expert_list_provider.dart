@@ -13,6 +13,7 @@ class ExpertListState {
   /// null = tất cả, true = chỉ online, false = chỉ offline
   final bool? isOnlineFilter;
   final String sortBy;
+  final String searchQuery;
   final int totalCount;
   final int onlineCount;
   final List<String> specialties;
@@ -25,6 +26,7 @@ class ExpertListState {
     this.selectedSpecialty,
     this.isOnlineFilter,   // null = default (cả hai)
     this.sortBy = 'online', // Default: sort online lên trước (client-side)
+    this.searchQuery = '',
     this.totalCount = 0,
     this.onlineCount = 0,
     this.specialties = const [],
@@ -38,6 +40,7 @@ class ExpertListState {
     String? selectedSpecialty,
     bool? isOnlineFilter,
     String? sortBy,
+    String? searchQuery,
     int? totalCount,
     int? onlineCount,
     List<String>? specialties,
@@ -56,6 +59,7 @@ class ExpertListState {
       isOnlineFilter:
           clearIsOnlineFilter ? null : (isOnlineFilter ?? this.isOnlineFilter),
       sortBy: sortBy ?? this.sortBy,
+        searchQuery: searchQuery ?? this.searchQuery,
       totalCount: totalCount ?? this.totalCount,
       onlineCount: onlineCount ?? this.onlineCount,
       specialties: specialties ?? this.specialties,
@@ -194,6 +198,14 @@ class ExpertListNotifier extends StateNotifier<ExpertListState> {
     await loadExperts();
   }
 
+  /// Apply local keyword search by expert name/specialty.
+  void setSearchQuery(String query) {
+    state = state.copyWith(
+      searchQuery: query.trim(),
+      filteredExperts: _applyFiltersAndSort(state.experts),
+    );
+  }
+
   /// Clear all filters
   void clearFilters() {
     debugPrint('🧹 Clearing all filters');
@@ -224,6 +236,17 @@ class ExpertListNotifier extends StateNotifier<ExpertListState> {
       filtered = filtered.where((expert) => expert.isOnline).toList();
     } else if (state.isOnlineFilter == false) {
       filtered = filtered.where((expert) => !expert.isOnline).toList();
+    }
+
+    // Local keyword search
+    if (state.searchQuery.isNotEmpty) {
+      final q = state.searchQuery.toLowerCase();
+      filtered = filtered.where((expert) {
+        final name = expert.displayName.toLowerCase();
+        final primary = expert.primarySpecialty.toLowerCase();
+        final allSpecs = expert.specialties.join(' ').toLowerCase();
+        return name.contains(q) || primary.contains(q) || allSpecs.contains(q);
+      }).toList();
     }
 
     // Sort (client-side fallback)

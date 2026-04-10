@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
+import 'package:app_links/app_links.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,10 +17,7 @@ const Color _primaryColor = Color(0xFF228B22);
 const Color _backgroundColor = Color(0xFFF6F8F6);
 
 /// Payment method enum
-enum PaymentMethod {
-  payos,
-  snakeaidPay,
-}
+enum PaymentMethod { payos, snakeaidPay }
 
 /// Payment Confirmation Screen
 /// Allows users to review consultation details and complete payment
@@ -29,14 +28,15 @@ class PaymentConfirmationScreen extends ConsumerStatefulWidget {
   final String? selectedTime;
   final String? duration;
   final String? price;
-  final bool hasDocuments;
-  final int uploadedImagesCount;
   final String? problemDescription;
   final String? questions;
+
   /// Booking ID for payment API call
   final String? bookingId;
+
   /// Real consultation ID from createBooking response
   final String? consultationId;
+
   /// Expert name from createBooking response
   final String? expertName;
 
@@ -48,8 +48,6 @@ class PaymentConfirmationScreen extends ConsumerStatefulWidget {
     this.selectedTime,
     this.duration,
     this.price,
-    this.hasDocuments = false,
-    this.uploadedImagesCount = 0,
     this.problemDescription,
     this.questions,
     this.bookingId,
@@ -63,7 +61,8 @@ class PaymentConfirmationScreen extends ConsumerStatefulWidget {
 }
 
 class _PaymentConfirmationScreenState
-    extends ConsumerState<PaymentConfirmationScreen> {
+    extends ConsumerState<PaymentConfirmationScreen>
+    with WidgetsBindingObserver {
   static const String _instantRequestCachePrefix =
       'last_emergency_request_for_expert_';
 
@@ -72,6 +71,15 @@ class _PaymentConfirmationScreenState
   bool _isPaymentLoading = false;
   double? _walletBalance;
   bool _isLoadingWallet = true;
+  final AppLinks _appLinks = AppLinks();
+  StreamSubscription<Uri>? _payOsCallbackSub;
+  bool _isHandlingPayOsCallback = false;
+  bool _isShowingPaymentStatusDialog = false;
+  String? _pendingPayOsTransactionId;
+  String? _pendingEmergencyRequestId;
+  String? _pendingBookingId;
+  String? _pendingWalletTopupTransactionId;
+  DateTime? _pendingWalletTopupStartedAt;
 
   Future<void> _cacheLastEmergencyRequestId(String requestId) async {
     final prefs = await SharedPreferences.getInstance();
@@ -89,7 +97,24 @@ class _PaymentConfirmationScreenState
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _initPayOsCallbackListener();
     _fetchWallet();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _payOsCallbackSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _tryAutoFinalizePendingPayOs();
+      _tryRefreshPendingWalletTopup();
+    }
   }
 
   bool get _hasBookingId =>
@@ -121,6 +146,379 @@ class _PaymentConfirmationScreenState
     }
   }
 
+  void _initPayOsCallbackListener() {
+    _payOsCallbackSub = _appLinks.uriLinkStream.listen((uri) async {
+      if (!mounted) return;
+
+      final hasPendingConsultationPayment =
+          _pendingPayOsTransactionId != null &&
+          _pendingPayOsTransactionId!.isNotEmpty;
+      final hasPendingWalletTopup =
+          _pendingWalletTopupTransactionId != null &&
+          _pendingWalletTopupTransactionId!.isNotEmpty;
+
+      if (!hasPendingConsultationPayment && !hasPendingWalletTopup) return;
+
+      final isSnakeaidPaymentLink =
+          uri.scheme == 'snakeaid' && uri.host == 'payment';
+      final isHttpPayOsCallback =
+          (uri.scheme == 'https' || uri.scheme == 'http') &&
+          (uri.host.contains('snakeaid') || uri.host.contains('payos')) &&
+          (uri.path.contains('pay') ||
+              uri.path.contains('payment') ||
+              uri.path.contains('callback') ||
+              uri.path.contains('return') ||
+              uri.path.contains('cancel'));
+
+      if (!isSnakeaidPaymentLink && !isHttpPayOsCallback) return;
+
+      if (_isHandlingPayOsCallback) return;
+      _isHandlingPayOsCallback = true;
+
+      try {
+        if (hasPendingConsultationPayment) {
+          await _handlePayOsCallbackUri(uri);
+        } else {
+          await _handleWalletTopupCallbackUri(uri);
+        }
+      } finally {
+        _isHandlingPayOsCallback = false;
+      }
+    });
+  }
+
+  Future<void> _handleWalletTopupCallbackUri(Uri uri) async {
+    final status = uri.queryParameters['status']?.toUpperCase();
+    final cancelParam = uri.queryParameters['cancel']?.toLowerCase() == 'true';
+    final path = uri.path.toLowerCase();
+
+    final isCancelled =
+        cancelParam ||
+        status == 'CANCELLED' ||
+        status == 'CANCELED' ||
+        status == 'FAILED' ||
+        path.endsWith('/cancel');
+
+    final isPaid =
+        (status == 'PAID' || status == 'SUCCESS' || status == 'COMPLETED') ||
+        path.endsWith('/return') ||
+        path.endsWith('/success');
+
+    if (isCancelled) {
+      _clearPendingWalletTopupContext();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bạn đã hủy nạp tiền vào ví.'),
+          backgroundColor: Color(0xFFFF8F00),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!isPaid) return;
+
+    _clearPendingWalletTopupContext();
+    await _fetchWallet();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Đã quay lại từ PayOS. Vui lòng kiểm tra lại số dư ví.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _handlePayOsCallbackUri(Uri uri) async {
+    final status = uri.queryParameters['status']?.toUpperCase();
+    final cancelParam = uri.queryParameters['cancel']?.toLowerCase() == 'true';
+    final path = uri.path.toLowerCase();
+
+    final isCancelled =
+        cancelParam ||
+        status == 'CANCELLED' ||
+        status == 'CANCELED' ||
+        status == 'FAILED' ||
+        path.endsWith('/cancel');
+
+    final isPaid =
+        (status == 'PAID' || status == 'SUCCESS' || status == 'COMPLETED') ||
+        path.endsWith('/return') ||
+        path.endsWith('/success');
+
+    if (isCancelled) {
+      if (!mounted) return;
+      setState(() {
+        _isPaymentLoading = false;
+      });
+      _clearPendingPayOsContext();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bạn đã hủy thanh toán PayOS.'),
+          backgroundColor: Color(0xFFFF8F00),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!isPaid) return;
+
+    final txId = _pendingPayOsTransactionId;
+    if (txId == null || txId.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _isPaymentLoading = false;
+      });
+      _clearPendingPayOsContext();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Thiếu transactionId để xác nhận thanh toán.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isPaymentLoading = true;
+    });
+    _showPaymentStatusDialog();
+
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      final confirmedPayment = await repo.confirmConsultationPayment(txId);
+      if (!confirmedPayment.isEscrowed) {
+        throw Exception(
+          'Thanh toán chưa hoàn tất (trạng thái: ${confirmedPayment.status})',
+        );
+      }
+
+      ref.invalidate(consultationBookingsProvider);
+
+      final emergencyRequestId = _pendingEmergencyRequestId;
+      final bookingId = _pendingBookingId;
+      _clearPendingPayOsContext();
+
+      if (!mounted) return;
+      setState(() {
+        _isPaymentLoading = false;
+      });
+
+      if (emergencyRequestId != null && emergencyRequestId.isNotEmpty) {
+        context.go(
+          '/emergency-request-waiting/$emergencyRequestId',
+          extra: {
+            'expertId': widget.expertId,
+            'expertName': widget.expertName ?? 'Chuyên gia',
+          },
+        );
+      } else {
+        context.go(
+          '/consultation-home',
+          extra: {'newConsultationId': bookingId},
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isPaymentLoading = false;
+      });
+      _clearPendingPayOsContext();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      _hidePaymentStatusDialog();
+    }
+  }
+
+  Future<void> _tryAutoFinalizePendingPayOs() async {
+    final txId = _pendingPayOsTransactionId;
+    if (!mounted || txId == null || txId.isEmpty) return;
+    if (_isHandlingPayOsCallback) return;
+
+    _isHandlingPayOsCallback = true;
+    _showPaymentStatusDialog();
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      final confirmedPayment = await repo.confirmConsultationPayment(txId);
+
+      if (!mounted) return;
+      if (!confirmedPayment.isEscrowed) {
+        // Keep pending context so user can return and retry confirm later.
+        return;
+      }
+
+      ref.invalidate(consultationBookingsProvider);
+
+      final emergencyRequestId = _pendingEmergencyRequestId;
+      final bookingId = _pendingBookingId;
+      _clearPendingPayOsContext();
+
+      if (!mounted) return;
+      setState(() {
+        _isPaymentLoading = false;
+      });
+
+      if (emergencyRequestId != null && emergencyRequestId.isNotEmpty) {
+        context.go(
+          '/emergency-request-waiting/$emergencyRequestId',
+          extra: {
+            'expertId': widget.expertId,
+            'expertName': widget.expertName ?? 'Chuyên gia',
+          },
+        );
+      } else {
+        context.go(
+          '/consultation-home',
+          extra: {'newConsultationId': bookingId},
+        );
+      }
+    } catch (e) {
+      // No snackbar here to avoid noisy errors while status may still be processing.
+      debugPrint('PayOS auto-confirm on resume failed: $e');
+    } finally {
+      _hidePaymentStatusDialog();
+      _isHandlingPayOsCallback = false;
+    }
+  }
+
+  Future<void> _tryRefreshPendingWalletTopup() async {
+    final txId = _pendingWalletTopupTransactionId;
+    if (!mounted || txId == null || txId.isEmpty) return;
+
+    final startedAt = _pendingWalletTopupStartedAt;
+    if (startedAt != null &&
+        DateTime.now().difference(startedAt) > const Duration(hours: 2)) {
+      _clearPendingWalletTopupContext();
+      return;
+    }
+
+    await _fetchWallet();
+  }
+
+  void _showPaymentStatusDialog() {
+    if (!mounted || _isShowingPaymentStatusDialog) return;
+    _isShowingPaymentStatusDialog = true;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text('Đang kiểm tra thanh toán'),
+          content: const Row(
+            children: [
+              SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.6),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Hệ thống đang xác nhận trạng thái từ PayOS. Vui lòng đợi... ',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ).then((_) {
+      _isShowingPaymentStatusDialog = false;
+    });
+  }
+
+  void _hidePaymentStatusDialog() {
+    if (!mounted || !_isShowingPaymentStatusDialog) return;
+    Navigator.of(context, rootNavigator: true).pop();
+    _isShowingPaymentStatusDialog = false;
+  }
+
+  void _clearPendingPayOsContext() {
+    _pendingPayOsTransactionId = null;
+    _pendingEmergencyRequestId = null;
+    _pendingBookingId = null;
+  }
+
+  void _clearPendingWalletTopupContext() {
+    _pendingWalletTopupTransactionId = null;
+    _pendingWalletTopupStartedAt = null;
+  }
+
+  Future<void> _startWalletTopup() async {
+    final price = int.tryParse(_getPriceAmount()) ?? 0;
+    final shortfall = price - (_walletBalance?.toInt() ?? 0);
+    final suggestedAmount = shortfall > 0 ? shortfall : 1000;
+    final amount = suggestedAmount.clamp(1000, 10000000).toDouble();
+
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      final topup = await repo.createWalletTopup(
+        amount: amount,
+        description: 'Nap tien vi tu consultation payment',
+      );
+
+      final checkoutUrl = topup['checkoutUrl']?.toString() ?? '';
+      final topupTransactionId = topup['transactionId']?.toString() ?? '';
+      if (checkoutUrl.isEmpty) {
+        throw Exception('Topup khong tra ve checkoutUrl');
+      }
+
+      final uri = Uri.tryParse(checkoutUrl);
+      if (uri == null) {
+        throw Exception('checkoutUrl topup khong hop le');
+      }
+
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        throw Exception('Khong the mo cong thanh toan topup');
+      }
+
+      _pendingWalletTopupTransactionId = topupTransactionId.isEmpty
+          ? null
+          : topupTransactionId;
+      _pendingWalletTopupStartedAt = DateTime.now();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Da mo PayOS de nap ${_formatPrice(amount.toInt().toString())}. Thanh toan xong hay quay lai de tai lai so du.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+      await _fetchWallet();
+    } catch (e) {
+      _clearPendingWalletTopupContext();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   Future<void> _handlePayment() async {
     // Booking flow has priority: when bookingId exists, never call emergency APIs.
     if (!_hasBookingId && _isInstantFlow) {
@@ -134,7 +532,9 @@ class _PaymentConfirmationScreenState
 
       try {
         final repo = ref.read(consultationRepositoryProvider);
-        final req = await repo.createEmergencyRequest(expertId: widget.expertId);
+        final req = await repo.createEmergencyRequest(
+          expertId: widget.expertId,
+        );
         requestId = req.requestId;
         await _cacheLastEmergencyRequestId(requestId);
       } catch (e) {
@@ -187,7 +587,21 @@ class _PaymentConfirmationScreenState
         );
 
         if (_selectedPaymentMethod == PaymentMethod.payos) {
-          await _handlePayOsFlow(repo, payment);
+          await _handlePayOsFlow(
+            payment,
+            emergencyRequestId: resolvedRequestId,
+          );
+          if (!mounted) return;
+          setState(() => _isPaymentLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Đã mở PayOS. Vui lòng hoàn tất thanh toán và quay lại ứng dụng.',
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          return;
         }
 
         if (!mounted) return;
@@ -235,7 +649,18 @@ class _PaymentConfirmationScreenState
         paymentMethod: paymentMethod,
       );
       if (_selectedPaymentMethod == PaymentMethod.payos) {
-        await _handlePayOsFlow(repo, payment);
+        await _handlePayOsFlow(payment, bookingId: widget.bookingId);
+        if (!mounted) return;
+        setState(() => _isPaymentLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Đã mở PayOS. Vui lòng hoàn tất thanh toán và quay lại ứng dụng.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
       }
       ref.invalidate(consultationBookingsProvider);
       if (!mounted) return;
@@ -257,9 +682,10 @@ class _PaymentConfirmationScreenState
   }
 
   Future<void> _handlePayOsFlow(
-    ConsultationRepository repo,
-    ConsultationPaymentResponse payment,
-  ) async {
+    ConsultationPaymentResponse payment, {
+    String? emergencyRequestId,
+    String? bookingId,
+  }) async {
     if (payment.isEscrowed) {
       return;
     }
@@ -268,6 +694,9 @@ class _PaymentConfirmationScreenState
     final transactionId = (payment.transactionId ?? '').toString();
     if (checkoutUrl.isEmpty) {
       throw Exception('Thiếu checkoutUrl cho PayOS');
+    }
+    if (transactionId.isEmpty) {
+      throw Exception('Thiếu transactionId cho PayOS');
     }
 
     final uri = Uri.tryParse(checkoutUrl);
@@ -280,43 +709,9 @@ class _PaymentConfirmationScreenState
       throw Exception('Không thể mở cổng thanh toán PayOS');
     }
 
-    if (!mounted) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Xác nhận thanh toán'),
-        content: const Text(
-          'Sau khi thanh toán xong trên PayOS, bấm "Tôi đã thanh toán" để hệ thống xác nhận giao dịch.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: _primaryColor),
-            child: const Text('Tôi đã thanh toán'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) {
-      throw Exception('Bạn chưa xác nhận hoàn tất thanh toán PayOS');
-    }
-
-    if (transactionId.isEmpty) {
-      throw Exception('Thiếu transactionId để xác nhận thanh toán');
-    }
-
-    final confirmedPayment = await repo.confirmConsultationPayment(transactionId);
-    if (!confirmedPayment.isEscrowed) {
-      throw Exception(
-        'Thanh toán chưa hoàn tất (trạng thái: ${confirmedPayment.status})',
-      );
-    }
+    _pendingPayOsTransactionId = transactionId;
+    _pendingEmergencyRequestId = emergencyRequestId;
+    _pendingBookingId = bookingId;
   }
 
   /// Show wallet payment confirmation dialog
@@ -324,19 +719,14 @@ class _PaymentConfirmationScreenState
     final priceAmount = _getPriceAmount();
     final price = int.tryParse(priceAmount) ?? 0;
     final theme = Theme.of(context);
-    
+
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Xác nhận thanh toán',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
         ),
         content: Container(
           constraints: const BoxConstraints(maxWidth: 300),
@@ -382,7 +772,9 @@ class _PaymentConfirmationScreenState
                               )
                             : Text(
                                 _walletBalance != null
-                                    ? _formatPrice(_walletBalance!.toInt().toString())
+                                    ? _formatPrice(
+                                        _walletBalance!.toInt().toString(),
+                                      )
                                     : 'Không có dữ liệu',
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   fontWeight: FontWeight.w600,
@@ -392,7 +784,7 @@ class _PaymentConfirmationScreenState
                       ],
                     ),
                     const SizedBox(height: 12),
-                    
+
                     // Amount to deduct
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -412,12 +804,12 @@ class _PaymentConfirmationScreenState
                         ),
                       ],
                     ),
-                    
+
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 12),
                       child: Divider(color: Color(0xFFBBF7D0)),
                     ),
-                    
+
                     // Balance after payment
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -439,11 +831,16 @@ class _PaymentConfirmationScreenState
                               )
                             : Text(
                                 _walletBalance != null
-                                    ? _formatPrice(((_walletBalance! - price).toInt()).toString())
+                                    ? _formatPrice(
+                                        ((_walletBalance! - price).toInt())
+                                            .toString(),
+                                      )
                                     : 'Không có dữ liệu',
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
-                                  color: _walletBalance != null && _walletBalance! >= price
+                                  color:
+                                      _walletBalance != null &&
+                                          _walletBalance! >= price
                                       ? const Color(0xFF228B22)
                                       : Colors.red,
                                 ),
@@ -453,7 +850,7 @@ class _PaymentConfirmationScreenState
                   ],
                 ),
               ),
-              
+
               // Insufficient balance warning
               if (_walletBalance != null && _walletBalance! < price) ...[
                 const SizedBox(height: 12),
@@ -484,6 +881,24 @@ class _PaymentConfirmationScreenState
                     ],
                   ),
                 ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: _startWalletTopup,
+                    icon: const Icon(Icons.add_card, size: 18),
+                    label: const Text('Nạp ví ngay'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: _startWalletTopup,
+                    icon: const Icon(Icons.add_card, size: 18),
+                    label: const Text('Nạp ví ngay'),
+                  ),
+                ),
               ],
             ],
           ),
@@ -491,10 +906,7 @@ class _PaymentConfirmationScreenState
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text(
-              'Hủy',
-              style: TextStyle(color: Colors.grey),
-            ),
+            child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
             onPressed: _walletBalance != null && _walletBalance! >= price
@@ -566,10 +978,7 @@ class _PaymentConfirmationScreenState
   String _formatPrice(String amount) {
     // Format number with thousands separator
     final number = int.tryParse(amount) ?? 0;
-    return '${number.toString().replaceAllMapped(
-          RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-          (Match m) => '${m[1]},',
-        )} VNĐ';
+    return '${number.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} VNĐ';
   }
 
   @override
@@ -599,47 +1008,53 @@ class _PaymentConfirmationScreenState
       body: state.isLoading
           ? const Center(child: CircularProgressIndicator())
           : state.expert == null
-              ? const Center(child: Text('Không tìm thấy chuyên gia'))
-              : Column(
-                  children: [
-                    // Main content
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Consultation Summary Card
-                            _buildConsultationSummary(
-                                context, state.expert!, theme),
-                            const SizedBox(height: 16),
-
-                            // Payment Details Section
-                            _buildPaymentDetails(theme),
-                            const SizedBox(height: 16),
-
-                            // Payment Method Section
-                            _buildPaymentMethods(theme),
-                            const SizedBox(height: 16),
-
-                            // Security Info Box
-                            _buildSecurityInfo(theme),
-                            const SizedBox(height: 24),
-                          ],
+          ? const Center(child: Text('Không tìm thấy chuyên gia'))
+          : Column(
+              children: [
+                // Main content
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Consultation Summary Card
+                        _buildConsultationSummary(
+                          context,
+                          state.expert!,
+                          theme,
                         ),
-                      ),
-                    ),
+                        const SizedBox(height: 16),
 
-                    // Bottom Action Area
-                    _buildBottomActions(theme),
-                  ],
+                        // Payment Details Section
+                        _buildPaymentDetails(theme),
+                        const SizedBox(height: 16),
+
+                        // Payment Method Section
+                        _buildPaymentMethods(theme),
+                        const SizedBox(height: 16),
+
+                        // Security Info Box
+                        _buildSecurityInfo(theme),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
                 ),
+
+                // Bottom Action Area
+                _buildBottomActions(theme),
+              ],
+            ),
     );
   }
 
   /// Build consultation summary card
   Widget _buildConsultationSummary(
-      BuildContext context, expert, ThemeData theme) {
+    BuildContext context,
+    expert,
+    ThemeData theme,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -671,17 +1086,15 @@ class _PaymentConfirmationScreenState
                       image: expert.avatarUrl != null
                           ? DecorationImage(
                               image: CachedNetworkImageProvider(
-                                  expert.avatarUrl!),
+                                expert.avatarUrl!,
+                              ),
                               fit: BoxFit.cover,
                             )
                           : null,
-                      color: expert.avatarUrl == null
-                          ? Colors.grey[300]
-                          : null,
+                      color: expert.avatarUrl == null ? Colors.grey[300] : null,
                     ),
                     child: expert.avatarUrl == null
-                        ? Icon(Icons.person,
-                            size: 32, color: Colors.grey[600])
+                        ? Icon(Icons.person, size: 32, color: Colors.grey[600])
                         : null,
                   ),
                   if (expert.isVerified)
@@ -713,6 +1126,8 @@ class _PaymentConfirmationScreenState
                   children: [
                     Text(
                       expert.displayName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -749,10 +1164,14 @@ class _PaymentConfirmationScreenState
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                           const SizedBox(width: 6),
-                          Text(
-                            widget.selectedDate!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
+                          Expanded(
+                            child: Text(
+                              widget.selectedDate!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ),
                         ],
@@ -769,10 +1188,14 @@ class _PaymentConfirmationScreenState
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          widget.duration ?? '30 phút',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                        Expanded(
+                          child: Text(
+                            widget.duration ?? '30 phút',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
                       ],
@@ -782,54 +1205,6 @@ class _PaymentConfirmationScreenState
               ),
             ],
           ),
-
-          // Documents info (if uploaded)
-          if (widget.hasDocuments) ...[
-            const SizedBox(height: 16),
-            Divider(color: Colors.grey.shade200),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.image,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Tài liệu đã tải lên (${widget.uploadedImagesCount} ảnh)',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-                TextButton(
-                  onPressed: () {
-                    // TODO: Show document details
-                  },
-                  child: const Text(
-                    'Xem chi tiết',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.blue,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );
@@ -928,12 +1303,12 @@ class _PaymentConfirmationScreenState
                   ),
                 ],
               ),
-              
+
               // Wallet balance
               const SizedBox(height: 16),
               Divider(color: Colors.grey.shade200),
               const SizedBox(height: 12),
-              
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -957,9 +1332,7 @@ class _PaymentConfirmationScreenState
                       ? const SizedBox(
                           width: 16,
                           height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                          ),
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : Text(
                           _walletBalance != null
@@ -967,7 +1340,8 @@ class _PaymentConfirmationScreenState
                               : 'Không có dữ liệu',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w600,
-                            color: _walletBalance != null &&
+                            color:
+                                _walletBalance != null &&
                                     _walletBalance! >= int.parse(priceAmount)
                                 ? _primaryColor
                                 : Colors.red,
@@ -975,9 +1349,9 @@ class _PaymentConfirmationScreenState
                         ),
                 ],
               ),
-              
+
               // Insufficient balance warning
-              if (_walletBalance != null && 
+              if (_walletBalance != null &&
                   _walletBalance! < int.parse(priceAmount)) ...[
                 const SizedBox(height: 12),
                 Container(
@@ -1161,30 +1535,30 @@ class _PaymentConfirmationScreenState
               height: 36,
               child: logoUrl != null
                   ? (logoUrl.startsWith('assets/')
-                      ? Image.asset(
-                          logoUrl,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) {
-                            return _buildFallbackIcon(method);
-                          },
-                        )
-                      : CachedNetworkImage(
-                          imageUrl: logoUrl,
-                          fit: BoxFit.contain,
-                          placeholder: (context, url) => Center(
-                            child: SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.grey.shade400,
+                        ? Image.asset(
+                            logoUrl,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return _buildFallbackIcon(method);
+                            },
+                          )
+                        : CachedNetworkImage(
+                            imageUrl: logoUrl,
+                            fit: BoxFit.contain,
+                            placeholder: (context, url) => Center(
+                              child: SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.grey.shade400,
+                                ),
                               ),
                             ),
-                          ),
-                          errorWidget: (context, url, error) {
-                            return _buildFallbackIcon(method);
-                          },
-                        ))
+                            errorWidget: (context, url, error) {
+                              return _buildFallbackIcon(method);
+                            },
+                          ))
                   : _buildFallbackIcon(method),
             ),
             const SizedBox(width: 16),
@@ -1226,20 +1600,13 @@ class _PaymentConfirmationScreenState
         color: Colors.amber.shade50,
         borderRadius: BorderRadius.circular(8),
         border: Border(
-          left: BorderSide(
-            color: Colors.amber.shade400,
-            width: 4,
-          ),
+          left: BorderSide(color: Colors.amber.shade400, width: 4),
         ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.security,
-            color: Colors.amber.shade600,
-            size: 20,
-          ),
+          Icon(Icons.security, color: Colors.amber.shade600, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -1311,9 +1678,7 @@ class _PaymentConfirmationScreenState
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _backgroundColor.withOpacity(0.8),
-        border: Border(
-          top: BorderSide(color: Colors.grey.shade300),
-        ),
+        border: Border(top: BorderSide(color: Colors.grey.shade300)),
       ),
       child: SafeArea(
         child: Column(

@@ -1,14 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../snake_species/providers/snake_species_provider.dart';
+import '../../community_report/repository/community_report_repository.dart';
+import '../screens/payment_history_screen.dart';
 
-/// Secondary menu grid (2x3) - Professional design
-class SecondaryMenuGrid extends StatelessWidget {
+final _alertCountProvider = FutureProvider.autoDispose<int>((ref) async {
+  final repo = ref.watch(communityReportRepositoryProvider);
+  final reports = await repo.getReports(pageSize: 100);
+  return reports.length;
+});
+
+/// Secondary menu grid - 5 action items
+class SecondaryMenuGrid extends ConsumerWidget {
   const SecondaryMenuGrid({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final snakeState = ref.watch(snakeSpeciesListProvider);
+    final alertCount = ref.watch(_alertCountProvider);
+
+    final snakeCountBadge = snakeState.species.isEmpty
+        ? null
+        : '${snakeState.species.length}';
+    final alertBadge = alertCount.maybeWhen(
+      data: (c) => c > 0 ? '$c' : null,
+      orElse: () => null,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
           Row(
@@ -21,15 +42,15 @@ class SecondaryMenuGrid extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               _MenuItem(
-                icon: Icons.monitor_heart,
-                label: 'Theo dõi\ntriệu chứng',
-                onTap: () {},
+                icon: Icons.health_and_safety_outlined,
+                label: 'Hướng dẫn\nsơ cứu',
+                onTap: () => context.push('/snake-first-aid-guide'),
               ),
               const SizedBox(width: 12),
               _MenuItem(
-                icon: Icons.menu_book,
+                icon: Icons.menu_book_outlined,
                 label: 'Thư viện\nloài rắn',
-                badge: '250+',
+                badge: snakeCountBadge,
                 onTap: () => context.push('/snake-species'),
               ),
             ],
@@ -38,26 +59,24 @@ class SecondaryMenuGrid extends StatelessWidget {
           Row(
             children: [
               _MenuItem(
-                icon: Icons.warning,
+                icon: Icons.warning_amber_rounded,
                 label: 'Cảnh báo\nkhu vực',
-                badge: '3',
-                badgeColor: Color(0xFFDC3545),
+                badge: alertBadge,
+                badgeColor: const Color(0xFFDC3545),
                 onTap: () => context.pushNamed('community_alert_map'),
               ),
               const SizedBox(width: 12),
               _MenuItem(
-                icon: Icons.receipt_long,
+                icon: Icons.receipt_long_outlined,
                 label: 'Thanh toán\n& lịch sử',
-                onTap: () {},
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const PaymentHistoryScreen(),
+                  ),
+                ),
               ),
               const SizedBox(width: 12),
-              _MenuItem(
-                icon: Icons.play_lesson,
-                label: 'Video\nhướng dẫn',
-                badge: '12',
-                badgeColor: Color(0xFF0D6EFD),
-                onTap: () {},
-              ),
+              const Expanded(child: SizedBox()),
             ],
           ),
         ],
@@ -85,6 +104,8 @@ class _MenuItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.of(context).size.width < 360;
+
     return Expanded(
       child: Material(
         color: Colors.white,
@@ -94,13 +115,13 @@ class _MenuItem extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            height: 110,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            height: compact ? 100 : 110,
+            padding: EdgeInsets.symmetric(
+              horizontal: compact ? 6 : 8,
+              vertical: compact ? 8 : 10,
+            ),
             decoration: BoxDecoration(
-              border: Border.all(
-                color: Colors.grey[200]!,
-                width: 1,
-              ),
+              border: Border.all(color: Colors.grey[200]!, width: 1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Stack(
@@ -109,7 +130,6 @@ class _MenuItem extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Icon with background
                     Center(
                       child: Container(
                         width: 40,
@@ -121,19 +141,18 @@ class _MenuItem extends StatelessWidget {
                         child: Center(
                           child: Icon(
                             icon,
-                            size: 22,
+                            size: compact ? 20 : 22,
                             color: const Color(0xFF228B22),
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 6),
-                    // Label
                     Flexible(
                       child: Text(
                         label,
                         style: TextStyle(
-                          fontSize: 10.5,
+                          fontSize: compact ? 10 : 10.5,
                           fontWeight: FontWeight.w600,
                           color: Colors.grey[800],
                           height: 1.2,
@@ -145,24 +164,17 @@ class _MenuItem extends StatelessWidget {
                     ),
                   ],
                 ),
-                // Badge
                 if (badge != null)
                   Positioned(
                     top: 0,
                     right: 0,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 2,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                       decoration: BoxDecoration(
                         color: badgeColor ?? const Color(0xFF6C757D),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      constraints: const BoxConstraints(
-                        minWidth: 20,
-                        minHeight: 16,
-                      ),
+                      constraints: const BoxConstraints(minWidth: 20, minHeight: 16),
                       child: Text(
                         badge!,
                         style: const TextStyle(
@@ -174,7 +186,6 @@ class _MenuItem extends StatelessWidget {
                       ),
                     ),
                   ),
-                // Status dot
                 if (hasStatusDot)
                   Positioned(
                     top: 2,
@@ -185,10 +196,7 @@ class _MenuItem extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: const Color(0xFF228B22),
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white,
-                          width: 1.5,
-                        ),
+                        border: Border.all(color: Colors.white, width: 1.5),
                       ),
                     ),
                   ),

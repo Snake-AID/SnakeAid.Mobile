@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../member/screens/home_screen.dart';
 import '../../member/screens/activity_screen.dart';
-import '../../member/screens/messages_screen.dart';
 import '../../member/screens/profile_screen.dart';
+import '../../notifications/screens/notification_inbox_screen.dart';
+import '../../notifications/providers/notification_inbox_provider.dart';
 
 /// Main scaffold with IndexedStack for instant tab switching
 /// This keeps all screens alive and switches between them without rebuild
-class MainScaffold extends StatefulWidget {
+class MainScaffold extends ConsumerStatefulWidget {
   final int initialIndex;
 
   const MainScaffold({
@@ -15,10 +17,10 @@ class MainScaffold extends StatefulWidget {
   });
 
   @override
-  State<MainScaffold> createState() => _MainScaffoldState();
+  ConsumerState<MainScaffold> createState() => _MainScaffoldState();
 }
 
-class _MainScaffoldState extends State<MainScaffold> {
+class _MainScaffoldState extends ConsumerState<MainScaffold> {
   late int _currentIndex;
 
   @override
@@ -44,15 +46,17 @@ class _MainScaffoldState extends State<MainScaffold> {
         children: const [
           MemberHomeScreen(),
           ActivityScreen(),
-          MessagesScreen(),
+          NotificationInboxScreen(),
           ProfileScreen(),
         ],
       ),
-      bottomNavigationBar: _buildBottomNav(),
+      bottomNavigationBar: _buildBottomNav(
+        ref.watch(notificationInboxProvider).unreadCount,
+      ),
     );
   }
 
-  Widget _buildBottomNav() {
+  Widget _buildBottomNav(int unreadCount) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -82,9 +86,9 @@ class _MainScaffoldState extends State<MainScaffold> {
                 onTap: () => _onTabTapped(1),
               ),
               _NavItem(
-                icon: Icons.chat_bubble_outline,
-                label: 'Tin nhắn',
-                hasNotification: true,
+                icon: Icons.notifications_outlined,
+                label: 'Thông báo',
+                hasNotification: unreadCount > 0,
                 isActive: _currentIndex == 2,
                 onTap: () => _onTabTapped(2),
               ),
