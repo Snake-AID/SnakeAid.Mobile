@@ -6,7 +6,12 @@ import '../models/snake_species_model.dart';
 
 class SnakeLibraryScreen extends ConsumerStatefulWidget {
   final bool firstAidMode;
-  const SnakeLibraryScreen({super.key, this.firstAidMode = false});
+  final Color themeColor;
+  const SnakeLibraryScreen({
+    super.key,
+    this.firstAidMode = false,
+    this.themeColor = const Color(0xFF1B5E20),
+  });
 
   @override
   ConsumerState<SnakeLibraryScreen> createState() =>
@@ -30,7 +35,7 @@ class _SnakeLibraryScreenState
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1B5E20),
+        backgroundColor: widget.themeColor,
         foregroundColor: Colors.white,
         title: const Text(
           'Thư viện loài rắn',
@@ -45,7 +50,7 @@ class _SnakeLibraryScreenState
         children: [
           // Search bar
           Container(
-            color: const Color(0xFF1B5E20),
+            color: widget.themeColor,
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: TextField(
               controller: _searchController,
@@ -90,7 +95,7 @@ class _SnakeLibraryScreenState
                 children: [
                   Icon(Icons.pets,
                       size: 16,
-                      color: const Color(0xFF1B5E20).withOpacity(0.7)),
+                      color: widget.themeColor.withOpacity(0.7)),
                   const SizedBox(width: 6),
                   Text(
                     '${state.filtered.length} loài',
@@ -112,8 +117,8 @@ class _SnakeLibraryScreenState
 
   Widget _buildBody(SnakeSpeciesListState state) {
     if (state.isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF1B5E20)),
+      return Center(
+        child: CircularProgressIndicator(color: widget.themeColor),
       );
     }
 
@@ -136,7 +141,7 @@ class _SnakeLibraryScreenState
               icon: const Icon(Icons.refresh),
               label: const Text('Thử lại'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1B5E20),
+                backgroundColor: widget.themeColor,
                 foregroundColor: Colors.white,
               ),
             ),
@@ -166,7 +171,7 @@ class _SnakeLibraryScreenState
       itemCount: state.filtered.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) =>
-          _SnakeCard(snake: state.filtered[index], firstAidMode: widget.firstAidMode),
+          _SnakeCard(snake: state.filtered[index], firstAidMode: widget.firstAidMode, themeColor: widget.themeColor),
     );
   }
 }
@@ -174,8 +179,13 @@ class _SnakeLibraryScreenState
 class _SnakeCard extends StatelessWidget {
   final SnakeSpeciesModel snake;
   final bool firstAidMode;
+  final Color themeColor;
 
-  const _SnakeCard({required this.snake, this.firstAidMode = false});
+  const _SnakeCard({
+    required this.snake,
+    this.firstAidMode = false,
+    this.themeColor = const Color(0xFF1B5E20),
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -285,9 +295,9 @@ class _SnakeCard extends StatelessWidget {
                 ),
               ),
 
-              const Icon(
+              Icon(
                 Icons.chevron_right,
-                color: Color(0xFF1B5E20),
+                color: themeColor,
               ),
             ],
           ),
@@ -301,11 +311,11 @@ class _SnakeCard extends StatelessWidget {
       width: 80,
       height: 80,
       decoration: BoxDecoration(
-        color: const Color(0xFF1B5E20).withOpacity(0.08),
+        color: themeColor.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Icon(Icons.pets,
-          size: 36, color: Color(0xFF1B5E20)),
+      child: Icon(Icons.pets,
+          size: 36, color: themeColor),
     );
   }
 

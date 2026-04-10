@@ -47,6 +47,8 @@ import 'package:snakeaid_mobile/features/expert/screens/expert_id_documents_scre
 import 'package:snakeaid_mobile/features/expert/screens/expert_specialties_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_feedback_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_working_hours_screen.dart';
+import 'package:snakeaid_mobile/features/expert/screens/ai_recognition_queue_screen.dart';
+import 'package:snakeaid_mobile/features/expert/screens/ai_recognition_review_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_home_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_available_jobs_screen.dart';
 
@@ -301,6 +303,32 @@ final router = GoRouter(
       name: 'snake_first_aid_guide',
       builder: (context, state) => const SnakeLibraryScreen(firstAidMode: true),
     ),
+    // Expert variants (purple)
+    GoRoute(
+      path: '/expert/snake-species',
+      name: 'expert_snake_library',
+      builder: (context, state) =>
+          const SnakeLibraryScreen(themeColor: Color(0xFF6C47C2)),
+    ),
+    GoRoute(
+      path: '/expert/snake-first-aid-guide',
+      name: 'expert_snake_first_aid_guide',
+      builder: (context, state) =>
+          const SnakeLibraryScreen(firstAidMode: true, themeColor: Color(0xFF6C47C2)),
+    ),
+    // Rescuer variants (orange)
+    GoRoute(
+      path: '/rescuer/snake-species',
+      name: 'rescuer_snake_library',
+      builder: (context, state) =>
+          const SnakeLibraryScreen(themeColor: Color(0xFFFF6B35)),
+    ),
+    GoRoute(
+      path: '/rescuer/snake-first-aid-guide',
+      name: 'rescuer_snake_first_aid_guide',
+      builder: (context, state) =>
+          const SnakeLibraryScreen(firstAidMode: true, themeColor: Color(0xFFFF6B35)),
+    ),
     GoRoute(
       path: '/snake-species/:id',
       name: 'snake_detail',
@@ -475,6 +503,23 @@ final router = GoRouter(
       path: '/expert-working-hours',
       name: 'expert_working_hours',
       builder: (context, state) => const ExpertWorkingHoursScreen(),
+    ),
+
+    // Expert AI Recognition Review Queue
+    GoRoute(
+      path: '/expert-ai-review-queue',
+      name: 'expert_ai_review_queue',
+      builder: (context, state) => const AiRecognitionQueueScreen(),
+    ),
+
+    // Expert AI Recognition Review Detail
+    GoRoute(
+      path: '/expert-ai-review/:recognitionResultId',
+      name: 'expert_ai_review',
+      builder: (context, state) {
+        final id = state.pathParameters['recognitionResultId']!;
+        return AiRecognitionReviewScreen(recognitionResultId: id);
+      },
     ),
 
     // Expert Consultation Detail

@@ -1044,6 +1044,11 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                       const SizedBox(height: 16),
                       _buildQuickAccess(),
                       const SizedBox(height: 24),
+
+                      // Snake Library section
+                      _buildSnakeLibrarySection(context),
+                      const SizedBox(height: 24),
+
                       Container(
                         color: Colors.purple.shade50,
                         padding: const EdgeInsets.all(16),
@@ -1817,6 +1822,59 @@ class _HomeTabState extends ConsumerState<_HomeTab>
     );
   }
 
+  Widget _buildSnakeLibrarySection(BuildContext context) {
+    const primaryColor = Color(0xFFFF6B35);
+    const accentColor = Color(0xFFE53935);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Text(
+              'Thư Viện Loài Rắn',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: primaryColor,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Tra cứu loài rắn và hướng dẫn sơ cứu',
+          style: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _RescuerSnakeLibraryCard(
+                icon: Icons.menu_book_outlined,
+                title: 'Thư Viện Loài',
+                subtitle: 'Nhận biết & phân loại',
+                color: primaryColor,
+                onTap: () => context.pushNamed('rescuer_snake_library'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _RescuerSnakeLibraryCard(
+                icon: Icons.health_and_safety_outlined,
+                title: 'Hướng Dẫn\nSơ Cứu',
+                subtitle: 'Xử lý khi bị cắn',
+                color: accentColor,
+                onTap: () =>
+                    context.pushNamed('rescuer_snake_first_aid_guide'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildQuickAccess() {
     final hasUnreadLesson = ref.watch(lessonReadProvider).hasUnread;
     return Row(
@@ -1944,5 +2002,82 @@ class _ProfileTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const RescuerProfileScreen();
+  }
+}
+
+// ── Snake Library Card widget (for rescuer home) ─────────────────────────────
+class _RescuerSnakeLibraryCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _RescuerSnakeLibraryCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      elevation: 0,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withOpacity(0.2)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: color,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios,
+                  size: 13, color: color.withOpacity(0.6)),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

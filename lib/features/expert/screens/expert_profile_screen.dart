@@ -179,6 +179,14 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
                       ),
                       const SizedBox(height: 12),
                       _buildMenuItem(
+                        icon: Icons.document_scanner,
+                        title: 'Xem Xét AI Nhận Diện',
+                        onTap: () {
+                          context.pushNamed('expert_ai_review_queue');
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildMenuItem(
                         icon: Icons.settings,
                         title: 'Cài Đặt',
                         onTap: () {},
