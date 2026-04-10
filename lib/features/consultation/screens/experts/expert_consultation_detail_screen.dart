@@ -331,6 +331,11 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
                           value: _formatDateTime(slotEndMs),
                         ),
                       ],
+                      if (bookedAtMs != null ||
+                          paymentDeadlineMs != null ||
+                          slotStartMs != null ||
+                          slotEndMs != null)
+                        const _Divider(),
                     ],
                   ),
                 ),
