@@ -3026,8 +3026,11 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
       ' lúc ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
   String _formatFee(int fee) {
-    if (fee >= 1000000) return '${(fee / 1000000).toStringAsFixed(1)}M ₫';
-    return '${(fee / 1000).toStringAsFixed(0)}K ₫';
+    final formatted = fee.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]},',
+    );
+    return '${formatted}đ';
   }
 
   String _formatDuration(int seconds) {
