@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/handlers/payment_deep_link_coordinator.dart';
 import '../../emergency/models/detailed_incident_response.dart';
 import '../../emergency/providers/detailed_incident_provider.dart';
 import '../../emergency/repository/incident_repository.dart';
@@ -26,6 +29,10 @@ class _MemberIncidentFinishedDetailScreenState
     extends ConsumerState<MemberIncidentFinishedDetailScreen> {
   bool _isProcessingPayment = false;
   bool _hasPaid = false;
+  int? _pendingPayOsOrderCode;
+  bool _isAwaitingPayOsReturn = false;
+  int? _lastHandledDeepLinkEventId;
+  StreamSubscription<PaymentDeepLinkEvent>? _deepLinkSub;
 
   void _handleBackNavigation() {
     if (Navigator.of(context).canPop()) {
@@ -38,6 +45,7 @@ class _MemberIncidentFinishedDetailScreenState
   @override
   void initState() {
     super.initState();
+    _initDeepLinks();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.incidentId.isNotEmpty) {
         ref
@@ -45,6 +53,75 @@ class _MemberIncidentFinishedDetailScreenState
             .loadDetailedIncident(widget.incidentId);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _deepLinkSub?.cancel();
+    super.dispose();
+  }
+
+  void _initDeepLinks() {
+    final coordinator = ref.read(paymentDeepLinkCoordinatorProvider);
+    _deepLinkSub = coordinator.stream.listen(_handlePaymentDeepLinkEvent);
+
+    final latest = coordinator.latestEvent;
+    if (latest != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handlePaymentDeepLinkEvent(latest);
+      });
+    }
+  }
+
+  Future<void> _handlePaymentDeepLinkEvent(PaymentDeepLinkEvent event) async {
+    if (!mounted || _lastHandledDeepLinkEventId == event.eventId) return;
+    if (!_isAwaitingPayOsReturn && _pendingPayOsOrderCode == null) return;
+    if (_pendingPayOsOrderCode != null && event.orderCode != _pendingPayOsOrderCode) {
+      return;
+    }
+
+    _lastHandledDeepLinkEventId = event.eventId;
+
+    if (event.isSuccess && !event.isCancelled) {
+      setState(() {
+        _hasPaid = true;
+        _pendingPayOsOrderCode = null;
+        _isAwaitingPayOsReturn = false;
+      });
+      await ref.read(detailedIncidentProvider.notifier).refreshDetailedIncident();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Thanh toán PayOS thành công.')),
+      );
+      return;
+    }
+
+    if (event.isCancelled) {
+      setState(() {
+        _pendingPayOsOrderCode = null;
+        _isAwaitingPayOsReturn = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bạn đã hủy thanh toán PayOS.'),
+          backgroundColor: Color(0xFFFF8F00),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isAwaitingPayOsReturn = false);
+    await ref.read(detailedIncidentProvider.notifier).refreshDetailedIncident();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          event.reason == null
+              ? 'Thanh toán chưa được xác nhận. Vui lòng kiểm tra lại trạng thái.'
+              : 'Thanh toán chưa được xác nhận: ${event.reason}',
+        ),
+      ),
+    );
   }
 
   String _formatCurrency(double value) {
@@ -127,6 +204,11 @@ class _MemberIncidentFinishedDetailScreenState
             description: 'Thanh toán phí cứu hộ',
           );
 
+      setState(() {
+        _pendingPayOsOrderCode = paymentResponse.orderCode;
+        _isAwaitingPayOsReturn = true;
+      });
+
       if (paymentResponse.checkoutUrl != null &&
           paymentResponse.checkoutUrl!.isNotEmpty) {
         final uri = Uri.tryParse(paymentResponse.checkoutUrl!);
@@ -147,6 +229,12 @@ class _MemberIncidentFinishedDetailScreenState
           .read(detailedIncidentProvider.notifier)
           .refreshDetailedIncident();
     } catch (e) {
+      if (mounted) {
+        setState(() {
+          _pendingPayOsOrderCode = null;
+          _isAwaitingPayOsReturn = false;
+        });
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('PayOS payment thất bại: ${e.toString()}')),
       );

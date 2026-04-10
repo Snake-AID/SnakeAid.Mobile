@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
-import 'package:app_links/app_links.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/handlers/payment_deep_link_coordinator.dart';
 import '../../providers/expert_detail_provider.dart';
 import '../../providers/consultation_bookings_provider.dart';
 import '../../models/consultation_payment_response.dart';
@@ -71,10 +70,10 @@ class _PaymentConfirmationScreenState
   bool _isPaymentLoading = false;
   double? _walletBalance;
   bool _isLoadingWallet = true;
-  final AppLinks _appLinks = AppLinks();
-  StreamSubscription<Uri>? _payOsCallbackSub;
+  StreamSubscription<PaymentDeepLinkEvent>? _payOsCallbackSub;
   bool _isHandlingPayOsCallback = false;
   bool _isShowingPaymentStatusDialog = false;
+  int? _lastHandledPayOsEventId;
   String? _pendingPayOsTransactionId;
   String? _pendingEmergencyRequestId;
   String? _pendingBookingId;
@@ -147,44 +146,41 @@ class _PaymentConfirmationScreenState
   }
 
   void _initPayOsCallbackListener() {
-    _payOsCallbackSub = _appLinks.uriLinkStream.listen((uri) async {
-      if (!mounted) return;
+    final coordinator = ref.read(paymentDeepLinkCoordinatorProvider);
+    _payOsCallbackSub = coordinator.stream.listen(_handlePayOsCallbackEvent);
 
-      final hasPendingConsultationPayment =
-          _pendingPayOsTransactionId != null &&
-          _pendingPayOsTransactionId!.isNotEmpty;
-      final hasPendingWalletTopup =
-          _pendingWalletTopupTransactionId != null &&
-          _pendingWalletTopupTransactionId!.isNotEmpty;
+    final latest = coordinator.latestEvent;
+    if (latest != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handlePayOsCallbackEvent(latest);
+      });
+    }
+  }
 
-      if (!hasPendingConsultationPayment && !hasPendingWalletTopup) return;
+  Future<void> _handlePayOsCallbackEvent(PaymentDeepLinkEvent event) async {
+    if (!mounted || _lastHandledPayOsEventId == event.eventId) return;
+    _lastHandledPayOsEventId = event.eventId;
 
-      final isSnakeaidPaymentLink =
-          uri.scheme == 'snakeaid' && uri.host == 'payment';
-      final isHttpPayOsCallback =
-          (uri.scheme == 'https' || uri.scheme == 'http') &&
-          (uri.host.contains('snakeaid') || uri.host.contains('payos')) &&
-          (uri.path.contains('pay') ||
-              uri.path.contains('payment') ||
-              uri.path.contains('callback') ||
-              uri.path.contains('return') ||
-              uri.path.contains('cancel'));
+    final hasPendingConsultationPayment =
+        _pendingPayOsTransactionId != null &&
+        _pendingPayOsTransactionId!.isNotEmpty;
+    final hasPendingWalletTopup =
+        _pendingWalletTopupTransactionId != null &&
+        _pendingWalletTopupTransactionId!.isNotEmpty;
 
-      if (!isSnakeaidPaymentLink && !isHttpPayOsCallback) return;
+    if (!hasPendingConsultationPayment && !hasPendingWalletTopup) return;
+    if (_isHandlingPayOsCallback) return;
+    _isHandlingPayOsCallback = true;
 
-      if (_isHandlingPayOsCallback) return;
-      _isHandlingPayOsCallback = true;
-
-      try {
-        if (hasPendingConsultationPayment) {
-          await _handlePayOsCallbackUri(uri);
-        } else {
-          await _handleWalletTopupCallbackUri(uri);
-        }
-      } finally {
-        _isHandlingPayOsCallback = false;
+    try {
+      if (hasPendingConsultationPayment) {
+        await _handlePayOsCallbackUri(event.uri);
+      } else {
+        await _handleWalletTopupCallbackUri(event.uri);
       }
-    });
+    } finally {
+      _isHandlingPayOsCallback = false;
+    }
   }
 
   Future<void> _handleWalletTopupCallbackUri(Uri uri) async {
@@ -691,7 +687,7 @@ class _PaymentConfirmationScreenState
     }
 
     final checkoutUrl = (payment.checkoutUrl ?? '').toString();
-    final transactionId = (payment.transactionId ?? '').toString();
+    final transactionId = payment.transactionId.toString();
     if (checkoutUrl.isEmpty) {
       throw Exception('Thiếu checkoutUrl cho PayOS');
     }
