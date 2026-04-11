@@ -74,6 +74,7 @@ class _PaymentConfirmationScreenState
   bool _isHandlingPayOsCallback = false;
   bool _isShowingPaymentStatusDialog = false;
   int? _lastHandledPayOsEventId;
+  int? _pendingPayOsOrderCode;
   String? _pendingPayOsTransactionId;
   String? _pendingEmergencyRequestId;
   String? _pendingBookingId;
@@ -169,6 +170,11 @@ class _PaymentConfirmationScreenState
         _pendingWalletTopupTransactionId!.isNotEmpty;
 
     if (!hasPendingConsultationPayment && !hasPendingWalletTopup) return;
+    if (hasPendingConsultationPayment &&
+        _pendingPayOsOrderCode != null &&
+        event.orderCode != _pendingPayOsOrderCode) {
+      return;
+    }
     if (_isHandlingPayOsCallback) return;
     _isHandlingPayOsCallback = true;
 
@@ -262,6 +268,7 @@ class _PaymentConfirmationScreenState
     if (!isPaid) return;
 
     final txId = _pendingPayOsTransactionId;
+    final expectedOrderCode = _pendingPayOsOrderCode;
     if (txId == null || txId.isEmpty) {
       if (!mounted) return;
       setState(() {
@@ -285,16 +292,15 @@ class _PaymentConfirmationScreenState
     _showPaymentStatusDialog();
 
     try {
-      final repo = ref.read(consultationRepositoryProvider);
-      final confirmedPayment = await repo.confirmConsultationPayment(txId);
-      if (!confirmedPayment.isEscrowed) {
-        throw Exception(
-          'Thanh toán chưa hoàn tất (trạng thái: ${confirmedPayment.status})',
-        );
+      final confirmedPayment = await _confirmConsultationPayOs(
+        txId,
+        expectedOrderCode,
+      );
+      if (confirmedPayment == null) {
+        throw Exception('Không thể xác nhận thanh toán PayOS');
       }
 
       ref.invalidate(consultationBookingsProvider);
-
       final emergencyRequestId = _pendingEmergencyRequestId;
       final bookingId = _pendingBookingId;
       _clearPendingPayOsContext();
@@ -336,6 +342,43 @@ class _PaymentConfirmationScreenState
     }
   }
 
+  Future<ConsultationPaymentResponse?> _confirmConsultationPayOs(
+    String transactionId,
+    int? expectedOrderCode,
+  ) async {
+    final repo = ref.read(consultationRepositoryProvider);
+    const retryDelays = <Duration>[
+      Duration(milliseconds: 500),
+      Duration(seconds: 1),
+      Duration(seconds: 2),
+    ];
+
+    for (var attempt = 0; attempt <= retryDelays.length; attempt++) {
+      final confirmedPayment = await repo.confirmConsultationPayment(
+        transactionId,
+      );
+      final hasExternalTransactionId =
+          (confirmedPayment.externalTransactionId ?? '').trim().isNotEmpty;
+      final hasExpectedOrder = expectedOrderCode == null
+          ? true
+          : confirmedPayment.orderCode == expectedOrderCode;
+      final isConfirmed =
+          confirmedPayment.isEscrowed &&
+          hasExternalTransactionId &&
+          hasExpectedOrder;
+
+      if (isConfirmed) {
+        return confirmedPayment;
+      }
+
+      if (attempt < retryDelays.length) {
+        await Future<void>.delayed(retryDelays[attempt]);
+      }
+    }
+
+    return null;
+  }
+
   Future<void> _tryAutoFinalizePendingPayOs() async {
     final txId = _pendingPayOsTransactionId;
     if (!mounted || txId == null || txId.isEmpty) return;
@@ -344,11 +387,13 @@ class _PaymentConfirmationScreenState
     _isHandlingPayOsCallback = true;
     _showPaymentStatusDialog();
     try {
-      final repo = ref.read(consultationRepositoryProvider);
-      final confirmedPayment = await repo.confirmConsultationPayment(txId);
+      final confirmedPayment = await _confirmConsultationPayOs(
+        txId,
+        _pendingPayOsOrderCode,
+      );
 
       if (!mounted) return;
-      if (!confirmedPayment.isEscrowed) {
+      if (confirmedPayment == null) {
         // Keep pending context so user can return and retry confirm later.
         return;
       }
@@ -706,6 +751,7 @@ class _PaymentConfirmationScreenState
     }
 
     _pendingPayOsTransactionId = transactionId;
+    _pendingPayOsOrderCode = payment.orderCode;
     _pendingEmergencyRequestId = emergencyRequestId;
     _pendingBookingId = bookingId;
   }
