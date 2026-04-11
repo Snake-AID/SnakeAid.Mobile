@@ -4,12 +4,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:app_links/app_links.dart';
 import '../config/base_url_config.dart';
+import 'payment_deep_link_coordinator.dart';
 
 /// Handles deep links for the SnakeAid app.
 ///
 /// Supported deep links:
 /// - snakeaid://payment - Payment callback handling
-/// - snakeaid://config/baseurl?url=<URL> - Hot-patch BASE_URL (debug only)
+/// - `snakeaid://config/baseurl?url=<URL>` - Hot-patch BASE_URL (debug only)
 ///
 /// Usage examples:
 /// ```bash
@@ -24,7 +25,7 @@ import '../config/base_url_config.dart';
 class DeepLinkHandler {
   final BaseUrlConfig baseUrlConfig;
   final AppLinks _appLinks = AppLinks();
-  StreamSubscription<Uri?>? _deepLinkSub;
+  StreamSubscription<Uri>? _deepLinkSub;
 
   DeepLinkHandler(this.baseUrlConfig);
 
@@ -35,10 +36,12 @@ class DeepLinkHandler {
 
     // Listen to deep links while app is running
     _deepLinkSub = _appLinks.uriLinkStream.listen((uri) {
-      if (uri != null) {
-        debugPrint('🔗 [DeepLinkHandler] Received deep link: $uri');
-        _handleDeepLink(uri);
+      debugPrint('🔗 [DeepLinkHandler] Received deep link: $uri');
+      if (PaymentDeepLinkCoordinator.instance.tryPublish(uri)) {
+        debugPrint('💰 [DeepLinkHandler] Routed payment deep link globally');
+        return;
       }
+      _handleDeepLink(uri);
     });
 
     // Check for initial link (app was opened via deep link)
@@ -93,7 +96,7 @@ class DeepLinkHandler {
   }
 
   /// Handle BASE_URL configuration deep link
-  /// snakeaid://config/baseurl?url=<URL>
+  /// `snakeaid://config/baseurl?url=<URL>`
   void _handleBaseUrlConfig(Uri uri) {
     final newUrl = uri.queryParameters['url'];
 
