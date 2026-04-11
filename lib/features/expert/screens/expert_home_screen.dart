@@ -3229,8 +3229,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
       ' lúc ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
   String _formatFullDateTimePlus7(DateTime d) {
-    final localPlus7 = d.add(const Duration(hours: 7));
-    return _formatFullDateTime(localPlus7);
+    return _formatFullDateTime(d);
   }
 
   String _formatFee(int fee) {
@@ -3325,7 +3324,7 @@ class _IncomeTabState extends ConsumerState<_IncomeTab> {
       }
       final results = await ref.read(transactionRepositoryProvider).getTransactions(
             userId: userId,
-            transType: 'ExpertPayout',
+            transType: 'consultation',
             pageNumber: page,
             pageSize: _pageSize,
           );
@@ -3357,10 +3356,10 @@ class _IncomeTabState extends ConsumerState<_IncomeTab> {
       _filtered.fold(0.0, (sum, t) => sum + t.amount);
 
   String _formatAmount(double amount) {
-    if (amount >= 1000000) {
-      return '${(amount / 1000000).toStringAsFixed(1)}M';
-    }
-    return '${(amount / 1000).toStringAsFixed(0)}K';
+    return amount.toInt().toString().replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]}.',
+        );
   }
 
   String _formatDate(DateTime dt) =>

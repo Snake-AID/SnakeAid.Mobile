@@ -63,9 +63,7 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
   }
 
   String _formatDateTimePlus7(int ms) {
-    final dt = DateTime.fromMillisecondsSinceEpoch(
-      ms,
-    ).add(const Duration(hours: 7));
+    final dt = DateTime.fromMillisecondsSinceEpoch(ms);
     final d = dt.day.toString().padLeft(2, '0');
     final m = dt.month.toString().padLeft(2, '0');
     final h = dt.hour.toString().padLeft(2, '0');

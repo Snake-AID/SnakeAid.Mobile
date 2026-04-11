@@ -683,6 +683,14 @@ class _VideoConsultationScreenState
 
     if (!mounted) return;
 
+    // Always call backend to end consultation so settlement is triggered.
+    // endConsultation catches any error internally, so navigation always proceeds.
+    await ref
+        .read(consultationRepositoryProvider)
+        .endConsultation(widget.consultationId);
+
+    if (!mounted) return;
+
     if (widget.isExpertMode) {
       context.go(
         '/expert-consultation-complete',
