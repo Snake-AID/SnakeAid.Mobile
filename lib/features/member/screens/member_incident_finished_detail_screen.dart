@@ -10,6 +10,7 @@ import '../../../core/handlers/payment_deep_link_coordinator.dart';
 import '../../emergency/models/detailed_incident_response.dart';
 import '../../emergency/providers/detailed_incident_provider.dart';
 import '../../emergency/repository/incident_repository.dart';
+import '../../wallet/repository/transaction_repository.dart' as wallet_tx;
 import '../../wallet/repository/wallet_repository.dart';
 
 class MemberIncidentFinishedDetailScreen extends ConsumerStatefulWidget {
@@ -28,8 +29,10 @@ class MemberIncidentFinishedDetailScreen extends ConsumerStatefulWidget {
 class _MemberIncidentFinishedDetailScreenState
     extends ConsumerState<MemberIncidentFinishedDetailScreen> {
   bool _isProcessingPayment = false;
+  bool _isConfirmingPayOs = false;
   bool _hasPaid = false;
   int? _pendingPayOsOrderCode;
+  String? _pendingPayOsTransactionId;
   bool _isAwaitingPayOsReturn = false;
   int? _lastHandledDeepLinkEventId;
   StreamSubscription<PaymentDeepLinkEvent>? _deepLinkSub;
@@ -76,30 +79,19 @@ class _MemberIncidentFinishedDetailScreenState
   Future<void> _handlePaymentDeepLinkEvent(PaymentDeepLinkEvent event) async {
     if (!mounted || _lastHandledDeepLinkEventId == event.eventId) return;
     if (!_isAwaitingPayOsReturn && _pendingPayOsOrderCode == null) return;
-    if (_pendingPayOsOrderCode != null && event.orderCode != _pendingPayOsOrderCode) {
+    if (_pendingPayOsOrderCode != null &&
+        event.orderCode != _pendingPayOsOrderCode) {
       return;
     }
 
     _lastHandledDeepLinkEventId = event.eventId;
 
-    if (event.isSuccess && !event.isCancelled) {
-      setState(() {
-        _hasPaid = true;
-        _pendingPayOsOrderCode = null;
-        _isAwaitingPayOsReturn = false;
-      });
-      await ref.read(detailedIncidentProvider.notifier).refreshDetailedIncident();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Thanh toán PayOS thành công.')),
-      );
-      return;
-    }
-
     if (event.isCancelled) {
       setState(() {
         _pendingPayOsOrderCode = null;
+        _pendingPayOsTransactionId = null;
         _isAwaitingPayOsReturn = false;
+        _isConfirmingPayOs = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -110,14 +102,120 @@ class _MemberIncidentFinishedDetailScreenState
       return;
     }
 
-    setState(() => _isAwaitingPayOsReturn = false);
-    await ref.read(detailedIncidentProvider.notifier).refreshDetailedIncident();
+    await _confirmPendingPayOsPayment(event);
+  }
+
+  Future<void> _confirmPendingPayOsPayment(PaymentDeepLinkEvent event) async {
+    final transactionId = _pendingPayOsTransactionId;
+    if (transactionId == null || transactionId.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _isAwaitingPayOsReturn = false;
+        _isConfirmingPayOs = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Thiếu transactionId để xác nhận thanh toán.'),
+        ),
+      );
+      return;
+    }
+
     if (!mounted) return;
+    setState(() {
+      _isAwaitingPayOsReturn = true;
+      _isConfirmingPayOs = true;
+    });
+
+    final repo = ref.read(wallet_tx.transactionRepositoryProvider);
+    final expectedOrderCode = _pendingPayOsOrderCode ?? event.orderCode;
+    final expectedIncidentTag = expectedOrderCode == null
+        ? null
+        : 'INCIDENT-$expectedOrderCode';
+    const delays = <Duration>[
+      Duration(milliseconds: 500),
+      Duration(seconds: 1),
+      Duration(seconds: 2),
+    ];
+    final maxAttempts = delays.length + 1;
+
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      wallet_tx.TransactionInfo? tx;
+      try {
+        tx = await repo.getTransactionById(transactionId);
+      } catch (_) {
+        tx = null;
+      }
+
+      if (!mounted) return;
+
+      final isPayOs = (tx?.paymentMethod ?? '').toUpperCase() == 'PAYOS';
+      final isIncidentPayment =
+          (tx?.transactionType ?? '') == 'SnakebiteIncidentPayment';
+      final hasExternalId = (tx?.externalTransactionId ?? '').trim().isNotEmpty;
+      final hasExpectedDescription = expectedIncidentTag == null
+          ? true
+          : (tx?.description ?? '').contains(expectedIncidentTag);
+      final isConfirmed =
+          tx != null &&
+          isPayOs &&
+          isIncidentPayment &&
+          hasExternalId &&
+          hasExpectedDescription;
+
+      if (isConfirmed) {
+        setState(() {
+          _hasPaid = true;
+          _pendingPayOsOrderCode = null;
+          _pendingPayOsTransactionId = null;
+          _isAwaitingPayOsReturn = false;
+          _isConfirmingPayOs = false;
+        });
+
+        await ref
+            .read(detailedIncidentProvider.notifier)
+            .refreshDetailedIncident();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Thanh toán PayOS thành công.')),
+        );
+        return;
+      }
+
+      if (attempt < maxAttempts - 1) {
+        await Future<void>.delayed(delays[attempt]);
+      }
+    }
+
+    if (!mounted) return;
+    await ref.read(detailedIncidentProvider.notifier).refreshDetailedIncident();
+    final refreshedIncident = ref.read(detailedIncidentProvider).incident;
+    final completedFromIncident =
+        refreshedIncident?.status == IncidentStatus.completed;
+
+    setState(() {
+      _isAwaitingPayOsReturn = false;
+      _isConfirmingPayOs = false;
+      if (completedFromIncident) {
+        _hasPaid = true;
+        _pendingPayOsOrderCode = null;
+        _pendingPayOsTransactionId = null;
+      }
+    });
+
+    if (!mounted) return;
+    if (completedFromIncident) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Thanh toán PayOS thành công.')),
+      );
+      return;
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          event.reason == null
-              ? 'Thanh toán chưa được xác nhận. Vui lòng kiểm tra lại trạng thái.'
+          event.reason == null || event.reason!.isEmpty
+              ? 'Thanh toán đã quay lại app nhưng backend chưa xác nhận xong.'
               : 'Thanh toán chưa được xác nhận: ${event.reason}',
         ),
       ),
@@ -206,6 +304,7 @@ class _MemberIncidentFinishedDetailScreenState
 
       setState(() {
         _pendingPayOsOrderCode = paymentResponse.orderCode;
+        _pendingPayOsTransactionId = paymentResponse.transactionId;
         _isAwaitingPayOsReturn = true;
       });
 
@@ -232,7 +331,9 @@ class _MemberIncidentFinishedDetailScreenState
       if (mounted) {
         setState(() {
           _pendingPayOsOrderCode = null;
+          _pendingPayOsTransactionId = null;
           _isAwaitingPayOsReturn = false;
+          _isConfirmingPayOs = false;
         });
       }
       ScaffoldMessenger.of(context).showSnackBar(
@@ -350,90 +451,139 @@ class _MemberIncidentFinishedDetailScreenState
         bottomNavigationBar: showFooter
             ? SafeArea(child: _buildPaymentFooter(incident))
             : null,
-        body: detailedIncidentState.isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFF228B22)),
-              )
-            : detailedIncidentState.error != null
-            ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        size: 56,
-                        color: Color(0xFFDC3545),
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Không tải được dữ liệu sự cố.',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        detailedIncidentState.error!,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 14),
-                      ElevatedButton.icon(
-                        onPressed: () => ref
-                            .read(detailedIncidentProvider.notifier)
-                            .loadDetailedIncident(
-                              widget.incidentId,
-                              forceRefresh: true,
+        body: Stack(
+          children: [
+            detailedIncidentState.isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF228B22)),
+                  )
+                : detailedIncidentState.error != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            size: 56,
+                            color: Color(0xFFDC3545),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Không tải được dữ liệu sự cố.',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            detailedIncidentState.error!,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey,
                             ),
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Thử lại'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF228B22),
-                          foregroundColor: Colors.white,
-                        ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 14),
+                          ElevatedButton.icon(
+                            onPressed: () => ref
+                                .read(detailedIncidentProvider.notifier)
+                                .loadDetailedIncident(
+                                  widget.incidentId,
+                                  forceRefresh: true,
+                                ),
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Thử lại'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF228B22),
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
+                  )
+                : incident == null
+                ? const Center(child: Text('Không tìm thấy sự cố.'))
+                : RefreshIndicator(
+                    onRefresh: () async {
+                      await ref
+                          .read(detailedIncidentProvider.notifier)
+                          .loadDetailedIncident(
+                            widget.incidentId,
+                            forceRefresh: true,
+                          );
+                    },
+                    color: const Color(0xFF228B22),
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.only(
+                        top: 16,
+                        bottom: showFooter ? 80 : 32,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildStatusOverview(incident),
+                          const SizedBox(height: 16),
+                          _buildIncidentInfoCard(incident),
+                          const SizedBox(height: 16),
+                          _buildRescuerInfoCard(incident),
+                          const SizedBox(height: 16),
+                          _buildPaymentCard(incident),
+                          const SizedBox(height: 16),
+                          _buildMediaCard(incident),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              )
-            : incident == null
-            ? const Center(child: Text('Không tìm thấy sự cố.'))
-            : RefreshIndicator(
-                onRefresh: () async {
-                  await ref
-                      .read(detailedIncidentProvider.notifier)
-                      .loadDetailedIncident(
-                        widget.incidentId,
-                        forceRefresh: true,
-                      );
-                },
-                color: const Color(0xFF228B22),
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.only(
-                    top: 16,
-                    bottom: showFooter ? 80 : 32,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildStatusOverview(incident),
-                      const SizedBox(height: 16),
-                      _buildIncidentInfoCard(incident),
-                      const SizedBox(height: 16),
-                      _buildRescuerInfoCard(incident),
-                      const SizedBox(height: 16),
-                      _buildPaymentCard(incident),
-                      const SizedBox(height: 16),
-                      _buildMediaCard(incident),
-                      const SizedBox(height: 24),
-                    ],
+            if (_isAwaitingPayOsReturn || _isConfirmingPayOs)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withOpacity(0.45),
+                  child: Center(
+                    child: Container(
+                      width: 260,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const CircularProgressIndicator(
+                            color: Color(0xFF228B22),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Đang xác nhận thanh toán PayOS',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1F1F1F),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _isConfirmingPayOs
+                                ? 'Hệ thống đang kiểm tra giao dịch với máy chủ...'
+                                : 'Vui lòng chờ trong giây lát...',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF666666),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
+          ],
+        ),
       ),
     );
   }
@@ -1553,7 +1703,9 @@ class _MemberIncidentFinishedDetailScreenState
             style: TextStyle(
               fontSize: isTotal ? 16 : 13,
               fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,
-              color: isTotal ? const Color(0xFF2F65E0) : const Color(0xFF374151),
+              color: isTotal
+                  ? const Color(0xFF2F65E0)
+                  : const Color(0xFF374151),
             ),
           ),
         ),

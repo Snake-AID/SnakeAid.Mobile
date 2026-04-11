@@ -48,10 +48,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           timer.cancel();
           _progressDone = true;
           _tryNavigate();
-          // Safety fallback: if auth is still loading after 4s, go to role-selection
-          _fallbackTimer = Timer(const Duration(seconds: 4), () {
+          // Safety fallback: if auth is still loading after 10s, go to role-selection
+          _fallbackTimer = Timer(const Duration(seconds: 10), () {
             if (!_hasNavigated && mounted) {
-              debugPrint('⚠️ Splash fallback: auth still loading after timeout, forcing role-selection');
+              debugPrint(
+                '⚠️ Splash fallback: auth still loading after timeout, forcing role-selection',
+              );
               _hasNavigated = true;
               context.go('/role-selection');
             }
