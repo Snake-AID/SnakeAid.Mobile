@@ -18,11 +18,47 @@ import '../../notifications/providers/notification_inbox_provider.dart';
 
 /// Member Home Screen - Entry point with emergency-first design
 /// This is a content-only widget, Scaffold is provided by MainScaffold
-class MemberHomeScreen extends ConsumerWidget {
+class MemberHomeScreen extends ConsumerStatefulWidget {
   const MemberHomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MemberHomeScreen> createState() => _MemberHomeScreenState();
+}
+
+class _MemberHomeScreenState extends ConsumerState<MemberHomeScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Silently verify incident status on screen load
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _silentRefreshIncident();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _silentRefreshIncident();
+    }
+  }
+
+  void _silentRefreshIncident() {
+    final hasActive = ref.read(activeIncidentProvider).hasActiveIncident;
+    if (hasActive) {
+      ref.read(activeIncidentProvider.notifier).refreshIncident();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Watch active incident state
     final activeIncidentState = ref.watch(activeIncidentProvider);
     final hasActiveIncident = activeIncidentState.hasActiveIncident;

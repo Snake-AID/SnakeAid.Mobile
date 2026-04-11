@@ -176,8 +176,11 @@ class _MemberIncidentFinishedDetailScreenState
             .read(detailedIncidentProvider.notifier)
             .refreshDetailedIncident();
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Thanh toán PayOS thành công.')),
+        await _showPaymentSuccessDialog(
+          title: 'Thanh Toán Thành Công',
+          subtitle: 'Thanh toán qua PayOS đã được xác nhận.',
+          amount: tx.amount,
+          method: 'PayOS',
         );
         return;
       }
@@ -205,8 +208,13 @@ class _MemberIncidentFinishedDetailScreenState
 
     if (!mounted) return;
     if (completedFromIncident) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Thanh toán PayOS thành công.')),
+      await _showPaymentSuccessDialog(
+        title: 'Thanh Toán Thành Công',
+        subtitle: 'Thanh toán qua PayOS đã được xác nhận.',
+        amount: _getPaymentAmount(
+          ref.read(detailedIncidentProvider).incident!,
+        ),
+        method: 'PayOS',
       );
       return;
     }
@@ -224,6 +232,203 @@ class _MemberIncidentFinishedDetailScreenState
 
   String _formatCurrency(double value) {
     return NumberFormat.currency(locale: 'vi_VN', symbol: '₫').format(value);
+  }
+
+  Future<void> _showPaymentSuccessDialog({
+    required String title,
+    required String subtitle,
+    required double amount,
+    required String method,
+  }) async {
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ── Green top banner ──────────────────────────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF228B22), Color(0xFF2ecc71)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.check_rounded,
+                        color: Colors.white,
+                        size: 44,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.white70,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // ── Details ───────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0F9F0),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Số tiền',
+                            style: TextStyle(
+                                fontSize: 14, color: Color(0xFF666666)),
+                          ),
+                          Text(
+                            _formatCurrency(amount),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF228B22),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8F8F8),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.account_balance_wallet,
+                              size: 18, color: Color(0xFF228B22)),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Phương thức',
+                            style: TextStyle(
+                                fontSize: 13, color: Color(0xFF666666)),
+                          ),
+                          const Spacer(),
+                          Text(
+                            method,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF333333),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8F8F8),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.access_time,
+                              size: 18, color: Color(0xFF888888)),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Thời gian',
+                            style: TextStyle(
+                                fontSize: 13, color: Color(0xFF666666)),
+                          ),
+                          const Spacer(),
+                          Text(
+                            DateFormat('HH:mm — dd/MM/yyyy')
+                                .format(DateTime.now()),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF333333),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF228B22),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'Hoàn Tất',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   double _getPaymentAmount(DetailedIncidentData incident) {
@@ -251,8 +456,11 @@ class _MemberIncidentFinishedDetailScreenState
       if (paymentResponse.status.toLowerCase() == 'paid' ||
           paymentResponse.status.toLowerCase() == 'completed') {
         setState(() => _hasPaid = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đơn 0đ đã được hoàn tất thành công.')),
+        await _showPaymentSuccessDialog(
+          title: 'Hoàn Tất Thành Công',
+          subtitle: 'Đơn cứu hộ của bạn đã được xác nhận hoàn tất.',
+          amount: 0,
+          method: 'Miễn phí',
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -367,8 +575,11 @@ class _MemberIncidentFinishedDetailScreenState
 
       if (paymentResponse.status.toLowerCase() == 'paid') {
         setState(() => _hasPaid = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Thanh toán bằng ví thành công.')),
+        await _showPaymentSuccessDialog(
+          title: 'Thanh Toán Thành Công',
+          subtitle: 'Phí cứu hộ đã được thanh toán qua ví SnakeAidPay.',
+          amount: amount,
+          method: 'SnakeAidPay',
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(

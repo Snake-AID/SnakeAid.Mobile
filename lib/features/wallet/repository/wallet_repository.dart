@@ -125,7 +125,7 @@ class WalletRepository {
     }
   }
 
-  /// POST /api/wallet/payment
+  /// POST /api/snakecatching/payment/wallet
   /// [transactionType] is 'CatchingDeposit' (đợt 1) or 'CatchingPayment' (đợt 2)
   /// Returns the [transactionId] from the response for subsequent status checks.
   Future<String> payWithWallet({
@@ -136,12 +136,12 @@ class WalletRepository {
   }) async {
     try {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      debugPrint('💸 Wallet Payment: POST /api/wallet/payment');
+      debugPrint('💸 Wallet Payment: POST /api/snakecatching/payment/wallet');
       debugPrint('   requestId: $snakeCatchingRequestId | amount: $amount | type: $transactionType');
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       final response = await _httpService.post(
-        '/api/wallet/payment',
+        '/api/snakecatching/payment/wallet',
         data: {
           'snakeCatchingRequestId': snakeCatchingRequestId,
           'amount': amount.toInt(),
