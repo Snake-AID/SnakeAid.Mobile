@@ -1126,15 +1126,19 @@ DESIGN: Celebratory success screen, clear payment confirmation, transparent fee 
 ## Integration Points
 
 ### API Endpoints:
-- `GET /expert/consultation/request/{id}` - Get consultation request details
-- `POST /expert/consultation/accept` - Accept consultation
-- `POST /expert/consultation/decline` - Decline consultation
-- `GET /expert/consultation/session/{id}` - Get active session data
-- `POST /expert/consultation/notes` - Save consultation notes during session
-- `POST /expert/consultation/complete` - Submit post-consultation summary
-- `GET /expert/snake-database/search?q={query}` - Search snake species
-- `POST /expert/snake-database/verify` - Verify AI identification
-- `GET /expert/consultation/history` - Get past consultations
+- `GET /api/experts/me/consultations/scheduled` - Get expert's scheduled consultations
+- `POST /api/consultations/instant/{id}/accept` - Accept instant consultation request
+- `POST /api/consultations/instant/{id}/reject` - Reject instant consultation request
+- `POST /api/consultations/{id}/video-token` - Get LiveKit token before joining room
+- `POST /api/consultations/{id}/end` - End consultation session
+- `GET /api/users/me/consultations` - Get consultation history/list
+- `POST /api/consultations/{id}/reviews` - Create consultation review
+- `GET /api/consultations/{id}/reviews` - Get consultation review detail
+
+Terminology update (2026-04):
+- Scheduled flow uses `/api/consultations/scheduled/*`
+- Instant flow uses `/api/consultations/instant/*`
+- Created consultation actions use `/api/consultations/{id}/*`
 
 ### Real-time Features:
 - WebRTC for video/audio calls
@@ -1169,6 +1173,7 @@ DESIGN: Celebratory success screen, clear payment confirmation, transparent fee 
 ---
 
 ## Version History
+- **v1.2** - April 11, 2026: Aligned API terminology to scheduled/instant consultation endpoints
 - **v1.1** - December 15, 2025: Updated payment structure with 3 consultation types
 - **v1.0** - December 11, 2025: Initial consultation flow design (8 screens)
 

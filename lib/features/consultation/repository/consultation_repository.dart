@@ -396,9 +396,8 @@ class ConsultationRepository {
   Future<List<ConsultationBookingResponse>> getMyBookings() async {
     try {
       debugPrint('📋 Fetching my bookings');
-      final response = await httpService.get(
-        '/api/users/me/consultations/scheduled',
-      );
+      final response =
+          await httpService.get('/api/users/me/consultations/scheduled');
 
       final body = response.data as Map<String, dynamic>;
       if (body['is_success'] == true && body['data'] != null) {
@@ -1143,16 +1142,48 @@ class ConsultationRepository {
         query['type'] = type;
       }
 
-      final response = await httpService.get(
-        '/api/experts/me/consultations',
-        queryParameters: query,
-      );
+      Response<dynamic> response;
+      try {
+        response = await httpService.get(
+          '/api/experts/me/consultations',
+          queryParameters: query,
+        );
+      } on DioException catch (e) {
+        final statusCode = e.response?.statusCode;
+        if (statusCode == 404 || statusCode == 405) {
+          // Fallback for environments still serving scheduled/legacy endpoints.
+          try {
+            response =
+                await httpService.get('/api/experts/me/consultations/scheduled');
+          } on DioException catch (e2) {
+            final statusCode2 = e2.response?.statusCode;
+            if (statusCode2 == 404 || statusCode2 == 405) {
+              response =
+                  await httpService.get('/api/experts/me/consultation-bookings');
+            } else {
+              rethrow;
+            }
+          }
+        } else {
+          rethrow;
+        }
+      }
 
       final body = response.data as Map<String, dynamic>;
       if (body['is_success'] == true && body['data'] != null) {
-        final data = body['data'] as Map<String, dynamic>;
-        final items = (data['items'] as List<dynamic>? ?? const []);
-        return items.whereType<Map<String, dynamic>>().map((e) {
+        List<Map<String, dynamic>> items;
+        final data = body['data'];
+        if (data is Map<String, dynamic>) {
+          items = (data['items'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .toList();
+        } else if (data is List) {
+          items = data.whereType<Map<String, dynamic>>().toList();
+        } else {
+          return [];
+        }
+
+        return items.map((e) {
           final endpointType = (e['type'] ?? '').toString().toLowerCase();
           final endpointStatus = (e['status'] ?? '').toString().toLowerCase();
 
@@ -1164,6 +1195,9 @@ class ConsultationRepository {
             case 'cancelled':
             case 'canceled':
               normalizedStatus = 'Cancelled';
+              break;
+            case 'pendingpayment':
+              normalizedStatus = 'PendingPayment';
               break;
             case 'scheduled':
             case 'ongoing':
