@@ -124,6 +124,7 @@ class TransactionRepository {
   Future<List<TransactionInfo>> getTransactions({
     String? userId,
     String? transType,
+    String? referenceId,
     int pageNumber = 1,
     int pageSize = 20,
   }) async {
@@ -134,6 +135,7 @@ class TransactionRepository {
       };
       if (userId != null) params['UserId'] = userId;
       if (transType != null) params['TransType'] = transType;
+      if (referenceId != null) params['ReferenceId'] = referenceId;
 
       debugPrint(
           '💳 GET /api/transactions  page=$pageNumber size=$pageSize'

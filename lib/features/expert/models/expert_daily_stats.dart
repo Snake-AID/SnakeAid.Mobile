@@ -22,9 +22,9 @@ class ExpertStats {
       period: json['period'] as String? ?? '',
       from: json['from'] as String? ?? '',
       to: json['to'] as String? ?? '',
-      consultationRequests: json['consultationRequests'] as int? ?? 0,
-      completedConsultations: json['completedConsultations'] as int? ?? 0,
-      totalIncome: json['totalIncome'] as int? ?? 0,
+      consultationRequests: (json['consultationRequests'] as num?)?.toInt() ?? 0,
+      completedConsultations: (json['completedConsultations'] as num?)?.toInt() ?? 0,
+      totalIncome: (json['totalIncome'] as num?)?.toInt() ?? 0,
       currency: json['currency'] as String? ?? 'VND',
     );
   }
