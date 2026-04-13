@@ -228,6 +228,11 @@ class _HomeTabState extends ConsumerState<_HomeTab>
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnimation;
 
+  // Monthly stats local state (bypasses module-level FutureProvider caching issues)
+  ExpertStats? _monthlyStats;
+  bool _statsLoading = true;
+  String? _statsError;
+
   // Instant consultation request popup
   bool _showInstantRequest = false;
   bool _isInstantMinimized = true;
@@ -268,13 +273,42 @@ class _HomeTabState extends ConsumerState<_HomeTab>
     // Reload data mỗi khi vào màn hình
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.invalidate(_expertBookingsFutureProvider);
+      ref.invalidate(_expertDailyStatsProvider);
+      _loadStats();
     });
+  }
+
+  Future<void> _loadStats() async {
+    if (!mounted) return;
+    setState(() {
+      _statsLoading = true;
+      _statsError = null;
+    });
+    try {
+      final stats = await ref
+          .read(expertAnalyticsRepositoryProvider)
+          .getStatistics(period: 'month');
+      if (!mounted) return;
+      setState(() {
+        _monthlyStats = stats;
+        _statsLoading = false;
+      });
+    } catch (e) {
+      debugPrint('⚠️ Monthly stats error: $e');
+      if (!mounted) return;
+      setState(() {
+        _statsError = e.toString();
+        _statsLoading = false;
+      });
+    }
   }
 
   // Public method to reload data when tab is selected
   void reload() {
     if (mounted) {
       ref.invalidate(_expertBookingsFutureProvider);
+      ref.invalidate(_expertDailyStatsProvider);
+      _loadStats();
     }
   }
 
@@ -1339,7 +1373,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
   }
 
   Widget _buildEarningsCard() {
-    final statsAsync = ref.watch(_expertMonthlyStatsProvider);
+    final stats = _monthlyStats;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -1369,8 +1403,8 @@ class _HomeTabState extends ConsumerState<_HomeTab>
             ),
           ),
           const SizedBox(height: 8),
-          statsAsync.when(
-            loading: () => const SizedBox(
+          if (_statsLoading)
+            const SizedBox(
               height: 44,
               child: Center(
                 child: SizedBox(
@@ -1382,16 +1416,21 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                   ),
                 ),
               ),
-            ),
-            error: (_, __) => const Text(
-              '--',
-              style: TextStyle(
-                fontSize: 36,
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+            )
+          else if (stats == null)
+            GestureDetector(
+              onTap: _loadStats,
+              child: const Text(
+                '--',
+                style: TextStyle(
+                  fontSize: 36,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            data: (stats) => Row(
+            )
+          else
+            Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
@@ -1412,68 +1451,73 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                 ),
               ],
             ),
-          ),
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.only(top: 16),
             decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: Colors.white24, width: 1)),
             ),
-            child: statsAsync.when(
-              loading: () => const Row(
-                children: [
-                  Icon(Icons.check_circle_outline,
-                      color: Colors.white38, size: 18),
-                  SizedBox(width: 6),
-                  Text('— Tư Vấn Hoàn Thành',
-                      style: TextStyle(fontSize: 14, color: Colors.white38)),
-                  SizedBox(width: 16),
-                  SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 1.5, color: Colors.white38),
-                  ),
-                ],
-              ),
-              error: (_, __) => const Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.white38, size: 16),
-                  SizedBox(width: 6),
-                  Text('Không thể tải dữ liệu',
-                      style: TextStyle(fontSize: 13, color: Colors.white54)),
-                ],
-              ),
-              data: (stats) => Row(
-                children: [
-                  const Icon(Icons.check_circle_outline,
-                      color: Colors.white, size: 18),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${stats.completedConsultations} Tư Vấn Hoàn Thành',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Container(width: 1, height: 16, color: Colors.white30),
-                  const SizedBox(width: 16),
-                  const Icon(Icons.inbox_outlined,
-                      color: Colors.white70, size: 18),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${stats.consultationRequests} Yêu Cầu',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            child: _statsLoading
+                ? const Row(
+                    children: [
+                      Icon(Icons.check_circle_outline,
+                          color: Colors.white38, size: 18),
+                      SizedBox(width: 6),
+                      Text('— Tư Vấn Hoàn Thành',
+                          style:
+                              TextStyle(fontSize: 14, color: Colors.white38)),
+                      SizedBox(width: 16),
+                      SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 1.5, color: Colors.white38),
+                      ),
+                    ],
+                  )
+                : stats == null
+                    ? GestureDetector(
+                        onTap: _loadStats,
+                        child: const Row(
+                          children: [
+                            Icon(Icons.refresh,
+                                color: Colors.white54, size: 16),
+                            SizedBox(width: 6),
+                            Text('Nhấn để thử lại',
+                                style: TextStyle(
+                                    fontSize: 13, color: Colors.white54)),
+                          ],
+                        ),
+                      )
+                    : Row(
+                        children: [
+                          const Icon(Icons.check_circle_outline,
+                              color: Colors.white, size: 18),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${stats.completedConsultations} Tư Vấn Hoàn Thành',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Container(width: 1, height: 16, color: Colors.white30),
+                          const SizedBox(width: 16),
+                          const Icon(Icons.inbox_outlined,
+                              color: Colors.white70, size: 18),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${stats.consultationRequests} Yêu Cầu',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
           ),
         ],
       ),
@@ -1482,18 +1526,10 @@ class _HomeTabState extends ConsumerState<_HomeTab>
 
   /// Format income: 1500000 → "1.5M", 500000 → "500K", etc.
   String _formatIncome(int amount) {
-    if (amount >= 1000000) {
-      final m = amount / 1000000;
-      return m == m.truncateToDouble()
-          ? '${m.toInt()}M'
-          : '${m.toStringAsFixed(1)}M';
-    } else if (amount >= 1000) {
-      final k = amount / 1000;
-      return k == k.truncateToDouble()
-          ? '${k.toInt()}K'
-          : '${k.toStringAsFixed(1)}K';
-    }
-    return '$amount';
+    return amount.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
   }
 
   Widget _buildStatsGrid() {
@@ -3229,8 +3265,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
       ' lúc ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
   String _formatFullDateTimePlus7(DateTime d) {
-    final localPlus7 = d.add(const Duration(hours: 7));
-    return _formatFullDateTime(localPlus7);
+    return _formatFullDateTime(d);
   }
 
   String _formatFee(int fee) {
@@ -3325,7 +3360,7 @@ class _IncomeTabState extends ConsumerState<_IncomeTab> {
       }
       final results = await ref.read(transactionRepositoryProvider).getTransactions(
             userId: userId,
-            transType: 'ExpertPayout',
+            transType: 'consultation',
             pageNumber: page,
             pageSize: _pageSize,
           );
@@ -3357,10 +3392,10 @@ class _IncomeTabState extends ConsumerState<_IncomeTab> {
       _filtered.fold(0.0, (sum, t) => sum + t.amount);
 
   String _formatAmount(double amount) {
-    if (amount >= 1000000) {
-      return '${(amount / 1000000).toStringAsFixed(1)}M';
-    }
-    return '${(amount / 1000).toStringAsFixed(0)}K';
+    return amount.toInt().toString().replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]}.',
+        );
   }
 
   String _formatDate(DateTime dt) =>

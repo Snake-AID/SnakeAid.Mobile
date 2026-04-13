@@ -10,6 +10,7 @@ import '../../providers/expert_detail_provider.dart';
 import '../../providers/consultation_bookings_provider.dart';
 import '../../models/consultation_payment_response.dart';
 import '../../repository/consultation_repository.dart';
+import 'emergency_request_waiting_screen.dart';
 
 // Primary color constant
 const Color _primaryColor = Color(0xFF228B22);
@@ -311,12 +312,11 @@ class _PaymentConfirmationScreenState
       });
 
       if (emergencyRequestId != null && emergencyRequestId.isNotEmpty) {
-        context.go(
-          '/emergency-request-waiting/$emergencyRequestId',
-          extra: {
-            'expertId': widget.expertId,
-            'expertName': widget.expertName ?? 'Chuyên gia',
-          },
+        showEmergencyRequestModal(
+          context,
+          requestId: emergencyRequestId,
+          expertId: widget.expertId ?? '',
+          expertName: widget.expertName ?? 'Chuyên gia',
         );
       } else {
         context.go(
@@ -410,12 +410,11 @@ class _PaymentConfirmationScreenState
       });
 
       if (emergencyRequestId != null && emergencyRequestId.isNotEmpty) {
-        context.go(
-          '/emergency-request-waiting/$emergencyRequestId',
-          extra: {
-            'expertId': widget.expertId,
-            'expertName': widget.expertName ?? 'Chuyên gia',
-          },
+        showEmergencyRequestModal(
+          context,
+          requestId: emergencyRequestId,
+          expertId: widget.expertId ?? '',
+          expertName: widget.expertName ?? 'Chuyên gia',
         );
       } else {
         context.go(
@@ -647,12 +646,11 @@ class _PaymentConfirmationScreenState
 
         if (!mounted) return;
         setState(() => _isPaymentLoading = false);
-        context.go(
-          '/emergency-request-waiting/$resolvedRequestId',
-          extra: {
-            'expertId': widget.expertId,
-            'expertName': widget.expertName ?? 'Chuyên gia',
-          },
+        showEmergencyRequestModal(
+          context,
+          requestId: resolvedRequestId,
+          expertId: widget.expertId ?? '',
+          expertName: widget.expertName ?? 'Chuyên gia',
         );
       } catch (e) {
         if (!mounted) return;
@@ -1022,6 +1020,9 @@ class _PaymentConfirmationScreenState
     final number = int.tryParse(amount) ?? 0;
     return '${number.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} VNĐ';
   }
+
+  String _formatBalance(double balance) =>
+      _formatPrice(balance.toInt().toString());
 
   @override
   Widget build(BuildContext context) {
@@ -1624,6 +1625,46 @@ class _PaymentConfirmationScreenState
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
+                  ],
+                  if (method == PaymentMethod.snakeaidPay) ...[
+                    const SizedBox(height: 6),
+                    _isLoadingWallet
+                        ? SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.5,
+                              color: Colors.grey.shade400,
+                            ),
+                          )
+                        : Row(
+                            children: [
+                              Icon(
+                                Icons.account_balance_wallet_outlined,
+                                size: 13,
+                                color: _walletBalance != null &&
+                                        _walletBalance! >=
+                                            (int.tryParse(_getPriceAmount()) ?? 0)
+                                    ? _primaryColor
+                                    : Colors.red.shade400,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _walletBalance != null
+                                    ? 'Số dư: ${_formatBalance(_walletBalance!)}'
+                                    : 'Không thể tải số dư',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: _walletBalance != null &&
+                                          _walletBalance! >=
+                                              (int.tryParse(_getPriceAmount()) ?? 0)
+                                      ? _primaryColor
+                                      : Colors.red.shade400,
+                                ),
+                              ),
+                            ],
+                          ),
                   ],
                 ],
               ),
