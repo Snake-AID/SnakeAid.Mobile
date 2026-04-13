@@ -76,14 +76,10 @@ end fork
 :Xác nhận CatchingDeposit thành công;
 
 |Operator|
-:Nhận thông báo đơn mới;
-:Xem thông tin yêu cầu
-(địa điểm, loài rắn, ảnh);
-:Gọi xác nhận với khách hàng;
-:Cập nhật trạng thái
+:Nhận thông báo & xem thông tin đơn;
+:Gọi xác nhận với khách
 **[Status: Confirmed]**;
-:Chọn cứu hộ viên phù hợp;
-:Gán Rescuer vào đơn
+:Chọn & gán Rescuer vào đơn
 **[Status: Assigned]**;
 
 |SnakeAid System|
@@ -222,11 +218,8 @@ else (Sau)
 endif
 
 |Operator|
-:Nhận thông báo đơn mới;
-:Xem chi tiết đơn
-(địa điểm, loài rắn, ảnh, thông tin khách);
-:Gọi điện xác nhận với khách hàng;
-:Cập nhật
+:Nhận thông báo & xem chi tiết đơn;
+:Gọi xác nhận với khách
 **[Status: Confirmed]**;
 
 |SnakeAid System|
@@ -253,10 +246,7 @@ title GIAI ĐOẠN 2 - PHÂN CÔNG & DI CHUYỂN ĐẾN HIỆN TRƯỜNG
 |Operator|
 start
 note left: Đơn đang ở **[Confirmed]**
-:Xem danh sách cứu hộ viên
-đang online, gần khu vực;
-:Chọn cứu hộ viên phù hợp;
-:Gán Rescuer vào đơn;
+:Chọn & gán Rescuer phù hợp;
 
 |SnakeAid System|
 :Cập nhật đơn

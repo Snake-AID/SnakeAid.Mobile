@@ -1,19 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../features/wallet/repository/transaction_repository.dart';
 
 /// Chi tiết lịch tư vấn dành cho chuyên gia.
 /// Nhận dữ liệu qua [data] map (từ router extra).
-class ExpertConsultationDetailScreen extends StatelessWidget {
+class ExpertConsultationDetailScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> data;
 
   const ExpertConsultationDetailScreen({super.key, required this.data});
 
+  @override
+  ConsumerState<ExpertConsultationDetailScreen> createState() =>
+      _ExpertConsultationDetailScreenState();
+}
+
+class _ExpertConsultationDetailScreenState
+    extends ConsumerState<ExpertConsultationDetailScreen> {
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   static const _purple = Color(0xFF6C47C2);
   static const _darkPurple = Color(0xFF553C9A);
   static const _green = Color(0xFF28A745);
   static const _red = Color(0xFFDC3545);
+
+  Map<String, dynamic> get data => widget.data;
+
+  // Settlement state
+  bool _settlementLoading = false;
+  double? _platformFee;
+  double? _expertPayout;
 
   // status index: 0=waiting, 1=upcoming, 2=completed, 3=cancelled
   int get _statusIndex => (data['statusIndex'] as int?) ?? 1;
@@ -66,11 +82,53 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
     return _formatDateTime(ms);
   }
 
-  String _formatCurrency(int amount) {
-    if (amount >= 1000000) {
-      return '${(amount / 1000000).toStringAsFixed(1)}M ₫';
+  String _formatCurrency(num amount) {
+    final intVal = amount.toInt();
+    final formatted = intVal.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+    return '$formatted ₫';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isCompleted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadSettlement());
     }
-    return '${(amount / 1000).toStringAsFixed(0)}.000 ₫';
+  }
+
+  Future<void> _loadSettlement() async {
+    final consultationId =
+        (data['consultationId'] as String?) ?? (data['id'] as String?) ?? '';
+    if (consultationId.isEmpty) return;
+    if (!mounted) return;
+    setState(() => _settlementLoading = true);
+    try {
+      final txns = await ref
+          .read(transactionRepositoryProvider)
+          .getTransactions(referenceId: consultationId, pageSize: 10);
+      if (!mounted) return;
+      double? pf;
+      double? ep;
+      for (final t in txns) {
+        if (t.transactionType.toLowerCase() == 'platformfee') {
+          pf = t.amount;
+        } else if (t.transactionType.toLowerCase() == 'expertpayout') {
+          ep = t.amount;
+        }
+      }
+      setState(() {
+        _platformFee = pf;
+        _expertPayout = ep;
+        _settlementLoading = false;
+      });
+    } catch (e) {
+      debugPrint('⚠️ Settlement load error: $e');
+      if (!mounted) return;
+      setState(() => _settlementLoading = false);
+    }
   }
 
   // ── Build ──────────────────────────────────────────────────────────────────
@@ -87,7 +145,7 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
     final paymentDeadlineMs = data['paymentDeadline'] as int?;
     final slotStartMs = data['slotStartTime'] as int?;
     final slotEndMs = data['slotEndTime'] as int?;
-    final feeCost = (data['feeCost'] as int?) ?? 0;
+    final feeCost = (data['feeCost'] as num?)?.toInt() ?? 0;
     final rating = data['rating'] as double?;
     final durationSeconds = data['durationSeconds'] as int?;
     final durationMinutes = (data['durationMinutes'] as int?) ?? 45;
@@ -350,31 +408,114 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                 ],
 
-                // ── Rating (completed only) ─────────────────────────────────
-                if (_isCompleted && durationSeconds != null) ...[
+                // ── Settlement breakdown (completed only) ──────────────────
+                if (_isCompleted) ...[
                   _SectionCard(
-                    child: Row(
-                      children: [
-                        const Icon(Icons.check_circle, color: _green, size: 20),
-                        const SizedBox(width: 10),
-                        Text(
-                          'Thời Lượng Thực Tế: ${_fmtSec(durationSeconds!)}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF2D2D2D),
+                    label: 'PHÂN BỔ THANH TOÁN',
+                    child: _settlementLoading
+                        ? const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Color(0xFF6C47C2),
+                                ),
+                              ),
+                            ),
+                          )
+                        : Column(
+                            children: [
+                              _DetailRow(
+                                icon: Icons.receipt_long_outlined,
+                                label: 'Chi phí tư vấn',
+                                value: _formatCurrency(feeCost),
+                              ),
+                              if (_platformFee != null) ...[
+                                const _Divider(),
+                                _DetailRow(
+                                  icon: Icons.account_balance_outlined,
+                                  label: 'Phí nền tảng',
+                                  value: '- ${_formatCurrency(_platformFee!)}',
+                                  valueColor: _red,
+                                ),
+                              ],
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEAF7EE),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.savings_outlined,
+                                      size: 17,
+                                      color: Color(0xFF1D7A36),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Expanded(
+                                      flex: 2,
+                                      child: Text(
+                                        'Thực nhận',
+                                        style: TextStyle(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF1D7A36),
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 3,
+                                      child: Text(
+                                        _expertPayout != null
+                                            ? '+${_formatCurrency(_expertPayout!)}'
+                                            : (_platformFee != null
+                                                ? '+${_formatCurrency(feeCost - _platformFee!.toInt())}'
+                                                : '--'),
+                                        textAlign: TextAlign.right,
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF28A745),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (_platformFee == null && !_settlementLoading)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: GestureDetector(
+                                    onTap: _loadSettlement,
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: const [
+                                        Icon(Icons.refresh,
+                                            size: 14,
+                                            color: Color(0xFF999999)),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'Tải lại dữ liệu phân bổ',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Color(0xFF999999),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          '+${_formatCurrency(feeCost)}',
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: _green,
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
                   const SizedBox(height: 12),
                 ],
@@ -559,32 +700,39 @@ class _DetailRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 9),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(icon, size: 18, color: const Color(0xFF6C47C2)),
-          const SizedBox(width: 12),
+          Icon(icon, size: 17, color: const Color(0xFF8B6CC8)),
+          const SizedBox(width: 10),
           Expanded(
+            flex: 2,
             child: Text(
               label,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF666666)),
+              style: const TextStyle(fontSize: 13, color: Color(0xFF888888)),
             ),
           ),
-          trailing ??
-              Flexible(
-                child: Text(
-                  value,
-                  textAlign: TextAlign.right,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: valueBold ? FontWeight.bold : FontWeight.w500,
-                    color: valueColor ?? const Color(0xFF2D2D2D),
+          Expanded(
+            flex: 3,
+            child: trailing != null
+                ? Align(
+                    alignment: Alignment.centerRight,
+                    child: trailing!,
+                  )
+                : Text(
+                    value,
+                    textAlign: TextAlign.right,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight:
+                          valueBold ? FontWeight.w600 : FontWeight.w500,
+                      color: valueColor ?? const Color(0xFF2D2D2D),
+                    ),
                   ),
-                ),
-              ),
+          ),
         ],
       ),
     );

@@ -15,6 +15,7 @@ import '../../blog/models/blog_model.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../notifications/providers/notification_inbox_provider.dart';
 import '../../wallet/repository/transaction_repository.dart';
+import '../providers/ai_recognition_review_provider.dart';
 
 /// FutureProvider for today's expert statistics (used in stats grid).
 /// Not autoDispose so data is cached for the session (avoids re-spinner on tab switch).
@@ -232,6 +233,11 @@ class _HomeTabState extends ConsumerState<_HomeTab>
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnimation;
 
+  // Monthly stats local state (bypasses module-level FutureProvider caching issues)
+  ExpertStats? _monthlyStats;
+  bool _statsLoading = true;
+  String? _statsError;
+
   // Instant consultation request popup
   bool _showInstantRequest = false;
   bool _isInstantMinimized = true;
@@ -272,13 +278,42 @@ class _HomeTabState extends ConsumerState<_HomeTab>
     // Reload data mỗi khi vào màn hình
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.invalidate(_expertBookingsFutureProvider);
+      ref.invalidate(_expertDailyStatsProvider);
+      _loadStats();
     });
+  }
+
+  Future<void> _loadStats() async {
+    if (!mounted) return;
+    setState(() {
+      _statsLoading = true;
+      _statsError = null;
+    });
+    try {
+      final stats = await ref
+          .read(expertAnalyticsRepositoryProvider)
+          .getStatistics(period: 'month');
+      if (!mounted) return;
+      setState(() {
+        _monthlyStats = stats;
+        _statsLoading = false;
+      });
+    } catch (e) {
+      debugPrint('⚠️ Monthly stats error: $e');
+      if (!mounted) return;
+      setState(() {
+        _statsError = e.toString();
+        _statsLoading = false;
+      });
+    }
   }
 
   // Public method to reload data when tab is selected
   void reload() {
     if (mounted) {
       ref.invalidate(_expertBookingsFutureProvider);
+      ref.invalidate(_expertDailyStatsProvider);
+      _loadStats();
     }
   }
 
@@ -1343,7 +1378,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
   }
 
   Widget _buildEarningsCard() {
-    final statsAsync = ref.watch(_expertMonthlyStatsProvider);
+    final stats = _monthlyStats;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -1373,8 +1408,8 @@ class _HomeTabState extends ConsumerState<_HomeTab>
             ),
           ),
           const SizedBox(height: 8),
-          statsAsync.when(
-            loading: () => const SizedBox(
+          if (_statsLoading)
+            const SizedBox(
               height: 44,
               child: Center(
                 child: SizedBox(
@@ -1386,16 +1421,21 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                   ),
                 ),
               ),
-            ),
-            error: (_, __) => const Text(
-              '--',
-              style: TextStyle(
-                fontSize: 36,
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+            )
+          else if (stats == null)
+            GestureDetector(
+              onTap: _loadStats,
+              child: const Text(
+                '--',
+                style: TextStyle(
+                  fontSize: 36,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            data: (stats) => Row(
+            )
+          else
+            Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
@@ -1416,68 +1456,73 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                 ),
               ],
             ),
-          ),
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.only(top: 16),
             decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: Colors.white24, width: 1)),
             ),
-            child: statsAsync.when(
-              loading: () => const Row(
-                children: [
-                  Icon(Icons.check_circle_outline,
-                      color: Colors.white38, size: 18),
-                  SizedBox(width: 6),
-                  Text('— Tư Vấn Hoàn Thành',
-                      style: TextStyle(fontSize: 14, color: Colors.white38)),
-                  SizedBox(width: 16),
-                  SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 1.5, color: Colors.white38),
-                  ),
-                ],
-              ),
-              error: (_, __) => const Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.white38, size: 16),
-                  SizedBox(width: 6),
-                  Text('Không thể tải dữ liệu',
-                      style: TextStyle(fontSize: 13, color: Colors.white54)),
-                ],
-              ),
-              data: (stats) => Row(
-                children: [
-                  const Icon(Icons.check_circle_outline,
-                      color: Colors.white, size: 18),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${stats.completedConsultations} Tư Vấn Hoàn Thành',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Container(width: 1, height: 16, color: Colors.white30),
-                  const SizedBox(width: 16),
-                  const Icon(Icons.inbox_outlined,
-                      color: Colors.white70, size: 18),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${stats.consultationRequests} Yêu Cầu',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            child: _statsLoading
+                ? const Row(
+                    children: [
+                      Icon(Icons.check_circle_outline,
+                          color: Colors.white38, size: 18),
+                      SizedBox(width: 6),
+                      Text('— Tư Vấn Hoàn Thành',
+                          style:
+                              TextStyle(fontSize: 14, color: Colors.white38)),
+                      SizedBox(width: 16),
+                      SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 1.5, color: Colors.white38),
+                      ),
+                    ],
+                  )
+                : stats == null
+                    ? GestureDetector(
+                        onTap: _loadStats,
+                        child: const Row(
+                          children: [
+                            Icon(Icons.refresh,
+                                color: Colors.white54, size: 16),
+                            SizedBox(width: 6),
+                            Text('Nhấn để thử lại',
+                                style: TextStyle(
+                                    fontSize: 13, color: Colors.white54)),
+                          ],
+                        ),
+                      )
+                    : Row(
+                        children: [
+                          const Icon(Icons.check_circle_outline,
+                              color: Colors.white, size: 18),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${stats.completedConsultations} Tư Vấn Hoàn Thành',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Container(width: 1, height: 16, color: Colors.white30),
+                          const SizedBox(width: 16),
+                          const Icon(Icons.inbox_outlined,
+                              color: Colors.white70, size: 18),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${stats.consultationRequests} Yêu Cầu',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
           ),
         ],
       ),
@@ -1486,18 +1531,10 @@ class _HomeTabState extends ConsumerState<_HomeTab>
 
   /// Format income: 1500000 → "1.5M", 500000 → "500K", etc.
   String _formatIncome(int amount) {
-    if (amount >= 1000000) {
-      final m = amount / 1000000;
-      return m == m.truncateToDouble()
-          ? '${m.toInt()}M'
-          : '${m.toStringAsFixed(1)}M';
-    } else if (amount >= 1000) {
-      final k = amount / 1000;
-      return k == k.truncateToDouble()
-          ? '${k.toInt()}K'
-          : '${k.toStringAsFixed(1)}K';
-    }
-    return '$amount';
+    return amount.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
   }
 
   Widget _buildStatsGrid() {
@@ -1806,55 +1843,165 @@ class _HomeTabState extends ConsumerState<_HomeTab>
   Widget _buildSnakeLibrarySection(BuildContext context) {
     const primaryColor = Color(0xFF6C47C2);
     const accentColor = Color(0xFF9F7AEA);
+    const aiColor = Color(0xFF10B981);
+    final queueState = ref.watch(aiReviewQueueProvider);
+    final pendingCount = queueState.items.length;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Row(
-          children: [
-            Text(
-              'Thư Viện Loài Rắn',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: primaryColor,
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.manage_search,
+                    color: primaryColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Công Cụ Hỗ Trợ',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF131018),
+                      ),
+                    ),
+                    Text(
+                      'Tra cứu & kiểm duyệt nhận diện AI',
+                      style: TextStyle(
+                          fontSize: 12, color: Color(0xFF9CA3AF)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+          const Divider(height: 1, color: Color(0xFFF3F4F6)),
+          const SizedBox(height: 14),
+
+          // Row: Thư viện loài + Sơ cứu
+          Row(
+            children: [
+              Expanded(
+                child: _SnakeLibraryCard(
+                  icon: Icons.menu_book_outlined,
+                  title: 'Thư Viện Loài',
+                  subtitle: 'Nhận biết & phân loại',
+                  color: primaryColor,
+                  onTap: () => context.pushNamed('expert_snake_library'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _SnakeLibraryCard(
+                  icon: Icons.health_and_safety_outlined,
+                  title: 'Hướng Dẫn\nSơ Cứu',
+                  subtitle: 'Xử lý khi bị cắn',
+                  color: accentColor,
+                  onTap: () =>
+                      context.pushNamed('expert_snake_first_aid_guide'),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          // AI Recognition Review — full-width highlighted row
+          Material(
+            color: aiColor.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              onTap: () => context.pushNamed('expert_ai_review_queue'),
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: aiColor.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.document_scanner,
+                          color: aiColor, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Xem Xét AI Nhận Diện',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF131018),
+                            ),
+                          ),
+                          Text(
+                            'Kiểm duyệt ảnh độ tin cậy thấp',
+                            style: TextStyle(
+                                fontSize: 11, color: Color(0xFF6B7280)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (pendingCount > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: aiColor,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '$pendingCount chờ',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(width: 6),
+                    Icon(Icons.arrow_forward_ios,
+                        size: 13, color: aiColor.withOpacity(0.7)),
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Tra cứu loài rắn và hướng dẫn sơ cứu',
-          style: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            // Browse species
-            Expanded(
-              child: _SnakeLibraryCard(
-                icon: Icons.menu_book_outlined,
-                title: 'Thư Viện Loài',
-                subtitle: 'Nhận biết & phân loại',
-                color: primaryColor,
-                onTap: () => context.pushNamed('expert_snake_library'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // First aid guide
-            Expanded(
-              child: _SnakeLibraryCard(
-                icon: Icons.health_and_safety_outlined,
-                title: 'Hướng Dẫn\nSơ Cứu',
-                subtitle: 'Xử lý khi bị cắn',
-                color: accentColor,
-                onTap: () =>
-                    context.pushNamed('expert_snake_first_aid_guide'),
-              ),
-            ),
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -3123,6 +3270,10 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}'
       ' lúc ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
+  String _formatFullDateTimePlus7(DateTime d) {
+    return _formatFullDateTime(d);
+  }
+
   String _formatFee(int fee) {
     final formatted = fee.toString().replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
@@ -3215,7 +3366,7 @@ class _IncomeTabState extends ConsumerState<_IncomeTab> {
       }
       final results = await ref.read(transactionRepositoryProvider).getTransactions(
             userId: userId,
-            transType: 'ExpertPayout',
+            transType: 'consultation',
             pageNumber: page,
             pageSize: _pageSize,
           );
@@ -3247,10 +3398,10 @@ class _IncomeTabState extends ConsumerState<_IncomeTab> {
       _filtered.fold(0.0, (sum, t) => sum + t.amount);
 
   String _formatAmount(double amount) {
-    if (amount >= 1000000) {
-      return '${(amount / 1000000).toStringAsFixed(1)}M';
-    }
-    return '${(amount / 1000).toStringAsFixed(0)}K';
+    return amount.toInt().toString().replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]}.',
+        );
   }
 
   String _formatDate(DateTime dt) =>

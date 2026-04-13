@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/handlers/payment_deep_link_coordinator.dart';
 import '../../snake_catching/repository/snake_catching_repository.dart';
 import '../../snake_catching/repository/snake_species_repository.dart';
 import '../../snake_catching/repository/payos_repository.dart';
@@ -70,7 +70,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   final GlobalKey _paymentCardKey = GlobalKey();
 
   // Deep link
-  StreamSubscription<Uri>? _deepLinkSub;
+  StreamSubscription<PaymentDeepLinkEvent>? _deepLinkSub;
+  int? _lastHandledDeepLinkEventId;
 
   @override
   void initState() {
@@ -96,33 +97,32 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   /// Listen for PayOS callback deep link
   /// Handles both snakeaid://payment/return and https://snakeaid-dev.duykhiem.id.vn/payos/return
   void _initDeepLinks() {
-    final appLinks = AppLinks();
-    _deepLinkSub = appLinks.uriLinkStream.listen((uri) {
-      if (!mounted) return;
-      final isSnakeaidScheme = uri.scheme == 'snakeaid' && uri.host == 'payment';
-      final isHttpsCallback = uri.host == 'snakeaid-dev.duykhiem.id.vn' &&
-          uri.path.startsWith('/payos/');
+    final coordinator = ref.read(paymentDeepLinkCoordinatorProvider);
+    _deepLinkSub = coordinator.stream.listen(_handlePaymentDeepLinkEvent);
 
-      if (isSnakeaidScheme || isHttpsCallback) {
-        final status = uri.queryParameters['status'];
-        final cancel = uri.queryParameters['cancel'];
-        final isSuccess = status?.toUpperCase() == 'PAID' ||
-            uri.path.endsWith('/return');
-        final isCancelled = cancel == 'true' || uri.path.endsWith('/cancel');
+    final latest = coordinator.latestEvent;
+    if (latest != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handlePaymentDeepLinkEvent(latest);
+      });
+    }
+  }
 
-        if (isSuccess && !isCancelled) {
-          _checkPaymentStatus();
-          _checkFinalPaymentStatus();
-        } else if (isCancelled) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Bạn đã hủy thanh toán. Vui lòng thử lại khi cần.'),
-              backgroundColor: Color(0xFFFF8F00),
-            ),
-          );
-        }
-      }
-    });
+  void _handlePaymentDeepLinkEvent(PaymentDeepLinkEvent event) {
+    if (!mounted || _lastHandledDeepLinkEventId == event.eventId) return;
+    _lastHandledDeepLinkEventId = event.eventId;
+
+    if (event.isSuccess && !event.isCancelled) {
+      _checkPaymentStatus();
+      _checkFinalPaymentStatus();
+    } else if (event.isCancelled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bạn đã hủy thanh toán. Vui lòng thử lại khi cần.'),
+          backgroundColor: Color(0xFFFF8F00),
+        ),
+      );
+    }
   }
 
   /// Smoothly scrolls to the payment card after the frame is rendered.

@@ -1,10 +1,10 @@
 ﻿import 'dart:async';
-import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/handlers/payment_deep_link_coordinator.dart';
 import '../../wallet/repository/wallet_repository.dart';
 
 /// Deposit Money Screen — top up the SnakeAidPay wallet via PayOS.
@@ -28,7 +28,8 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
   static const _kPrefTxId = 'topup_pending_transaction_id';
   static const _kPrefUrl  = 'topup_pending_checkout_url';
 
-  StreamSubscription<Uri>? _deepLinkSub;
+  StreamSubscription<PaymentDeepLinkEvent>? _deepLinkSub;
+  int? _lastHandledDeepLinkEventId;
 
   static const List<int> _quickAmounts = [
     50000, 100000, 200000, 500000, 1000000, 2000000,
@@ -84,23 +85,34 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
   }
 
   void _initDeepLinks() {
-    final appLinks = AppLinks();
-    _deepLinkSub = appLinks.uriLinkStream.listen((uri) async {
-      if (!mounted) return;
-      final isReturn = (uri.scheme == 'snakeaid' && uri.host == 'payment') ||
-          (uri.host == 'snakeaid-dev.duykhiem.id.vn' && uri.path.startsWith('/payos'));
-      if (isReturn) {
-        final success = uri.queryParameters['status'] != 'CANCELLED';
-        if (success && _pendingTransactionId != null) {
-          await ref.read(walletRepositoryProvider).confirmPayment(
-            transactionId: _pendingTransactionId!,
-          );
-          await _clearPendingTopup();
-        }
-        await _loadWallet();
-        _showResultDialog(success: success);
-      }
-    });
+    final coordinator = ref.read(paymentDeepLinkCoordinatorProvider);
+    _deepLinkSub = coordinator.stream.listen(_handleDeepLinkEvent);
+
+    final latest = coordinator.latestEvent;
+    if (latest != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleDeepLinkEvent(latest);
+      });
+    }
+  }
+
+  Future<void> _handleDeepLinkEvent(PaymentDeepLinkEvent event) async {
+    if (!mounted || _lastHandledDeepLinkEventId == event.eventId) return;
+    _lastHandledDeepLinkEventId = event.eventId;
+
+    final success = event.isSuccess && !event.isCancelled;
+    if (success && _pendingTransactionId != null) {
+      await ref.read(walletRepositoryProvider).confirmPayment(
+        transactionId: _pendingTransactionId!,
+      );
+      await _clearPendingTopup();
+    } else if (event.isCancelled) {
+      await _clearPendingTopup();
+    }
+
+    await _loadWallet();
+    if (!mounted) return;
+    _showResultDialog(success: success);
   }
 
   Future<void> _onDeposit() async {

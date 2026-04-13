@@ -1,12 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/handlers/payment_deep_link_coordinator.dart';
 import '../../emergency/models/detailed_incident_response.dart';
 import '../../emergency/providers/detailed_incident_provider.dart';
 import '../../emergency/repository/incident_repository.dart';
+import '../../wallet/repository/transaction_repository.dart' as wallet_tx;
 import '../../wallet/repository/wallet_repository.dart';
 
 class MemberIncidentFinishedDetailScreen extends ConsumerStatefulWidget {
@@ -25,7 +29,13 @@ class MemberIncidentFinishedDetailScreen extends ConsumerStatefulWidget {
 class _MemberIncidentFinishedDetailScreenState
     extends ConsumerState<MemberIncidentFinishedDetailScreen> {
   bool _isProcessingPayment = false;
+  bool _isConfirmingPayOs = false;
   bool _hasPaid = false;
+  int? _pendingPayOsOrderCode;
+  String? _pendingPayOsTransactionId;
+  bool _isAwaitingPayOsReturn = false;
+  int? _lastHandledDeepLinkEventId;
+  StreamSubscription<PaymentDeepLinkEvent>? _deepLinkSub;
 
   void _handleBackNavigation() {
     if (Navigator.of(context).canPop()) {
@@ -38,6 +48,7 @@ class _MemberIncidentFinishedDetailScreenState
   @override
   void initState() {
     super.initState();
+    _initDeepLinks();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.incidentId.isNotEmpty) {
         ref
@@ -47,8 +58,377 @@ class _MemberIncidentFinishedDetailScreenState
     });
   }
 
+  @override
+  void dispose() {
+    _deepLinkSub?.cancel();
+    super.dispose();
+  }
+
+  void _initDeepLinks() {
+    final coordinator = ref.read(paymentDeepLinkCoordinatorProvider);
+    _deepLinkSub = coordinator.stream.listen(_handlePaymentDeepLinkEvent);
+
+    final latest = coordinator.latestEvent;
+    if (latest != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handlePaymentDeepLinkEvent(latest);
+      });
+    }
+  }
+
+  Future<void> _handlePaymentDeepLinkEvent(PaymentDeepLinkEvent event) async {
+    if (!mounted || _lastHandledDeepLinkEventId == event.eventId) return;
+    if (!_isAwaitingPayOsReturn && _pendingPayOsOrderCode == null) return;
+    if (_pendingPayOsOrderCode != null &&
+        event.orderCode != _pendingPayOsOrderCode) {
+      return;
+    }
+
+    _lastHandledDeepLinkEventId = event.eventId;
+
+    if (event.isCancelled) {
+      setState(() {
+        _pendingPayOsOrderCode = null;
+        _pendingPayOsTransactionId = null;
+        _isAwaitingPayOsReturn = false;
+        _isConfirmingPayOs = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bạn đã hủy thanh toán PayOS.'),
+          backgroundColor: Color(0xFFFF8F00),
+        ),
+      );
+      return;
+    }
+
+    await _confirmPendingPayOsPayment(event);
+  }
+
+  Future<void> _confirmPendingPayOsPayment(PaymentDeepLinkEvent event) async {
+    final transactionId = _pendingPayOsTransactionId;
+    if (transactionId == null || transactionId.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _isAwaitingPayOsReturn = false;
+        _isConfirmingPayOs = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Thiếu transactionId để xác nhận thanh toán.'),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isAwaitingPayOsReturn = true;
+      _isConfirmingPayOs = true;
+    });
+
+    final repo = ref.read(wallet_tx.transactionRepositoryProvider);
+    final expectedOrderCode = _pendingPayOsOrderCode ?? event.orderCode;
+    final expectedIncidentTag = expectedOrderCode == null
+        ? null
+        : 'INCIDENT-$expectedOrderCode';
+    const delays = <Duration>[
+      Duration(milliseconds: 500),
+      Duration(seconds: 1),
+      Duration(seconds: 2),
+    ];
+    final maxAttempts = delays.length + 1;
+
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      wallet_tx.TransactionInfo? tx;
+      try {
+        tx = await repo.getTransactionById(transactionId);
+      } catch (_) {
+        tx = null;
+      }
+
+      if (!mounted) return;
+
+      final isPayOs = (tx?.paymentMethod ?? '').toUpperCase() == 'PAYOS';
+      final isIncidentPayment =
+          (tx?.transactionType ?? '') == 'SnakebiteIncidentPayment';
+      final hasExternalId = (tx?.externalTransactionId ?? '').trim().isNotEmpty;
+      final hasExpectedDescription = expectedIncidentTag == null
+          ? true
+          : (tx?.description ?? '').contains(expectedIncidentTag);
+      final isConfirmed =
+          tx != null &&
+          isPayOs &&
+          isIncidentPayment &&
+          hasExternalId &&
+          hasExpectedDescription;
+
+      if (isConfirmed) {
+        setState(() {
+          _hasPaid = true;
+          _pendingPayOsOrderCode = null;
+          _pendingPayOsTransactionId = null;
+          _isAwaitingPayOsReturn = false;
+          _isConfirmingPayOs = false;
+        });
+
+        await ref
+            .read(detailedIncidentProvider.notifier)
+            .refreshDetailedIncident();
+        if (!mounted) return;
+        await _showPaymentSuccessDialog(
+          title: 'Thanh Toán Thành Công',
+          subtitle: 'Thanh toán qua PayOS đã được xác nhận.',
+          amount: tx.amount,
+          method: 'PayOS',
+        );
+        return;
+      }
+
+      if (attempt < maxAttempts - 1) {
+        await Future<void>.delayed(delays[attempt]);
+      }
+    }
+
+    if (!mounted) return;
+    await ref.read(detailedIncidentProvider.notifier).refreshDetailedIncident();
+    final refreshedIncident = ref.read(detailedIncidentProvider).incident;
+    final completedFromIncident =
+        refreshedIncident?.status == IncidentStatus.completed;
+
+    setState(() {
+      _isAwaitingPayOsReturn = false;
+      _isConfirmingPayOs = false;
+      if (completedFromIncident) {
+        _hasPaid = true;
+        _pendingPayOsOrderCode = null;
+        _pendingPayOsTransactionId = null;
+      }
+    });
+
+    if (!mounted) return;
+    if (completedFromIncident) {
+      await _showPaymentSuccessDialog(
+        title: 'Thanh Toán Thành Công',
+        subtitle: 'Thanh toán qua PayOS đã được xác nhận.',
+        amount: _getPaymentAmount(
+          ref.read(detailedIncidentProvider).incident!,
+        ),
+        method: 'PayOS',
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          event.reason == null || event.reason!.isEmpty
+              ? 'Thanh toán đã quay lại app nhưng backend chưa xác nhận xong.'
+              : 'Thanh toán chưa được xác nhận: ${event.reason}',
+        ),
+      ),
+    );
+  }
+
   String _formatCurrency(double value) {
     return NumberFormat.currency(locale: 'vi_VN', symbol: '₫').format(value);
+  }
+
+  Future<void> _showPaymentSuccessDialog({
+    required String title,
+    required String subtitle,
+    required double amount,
+    required String method,
+  }) async {
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ── Green top banner ──────────────────────────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF228B22), Color(0xFF2ecc71)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.check_rounded,
+                        color: Colors.white,
+                        size: 44,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.white70,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // ── Details ───────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0F9F0),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Số tiền',
+                            style: TextStyle(
+                                fontSize: 14, color: Color(0xFF666666)),
+                          ),
+                          Text(
+                            _formatCurrency(amount),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF228B22),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8F8F8),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.account_balance_wallet,
+                              size: 18, color: Color(0xFF228B22)),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Phương thức',
+                            style: TextStyle(
+                                fontSize: 13, color: Color(0xFF666666)),
+                          ),
+                          const Spacer(),
+                          Text(
+                            method,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF333333),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8F8F8),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.access_time,
+                              size: 18, color: Color(0xFF888888)),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Thời gian',
+                            style: TextStyle(
+                                fontSize: 13, color: Color(0xFF666666)),
+                          ),
+                          const Spacer(),
+                          Text(
+                            DateFormat('HH:mm — dd/MM/yyyy')
+                                .format(DateTime.now()),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF333333),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF228B22),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'Hoàn Tất',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   double _getPaymentAmount(DetailedIncidentData incident) {
@@ -76,8 +456,11 @@ class _MemberIncidentFinishedDetailScreenState
       if (paymentResponse.status.toLowerCase() == 'paid' ||
           paymentResponse.status.toLowerCase() == 'completed') {
         setState(() => _hasPaid = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đơn 0đ đã được hoàn tất thành công.')),
+        await _showPaymentSuccessDialog(
+          title: 'Hoàn Tất Thành Công',
+          subtitle: 'Đơn cứu hộ của bạn đã được xác nhận hoàn tất.',
+          amount: 0,
+          method: 'Miễn phí',
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -127,6 +510,12 @@ class _MemberIncidentFinishedDetailScreenState
             description: 'Thanh toán phí cứu hộ',
           );
 
+      setState(() {
+        _pendingPayOsOrderCode = paymentResponse.orderCode;
+        _pendingPayOsTransactionId = paymentResponse.transactionId;
+        _isAwaitingPayOsReturn = true;
+      });
+
       if (paymentResponse.checkoutUrl != null &&
           paymentResponse.checkoutUrl!.isNotEmpty) {
         final uri = Uri.tryParse(paymentResponse.checkoutUrl!);
@@ -147,6 +536,14 @@ class _MemberIncidentFinishedDetailScreenState
           .read(detailedIncidentProvider.notifier)
           .refreshDetailedIncident();
     } catch (e) {
+      if (mounted) {
+        setState(() {
+          _pendingPayOsOrderCode = null;
+          _pendingPayOsTransactionId = null;
+          _isAwaitingPayOsReturn = false;
+          _isConfirmingPayOs = false;
+        });
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('PayOS payment thất bại: ${e.toString()}')),
       );
@@ -178,8 +575,11 @@ class _MemberIncidentFinishedDetailScreenState
 
       if (paymentResponse.status.toLowerCase() == 'paid') {
         setState(() => _hasPaid = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Thanh toán bằng ví thành công.')),
+        await _showPaymentSuccessDialog(
+          title: 'Thanh Toán Thành Công',
+          subtitle: 'Phí cứu hộ đã được thanh toán qua ví SnakeAidPay.',
+          amount: amount,
+          method: 'SnakeAidPay',
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -262,90 +662,139 @@ class _MemberIncidentFinishedDetailScreenState
         bottomNavigationBar: showFooter
             ? SafeArea(child: _buildPaymentFooter(incident))
             : null,
-        body: detailedIncidentState.isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFF228B22)),
-              )
-            : detailedIncidentState.error != null
-            ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        size: 56,
-                        color: Color(0xFFDC3545),
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Không tải được dữ liệu sự cố.',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        detailedIncidentState.error!,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 14),
-                      ElevatedButton.icon(
-                        onPressed: () => ref
-                            .read(detailedIncidentProvider.notifier)
-                            .loadDetailedIncident(
-                              widget.incidentId,
-                              forceRefresh: true,
+        body: Stack(
+          children: [
+            detailedIncidentState.isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF228B22)),
+                  )
+                : detailedIncidentState.error != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            size: 56,
+                            color: Color(0xFFDC3545),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Không tải được dữ liệu sự cố.',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            detailedIncidentState.error!,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey,
                             ),
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Thử lại'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF228B22),
-                          foregroundColor: Colors.white,
-                        ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 14),
+                          ElevatedButton.icon(
+                            onPressed: () => ref
+                                .read(detailedIncidentProvider.notifier)
+                                .loadDetailedIncident(
+                                  widget.incidentId,
+                                  forceRefresh: true,
+                                ),
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Thử lại'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF228B22),
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
+                  )
+                : incident == null
+                ? const Center(child: Text('Không tìm thấy sự cố.'))
+                : RefreshIndicator(
+                    onRefresh: () async {
+                      await ref
+                          .read(detailedIncidentProvider.notifier)
+                          .loadDetailedIncident(
+                            widget.incidentId,
+                            forceRefresh: true,
+                          );
+                    },
+                    color: const Color(0xFF228B22),
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.only(
+                        top: 16,
+                        bottom: showFooter ? 80 : 32,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildStatusOverview(incident),
+                          const SizedBox(height: 16),
+                          _buildIncidentInfoCard(incident),
+                          const SizedBox(height: 16),
+                          _buildRescuerInfoCard(incident),
+                          const SizedBox(height: 16),
+                          _buildPaymentCard(incident),
+                          const SizedBox(height: 16),
+                          _buildMediaCard(incident),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              )
-            : incident == null
-            ? const Center(child: Text('Không tìm thấy sự cố.'))
-            : RefreshIndicator(
-                onRefresh: () async {
-                  await ref
-                      .read(detailedIncidentProvider.notifier)
-                      .loadDetailedIncident(
-                        widget.incidentId,
-                        forceRefresh: true,
-                      );
-                },
-                color: const Color(0xFF228B22),
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.only(
-                    top: 16,
-                    bottom: showFooter ? 80 : 32,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildStatusOverview(incident),
-                      const SizedBox(height: 16),
-                      _buildIncidentInfoCard(incident),
-                      const SizedBox(height: 16),
-                      _buildRescuerInfoCard(incident),
-                      const SizedBox(height: 16),
-                      _buildPaymentCard(incident),
-                      const SizedBox(height: 16),
-                      _buildMediaCard(incident),
-                      const SizedBox(height: 24),
-                    ],
+            if (_isAwaitingPayOsReturn || _isConfirmingPayOs)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withOpacity(0.45),
+                  child: Center(
+                    child: Container(
+                      width: 260,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const CircularProgressIndicator(
+                            color: Color(0xFF228B22),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Đang xác nhận thanh toán PayOS',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1F1F1F),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _isConfirmingPayOs
+                                ? 'Hệ thống đang kiểm tra giao dịch với máy chủ...'
+                                : 'Vui lòng chờ trong giây lát...',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF666666),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
+          ],
+        ),
       ),
     );
   }
@@ -1465,7 +1914,9 @@ class _MemberIncidentFinishedDetailScreenState
             style: TextStyle(
               fontSize: isTotal ? 16 : 13,
               fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,
-              color: isTotal ? const Color(0xFF2F65E0) : const Color(0xFF374151),
+              color: isTotal
+                  ? const Color(0xFF2F65E0)
+                  : const Color(0xFF374151),
             ),
           ),
         ),

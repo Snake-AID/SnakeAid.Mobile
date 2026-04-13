@@ -207,18 +207,6 @@ class _ConsultationWaitingRoomScreenState
     }
   }
 
-  void _confirmComplete() {
-    context.go(
-      '/consultation-complete',
-      extra: {
-        'expertName': widget.expertName,
-        'expertSpecialty': widget.expertSpecialty,
-        'durationSeconds': widget.durationSeconds,
-        'consultationId': widget.consultationId,
-      },
-    );
-  }
-
   void _cancelCall() {
     context.go('/consultation-home');
   }
