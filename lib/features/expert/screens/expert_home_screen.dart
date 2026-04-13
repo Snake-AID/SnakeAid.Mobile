@@ -44,15 +44,20 @@ final _expertBookingsFutureProvider =
 _ExpertConsultation _bookingToExpertConsultation(
   ConsultationBookingResponse b,
 ) {
-  // now dùng UTC+7 để khớp với giờ VN wall-clock của backend
-  final now = DateTime.now().toUtc().add(const Duration(hours: 7));
-  final scheduled = b.slotStartTime ?? b.scheduledTime;
-  // Chuẩn hoá scheduled về cùng kiểu UTC (Đây là VN wall-clock được tag +00)
-  final scheduledVn = scheduled.toUtc();
+  DateTime toVn(DateTime value) => value.add(const Duration(hours: 7));
+
+  final now = DateTime.now();
+  final scheduled = toVn(b.slotStartTime ?? b.scheduledTime);
+  final slotStartTime = b.slotStartTime != null ? toVn(b.slotStartTime!) : null;
+  final slotEndTime = b.slotEndTime != null ? toVn(b.slotEndTime!) : null;
+  final bookedAt = b.bookedAt != null ? toVn(b.bookedAt!) : null;
+  final paymentDeadline =
+      b.paymentDeadline != null ? toVn(b.paymentDeadline!) : null;
+
   final _ExpertConsultationStatus status;
   switch (b.status) {
     case ConsultationBookingStatus.confirmed:
-      final diff = scheduledVn.difference(now);
+      final diff = scheduled.difference(now);
       // Chỉ hiện "Đến giờ" khi trong vòng 15 phút trước giờ hẹn
       status = diff.inMinutes <= 15
           ? _ExpertConsultationStatus.waiting
@@ -74,21 +79,21 @@ _ExpertConsultation _bookingToExpertConsultation(
     patientName: b.userName ?? 'Bệnh nhân',
     patientPhone: '',
     consultationType: b.consultationType == 'Instant' ? 'Khẩn Cấp' : 'Đặt Lịch',
-    snakeSuspect: 'Chưa xác định',
+    snakeSuspect: '',
     hasSnakeImage: false,
     scheduledTime: scheduled,
-    bookedAt: b.bookedAt,
-    paymentDeadline: b.paymentDeadline,
-    slotStartTime: b.slotStartTime,
-    slotEndTime: b.slotEndTime,
+    bookedAt: bookedAt,
+    paymentDeadline: paymentDeadline,
+    slotStartTime: slotStartTime,
+    slotEndTime: slotEndTime,
     status: status,
     feeCost: b.feeCost,
     rating: b.rating,
-    durationSeconds: b.slotEndTime != null && b.slotStartTime != null
-        ? b.slotEndTime!.difference(b.slotStartTime!).inSeconds
+    durationSeconds: slotEndTime != null && slotStartTime != null
+      ? slotEndTime.difference(slotStartTime).inSeconds
         : null,
-    durationMinutes: b.slotEndTime != null && b.slotStartTime != null
-        ? b.slotEndTime!.difference(b.slotStartTime!).inMinutes
+    durationMinutes: slotEndTime != null && slotStartTime != null
+      ? slotEndTime.difference(slotStartTime).inMinutes
         : 45,
     consultationMethod: 'video',
     problemDescription: b.problemDescription,
@@ -1317,7 +1322,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
   }
 
   List<_ExpertConsultation> get _upcomingConsultations {
-    final now = DateTime.now().toUtc().add(const Duration(hours: 7));
+    final now = DateTime.now();
     final consultations =
         ref
             .watch(_expertBookingsFutureProvider)
@@ -2643,24 +2648,25 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.pest_control,
-                                    size: 14,
-                                    color: Color(0xFF999999),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    c.snakeSuspect,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Color(0xFF555555),
-                                      fontWeight: FontWeight.w500,
+                              if (c.snakeSuspect.trim().isNotEmpty)
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.pest_control,
+                                      size: 14,
+                                      color: Color(0xFF999999),
                                     ),
-                                  ),
-                                ],
-                              ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      c.snakeSuspect,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF555555),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                             ],
                           ),
                         ),
@@ -2984,7 +2990,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                 _buildHistoryMetaChip(
                   icon: Icons.event_available_outlined,
                   label: 'Đặt lúc',
-                  value: _formatFullDateTimePlus7(item.bookedAt!),
+                  value: _formatFullDateTime(item.bookedAt!),
                 ),
             ],
           ),
@@ -3116,11 +3122,6 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
   String _formatFullDateTime(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}'
       ' lúc ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
-
-  String _formatFullDateTimePlus7(DateTime d) {
-    final localPlus7 = d.add(const Duration(hours: 7));
-    return _formatFullDateTime(localPlus7);
-  }
 
   String _formatFee(int fee) {
     final formatted = fee.toString().replaceAllMapped(

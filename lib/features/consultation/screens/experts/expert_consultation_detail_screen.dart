@@ -63,14 +63,7 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
   }
 
   String _formatDateTimePlus7(int ms) {
-    final dt = DateTime.fromMillisecondsSinceEpoch(
-      ms,
-    ).add(const Duration(hours: 7));
-    final d = dt.day.toString().padLeft(2, '0');
-    final m = dt.month.toString().padLeft(2, '0');
-    final h = dt.hour.toString().padLeft(2, '0');
-    final min = dt.minute.toString().padLeft(2, '0');
-    return '$d/$m/${dt.year}  $h:$min';
+    return _formatDateTime(ms);
   }
 
   String _formatCurrency(int amount) {
@@ -230,7 +223,7 @@ class ExpertConsultationDetailScreen extends StatelessWidget {
                         label: 'Ngày & Giờ',
                         value: scheduledMs > 0
                             ? _formatDateTime(scheduledMs)
-                            : 'Chưa xác định',
+                            : '--',
                       ),
                       const _Divider(),
                       _DetailRow(

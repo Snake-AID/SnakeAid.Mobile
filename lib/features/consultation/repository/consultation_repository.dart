@@ -1197,6 +1197,39 @@ class ConsultationRepository {
         }
 
         return items.map((e) {
+          int? parseAmount(dynamic value) {
+          if (value is num) return value.toInt();
+          if (value == null) return null;
+          final raw = value.toString().trim();
+          if (raw.isEmpty) return null;
+          return int.tryParse(raw);
+          }
+
+          final payment = e['payment'] is Map
+            ? Map<String, dynamic>.from(e['payment'] as Map)
+            : <String, dynamic>{};
+          final paymentInfo = e['paymentInfo'] is Map
+            ? Map<String, dynamic>.from(e['paymentInfo'] as Map)
+            : <String, dynamic>{};
+          final consultationPayment = e['consultationPayment'] is Map
+            ? Map<String, dynamic>.from(e['consultationPayment'] as Map)
+            : <String, dynamic>{};
+
+          final resolvedFee =
+            parseAmount(e['price']) ??
+            parseAmount(e['feeCost']) ??
+            parseAmount(e['fee']) ??
+            parseAmount(e['amount']) ??
+            parseAmount(e['scheduledConsultationFee']) ??
+            parseAmount(e['emergencyConsultationFee']) ??
+            parseAmount(payment['amount']) ??
+            parseAmount(payment['feeCost']) ??
+            parseAmount(paymentInfo['amount']) ??
+            parseAmount(paymentInfo['feeCost']) ??
+            parseAmount(consultationPayment['amount']) ??
+            parseAmount(consultationPayment['feeCost']) ??
+            0;
+
           final endpointType = (e['type'] ?? '').toString().toLowerCase();
           final endpointStatus = (e['status'] ?? '').toString().toLowerCase();
 
@@ -1234,8 +1267,8 @@ class ConsultationRepository {
             'slotStartTime': e['slotStartTime'] ?? e['startTime'],
             'slotEndTime': e['slotEndTime'] ?? e['endTime'],
             'status': normalizedStatus,
-            'feeCost': e['price'],
-            'price': e['price'],
+            'feeCost': resolvedFee,
+            'price': resolvedFee,
             'bookedAt': e['startTime'],
           };
 
