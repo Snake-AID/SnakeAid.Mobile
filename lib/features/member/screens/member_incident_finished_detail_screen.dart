@@ -7,10 +7,11 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/handlers/payment_deep_link_coordinator.dart';
+import '../../../core/payments/payos_payment_verifier.dart';
+import '../../../core/payments/payos_pending_context.dart';
 import '../../emergency/models/detailed_incident_response.dart';
 import '../../emergency/providers/detailed_incident_provider.dart';
 import '../../emergency/repository/incident_repository.dart';
-import '../../wallet/repository/transaction_repository.dart' as wallet_tx;
 import '../../wallet/repository/wallet_repository.dart';
 
 class MemberIncidentFinishedDetailScreen extends ConsumerStatefulWidget {
@@ -29,17 +30,15 @@ class MemberIncidentFinishedDetailScreen extends ConsumerStatefulWidget {
 class _MemberIncidentFinishedDetailScreenState
     extends ConsumerState<MemberIncidentFinishedDetailScreen>
     with WidgetsBindingObserver {
-  static const Duration _kPayOsOverlayTimeout = Duration(seconds: 8);
-
   bool _isProcessingPayment = false;
   bool _isConfirmingPayOs = false;
   bool _hasPaid = false;
   int? _pendingPayOsOrderCode;
   String? _pendingPayOsTransactionId;
   bool _isAwaitingPayOsReturn = false;
+  bool _isShowingPaymentStatusDialog = false;
   int? _lastHandledDeepLinkEventId;
   StreamSubscription<PaymentDeepLinkEvent>? _deepLinkSub;
-  Timer? _awaitingOverlayTimer;
 
   void _handleBackNavigation() {
     if (Navigator.of(context).canPop()) {
@@ -66,46 +65,16 @@ class _MemberIncidentFinishedDetailScreenState
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!mounted) return;
-    if (state == AppLifecycleState.resumed &&
-        _isAwaitingPayOsReturn &&
-        !_isConfirmingPayOs) {
-      _startAwaitingOverlayTimeout();
-    }
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.hidden) {
-      _cancelAwaitingOverlayTimeout();
+    if (state == AppLifecycleState.resumed) {
+      _tryAutoFinalizePendingPayOs();
     }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _cancelAwaitingOverlayTimeout();
     _deepLinkSub?.cancel();
     super.dispose();
-  }
-
-  void _startAwaitingOverlayTimeout() {
-    _cancelAwaitingOverlayTimeout();
-    _awaitingOverlayTimer = Timer(_kPayOsOverlayTimeout, () {
-      if (!mounted || !_isAwaitingPayOsReturn || _isConfirmingPayOs) return;
-      setState(() {
-        _isAwaitingPayOsReturn = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Chưa nhận được callback PayOS. Bạn có thể quay lại cổng thanh toán hoặc tiếp tục chờ.',
-          ),
-        ),
-      );
-    });
-  }
-
-  void _cancelAwaitingOverlayTimeout() {
-    _awaitingOverlayTimer?.cancel();
-    _awaitingOverlayTimer = null;
   }
 
   void _initDeepLinks() {
@@ -131,13 +100,12 @@ class _MemberIncidentFinishedDetailScreenState
     _lastHandledDeepLinkEventId = event.eventId;
 
     if (event.isCancelled) {
-      _cancelAwaitingOverlayTimeout();
-      setState(() {
-        _pendingPayOsOrderCode = null;
-        _pendingPayOsTransactionId = null;
-        _isAwaitingPayOsReturn = false;
-        _isConfirmingPayOs = false;
-      });
+      _clearPendingPayOsContext();
+      if (mounted) {
+        setState(() {
+          _isConfirmingPayOs = false;
+        });
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Bạn đã hủy thanh toán PayOS.'),
@@ -147,10 +115,13 @@ class _MemberIncidentFinishedDetailScreenState
       return;
     }
 
-    await _confirmPendingPayOsPayment(event);
+    await _confirmPendingPayOsPayment(event: event);
   }
 
-  Future<void> _confirmPendingPayOsPayment(PaymentDeepLinkEvent event) async {
+  Future<void> _confirmPendingPayOsPayment({
+    PaymentDeepLinkEvent? event,
+    bool showStatusDialog = true,
+  }) async {
     final transactionId = _pendingPayOsTransactionId;
     if (transactionId == null || transactionId.isEmpty) {
       if (!mounted) return;
@@ -167,57 +138,35 @@ class _MemberIncidentFinishedDetailScreenState
     }
 
     if (!mounted) return;
-    _cancelAwaitingOverlayTimeout();
     setState(() {
-      _isAwaitingPayOsReturn = true;
       _isConfirmingPayOs = true;
     });
+    if (showStatusDialog) {
+      _showPaymentStatusDialog();
+    }
 
-    final repo = ref.read(wallet_tx.transactionRepositoryProvider);
-    final expectedOrderCode = _pendingPayOsOrderCode ?? event.orderCode;
-    final expectedIncidentTag = expectedOrderCode == null
-        ? null
-        : 'INCIDENT-$expectedOrderCode';
-    const delays = <Duration>[
-      Duration(milliseconds: 500),
-      Duration(seconds: 1),
-      Duration(seconds: 2),
-    ];
-    final maxAttempts = delays.length + 1;
-
-    for (var attempt = 0; attempt < maxAttempts; attempt++) {
-      wallet_tx.TransactionInfo? tx;
-      try {
-        tx = await repo.getTransactionById(transactionId);
-      } catch (_) {
-        tx = null;
-      }
+    try {
+      final verifier = ref.read(payOsPaymentVerifierProvider);
+      final result = await verifier.verify(
+        context: PayOsPendingContext(
+          flowType: PayOsFlowType.snakebiteIncident,
+          transactionId: transactionId,
+          orderCode: _pendingPayOsOrderCode ?? event?.orderCode,
+          referenceId: widget.incidentId,
+          startedAt: DateTime.now(),
+        ),
+        event: event,
+      );
 
       if (!mounted) return;
 
-      final isPayOs = (tx?.paymentMethod ?? '').toUpperCase() == 'PAYOS';
-      final isIncidentPayment =
-          (tx?.transactionType ?? '') == 'SnakebiteIncidentPayment';
-      final hasExternalId = (tx?.externalTransactionId ?? '').trim().isNotEmpty;
-      final hasExpectedDescription = expectedIncidentTag == null
-          ? true
-          : (tx?.description ?? '').contains(expectedIncidentTag);
-      final isConfirmed =
-          tx != null &&
-          isPayOs &&
-          isIncidentPayment &&
-          hasExternalId &&
-          hasExpectedDescription;
-
-      if (isConfirmed) {
+      if (result.status == PayOsVerificationStatus.confirmed &&
+          result.transaction != null) {
         setState(() {
           _hasPaid = true;
-          _pendingPayOsOrderCode = null;
-          _pendingPayOsTransactionId = null;
-          _isAwaitingPayOsReturn = false;
           _isConfirmingPayOs = false;
         });
-        _cancelAwaitingOverlayTimeout();
+        _clearPendingPayOsContext();
 
         await ref
             .read(detailedIncidentProvider.notifier)
@@ -226,54 +175,113 @@ class _MemberIncidentFinishedDetailScreenState
         await _showPaymentSuccessDialog(
           title: 'Thanh Toán Thành Công',
           subtitle: 'Thanh toán qua PayOS đã được xác nhận.',
-          amount: tx.amount,
+          amount: result.transaction!.amount,
           method: 'PayOS',
         );
         return;
       }
 
-      if (attempt < maxAttempts - 1) {
-        await Future<void>.delayed(delays[attempt]);
-      }
-    }
+      if (!mounted) return;
+      await ref
+          .read(detailedIncidentProvider.notifier)
+          .refreshDetailedIncident();
+      final refreshedIncident = ref.read(detailedIncidentProvider).incident;
+      final completedFromIncident =
+          refreshedIncident?.status == IncidentStatus.completed;
 
-    if (!mounted) return;
-    await ref.read(detailedIncidentProvider.notifier).refreshDetailedIncident();
-    final refreshedIncident = ref.read(detailedIncidentProvider).incident;
-    final completedFromIncident =
-        refreshedIncident?.status == IncidentStatus.completed;
-
-    setState(() {
-      _isAwaitingPayOsReturn = false;
-      _isConfirmingPayOs = false;
+      setState(() {
+        _isConfirmingPayOs = false;
+        if (completedFromIncident) {
+          _hasPaid = true;
+        }
+      });
       if (completedFromIncident) {
-        _hasPaid = true;
-        _pendingPayOsOrderCode = null;
-        _pendingPayOsTransactionId = null;
+        _clearPendingPayOsContext();
       }
-    });
-    _cancelAwaitingOverlayTimeout();
 
-    if (!mounted) return;
-    if (completedFromIncident) {
-      await _showPaymentSuccessDialog(
-        title: 'Thanh Toán Thành Công',
-        subtitle: 'Thanh toán qua PayOS đã được xác nhận.',
-        amount: _getPaymentAmount(ref.read(detailedIncidentProvider).incident!),
-        method: 'PayOS',
-      );
-      return;
+      if (!mounted) return;
+      if (completedFromIncident) {
+        await _showPaymentSuccessDialog(
+          title: 'Thanh Toán Thành Công',
+          subtitle: 'Thanh toán qua PayOS đã được xác nhận.',
+          amount: _getPaymentAmount(
+            ref.read(detailedIncidentProvider).incident!,
+          ),
+          method: 'PayOS',
+        );
+        return;
+      }
+
+      if (event != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              event.reason == null || event.reason!.isEmpty
+                  ? 'Thanh toán đã quay lại app nhưng backend chưa xác nhận xong.'
+                  : 'Thanh toán chưa được xác nhận: ${event.reason}',
+            ),
+          ),
+        );
+      }
+    } finally {
+      _hidePaymentStatusDialog();
     }
+  }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          event.reason == null || event.reason!.isEmpty
-              ? 'Thanh toán đã quay lại app nhưng backend chưa xác nhận xong.'
-              : 'Thanh toán chưa được xác nhận: ${event.reason}',
+  Future<void> _tryAutoFinalizePendingPayOs() async {
+    final txId = _pendingPayOsTransactionId;
+    if (!mounted || txId == null || txId.isEmpty) return;
+    if (_isConfirmingPayOs) return;
+
+    await _confirmPendingPayOsPayment(showStatusDialog: true);
+  }
+
+  void _showPaymentStatusDialog() {
+    if (!mounted || _isShowingPaymentStatusDialog) return;
+    _isShowingPaymentStatusDialog = true;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text('Đang kiểm tra thanh toán'),
+          content: const Row(
+            children: [
+              SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.6),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Hệ thống đang xác nhận trạng thái từ PayOS. Vui lòng đợi...',
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    );
+    ).then((_) {
+      _isShowingPaymentStatusDialog = false;
+    });
+  }
+
+  void _hidePaymentStatusDialog() {
+    if (!mounted || !_isShowingPaymentStatusDialog) return;
+    Navigator.of(context, rootNavigator: true).pop();
+    _isShowingPaymentStatusDialog = false;
+  }
+
+  void _clearPendingPayOsContext() {
+    _pendingPayOsOrderCode = null;
+    _pendingPayOsTransactionId = null;
+    _isAwaitingPayOsReturn = false;
   }
 
   String _formatCurrency(double value) {
@@ -583,7 +591,6 @@ class _MemberIncidentFinishedDetailScreenState
         _pendingPayOsTransactionId = paymentResponse.transactionId;
         _isAwaitingPayOsReturn = true;
       });
-      _cancelAwaitingOverlayTimeout();
 
       if (paymentResponse.checkoutUrl != null &&
           paymentResponse.checkoutUrl!.isNotEmpty) {
@@ -607,13 +614,10 @@ class _MemberIncidentFinishedDetailScreenState
     } catch (e) {
       if (mounted) {
         setState(() {
-          _pendingPayOsOrderCode = null;
-          _pendingPayOsTransactionId = null;
-          _isAwaitingPayOsReturn = false;
           _isConfirmingPayOs = false;
         });
       }
-      _cancelAwaitingOverlayTimeout();
+      _clearPendingPayOsContext();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('PayOS payment thất bại: ${e.toString()}')),
       );
@@ -818,51 +822,6 @@ class _MemberIncidentFinishedDetailScreenState
                       ),
                     ),
                   ),
-            if (_isAwaitingPayOsReturn || _isConfirmingPayOs)
-              Positioned.fill(
-                child: Container(
-                  color: Colors.black.withOpacity(0.45),
-                  child: Center(
-                    child: Container(
-                      width: 260,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const CircularProgressIndicator(
-                            color: Color(0xFF228B22),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Đang xác nhận thanh toán PayOS',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF1F1F1F),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _isConfirmingPayOs
-                                ? 'Hệ thống đang kiểm tra giao dịch với máy chủ...'
-                                : 'Vui lòng chờ trong giây lát...',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF666666),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),

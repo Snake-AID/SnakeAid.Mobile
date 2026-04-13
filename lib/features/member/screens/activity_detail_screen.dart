@@ -1,15 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/handlers/payment_deep_link_coordinator.dart';
+import '../../../core/payments/payos_payment_verifier.dart';
+import '../../../core/payments/payos_pending_context.dart';
 import '../../snake_catching/repository/snake_catching_repository.dart';
 import '../../snake_catching/repository/snake_species_repository.dart';
 import '../../snake_catching/repository/payos_repository.dart';
-import '../../snake_catching/repository/transaction_repository.dart';
 import '../../wallet/repository/wallet_repository.dart';
+import '../../wallet/repository/transaction_repository.dart' as wallet_tx;
 import '../../snake_catching/repository/feedback_repository.dart';
 import '../../snake_catching/models/snake_catching_request.dart';
 import '../../snake_catching/models/snake_species.dart';
@@ -20,33 +21,33 @@ import 'package:intl/intl.dart';
 class ActivityDetailScreen extends ConsumerStatefulWidget {
   final String requestId;
 
-  const ActivityDetailScreen({
-    super.key,
-    required this.requestId,
-  });
+  const ActivityDetailScreen({super.key, required this.requestId});
 
   @override
-  ConsumerState<ActivityDetailScreen> createState() => _ActivityDetailScreenState();
+  ConsumerState<ActivityDetailScreen> createState() =>
+      _ActivityDetailScreenState();
 }
 
 class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   bool _isLoading = true;
   SnakeCatchingRequestData? _request;
   String? _errorMessage;
-  Map<int, SnakeSpecies> _speciesDetailsMap = {};
-  Set<int> _loadingSpeciesIds = {};
+  final Map<int, SnakeSpecies> _speciesDetailsMap = {};
+  final Set<int> _loadingSpeciesIds = {};
   Timer? _refreshTimer;
 
   // Deposit payment state (status == Assigned)
-  TransactionInfo? _transaction;
-  String? _depositTransactionId;   // set from wallet/PayOS response
+  wallet_tx.TransactionInfo? _transaction;
+  String? _depositTransactionId; // set from wallet/PayOS response
+  PayOsPendingContext? _pendingDepositPayOsContext;
   bool _isCheckingPayment = false;
   bool _isCreatingPayment = false;
   Timer? _paymentTimer;
 
   // Final payment state (status == Finished)
-  TransactionInfo? _finalTransaction;
-  String? _finalTransactionId;     // set from wallet/PayOS response
+  wallet_tx.TransactionInfo? _finalTransaction;
+  String? _finalTransactionId; // set from wallet/PayOS response
+  PayOsPendingContext? _pendingFinalPayOsContext;
   bool _isCreatingFinalPayment = false;
   Timer? _finalPaymentTimer;
   bool _hasTransferredToRescuer = false;
@@ -108,20 +109,92 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     }
   }
 
-  void _handlePaymentDeepLinkEvent(PaymentDeepLinkEvent event) {
+  Future<void> _handlePaymentDeepLinkEvent(PaymentDeepLinkEvent event) async {
     if (!mounted || _lastHandledDeepLinkEventId == event.eventId) return;
     _lastHandledDeepLinkEventId = event.eventId;
 
     if (event.isSuccess && !event.isCancelled) {
-      _checkPaymentStatus();
-      _checkFinalPaymentStatus();
+      if (_pendingDepositPayOsContext != null) {
+        await _verifyPendingDepositPayOs(event);
+      }
+      if (_pendingFinalPayOsContext != null) {
+        await _verifyPendingFinalPayOs(event);
+      }
     } else if (event.isCancelled) {
+      if (_pendingDepositPayOsContext != null &&
+          (event.orderCode == null ||
+              event.orderCode == _pendingDepositPayOsContext!.orderCode)) {
+        _pendingDepositPayOsContext = null;
+      }
+      if (_pendingFinalPayOsContext != null &&
+          (event.orderCode == null ||
+              event.orderCode == _pendingFinalPayOsContext!.orderCode)) {
+        _pendingFinalPayOsContext = null;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Bạn đã hủy thanh toán. Vui lòng thử lại khi cần.'),
           backgroundColor: Color(0xFFFF8F00),
         ),
       );
+    }
+  }
+
+  Future<void> _verifyPendingDepositPayOs(PaymentDeepLinkEvent event) async {
+    final pendingContext = _pendingDepositPayOsContext;
+    if (pendingContext == null) return;
+
+    final verifier = ref.read(payOsPaymentVerifierProvider);
+    final result = await verifier.verify(context: pendingContext, event: event);
+
+    if (!mounted) return;
+    if (result.status == PayOsVerificationStatus.confirmed) {
+      setState(() {
+        _transaction = result.transaction;
+        _depositPaid = true;
+        _pendingDepositPayOsContext = null;
+      });
+      _paymentTimer?.cancel();
+      await _silentRefresh();
+      return;
+    }
+
+    if (result.status == PayOsVerificationStatus.mismatch) {
+      setState(() {
+        _pendingDepositPayOsContext = null;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result.message)));
+    }
+  }
+
+  Future<void> _verifyPendingFinalPayOs(PaymentDeepLinkEvent event) async {
+    final pendingContext = _pendingFinalPayOsContext;
+    if (pendingContext == null) return;
+
+    final verifier = ref.read(payOsPaymentVerifierProvider);
+    final result = await verifier.verify(context: pendingContext, event: event);
+
+    if (!mounted) return;
+    if (result.status == PayOsVerificationStatus.confirmed) {
+      setState(() {
+        _finalTransaction = result.transaction;
+        _pendingFinalPayOsContext = null;
+        _hasTransferredToRescuer = true;
+      });
+      _finalPaymentTimer?.cancel();
+      await _silentRefresh();
+      return;
+    }
+
+    if (result.status == PayOsVerificationStatus.mismatch) {
+      setState(() {
+        _pendingFinalPayOsContext = null;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result.message)));
     }
   }
 
@@ -196,8 +269,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       });
 
       try {
-        final speciesDetail = await speciesRepository.getSnakeSpeciesById(speciesId);
-        
+        final speciesDetail = await speciesRepository.getSnakeSpeciesById(
+          speciesId,
+        );
+
         if (mounted && speciesDetail != null) {
           setState(() {
             _speciesDetailsMap[speciesId] = speciesDetail;
@@ -250,25 +325,39 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
 
   /// Check deposit payment status via GET /api/transactions/{id}.
   /// Only runs when [_depositTransactionId] has been set from a payment response.
-  Future<void> _checkPaymentStatus({bool silent = false, bool scrollIfUnpaid = false}) async {
+  Future<void> _checkPaymentStatus({
+    bool silent = false,
+    bool scrollIfUnpaid = false,
+  }) async {
     if (!mounted) return;
     final tid = _depositTransactionId;
     if (tid == null) return;
     if (!silent) setState(() => _isCheckingPayment = true);
     try {
-      final repo = ref.read(transactionRepositoryProvider);
+      final repo = ref.read(wallet_tx.transactionRepositoryProvider);
       final tx = await repo.getTransactionById(tid);
       if (!mounted) return;
+      final txIsDeposit =
+          tx != null && tx.matchesTransactionType('CatchingDeposit');
+      final isConfirmedDeposit =
+          txIsDeposit &&
+          (tx.isPaid ||
+              (tx.isPayOsPayment &&
+                  tx.matchesPrefix(
+                    'CATCHING-',
+                    _pendingDepositPayOsContext?.orderCode,
+                  ) &&
+                  tx.hasExternalTransactionId));
       setState(() {
         _transaction = tx;
         _isCheckingPayment = false;
-        if (tx != null && tx.isPaid) _depositPaid = true;
+        if (isConfirmedDeposit) _depositPaid = true;
       });
-      if (scrollIfUnpaid && (tx == null || !tx.isPaid)) {
+      if (scrollIfUnpaid && !isConfirmedDeposit) {
         _scrollToPaymentCard();
       }
       // Poll until BE confirms payment
-      if (tx == null || !tx.isPaid) {
+      if (!isConfirmedDeposit) {
         _paymentTimer?.cancel();
         _paymentTimer = Timer.periodic(const Duration(seconds: 5), (_) {
           if (_depositTransactionId != null &&
@@ -307,11 +396,14 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
 
     // Check if already submitted
     final currentUser = ref.read(currentUserProvider);
-    final alreadyReviewed = currentUser != null &&
-        request.feedbacks.any((f) =>
-            f.raterId == currentUser.id &&
-            f.targetUserId == rescuer.accountId &&
-            f.referenceId == request.id);
+    final alreadyReviewed =
+        currentUser != null &&
+        request.feedbacks.any(
+          (f) =>
+              f.raterId == currentUser.id &&
+              f.targetUserId == rescuer.accountId &&
+              f.referenceId == request.id,
+        );
     if (alreadyReviewed) return;
 
     showModalBottomSheet(
@@ -322,7 +414,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         builder: (ctx, setSheet) {
           return Padding(
             padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).viewInsets.bottom),
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            ),
             child: Container(
               decoration: const BoxDecoration(
                 color: Colors.white,
@@ -334,10 +427,12 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 children: [
                   // Handle
                   Container(
-                    width: 40, height: 4,
+                    width: 40,
+                    height: 4,
                     decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2)),
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                   const SizedBox(height: 20),
 
@@ -349,7 +444,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                         backgroundImage: rescuer.avatarUrl != null
                             ? NetworkImage(rescuer.avatarUrl!)
                             : null,
-                        backgroundColor: const Color(0xFFFF6B35).withOpacity(0.15),
+                        backgroundColor: const Color(
+                          0xFFFF6B35,
+                        ).withOpacity(0.15),
                         child: rescuer.avatarUrl == null
                             ? const Icon(Icons.person, color: Color(0xFFFF6B35))
                             : null,
@@ -359,15 +456,21 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Đánh giá cứu hộ viên',
-                                style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF1F1F1F))),
+                            const Text(
+                              'Đánh giá cứu hộ viên',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1F1F1F),
+                              ),
+                            ),
                             const SizedBox(height: 2),
                             Text(
                               rescuer.fullName ?? 'Cứu hộ viên',
-                              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
                             ),
                           ],
                         ),
@@ -386,7 +489,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 6),
                           child: Icon(
-                            i < selectedRating ? Icons.star_rounded : Icons.star_border_rounded,
+                            i < selectedRating
+                                ? Icons.star_rounded
+                                : Icons.star_border_rounded,
                             size: 40,
                             color: i < selectedRating
                                 ? const Color(0xFFFFB300)
@@ -400,15 +505,23 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   if (selectedRating > 0) ...[
                     const SizedBox(height: 6),
                     Text(
-                      ['', 'Rất tệ', 'Tệ', 'Bình thường', 'Tốt', 'Tuyệt vời!'][selectedRating],
+                      [
+                        '',
+                        'Rất tệ',
+                        'Tệ',
+                        'Bình thường',
+                        'Tốt',
+                        'Tuyệt vời!',
+                      ][selectedRating],
                       style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: selectedRating >= 4
-                              ? const Color(0xFF228B22)
-                              : selectedRating == 3
-                                  ? Colors.orange
-                                  : const Color(0xFFDC3545)),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: selectedRating >= 4
+                            ? const Color(0xFF228B22)
+                            : selectedRating == 3
+                            ? Colors.orange
+                            : const Color(0xFFDC3545),
+                      ),
                     ),
                   ],
 
@@ -420,8 +533,12 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     maxLines: 3,
                     maxLength: 300,
                     decoration: InputDecoration(
-                      hintText: 'Chia sẻ trải nghiệm của bạn (không bắt buộc)...',
-                      hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
+                      hintText:
+                          'Chia sẻ trải nghiệm của bạn (không bắt buộc)...',
+                      hintStyle: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[400],
+                      ),
                       filled: true,
                       fillColor: const Color(0xFFF6F8F6),
                       border: OutlineInputBorder(
@@ -429,7 +546,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                         borderSide: BorderSide.none,
                       ),
                       contentPadding: const EdgeInsets.all(14),
-                      counterStyle: TextStyle(fontSize: 11, color: Colors.grey[400]),
+                      counterStyle: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[400],
+                      ),
                     ),
                   ),
 
@@ -441,15 +561,18 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       Expanded(
                         child: TextButton(
                           onPressed: () => Navigator.pop(ctx),
-                          child: Text('Để sau',
-                              style: TextStyle(color: Colors.grey[600])),
+                          child: Text(
+                            'Để sau',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         flex: 2,
                         child: ElevatedButton(
-                          onPressed: selectedRating == 0 || _isSubmittingFeedback
+                          onPressed:
+                              selectedRating == 0 || _isSubmittingFeedback
                               ? null
                               : () async {
                                   Navigator.pop(ctx);
@@ -465,16 +588,23 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                             disabledBackgroundColor: Colors.grey[200],
                           ),
                           child: _isSubmittingFeedback
                               ? const SizedBox(
-                                  width: 18, height: 18,
+                                  width: 18,
+                                  height: 18,
                                   child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Colors.white))
-                              : const Text('Gửi đánh giá',
-                                  style: TextStyle(fontWeight: FontWeight.bold)),
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text(
+                                  'Gửi đánh giá',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
                         ),
                       ),
                     ],
@@ -497,7 +627,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     if (_request == null) return;
     setState(() => _isSubmittingFeedback = true);
     try {
-      await ref.read(feedbackRepositoryProvider).submitFeedback(
+      await ref
+          .read(feedbackRepositoryProvider)
+          .submitFeedback(
             FeedbackRequest(
               targetUserId: targetUserId,
               referenceId: _request!.id,
@@ -520,7 +652,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           ),
           backgroundColor: const Color(0xFF228B22),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
       _silentRefresh();
@@ -532,7 +666,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           content: Text(e.toString().replaceAll('Exception: ', '')),
           backgroundColor: const Color(0xFFDC3545),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     }
@@ -546,11 +682,13 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     // Check if current member already left a feedback for this rescuer
     final existing = currentUser != null
         ? request.feedbacks
-            .where((f) =>
-                f.raterId == currentUser.id &&
-                f.targetUserId == rescuer.accountId &&
-                f.referenceId == request.id)
-            .firstOrNull
+              .where(
+                (f) =>
+                    f.raterId == currentUser.id &&
+                    f.targetUserId == rescuer.accountId &&
+                    f.referenceId == request.id,
+              )
+              .firstOrNull
         : null;
 
     return Padding(
@@ -562,9 +700,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 3)),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
           ],
         ),
         child: Column(
@@ -574,24 +713,31 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
             Row(
               children: [
                 Container(
-                  width: 36, height: 36,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFB300).withOpacity(0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.star_rounded,
-                      color: Color(0xFFFFB300), size: 20),
+                  child: const Icon(
+                    Icons.star_rounded,
+                    color: Color(0xFFFFB300),
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Đánh giá dịch vụ',
-                          style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1F1F1F))),
+                      const Text(
+                        'Đánh giá dịch vụ',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1F1F1F),
+                        ),
+                      ),
                       Text(
                         rescuer.fullName ?? 'Cứu hộ viên',
                         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
@@ -607,32 +753,48 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
             if (existing != null) ...[
               // ── Show submitted feedback ──
               Row(
-                children: List.generate(5, (i) => Icon(
-                  i < existing.rating ? Icons.star_rounded : Icons.star_border_rounded,
-                  size: 22,
-                  color: i < existing.rating ? const Color(0xFFFFB300) : Colors.grey[300],
-                )),
+                children: List.generate(
+                  5,
+                  (i) => Icon(
+                    i < existing.rating
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
+                    size: 22,
+                    color: i < existing.rating
+                        ? const Color(0xFFFFB300)
+                        : Colors.grey[300],
+                  ),
+                ),
               ),
-              if (existing.comments != null && existing.comments!.isNotEmpty) ...[
+              if (existing.comments != null &&
+                  existing.comments!.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(
                   '"${existing.comments!}"',
                   style: TextStyle(
-                      fontSize: 13,
-                      fontStyle: FontStyle.italic,
-                      color: Colors.grey[700]),
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey[700],
+                  ),
                 ),
               ],
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.check_circle_outline, size: 14, color: const Color(0xFF228B22)),
+                  Icon(
+                    Icons.check_circle_outline,
+                    size: 14,
+                    color: const Color(0xFF228B22),
+                  ),
                   const SizedBox(width: 5),
-                  Text('Đã gửi đánh giá',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: const Color(0xFF228B22),
-                          fontWeight: FontWeight.w500)),
+                  Text(
+                    'Đã gửi đánh giá',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: const Color(0xFF228B22),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ],
               ),
             ] else ...[
@@ -653,7 +815,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 13),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
@@ -685,13 +848,20 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) => Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          ),
           child: Container(
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-            padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(ctx).padding.bottom + 24),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              12,
+              20,
+              MediaQuery.of(ctx).padding.bottom + 24,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -699,7 +869,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 // Handle
                 Center(
                   child: Container(
-                    width: 40, height: 4,
+                    width: 40,
+                    height: 4,
                     decoration: BoxDecoration(
                       color: Colors.grey[300],
                       borderRadius: BorderRadius.circular(2),
@@ -711,17 +882,26 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 Row(
                   children: [
                     Container(
-                      width: 36, height: 36,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
                         color: const Color(0xFFDC3545).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.cancel_outlined, color: Color(0xFFDC3545), size: 20),
+                      child: const Icon(
+                        Icons.cancel_outlined,
+                        color: Color(0xFFDC3545),
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     const Text(
                       'Hủy Đơn',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1F1F1F)),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1F1F1F),
+                      ),
                     ),
                   ],
                 ),
@@ -732,53 +912,58 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 ),
                 const SizedBox(height: 16),
                 // Reason options
-                ...reasons.map((r) => GestureDetector(
-                  onTap: () => setSheetState(() => selectedReason = r),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: selectedReason == r
-                          ? const Color(0xFFDC3545).withOpacity(0.07)
-                          : const Color(0xFFF8F8F8),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: selectedReason == r
-                            ? const Color(0xFFDC3545)
-                            : Colors.transparent,
-                        width: 1.5,
+                ...reasons.map(
+                  (r) => GestureDetector(
+                    onTap: () => setSheetState(() => selectedReason = r),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
                       ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          selectedReason == r
-                              ? Icons.radio_button_checked
-                              : Icons.radio_button_unchecked,
-                          size: 18,
+                      decoration: BoxDecoration(
+                        color: selectedReason == r
+                            ? const Color(0xFFDC3545).withOpacity(0.07)
+                            : const Color(0xFFF8F8F8),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
                           color: selectedReason == r
                               ? const Color(0xFFDC3545)
-                              : Colors.grey[400],
+                              : Colors.transparent,
+                          width: 1.5,
                         ),
-                        const SizedBox(width: 10),
-                        Text(
-                          r,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: selectedReason == r
-                                ? FontWeight.w600
-                                : FontWeight.normal,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            selectedReason == r
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            size: 18,
                             color: selectedReason == r
                                 ? const Color(0xFFDC3545)
-                                : const Color(0xFF333333),
+                                : Colors.grey[400],
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 10),
+                          Text(
+                            r,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: selectedReason == r
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                              color: selectedReason == r
+                                  ? const Color(0xFFDC3545)
+                                  : const Color(0xFF333333),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                )),
+                ),
                 // Free-text field when "Lý do khác" is selected
-                if (selectedReason == 'Lý do khác') ...[  
+                if (selectedReason == 'Lý do khác') ...[
                   const SizedBox(height: 4),
                   TextField(
                     controller: otherController,
@@ -786,7 +971,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     maxLines: 2,
                     decoration: InputDecoration(
                       hintText: 'Nhập lý do của bạn...',
-                      hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+                      hintStyle: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 13,
+                      ),
                       filled: true,
                       fillColor: const Color(0xFFF8F8F8),
                       border: OutlineInputBorder(
@@ -799,9 +987,15 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: Color(0xFFDC3545), width: 1.5),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFDC3545),
+                          width: 1.5,
+                        ),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
                     ),
                     onChanged: (_) => setSheetState(() {}),
                   ),
@@ -820,12 +1014,19 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.warning_amber_rounded, color: Color(0xFFFF8F00), size: 16),
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          color: Color(0xFFFF8F00),
+                          size: 16,
+                        ),
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Cứu hộ viên đã được phân công. Việc hủy lúc này có thể ảnh hưởng đến uy tín của bạn.',
-                            style: TextStyle(fontSize: 12, color: Color(0xFF7B5800)),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF7B5800),
+                            ),
                           ),
                         ),
                       ],
@@ -838,26 +1039,32 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   child: ElevatedButton(
                     onPressed: selectedReason == null
                         ? null
-                        : selectedReason == 'Lý do khác' && otherController.text.trim().isEmpty
-                            ? null
-                            : () {
-                                final reason = selectedReason == 'Lý do khác'
-                                    ? otherController.text.trim()
-                                    : selectedReason!;
-                                Navigator.pop(ctx);
-                                _executeCancelRequest(reason);
-                              },
+                        : selectedReason == 'Lý do khác' &&
+                              otherController.text.trim().isEmpty
+                        ? null
+                        : () {
+                            final reason = selectedReason == 'Lý do khác'
+                                ? otherController.text.trim()
+                                : selectedReason!;
+                            Navigator.pop(ctx);
+                            _executeCancelRequest(reason);
+                          },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFDC3545),
                       foregroundColor: Colors.white,
                       disabledBackgroundColor: Colors.grey[200],
                       disabledForegroundColor: Colors.grey[400],
                       elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     child: const Text(
                       'XÁC NHẬN HỦY ĐƠN',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -872,19 +1079,24 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   Future<void> _executeCancelRequest(String reason) async {
     setState(() => _isCancelling = true);
     try {
-      await ref.read(snakeCatchingRepositoryProvider).cancelRequest(widget.requestId, reason);
+      await ref
+          .read(snakeCatchingRepositoryProvider)
+          .cancelRequest(widget.requestId, reason);
       if (!mounted) return;
       setState(() => _isCancelling = false);
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 64, height: 64,
+                width: 64,
+                height: 64,
                 decoration: BoxDecoration(
                   color: Colors.grey[100],
                   shape: BoxShape.circle,
@@ -894,7 +1106,11 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
               const SizedBox(height: 16),
               const Text(
                 'Đơn đã được hủy',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1F1F1F)),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1F1F1F),
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -917,10 +1133,15 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   backgroundColor: const Color(0xFF228B22),
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                   padding: const EdgeInsets.symmetric(vertical: 13),
                 ),
-                child: const Text('Về Danh Sách', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text(
+                  'Về Danh Sách',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ),
           ],
@@ -929,10 +1150,12 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isCancelling = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(e.toString().replaceAll('Exception: ', '')),
-        backgroundColor: const Color(0xFFDC3545),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: const Color(0xFFDC3545),
+        ),
+      );
     }
   }
 
@@ -952,19 +1175,23 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     }
     setState(() => _isPayingWithWallet = true);
     try {
-      final transactionId = await ref.read(walletRepositoryProvider).payWithWallet(
-        snakeCatchingRequestId: _request!.id,
-        amount: amount,
-        transactionType: 'CatchingDeposit',
-        description: 'Catching deposit 1',
-      );
+      final transactionId = await ref
+          .read(walletRepositoryProvider)
+          .payWithWallet(
+            snakeCatchingRequestId: _request!.id,
+            amount: amount,
+            transactionType: 'CatchingDeposit',
+            description: 'Catching deposit 1',
+          );
       if (!mounted) return;
       setState(() {
         _isPayingWithWallet = false;
         _depositTransactionId = transactionId;
         _depositPaid = true;
+        _pendingDepositPayOsContext = null;
       });
-      final depositAmount = _request!.estimatedPrice ?? _request!.mission?.estimatedCost ?? 0;
+      final depositAmount =
+          _request!.estimatedPrice ?? _request!.mission?.estimatedCost ?? 0;
       await _showPaymentSuccessDialog(
         title: 'Thanh Toán Thành Công!',
         subtitle: 'Đặt cọc phí di chuyển đã được xác nhận.',
@@ -994,16 +1221,19 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     }
     setState(() => _isPayingFinalWithWallet = true);
     try {
-      final transactionId = await ref.read(walletRepositoryProvider).payWithWallet(
-        snakeCatchingRequestId: _request!.id,
-        amount: finalAmount,
-        transactionType: 'CatchingPayment',
-        description: 'Catching payment',
-      );
+      final transactionId = await ref
+          .read(walletRepositoryProvider)
+          .payWithWallet(
+            snakeCatchingRequestId: _request!.id,
+            amount: finalAmount,
+            transactionType: 'CatchingPayment',
+            description: 'Catching payment',
+          );
       if (!mounted) return;
       setState(() {
         _isPayingFinalWithWallet = false;
         _finalTransactionId = transactionId;
+        _pendingFinalPayOsContext = null;
       });
       await _showPaymentSuccessDialog(
         title: 'Thanh Toán Thành Công!',
@@ -1052,7 +1282,17 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       if (!mounted) return;
       setState(() {
         _isCreatingPayment = false;
-        if (link.transactionId != null) _depositTransactionId = link.transactionId;
+        if (link.transactionId != null)
+          _depositTransactionId = link.transactionId;
+        if (link.transactionId != null) {
+          _pendingDepositPayOsContext = PayOsPendingContext(
+            flowType: PayOsFlowType.snakeCatchingDeposit,
+            transactionId: link.transactionId!,
+            orderCode: link.orderCode,
+            referenceId: _request!.id,
+            startedAt: DateTime.now(),
+          );
+        }
       });
 
       final uri = Uri.parse(link.checkoutUrl);
@@ -1072,20 +1312,33 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
 
   /// Check final payment (CatchingPayment) status via GET /api/transactions/{id}.
   /// Only runs when [_finalTransactionId] has been set from a payment response.
-  Future<void> _checkFinalPaymentStatus({bool silent = false, bool scrollIfUnpaid = false}) async {
+  Future<void> _checkFinalPaymentStatus({
+    bool silent = false,
+    bool scrollIfUnpaid = false,
+  }) async {
     if (!mounted) return;
     final tid = _finalTransactionId;
     if (tid == null) return;
     try {
-      final repo = ref.read(transactionRepositoryProvider);
+      final repo = ref.read(wallet_tx.transactionRepositoryProvider);
       final tx = await repo.getTransactionById(tid);
       if (!mounted) return;
 
       final requestIsPaid = (_request?.status == 'Completed');
-      final txIsFinalPayment = (tx?.isCatchingPayment == true);
+      final txIsFinalPayment =
+          tx != null && tx.matchesTransactionType('CatchingPayment');
+      final txIsConfirmed =
+          txIsFinalPayment &&
+          (tx.isPaid ||
+              (tx.isPayOsPayment &&
+                  tx.matchesPrefix(
+                    'CATCHING-',
+                    _pendingFinalPayOsContext?.orderCode,
+                  ) &&
+                  tx.hasExternalTransactionId));
 
       setState(() {
-        _finalTransaction = (txIsFinalPayment || requestIsPaid) ? tx : null;
+        _finalTransaction = (txIsConfirmed || requestIsPaid) ? tx : null;
       });
 
       if (scrollIfUnpaid && _finalTransaction == null) _scrollToPaymentCard();
@@ -1100,7 +1353,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
             _finalPaymentTimer?.cancel();
           }
         });
-      } else if (requestIsPaid || (txIsFinalPayment && _finalTransaction!.isPaid)) {
+      } else if (requestIsPaid || txIsConfirmed) {
         // Payment confirmed
         _finalPaymentTimer?.cancel();
         _hasTransferredToRescuer = true;
@@ -1139,9 +1392,22 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       if (!mounted) return;
       setState(() {
         _isCreatingFinalPayment = false;
-        if (link.transactionId != null) _finalTransactionId = link.transactionId;
+        if (link.transactionId != null)
+          _finalTransactionId = link.transactionId;
+        if (link.transactionId != null) {
+          _pendingFinalPayOsContext = PayOsPendingContext(
+            flowType: PayOsFlowType.snakeCatchingPayment,
+            transactionId: link.transactionId!,
+            orderCode: link.orderCode,
+            referenceId: _request!.id,
+            startedAt: DateTime.now(),
+          );
+        }
       });
-      await launchUrl(Uri.parse(link.checkoutUrl), mode: LaunchMode.externalApplication);
+      await launchUrl(
+        Uri.parse(link.checkoutUrl),
+        mode: LaunchMode.externalApplication,
+      );
       if (mounted) _checkFinalPaymentStatus();
     } catch (e) {
       if (!mounted) return;
@@ -1176,10 +1442,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? _buildErrorView()
-              : _request != null
-                  ? _buildDetailView()
-                  : _buildNotFoundView(),
+          ? _buildErrorView()
+          : _request != null
+          ? _buildDetailView()
+          : _buildNotFoundView(),
       bottomSheet: _request != null ? _buildStickyFooter(_request!) : null,
     );
   }
@@ -1191,11 +1457,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Color(0xFFDC3545),
-            ),
+            const Icon(Icons.error_outline, size: 64, color: Color(0xFFDC3545)),
             const SizedBox(height: 16),
             Text(
               _errorMessage!,
@@ -1225,11 +1487,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.search_off,
-              size: 80,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.search_off, size: 80, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
               'Không Tìm Thấy',
@@ -1243,10 +1501,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
             Text(
               'Yêu cầu này không tồn tại hoặc đã bị xóa.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
             const SizedBox(height: 24),
             ElevatedButton(
@@ -1276,7 +1531,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 24),
-          
+
           // Status Icon & Title
           Center(
             child: Container(
@@ -1293,9 +1548,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
               ),
             ),
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           Center(
             child: Text(
               _getStatusText(effectiveStatus),
@@ -1308,11 +1563,15 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           ),
 
           // Sub-status label when mission is En_Route or Arrived
-          if (effectiveStatus == 'en_route' || effectiveStatus == 'arrived') ...[          
+          if (effectiveStatus == 'en_route' ||
+              effectiveStatus == 'arrived') ...[
             const SizedBox(height: 6),
             Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
@@ -1320,8 +1579,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 ),
                 child: Text(
                   effectiveStatus == 'en_route'
-                  ? 'Tài xế đang trên đường đến'
-                  : 'Tài xế đã đến nơi',                  
+                      ? 'Tài xế đang trên đường đến'
+                      : 'Tài xế đã đến nơi',
                   style: TextStyle(
                     fontSize: 12,
                     color: statusColor,
@@ -1331,7 +1590,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
               ),
             ),
           ],
-          
+
           const SizedBox(height: 24),
 
           // ── Status Progress Stepper ───────────────────────────────
@@ -1381,7 +1640,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     ],
                   ),
                 ),
-                
+
                 // Info Content
                 Padding(
                   padding: const EdgeInsets.all(16),
@@ -1392,7 +1651,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                         'Thời gian gửi',
                         dateFormat.format(request.requestDate.toLocal()),
                       ),
-                      
+
                       if (request.priority != 'Normal') ...[
                         const SizedBox(height: 12),
                         _buildInfoRow(
@@ -1402,7 +1661,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                           valueColor: _getPriorityColor(request.priority),
                         ),
                       ],
-                      
+
                       const SizedBox(height: 12),
                       _buildInfoRow(
                         Icons.location_on,
@@ -1420,16 +1679,18 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                           valueColor: const Color(0xFF2196F3),
                         ),
                       ],
-                      
+
                       if (request.preferredTime != null) ...[
                         const SizedBox(height: 12),
                         _buildInfoRow(
                           Icons.schedule,
                           'Thời gian mong muốn',
-                          DateFormat('HH:mm').format(request.preferredTime!.toLocal()),
+                          DateFormat(
+                            'HH:mm',
+                          ).format(request.preferredTime!.toLocal()),
                         ),
                       ],
-                      
+
                       if (request.assignedRescuerId != null) ...[
                         const SizedBox(height: 12),
                         _buildInfoRow(
@@ -1438,7 +1699,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                           request.mission != null
                               ? _getStatusText(_getEffectiveStatus(request))
                               : 'Đã được phân công',
-                          valueColor: _getStatusColor(_getEffectiveStatus(request)),
+                          valueColor: _getStatusColor(
+                            _getEffectiveStatus(request),
+                          ),
                         ),
                         if (request.assignedAt != null) ...[
                           const SizedBox(height: 8),
@@ -1462,84 +1725,110 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           ),
 
           // ── Rescuer Info Card (when Assigned, Finished, Paid, or Completed) ──
-          if (request.status == 'Assigned' || request.status == 'Finished' ||
-              request.status == 'Paid' || request.status == 'Completed') ...[
+          if (request.status == 'Assigned' ||
+              request.status == 'Finished' ||
+              request.status == 'Paid' ||
+              request.status == 'Completed') ...[
             const SizedBox(height: 16),
             _buildRescuerInfoCard(request),
           ],
 
           // ── Payment Card (Pending / Confirmed / Assigned — unpaid or already paid) ──
-          if (const {'Pending', 'Confirmed', 'Assigned'}.contains(request.status)) ...[            
+          if (const {
+            'Pending',
+            'Confirmed',
+            'Assigned',
+          }.contains(request.status)) ...[
             const SizedBox(height: 16),
             _buildPaymentCard(request),
           ],
 
           // ── Final Payment Card (when Finished, Paid, or Completed) ──
-          if (request.status == 'Finished' || request.status == 'Paid' ||
+          if (request.status == 'Finished' ||
+              request.status == 'Paid' ||
               request.status == 'Completed') ...[
             const SizedBox(height: 16),
             _buildFinishedPaymentCard(request),
           ],
 
           // Species Section — caught snakes when Finished/Paid/Completed; reported snakes otherwise
-          if ((request.status == 'Finished' || request.status == 'Paid' ||
-               request.status == 'Completed')) ...[
-            Builder(builder: (_) {
-              final missionDetails = request.mission?.missionDetails ?? [];
-              // Prefer missionDetails (rescuer-confirmed catches); fall back to request.details
-              if (missionDetails.isNotEmpty) {
-                final int total = missionDetails.fold(0, (s, d) => s + d.quantity);
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 24),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'Rắn Đã Bắt Được ($total)',
-                        style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF333333),
+          if ((request.status == 'Finished' ||
+              request.status == 'Paid' ||
+              request.status == 'Completed')) ...[
+            Builder(
+              builder: (_) {
+                final missionDetails = request.mission?.missionDetails ?? [];
+                // Prefer missionDetails (rescuer-confirmed catches); fall back to request.details
+                if (missionDetails.isNotEmpty) {
+                  final int total = missionDetails.fold(
+                    0,
+                    (s, d) => s + d.quantity,
+                  );
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 24),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'Rắn Đã Bắt Được ($total)',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF333333),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Wrap(
-                        spacing: 8, runSpacing: 8,
-                        children: missionDetails.map(_buildMissionSpeciesChip).toList(),
-                      ),
-                    ),
-                  ],
-                );
-              } else if (request.details.isNotEmpty) {
-                final int total = request.details.fold(0, (s, d) => s + d.quantity);
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 24),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'Rắn Đã Bắt Được ($total)',
-                        style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF333333),
+                      const SizedBox(height: 12),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: missionDetails
+                              .map(_buildMissionSpeciesChip)
+                              .toList(),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Wrap(
-                        spacing: 8, runSpacing: 8,
-                        children: request.details.map((d) => _buildSpeciesChip(d)).toList(),
+                    ],
+                  );
+                } else if (request.details.isNotEmpty) {
+                  final int total = request.details.fold(
+                    0,
+                    (s, d) => s + d.quantity,
+                  );
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 24),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'Rắn Đã Bắt Được ($total)',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF333333),
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
-                );
-              }
-              return const SizedBox.shrink();
-            }),
+                      const SizedBox(height: 12),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: request.details
+                              .map((d) => _buildSpeciesChip(d))
+                              .toList(),
+                        ),
+                      ),
+                    ],
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
           ] else if (request.details.isNotEmpty) ...[
             const SizedBox(height: 24),
             Padding(
@@ -1559,13 +1848,16 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
               child: Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: request.details.map((detail) => _buildSpeciesChip(detail)).toList(),
+                children: request.details
+                    .map((detail) => _buildSpeciesChip(detail))
+                    .toList(),
               ),
             ),
           ],
 
           // Additional Details
-          if (request.additionalDetails != null && request.additionalDetails!.isNotEmpty) ...[
+          if (request.additionalDetails != null &&
+              request.additionalDetails!.isNotEmpty) ...[
             const SizedBox(height: 24),
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -1573,14 +1865,20 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFFF0F8FF),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF2196F3).withOpacity(0.3)),
+                border: Border.all(
+                  color: const Color(0xFF2196F3).withOpacity(0.3),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.location_on, color: Color(0xFF2196F3), size: 20),
+                      Icon(
+                        Icons.location_on,
+                        color: Color(0xFF2196F3),
+                        size: 20,
+                      ),
                       SizedBox(width: 8),
                       Text(
                         'Ghi Chú Địa Chỉ',
@@ -1615,14 +1913,20 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFFFFF3E0),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFF9800).withOpacity(0.3)),
+                border: Border.all(
+                  color: const Color(0xFFFF9800).withOpacity(0.3),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.info_outline, color: Color(0xFFFF9800), size: 20),
+                      Icon(
+                        Icons.info_outline,
+                        color: Color(0xFFFF9800),
+                        size: 20,
+                      ),
                       SizedBox(width: 8),
                       Text(
                         'Thông Tin Bổ Sung',
@@ -1668,20 +1972,31 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   Widget _buildStickyFooter(SnakeCatchingRequestData request) {
     // Deposit payment is allowed at Pending, Confirmed, Assigned statuses
     const depositStatuses = {'Pending', 'Confirmed', 'Assigned'};
-    final bool needPayment = depositStatuses.contains(request.status) && !_depositPaid;
-    final bool needFinalPayment = request.status == 'Finished' &&
-        _finalTransaction == null;
-    final bool isAnyLoading = _isCreatingPayment || _isCreatingFinalPayment ||
-        _isPayingWithWallet || _isPayingFinalWithWallet;
+    final bool needPayment =
+        depositStatuses.contains(request.status) && !_depositPaid;
+    final bool needFinalPayment =
+        request.status == 'Finished' && _finalTransaction == null;
+    final bool isAnyLoading =
+        _isCreatingPayment ||
+        _isCreatingFinalPayment ||
+        _isPayingWithWallet ||
+        _isPayingFinalWithWallet;
 
     // Cancel is allowed: Pending (any time) or Assigned only when mission is still Preparing
-    final bool canCancel = !_isCancelling &&
+    final bool canCancel =
+        !_isCancelling &&
         (request.status == 'Pending' ||
             (request.status == 'Assigned' &&
-                (request.mission == null || request.mission!.status == 'Preparing')));
+                (request.mission == null ||
+                    request.mission!.status == 'Preparing')));
 
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        MediaQuery.of(context).padding.bottom + 12,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -1704,21 +2019,32 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     : () => _showPaymentSheet(isFinalPayment: needFinalPayment),
                 icon: isAnyLoading
                     ? const SizedBox(
-                        width: 18, height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : const Icon(Icons.payment_rounded, size: 20),
                 label: Text(
                   isAnyLoading
                       ? 'Đang xử lý...'
-                      : (needFinalPayment ? 'THANH TOÁN DỊCH VỤ' : 'THANH TOÁN PHÍ DI CHUYỂN'),
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      : (needFinalPayment
+                            ? 'THANH TOÁN DỊCH VỤ'
+                            : 'THANH TOÁN PHÍ DI CHUYỂN'),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF228B22),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   elevation: 2,
                 ),
               ),
@@ -1728,21 +2054,35 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           Row(
             children: [
               // Cancel button (small, left)
-              if (canCancel) ...[  
+              if (canCancel) ...[
                 SizedBox(
                   height: 46,
                   child: OutlinedButton.icon(
                     onPressed: _isCancelling ? null : _showCancelSheet,
                     icon: _isCancelling
-                        ? const SizedBox(width: 14, height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFDC3545)))
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFFDC3545),
+                            ),
+                          )
                         : const Icon(Icons.cancel_outlined, size: 18),
-                    label: const Text('Hủy đơn', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    label: const Text(
+                      'Hủy đơn',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFDC3545),
                       side: const BorderSide(color: Color(0xFFDC3545)),
                       padding: const EdgeInsets.symmetric(horizontal: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),
@@ -1756,11 +2096,16 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF228B22),
                       side: const BorderSide(color: Color(0xFF228B22)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     child: const Text(
                       'Quay Lại',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -1783,10 +2128,14 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     // prefer actualCost, fall back to baseFee + snakeFee + envFee
     double _finalAmount() {
       final m = _request!.mission;
-      if (m?.actualCost != null && m!.actualCost! > 0) return m.actualCost!.toDouble();
-      final base  = m?.price ?? 0;
-      final snake = (m?.missionDetails ?? []).fold<double>(0, (s, d) => s + d.price);
-      final env   = m?.catchingEnvironment?.price ?? 0;
+      if (m?.actualCost != null && m!.actualCost! > 0)
+        return m.actualCost!.toDouble();
+      final base = m?.price ?? 0;
+      final snake = (m?.missionDetails ?? []).fold<double>(
+        0,
+        (s, d) => s + d.price,
+      );
+      final env = m?.catchingEnvironment?.price ?? 0;
       return (base + snake + env).toDouble();
     }
 
@@ -1799,7 +2148,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         walletInfo: _walletInfo,
         amount: isFinalPayment
             ? _finalAmount()
-            : (_request!.estimatedPrice ?? _request!.mission?.estimatedCost ?? 0).toDouble(),
+            : (_request!.estimatedPrice ??
+                      _request!.mission?.estimatedCost ??
+                      0)
+                  .toDouble(),
         onPayOS: () {
           Navigator.pop(ctx);
           if (isFinalPayment) {
@@ -1906,7 +2258,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     // Amount row
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF0F9F0),
                         borderRadius: BorderRadius.circular(12),
@@ -1917,7 +2271,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                           const Text(
                             'Số tiền',
                             style: TextStyle(
-                                fontSize: 14, color: Color(0xFF666666)),
+                              fontSize: 14,
+                              color: Color(0xFF666666),
+                            ),
                           ),
                           Text(
                             _formatCurrency(amount),
@@ -1934,20 +2290,27 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     // Method row
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8F8F8),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.account_balance_wallet,
-                              size: 18, color: Color(0xFF228B22)),
+                          const Icon(
+                            Icons.account_balance_wallet,
+                            size: 18,
+                            color: Color(0xFF228B22),
+                          ),
                           const SizedBox(width: 10),
                           const Text(
                             'Phương thức',
                             style: TextStyle(
-                                fontSize: 13, color: Color(0xFF666666)),
+                              fontSize: 13,
+                              color: Color(0xFF666666),
+                            ),
                           ),
                           const Spacer(),
                           Text(
@@ -1965,25 +2328,33 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     // Time row
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8F8F8),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.access_time,
-                              size: 18, color: Color(0xFF888888)),
+                          const Icon(
+                            Icons.access_time,
+                            size: 18,
+                            color: Color(0xFF888888),
+                          ),
                           const SizedBox(width: 10),
                           const Text(
                             'Thời gian',
                             style: TextStyle(
-                                fontSize: 13, color: Color(0xFF666666)),
+                              fontSize: 13,
+                              color: Color(0xFF666666),
+                            ),
                           ),
                           const Spacer(),
                           Text(
-                            DateFormat('HH:mm — dd/MM/yyyy')
-                                .format(DateTime.now()),
+                            DateFormat(
+                              'HH:mm — dd/MM/yyyy',
+                            ).format(DateTime.now()),
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -2002,16 +2373,18 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF228B22),
                           foregroundColor: Colors.white,
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 15),
+                          padding: const EdgeInsets.symmetric(vertical: 15),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           elevation: 0,
                         ),
                         child: const Text(
                           'Hoàn Tất',
                           style: TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.bold),
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
@@ -2089,7 +2462,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   decoration: BoxDecoration(
                     color: const Color(0xFFE3F2FD),
                     shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFF2196F3).withOpacity(0.3), width: 2),
+                    border: Border.all(
+                      color: const Color(0xFF2196F3).withOpacity(0.3),
+                      width: 2,
+                    ),
                   ),
                   child: avatarUrl != null
                       ? ClipOval(
@@ -2103,7 +2479,11 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                             ),
                           ),
                         )
-                      : const Icon(Icons.person, size: 36, color: Color(0xFF2196F3)),
+                      : const Icon(
+                          Icons.person,
+                          size: 36,
+                          color: Color(0xFF2196F3),
+                        ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -2125,7 +2505,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                             ...List.generate(5, (i) {
                               const star = Color(0xFFFFC107);
                               return Icon(
-                                i < rating.round() ? Icons.star : Icons.star_border,
+                                i < rating.round()
+                                    ? Icons.star
+                                    : Icons.star_border,
                                 color: star,
                                 size: 16,
                               );
@@ -2143,17 +2525,27 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       else
                         const Text(
                           'Chưa có đánh giá',
-                          style: TextStyle(fontSize: 12, color: Color(0xFF999999)),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF999999),
+                          ),
                         ),
                       if (request.assignedAt != null) ...[
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            const Icon(Icons.access_time, size: 12, color: Color(0xFF999999)),
+                            const Icon(
+                              Icons.access_time,
+                              size: 12,
+                              color: Color(0xFF999999),
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               'Nhận đơn: ${DateFormat('HH:mm dd/MM').format(request.assignedAt!.toLocal())}',
-                              style: const TextStyle(fontSize: 12, color: Color(0xFF999999)),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF999999),
+                              ),
                             ),
                           ],
                         ),
@@ -2178,7 +2570,11 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       await launchUrl(uri);
                     }
                   },
-                  icon: const Icon(Icons.call, size: 18, color: Color(0xFF2196F3)),
+                  icon: const Icon(
+                    Icons.call,
+                    size: 18,
+                    color: Color(0xFF2196F3),
+                  ),
                   label: Text(
                     'Gọi $phone',
                     style: const TextStyle(
@@ -2190,7 +2586,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFF2196F3)),
                     padding: const EdgeInsets.symmetric(vertical: 11),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
               ),
@@ -2243,7 +2641,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  paid ? 'Đã Thanh Toán Phí Di Chuyển' : 'Thanh Toán Phí Di Chuyển',
+                  paid
+                      ? 'Đã Thanh Toán Phí Di Chuyển'
+                      : 'Thanh Toán Phí Di Chuyển',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -2255,7 +2655,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   ),
                 ],
               ],
@@ -2280,7 +2683,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       padding: const EdgeInsets.only(left: 28, top: 2),
                       child: Text(
                         'Khoảng cách: ${request.distanceKm!.toStringAsFixed(1)} km',
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF999999)),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF999999),
+                        ),
                       ),
                     ),
                   const SizedBox(height: 16),
@@ -2299,12 +2705,19 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.receipt_long, size: 15, color: Color(0xFF888888)),
+                          Icon(
+                            Icons.receipt_long,
+                            size: 15,
+                            color: Color(0xFF888888),
+                          ),
                           SizedBox(width: 6),
                           Text(
                             'Chi phí sẽ thanh toán sau khi hoàn thành',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-                                color: Color(0xFF666666)),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF666666),
+                            ),
                           ),
                         ],
                       ),
@@ -2317,46 +2730,72 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                           icon: Icons.miscellaneous_services,
                         ),
                       // Snake catching fee from missionDetails (if available)
-                      if ((request.mission?.missionDetails ?? []).isNotEmpty) ...[  
+                      if ((request.mission?.missionDetails ?? [])
+                          .isNotEmpty) ...[
                         const SizedBox(height: 6),
                         _buildPayRow(
                           'Phí bắt rắn:',
-                          _formatCurrency((request.mission!.missionDetails
-                              .fold(0.0, (s, d) => s + d.price))),
+                          _formatCurrency(
+                            (request.mission!.missionDetails.fold(
+                              0.0,
+                              (s, d) => s + d.price,
+                            )),
+                          ),
                           icon: Icons.pest_control,
                         ),
-                        ...request.mission!.missionDetails.map((d) => Padding(
-                              padding: const EdgeInsets.only(top: 4, left: 28),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text('· ${d.snakeSpeciesName} × ${d.quantity}',
-                                      style: const TextStyle(fontSize: 12,
-                                          color: Color(0xFF888888))),
-                                  Text(_formatCurrency(d.price),
-                                      style: const TextStyle(fontSize: 12,
-                                          color: Color(0xFF888888))),
-                                ],
-                              ),
-                            )),
-                      ] else ...[  
+                        ...request.mission!.missionDetails.map(
+                          (d) => Padding(
+                            padding: const EdgeInsets.only(top: 4, left: 28),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '· ${d.snakeSpeciesName} × ${d.quantity}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF888888),
+                                  ),
+                                ),
+                                Text(
+                                  _formatCurrency(d.price),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF888888),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ] else ...[
                         const SizedBox(height: 6),
                         const Row(
                           children: [
-                            Icon(Icons.pest_control, size: 14, color: Color(0xFFAAAAAA)),
+                            Icon(
+                              Icons.pest_control,
+                              size: 14,
+                              color: Color(0xFFAAAAAA),
+                            ),
                             SizedBox(width: 6),
-                            Text('Phí bắt rắn: xác nhận sau khi hoàn thành',
-                                style: TextStyle(fontSize: 12, color: Color(0xFFAAAAAA),
-                                    fontStyle: FontStyle.italic)),
+                            Text(
+                              'Phí bắt rắn: xác nhận sau khi hoàn thành',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFFAAAAAA),
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
                           ],
                         ),
                       ],
                       // Environment fee
-                      if (request.mission?.catchingEnvironment != null) ...[  
+                      if (request.mission?.catchingEnvironment != null) ...[
                         const SizedBox(height: 6),
                         _buildPayRow(
                           'Phụ phí khu vực (${request.mission!.catchingEnvironment!.name}):',
-                          _formatCurrency(request.mission!.catchingEnvironment!.price),
+                          _formatCurrency(
+                            request.mission!.catchingEnvironment!.price,
+                          ),
                           icon: Icons.home_work_outlined,
                         ),
                       ],
@@ -2364,7 +2803,6 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-
 
                 if (paid) ...[
                   // Paid state
@@ -2376,7 +2814,11 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.verified, color: Color(0xFF28A745), size: 22),
+                        const Icon(
+                          Icons.verified,
+                          color: Color(0xFF28A745),
+                          size: 22,
+                        ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
@@ -2393,12 +2835,18 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                               if (_transaction?.amount != null)
                                 Text(
                                   'Đã thanh toán: ${_formatCurrency(_transaction!.amount)}',
-                                  style: const TextStyle(fontSize: 13, color: Color(0xFF4CAF50)),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF4CAF50),
+                                  ),
                                 ),
                               const SizedBox(height: 2),
                               const Text(
                                 'Người cứu hộ đang trên đường đến',
-                                style: TextStyle(fontSize: 12, color: Color(0xFF666666)),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF666666),
+                                ),
                               ),
                             ],
                           ),
@@ -2417,12 +2865,20 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.info_outline, color: Color(0xFFFF8F00), size: 20),
+                        Icon(
+                          Icons.info_outline,
+                          color: Color(0xFFFF8F00),
+                          size: 20,
+                        ),
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             'Vui lòng thanh toán đặt cọc để người cứu hộ bắt đầu di chuyển đến địa điểm của bạn.',
-                            style: TextStyle(fontSize: 13, color: Color(0xFF795548), height: 1.4),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF795548),
+                              height: 1.4,
+                            ),
                           ),
                         ),
                       ],
@@ -2435,7 +2891,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       SizedBox(width: 4),
                       Text(
                         'Tự động kiểm tra mỗi 5 giây',
-                        style: TextStyle(fontSize: 11, color: Color(0xFF999999)),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF999999),
+                        ),
                       ),
                     ],
                   ),
@@ -2455,16 +2914,20 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   Widget _buildFinishedPaymentCard(SnakeCatchingRequestData request) {
     final mission = request.mission;
 
-    final double baseFee   = mission?.price ?? 0;
+    final double baseFee = mission?.price ?? 0;
     final double travelFee = mission?.estimatedCost ?? 0;
-    final double snakeFee  = (mission?.missionDetails ?? [])
-        .fold(0.0, (sum, d) => sum + d.price);
-    final double envFee    = mission?.catchingEnvironment?.price ?? 0;
-    final String? envName  = mission?.catchingEnvironment?.name;
-    final double round2Amount = mission?.actualCost ?? (baseFee + snakeFee + envFee);
+    final double snakeFee = (mission?.missionDetails ?? []).fold(
+      0.0,
+      (sum, d) => sum + d.price,
+    );
+    final double envFee = mission?.catchingEnvironment?.price ?? 0;
+    final String? envName = mission?.catchingEnvironment?.name;
+    final double round2Amount =
+        mission?.actualCost ?? (baseFee + snakeFee + envFee);
     final double totalPaid = travelFee + round2Amount;
 
-    final bool round2Paid = _finalTransaction != null ||
+    final bool round2Paid =
+        _finalTransaction != null ||
         request.status == 'Paid' ||
         request.status == 'Completed';
 
@@ -2472,42 +2935,50 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     final missionMedia = request.mission?.media ?? [];
     final evidencePhotos = missionMedia.isNotEmpty
         ? missionMedia.where((m) => m.purpose == 'Evidence').toList()
-        : request.media.where((m) => m.purpose == 'Evidence' || m.url.isNotEmpty).toList();
+        : request.media
+              .where((m) => m.purpose == 'Evidence' || m.url.isNotEmpty)
+              .toList();
 
     Widget _card({required Widget child}) => Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2)),
-            ],
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
-          child: child,
-        );
+        ],
+      ),
+      child: child,
+    );
 
     Widget _cardHeader(String title, Color color, IconData icon) => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(16),
-              topRight: Radius.circular(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white, size: 20),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
           ),
-          child: Row(children: [
-            Icon(icon, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Text(title,
-                style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white)),
-          ]),
-        );
+        ],
+      ),
+    );
 
     // ── Card 1: Round 1 — travel fee (always done by this point) ────
     final round1Card = _card(
@@ -2537,28 +3008,39 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       alignment: Alignment.centerLeft,
                       child: Text(
                         'Khoảng cách: ${request.distanceKm!.toStringAsFixed(1)} km',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF999999)),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF999999),
+                        ),
                       ),
                     ),
                   ),
                 ],
                 const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFE8F5E9),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.verified, color: Color(0xFF28A745), size: 16),
+                      const Icon(
+                        Icons.verified,
+                        color: Color(0xFF28A745),
+                        size: 16,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         'Đã thanh toán ${_formatCurrency(travelFee)}',
                         style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF28A745)),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF28A745),
+                        ),
                       ),
                     ],
                   ),
@@ -2577,7 +3059,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _cardHeader(
-            round2Paid ? 'Đợt 2 — Thanh Toán Dịch Vụ (Đã Thanh Toán)' : 'Đợt 2 — Thanh Toán Dịch Vụ',
+            round2Paid
+                ? 'Đợt 2 — Thanh Toán Dịch Vụ (Đã Thanh Toán)'
+                : 'Đợt 2 — Thanh Toán Dịch Vụ',
             round2Paid ? const Color(0xFF28A745) : const Color(0xFFFF6B35),
             round2Paid ? Icons.check_circle : Icons.payments_outlined,
           ),
@@ -2586,36 +3070,55 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Chi tiết đợt 2:',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF555555))),
+                const Text(
+                  'Chi tiết đợt 2:',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF555555),
+                  ),
+                ),
                 const SizedBox(height: 10),
 
                 // Base fee
-                _buildPayRow('Phí dịch vụ cơ bản:', _formatCurrency(baseFee),
-                    icon: Icons.miscellaneous_services),
+                _buildPayRow(
+                  'Phí dịch vụ cơ bản:',
+                  _formatCurrency(baseFee),
+                  icon: Icons.miscellaneous_services,
+                ),
 
                 // Snake fee
                 if (snakeFee > 0) ...[
                   const SizedBox(height: 8),
-                  _buildPayRow('Phí bắt rắn:', _formatCurrency(snakeFee),
-                      icon: Icons.pest_control),
-                  ...(mission?.missionDetails ?? []).map((d) => Padding(
-                        padding: const EdgeInsets.only(top: 4, left: 28),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('${d.snakeSpeciesName} × ${d.quantity}',
-                                style: const TextStyle(
-                                    fontSize: 13, color: Color(0xFF888888))),
-                            Text(_formatCurrency(d.price),
-                                style: const TextStyle(
-                                    fontSize: 13, color: Color(0xFF888888))),
-                          ],
-                        ),
-                      )),
+                  _buildPayRow(
+                    'Phí bắt rắn:',
+                    _formatCurrency(snakeFee),
+                    icon: Icons.pest_control,
+                  ),
+                  ...(mission?.missionDetails ?? []).map(
+                    (d) => Padding(
+                      padding: const EdgeInsets.only(top: 4, left: 28),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${d.snakeSpeciesName} × ${d.quantity}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF888888),
+                            ),
+                          ),
+                          Text(
+                            _formatCurrency(d.price),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF888888),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
 
                 // Environment fee
@@ -2635,18 +3138,20 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     Text(
                       round2Paid ? 'Đã thanh toán:' : 'Số tiền cần thanh toán:',
                       style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF333333)),
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF333333),
+                      ),
                     ),
                     Text(
                       _formatCurrency(round2Amount),
                       style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: round2Paid
-                              ? const Color(0xFF28A745)
-                              : const Color(0xFFFF6B35)),
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: round2Paid
+                            ? const Color(0xFF28A745)
+                            : const Color(0xFFFF6B35),
+                      ),
                     ),
                   ],
                 ),
@@ -2654,11 +3159,14 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 // ── Evidence photos (shown in round-2 card) ──
                 if (evidencePhotos.isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  const Text('Ảnh bằng chứng nhiệm vụ',
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF333333))),
+                  const Text(
+                    'Ảnh bằng chứng nhiệm vụ',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF333333),
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   SizedBox(
                     height: 90,
@@ -2679,8 +3187,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                               width: 90,
                               height: 90,
                               color: const Color(0xFFF0F0F0),
-                              child: const Icon(Icons.image_not_supported,
-                                  color: Color(0xFFCCCCCC)),
+                              child: const Icon(
+                                Icons.image_not_supported,
+                                color: Color(0xFFCCCCCC),
+                              ),
                             ),
                           ),
                         );
@@ -2701,15 +3211,20 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.verified, color: Color(0xFF28A745), size: 22),
+                        const Icon(
+                          Icons.verified,
+                          color: Color(0xFF28A745),
+                          size: 22,
+                        ),
                         const SizedBox(width: 10),
                         const Expanded(
                           child: Text(
                             'Thanh toán đợt 2 thành công!',
                             style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF28A745)),
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF28A745),
+                            ),
                           ),
                         ),
                       ],
@@ -2725,13 +3240,20 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.info_outline, color: Color(0xFFFF8F00), size: 20),
+                        Icon(
+                          Icons.info_outline,
+                          color: Color(0xFFFF8F00),
+                          size: 20,
+                        ),
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             'Người cứu hộ đã hoàn thành nhiệm vụ. Vui lòng thanh toán để xác nhận dịch vụ.',
                             style: TextStyle(
-                                fontSize: 13, color: Color(0xFF795548), height: 1.4),
+                              fontSize: 13,
+                              color: Color(0xFF795548),
+                              height: 1.4,
+                            ),
                           ),
                         ),
                       ],
@@ -2742,8 +3264,13 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     children: [
                       Icon(Icons.refresh, size: 12, color: Color(0xFF999999)),
                       SizedBox(width: 4),
-                      Text('Tự động kiểm tra mỗi 5 giây',
-                          style: TextStyle(fontSize: 11, color: Color(0xFF999999))),
+                      Text(
+                        'Tự động kiểm tra mỗi 5 giây',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF999999),
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -2768,9 +3295,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                    color: const Color(0xFF28A745).withOpacity(0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4)),
+                  color: const Color(0xFF28A745).withOpacity(0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
               ],
             ),
             child: Row(
@@ -2781,19 +3309,23 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Tổng đã thanh toán',
-                          style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.white70,
-                              fontWeight: FontWeight.w500)),
+                      const Text(
+                        'Tổng đã thanh toán',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         _formatCurrency(totalPaid),
                         style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: -0.5),
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: -0.5,
+                        ),
                       ),
                     ],
                   ),
@@ -2801,11 +3333,21 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('Đợt 1: ${_formatCurrency(travelFee)}',
-                        style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                    Text(
+                      'Đợt 1: ${_formatCurrency(travelFee)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.white70,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text('Đợt 2: ${_formatCurrency(round2Amount)}',
-                        style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                    Text(
+                      'Đợt 2: ${_formatCurrency(round2Amount)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.white70,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -2818,16 +3360,14 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         round1Card,
         const SizedBox(height: 12),
         round2Card,
-        if (round2Paid) ...[
-          const SizedBox(height: 12),
-          totalCard,
-        ],
+        if (round2Paid) ...[const SizedBox(height: 12), totalCard],
       ],
     );
   }
 
-
-  Widget _buildPayRow(String label, String value, {
+  Widget _buildPayRow(
+    String label,
+    String value, {
     IconData? icon,
     Color? valueColor,
   }) {
@@ -2917,7 +3457,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     final speciesDetail = _speciesDetailsMap[md.snakeSpeciesId];
     final isLoading = _loadingSpeciesIds.contains(md.snakeSpeciesId);
     return InkWell(
-      onTap: speciesDetail != null ? () => _showSpeciesDetailModal(speciesDetail, md.quantity) : null,
+      onTap: speciesDetail != null
+          ? () => _showSpeciesDetailModal(speciesDetail, md.quantity)
+          : null,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(12),
@@ -2926,7 +3468,11 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0xFFE0E0E0)),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2)),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
         child: Row(
@@ -2937,7 +3483,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 borderRadius: BorderRadius.circular(8),
                 child: Image.network(
                   speciesDetail!.imageUrl!,
-                  width: 80, height: 80, fit: BoxFit.cover,
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => _buildImagePlaceholder(),
                   loadingBuilder: (_, child, progress) =>
                       progress == null ? child : _buildImagePlaceholder(),
@@ -2947,12 +3495,17 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
               _buildImagePlaceholder()
             else
               Container(
-                width: 80, height: 80,
+                width: 80,
+                height: 80,
                 decoration: BoxDecoration(
                   color: const Color(0xFFFF9800).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.pest_control, color: Color(0xFFFF9800), size: 40),
+                child: const Icon(
+                  Icons.pest_control,
+                  color: Color(0xFFFF9800),
+                  size: 40,
+                ),
               ),
             const SizedBox(width: 12),
             Expanded(
@@ -2964,20 +3517,34 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       Expanded(
                         child: Text(
                           md.snakeSpeciesName,
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
-                          maxLines: 2, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF333333),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (speciesDetail?.isVenomous == true) ...[
                         const SizedBox(width: 4),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.red.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text('ĐỘC',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red)),
+                          child: const Text(
+                            'ĐỘC',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red,
+                            ),
+                          ),
                         ),
                       ],
                     ],
@@ -2986,8 +3553,13 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   if (speciesDetail?.scientificName.isNotEmpty == true)
                     Text(
                       speciesDetail!.scientificName,
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600], fontStyle: FontStyle.italic),
-                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontStyle: FontStyle.italic,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   const SizedBox(height: 8),
                   Row(
@@ -2997,22 +3569,35 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                         const SizedBox(width: 8),
                       ],
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFF228B22).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
                           'SL: ${md.quantity}',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF228B22)),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF228B22),
+                          ),
                         ),
                       ),
                     ],
                   ),
                   if (speciesDetail != null) ...[
                     const SizedBox(height: 8),
-                    Text('Nhấn để xem chi tiết',
-                        style: TextStyle(fontSize: 11, color: Colors.grey[500], fontStyle: FontStyle.italic)),
+                    Text(
+                      'Nhấn để xem chi tiết',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[500],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
                   ],
                 ],
               ),
@@ -3029,7 +3614,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     final int displayQty = quantityOverride ?? detail.quantity;
 
     return InkWell(
-      onTap: speciesDetail != null ? () => _showSpeciesDetailModal(speciesDetail, displayQty) : null,
+      onTap: speciesDetail != null
+          ? () => _showSpeciesDetailModal(speciesDetail, displayQty)
+          : null,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(12),
@@ -3057,7 +3644,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   width: 80,
                   height: 80,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => _buildImagePlaceholder(),
+                  errorBuilder: (context, error, stackTrace) =>
+                      _buildImagePlaceholder(),
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;
                     return _buildImagePlaceholder();
@@ -3104,7 +3692,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       if (speciesDetail?.isVenomous == true) ...[
                         const SizedBox(width: 4),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.red.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(4),
@@ -3142,7 +3733,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                         const SizedBox(width: 8),
                       ],
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFF228B22).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(20),
@@ -3198,7 +3792,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   Widget _buildRiskLevelBadge(double riskLevel) {
     Color badgeColor;
     String riskText;
-    
+
     if (riskLevel >= 8.0) {
       badgeColor = Colors.red;
       riskText = 'CỰC KỲ NGUY HIỂM';
@@ -3284,13 +3878,18 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                             width: double.infinity,
                             height: 200,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Container(
-                              height: 200,
-                              color: Colors.grey[200],
-                              child: const Center(
-                                child: Icon(Icons.broken_image, size: 50, color: Colors.grey),
-                              ),
-                            ),
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  height: 200,
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.broken_image,
+                                      size: 50,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ),
                           ),
                         ),
                       const SizedBox(height: 16),
@@ -3321,16 +3920,25 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                           _buildRiskLevelBadge(species.riskLevel),
                           if (species.isVenomous)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.red.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.red.withOpacity(0.3)),
+                                border: Border.all(
+                                  color: Colors.red.withOpacity(0.3),
+                                ),
                               ),
                               child: const Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.dangerous, color: Colors.red, size: 14),
+                                  Icon(
+                                    Icons.dangerous,
+                                    color: Colors.red,
+                                    size: 14,
+                                  ),
                                   SizedBox(width: 4),
                                   Text(
                                     'RẮN ĐỘC',
@@ -3344,7 +3952,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                               ),
                             ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFF228B22).withOpacity(0.1),
                               borderRadius: BorderRadius.circular(20),
@@ -3360,7 +3971,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                           ),
                           if (species.primaryVenomType != null)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.purple.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(20),
@@ -3396,7 +4010,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                         const SizedBox(height: 16),
                       ],
                       // Physical Traits
-                      if (species.identification?.physicalTraits.isNotEmpty == true) ...[
+                      if (species.identification?.physicalTraits.isNotEmpty ==
+                          true) ...[
                         _buildListSection(
                           icon: Icons.straighten,
                           title: 'Đặc Điểm Vật Lý',
@@ -3405,7 +4020,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                         const SizedBox(height: 16),
                       ],
                       // Behaviors
-                      if (species.identification?.behaviors.isNotEmpty == true) ...[
+                      if (species.identification?.behaviors.isNotEmpty ==
+                          true) ...[
                         _buildListSection(
                           icon: Icons.pets,
                           title: 'Hành Vi',
@@ -3414,7 +4030,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                         const SizedBox(height: 16),
                       ],
                       // Habitat
-                      if (species.identification?.habitat.isNotEmpty == true) ...[
+                      if (species.identification?.habitat.isNotEmpty ==
+                          true) ...[
                         _buildSection(
                           icon: Icons.terrain,
                           title: 'Môi Trường Sống',
@@ -3512,25 +4129,33 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: items
-                .map((item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('• ', style: TextStyle(fontSize: 14, color: Color(0xFF228B22))),
-                          Expanded(
-                            child: Text(
-                              item,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF555555),
-                                height: 1.5,
-                              ),
+                .map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '• ',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF228B22),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            item,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF555555),
+                              height: 1.5,
                             ),
                           ),
-                        ],
-                      ),
-                    ))
+                        ),
+                      ],
+                    ),
+                  ),
+                )
                 .toList(),
           ),
         ),
@@ -3557,83 +4182,94 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           ],
         ),
         const SizedBox(height: 8),
-        ...symptoms.map((symptom) => Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: symptom.isCritical 
-                    ? Colors.red.withOpacity(0.05)
-                    : const Color(0xFFF6F8F6),
-                borderRadius: BorderRadius.circular(8),
-                border: symptom.isCritical
-                    ? Border.all(color: Colors.red.withOpacity(0.3))
-                    : null,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      if (symptom.isCritical)
-                        const Icon(Icons.error, color: Colors.red, size: 16),
-                      if (symptom.isCritical) const SizedBox(width: 4),
-                      Text(
-                        symptom.timeRange,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: symptom.isCritical ? Colors.red : const Color(0xFF228B22),
+        ...symptoms.map(
+          (symptom) => Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: symptom.isCritical
+                  ? Colors.red.withOpacity(0.05)
+                  : const Color(0xFFF6F8F6),
+              borderRadius: BorderRadius.circular(8),
+              border: symptom.isCritical
+                  ? Border.all(color: Colors.red.withOpacity(0.3))
+                  : null,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    if (symptom.isCritical)
+                      const Icon(Icons.error, color: Colors.red, size: 16),
+                    if (symptom.isCritical) const SizedBox(width: 4),
+                    Text(
+                      symptom.timeRange,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: symptom.isCritical
+                            ? Colors.red
+                            : const Color(0xFF228B22),
+                      ),
+                    ),
+                    if (symptom.isCritical) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'NGUY CẤP',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
-                      if (symptom.isCritical) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.circular(4),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ...symptom.signs.map(
+                  (sign) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '• ',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: symptom.isCritical
+                                ? Colors.red
+                                : const Color(0xFF228B22),
                           ),
-                          child: const Text(
-                            'NGUY CẤP',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                        ),
+                        Expanded(
+                          child: Text(
+                            sign,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF555555),
+                              height: 1.5,
                             ),
                           ),
                         ),
                       ],
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  ...symptom.signs.map((sign) => Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '• ',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: symptom.isCritical ? Colors.red : const Color(0xFF228B22),
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                sign,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Color(0xFF555555),
-                                  height: 1.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )),
-                ],
-              ),
-            )),
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -3644,30 +4280,31 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   Widget _buildStatusStepper(String effectiveStatus, String requestStatus) {
     // Steps in order (using effective status keys)
     const steps = [
-      ('pending',   Icons.schedule,          'Chờ\nduyệt'),
+      ('pending', Icons.schedule, 'Chờ\nduyệt'),
       ('confirmed', Icons.check_circle_outline, 'Đã\nduyệt'),
-      ('assigned',  Icons.assignment_ind,    'Phân\ncông'),
-      ('deposited', Icons.payments_rounded,  'Đặt\ncọc'),
-      ('en_route',  Icons.directions_car,    'Đang\nđến'),
-      ('arrived',   Icons.location_on,       'Đến\nnơi'),
-      ('finished',  Icons.payments_outlined, 'Thanh\ntoán'),
-      ('completed', Icons.check_circle,      'Hoàn\nthành'),
+      ('assigned', Icons.assignment_ind, 'Phân\ncông'),
+      ('deposited', Icons.payments_rounded, 'Đặt\ncọc'),
+      ('en_route', Icons.directions_car, 'Đang\nđến'),
+      ('arrived', Icons.location_on, 'Đến\nnơi'),
+      ('finished', Icons.payments_outlined, 'Thanh\ntoán'),
+      ('completed', Icons.check_circle, 'Hoàn\nthành'),
     ];
 
     // Determine effective index
     final activeKey = effectiveStatus.toLowerCase();
     // Map cancelled/expired/paid/dispute to nearest visible step
-    final displayKey = {
-      'paid': 'completed',
-      'dispute': 'finished',
-    }[activeKey] ?? activeKey;
+    final displayKey =
+        {'paid': 'completed', 'dispute': 'finished'}[activeKey] ?? activeKey;
 
     final activeIndex = steps.indexWhere((s) => s.$1 == displayKey);
     // If not found (e.g. cancelled/expired), skip drawing stepper
-    if (activeIndex < 0 && requestStatus.toLowerCase() != 'cancelled' && requestStatus.toLowerCase() != 'expired') {
+    if (activeIndex < 0 &&
+        requestStatus.toLowerCase() != 'cancelled' &&
+        requestStatus.toLowerCase() != 'expired') {
       return const SizedBox.shrink();
     }
-    if (requestStatus.toLowerCase() == 'cancelled' || requestStatus.toLowerCase() == 'expired') {
+    if (requestStatus.toLowerCase() == 'cancelled' ||
+        requestStatus.toLowerCase() == 'expired') {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Container(
@@ -3683,7 +4320,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
               Icon(Icons.cancel, color: Colors.grey[500], size: 18),
               const SizedBox(width: 8),
               Text(
-                requestStatus.toLowerCase() == 'cancelled' ? 'Yêu cầu đã bị hủy' : 'Yêu cầu đã hết hạn',
+                requestStatus.toLowerCase() == 'cancelled'
+                    ? 'Yêu cầu đã bị hủy'
+                    : 'Yêu cầu đã hết hạn',
                 style: TextStyle(fontSize: 13, color: Colors.grey[600]),
               ),
             ],
@@ -3694,7 +4333,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
 
     final activeColor = _getStatusColor(steps[activeIndex].$1);
     final activeLabel = steps[activeIndex].$3.replaceAll('\n', ' ');
-    final activeIcon  = steps[activeIndex].$2;
+    final activeIcon = steps[activeIndex].$2;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -3718,7 +4357,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: activeColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(20),
@@ -3752,15 +4394,15 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: List.generate(steps.length, (idx) {
-                final step     = steps[idx];
-                final isDone   = idx < activeIndex;
+                final step = steps[idx];
+                final isDone = idx < activeIndex;
                 final isActive = idx == activeIndex;
-                final isFirst  = idx == 0;
-                final isLast   = idx == steps.length - 1;
-                final color    = _getStatusColor(step.$1);
+                final isFirst = idx == 0;
+                final isLast = idx == steps.length - 1;
+                final color = _getStatusColor(step.$1);
 
                 // Left connector color: based on whether THIS step is done/active
-                final leftLineDone  = isDone || isActive;
+                final leftLineDone = isDone || isActive;
                 // Right connector color: based on whether NEXT step is reached
                 final rightLineDone = idx < activeIndex;
 
@@ -3778,8 +4420,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                               color: isFirst
                                   ? Colors.transparent
                                   : (leftLineDone
-                                      ? _getStatusColor(steps[idx - 1].$1)
-                                      : Colors.grey[200]),
+                                        ? _getStatusColor(steps[idx - 1].$1)
+                                        : Colors.grey[200]),
                             ),
                           ),
                           // Circle
@@ -3791,10 +4433,12 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                               color: isActive
                                   ? color
                                   : isDone
-                                      ? color
-                                      : Colors.grey[100],
+                                  ? color
+                                  : Colors.grey[100],
                               border: Border.all(
-                                color: isActive || isDone ? color : Colors.grey[300]!,
+                                color: isActive || isDone
+                                    ? color
+                                    : Colors.grey[300]!,
                                 width: 1.5,
                               ),
                               boxShadow: isActive
@@ -3809,13 +4453,18 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                             ),
                             child: Center(
                               child: isDone
-                                  ? const Icon(Icons.check_rounded,
-                                      size: 13, color: Colors.white)
+                                  ? const Icon(
+                                      Icons.check_rounded,
+                                      size: 13,
+                                      color: Colors.white,
+                                    )
                                   : isActive
-                                      ? Icon(step.$2,
-                                          size: 13, color: Colors.white)
-                                      : Icon(step.$2,
-                                          size: 12, color: Colors.grey[400]),
+                                  ? Icon(step.$2, size: 13, color: Colors.white)
+                                  : Icon(
+                                      step.$2,
+                                      size: 12,
+                                      color: Colors.grey[400],
+                                    ),
                             ),
                           ),
                           // Right connector (invisible for last step)
@@ -3824,9 +4473,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                               height: 2.5,
                               color: isLast
                                   ? Colors.transparent
-                                  : (rightLineDone
-                                      ? color
-                                      : Colors.grey[200]),
+                                  : (rightLineDone ? color : Colors.grey[200]),
                             ),
                           ),
                         ],
@@ -3849,13 +4496,14 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                               style: TextStyle(
                                 fontSize: 8.5,
                                 height: 1.35,
-                                fontWeight:
-                                    isActive ? FontWeight.bold : FontWeight.normal,
+                                fontWeight: isActive
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                                 color: isActive
                                     ? color
                                     : isDone
-                                        ? Colors.grey[600]
-                                        : Colors.grey[400],
+                                    ? Colors.grey[600]
+                                    : Colors.grey[400],
                               ),
                             ),
                           ),
@@ -3889,7 +4537,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     if (request.status == 'Assigned') {
       // Mission sub-statuses take priority (En_Route / Arrived)
       if (request.mission != null) {
-        final ms = request.mission!.status.toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+        final ms = request.mission!.status
+            .toLowerCase()
+            .replaceAll('-', '_')
+            .replaceAll(' ', '_');
         if (ms == 'en_route' || ms == 'enroute') return 'en_route';
         if (ms == 'arrived') return 'arrived';
       }
@@ -4000,6 +4651,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     }
   }
 }
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Payment Method Bottom Sheet
 // ──────────────────────────────────────────────────────────────────────────────
@@ -4019,10 +4671,9 @@ class _PaymentMethodSheet extends StatelessWidget {
   });
 
   String _fmt(double v) {
-    final s = v.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-      (m) => '${m[1]}.',
-    );
+    final s = v
+        .toStringAsFixed(0)
+        .replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
     return '$s đ';
   }
 
@@ -4041,7 +4692,11 @@ class _PaymentMethodSheet extends StatelessWidget {
         ),
       ),
       padding: EdgeInsets.fromLTRB(
-          20, 12, 20, MediaQuery.of(context).padding.bottom + 24),
+        20,
+        12,
+        20,
+        MediaQuery.of(context).padding.bottom + 24,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -4066,8 +4721,11 @@ class _PaymentMethodSheet extends StatelessWidget {
                   color: const Color(0xFF228B22).withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.payment_rounded,
-                    color: Color(0xFF228B22), size: 22),
+                child: const Icon(
+                  Icons.payment_rounded,
+                  color: Color(0xFF228B22),
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               Column(
@@ -4098,8 +4756,7 @@ class _PaymentMethodSheet extends StatelessWidget {
           // ── Amount pill ───────────────────────────────────────────
           Container(
             width: double.infinity,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: const Color(0xFF228B22).withOpacity(0.08),
               borderRadius: BorderRadius.circular(12),
@@ -4110,7 +4767,9 @@ class _PaymentMethodSheet extends StatelessWidget {
                 Text(
                   isFinalPayment ? 'Đợt 2 — Dịch vụ' : 'Đợt 1 — Đặt cọc',
                   style: const TextStyle(
-                      fontSize: 13, color: Color(0xFF555555)),
+                    fontSize: 13,
+                    color: Color(0xFF555555),
+                  ),
                 ),
                 Text(
                   _fmt(amount),
@@ -4145,7 +4804,9 @@ class _PaymentMethodSheet extends StatelessWidget {
                 // Card header
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 14),
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
                       colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
@@ -4167,9 +4828,10 @@ class _PaymentMethodSheet extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
-                            Icons.account_balance_wallet,
-                            color: Colors.white,
-                            size: 20),
+                          Icons.account_balance_wallet,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       const Expanded(
@@ -4187,7 +4849,9 @@ class _PaymentMethodSheet extends StatelessWidget {
                             Text(
                               'Thanh toán tức thì, không phí giao dịch',
                               style: TextStyle(
-                                  fontSize: 11, color: Colors.white70),
+                                fontSize: 11,
+                                color: Colors.white70,
+                              ),
                             ),
                           ],
                         ),
@@ -4203,16 +4867,21 @@ class _PaymentMethodSheet extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Số dư hiện tại',
-                              style: TextStyle(
-                                  fontSize: 13, color: Colors.grey[600])),
+                          Text(
+                            'Số dư hiện tại',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                            ),
+                          ),
                           walletInfo == null
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
                                   child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Color(0xFF228B22)),
+                                    strokeWidth: 2,
+                                    color: Color(0xFF228B22),
+                                  ),
                                 )
                               : Text(
                                   _fmt(balance),
@@ -4230,22 +4899,28 @@ class _PaymentMethodSheet extends StatelessWidget {
                         const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFDC3545).withOpacity(0.06),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.info_outline,
-                                  size: 14, color: Color(0xFFDC3545)),
+                              const Icon(
+                                Icons.info_outline,
+                                size: 14,
+                                color: Color(0xFFDC3545),
+                              ),
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
                                   'Số dư không đủ. Cần nạp thêm ${_fmt(amount - balance)}.',
                                   style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFFDC3545)),
+                                    fontSize: 12,
+                                    color: Color(0xFFDC3545),
+                                  ),
                                 ),
                               ),
                             ],
@@ -4262,10 +4937,10 @@ class _PaymentMethodSheet extends StatelessWidget {
                             foregroundColor: Colors.white,
                             disabledBackgroundColor: Colors.grey[200],
                             disabledForegroundColor: Colors.grey[400],
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 13),
+                            padding: const EdgeInsets.symmetric(vertical: 13),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                             elevation: 0,
                           ),
                           child: Text(
@@ -4273,8 +4948,9 @@ class _PaymentMethodSheet extends StatelessWidget {
                                 ? 'Thanh toán bằng ví'
                                 : 'Số dư không đủ',
                             style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold),
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
@@ -4306,7 +4982,9 @@ class _PaymentMethodSheet extends StatelessWidget {
                 // Card header
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 14),
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
                       colors: [Color(0xFF1565C0), Color(0xFF0D47A1)],
@@ -4327,8 +5005,11 @@ class _PaymentMethodSheet extends StatelessWidget {
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.credit_card_rounded,
-                            color: Colors.white, size: 20),
+                        child: const Icon(
+                          Icons.credit_card_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       const Expanded(
@@ -4346,7 +5027,9 @@ class _PaymentMethodSheet extends StatelessWidget {
                             Text(
                               'Thẻ ngân hàng, QR code, Internet Banking',
                               style: TextStyle(
-                                  fontSize: 11, color: Colors.white70),
+                                fontSize: 11,
+                                color: Colors.white70,
+                              ),
                             ),
                           ],
                         ),
@@ -4365,8 +5048,10 @@ class _PaymentMethodSheet extends StatelessWidget {
                           const SizedBox(width: 8),
                           _featureChip(Icons.credit_card, 'ATM / Visa'),
                           const SizedBox(width: 8),
-                          _featureChip(Icons.account_balance,
-                              'Internet Banking'),
+                          _featureChip(
+                            Icons.account_balance,
+                            'Internet Banking',
+                          ),
                         ],
                       ),
                       const SizedBox(height: 14),
@@ -4377,17 +5062,18 @@ class _PaymentMethodSheet extends StatelessWidget {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF1565C0),
                             foregroundColor: Colors.white,
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 13),
+                            padding: const EdgeInsets.symmetric(vertical: 13),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                             elevation: 0,
                           ),
                           child: const Text(
                             'Thanh toán qua PayOS',
                             style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold),
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
@@ -4404,8 +5090,7 @@ class _PaymentMethodSheet extends StatelessWidget {
 
   Widget _featureChip(IconData icon, String label) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: const Color(0xFF1565C0).withOpacity(0.07),
         borderRadius: BorderRadius.circular(20),
@@ -4415,11 +5100,14 @@ class _PaymentMethodSheet extends StatelessWidget {
         children: [
           Icon(icon, size: 13, color: const Color(0xFF1565C0)),
           const SizedBox(width: 4),
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF1565C0),
-                  fontWeight: FontWeight.w500)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Color(0xFF1565C0),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ],
       ),
     );

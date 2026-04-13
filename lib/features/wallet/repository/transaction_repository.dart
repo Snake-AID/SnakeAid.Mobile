@@ -62,8 +62,7 @@ const Set<String> kCreditTypes = {
 
 bool isCredit(String transactionType) => kCreditTypes.contains(transactionType);
 
-String transTypeLabel(String type) =>
-    kTransTypeLabels[type] ?? type;
+String transTypeLabel(String type) => kTransTypeLabels[type] ?? type;
 
 // ── Model ──────────────────────────────────────────────────────────────────
 
@@ -74,6 +73,7 @@ class TransactionInfo {
   final String referenceId;
   final double amount;
   final String currency;
+  final String status;
   final String transactionType;
   final String description;
   final String paymentMethod;
@@ -87,6 +87,7 @@ class TransactionInfo {
     required this.referenceId,
     required this.amount,
     required this.currency,
+    required this.status,
     required this.transactionType,
     required this.description,
     required this.paymentMethod,
@@ -102,6 +103,7 @@ class TransactionInfo {
       referenceId: json['referenceId'] as String? ?? '',
       amount: (json['amount'] as num?)?.toDouble() ?? 0,
       currency: json['currency'] as String? ?? 'VND',
+      status: json['status'] as String? ?? '',
       transactionType: json['transactionType'] as String? ?? '',
       description: json['description'] as String? ?? '',
       paymentMethod: json['paymentMethod'] as String? ?? '',
@@ -110,6 +112,24 @@ class TransactionInfo {
           ? DateTime.parse(json['createdAt'] as String)
           : DateTime.now(),
     );
+  }
+
+  bool get hasExternalTransactionId => externalTransactionId.trim().isNotEmpty;
+
+  bool get isPaid => status.trim().toLowerCase() == 'paid';
+
+  bool get isPayOsPayment => paymentMethod.trim().toUpperCase() == 'PAYOS';
+
+  bool matchesPrefix(String prefix, int? orderCode) {
+    if (orderCode == null) {
+      return true;
+    }
+
+    return description.startsWith('$prefix$orderCode');
+  }
+
+  bool matchesTransactionType(String expectedType) {
+    return transactionType == expectedType;
   }
 }
 
@@ -138,8 +158,9 @@ class TransactionRepository {
       if (referenceId != null) params['ReferenceId'] = referenceId;
 
       debugPrint(
-          '💳 GET /api/transactions  page=$pageNumber size=$pageSize'
-          '${transType != null ? " type=$transType" : ""}');
+        '💳 GET /api/transactions  page=$pageNumber size=$pageSize'
+        '${transType != null ? " type=$transType" : ""}',
+      );
       final response = await _httpService.get(
         '/api/transactions',
         queryParameters: params,
