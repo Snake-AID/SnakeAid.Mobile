@@ -15,6 +15,7 @@ import '../../blog/models/blog_model.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../notifications/providers/notification_inbox_provider.dart';
 import '../../wallet/repository/transaction_repository.dart';
+import '../providers/ai_recognition_review_provider.dart';
 
 /// FutureProvider for today's expert statistics (used in stats grid).
 /// Not autoDispose so data is cached for the session (avoids re-spinner on tab switch).
@@ -1801,55 +1802,165 @@ class _HomeTabState extends ConsumerState<_HomeTab>
   Widget _buildSnakeLibrarySection(BuildContext context) {
     const primaryColor = Color(0xFF6C47C2);
     const accentColor = Color(0xFF9F7AEA);
+    const aiColor = Color(0xFF10B981);
+    final queueState = ref.watch(aiReviewQueueProvider);
+    final pendingCount = queueState.items.length;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Row(
-          children: [
-            Text(
-              'Thư Viện Loài Rắn',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: primaryColor,
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.manage_search,
+                    color: primaryColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Công Cụ Hỗ Trợ',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF131018),
+                      ),
+                    ),
+                    Text(
+                      'Tra cứu & kiểm duyệt nhận diện AI',
+                      style: TextStyle(
+                          fontSize: 12, color: Color(0xFF9CA3AF)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+          const Divider(height: 1, color: Color(0xFFF3F4F6)),
+          const SizedBox(height: 14),
+
+          // Row: Thư viện loài + Sơ cứu
+          Row(
+            children: [
+              Expanded(
+                child: _SnakeLibraryCard(
+                  icon: Icons.menu_book_outlined,
+                  title: 'Thư Viện Loài',
+                  subtitle: 'Nhận biết & phân loại',
+                  color: primaryColor,
+                  onTap: () => context.pushNamed('expert_snake_library'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _SnakeLibraryCard(
+                  icon: Icons.health_and_safety_outlined,
+                  title: 'Hướng Dẫn\nSơ Cứu',
+                  subtitle: 'Xử lý khi bị cắn',
+                  color: accentColor,
+                  onTap: () =>
+                      context.pushNamed('expert_snake_first_aid_guide'),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          // AI Recognition Review — full-width highlighted row
+          Material(
+            color: aiColor.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              onTap: () => context.pushNamed('expert_ai_review_queue'),
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: aiColor.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.document_scanner,
+                          color: aiColor, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Xem Xét AI Nhận Diện',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF131018),
+                            ),
+                          ),
+                          Text(
+                            'Kiểm duyệt ảnh độ tin cậy thấp',
+                            style: TextStyle(
+                                fontSize: 11, color: Color(0xFF6B7280)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (pendingCount > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: aiColor,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '$pendingCount chờ',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(width: 6),
+                    Icon(Icons.arrow_forward_ios,
+                        size: 13, color: aiColor.withOpacity(0.7)),
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Tra cứu loài rắn và hướng dẫn sơ cứu',
-          style: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            // Browse species
-            Expanded(
-              child: _SnakeLibraryCard(
-                icon: Icons.menu_book_outlined,
-                title: 'Thư Viện Loài',
-                subtitle: 'Nhận biết & phân loại',
-                color: primaryColor,
-                onTap: () => context.pushNamed('expert_snake_library'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // First aid guide
-            Expanded(
-              child: _SnakeLibraryCard(
-                icon: Icons.health_and_safety_outlined,
-                title: 'Hướng Dẫn\nSơ Cứu',
-                subtitle: 'Xử lý khi bị cắn',
-                color: accentColor,
-                onTap: () =>
-                    context.pushNamed('expert_snake_first_aid_guide'),
-              ),
-            ),
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 

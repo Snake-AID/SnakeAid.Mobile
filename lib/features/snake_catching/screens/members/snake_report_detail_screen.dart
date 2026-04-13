@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 import '../../models/snake_species.dart';
 import '../../models/snake_catching_request.dart';
+import '../../providers/snake_location_provider.dart' hide snakeSpeciesRepositoryProvider;
 import '../../repository/snake_species_repository.dart';
 import '../../repository/snake_catching_repository.dart';
 import '../../widgets/location_picker_dialog.dart';
@@ -50,6 +51,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
   SnakeSpecies? _selectedSpecies;
   bool _isLoadingSpecies = false;
   String? _speciesError;
+  bool _showLocationFiltered = false;
   
   // Multi-species state (for few/many snakes)
   // Map<SnakeSpecies, int> - species to quantity mapping
@@ -120,17 +122,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
   }
 
   void _onSearchChanged() {
-    final query = _searchController.text.toLowerCase();
-    setState(() {
-      if (query.isEmpty) {
-        _filteredSpecies = _allSpecies;
-      } else {
-        _filteredSpecies = _allSpecies.where((species) {
-          return species.commonName.toLowerCase().contains(query) ||
-              species.scientificName.toLowerCase().contains(query);
-        }).toList();
-      }
-    });
+    setState(() {}); // triggers rebuild; displaySpecies computed inline in _buildSpeciesTab
   }
 
   String get _titleText {
@@ -376,7 +368,12 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
         _selectedAddress = result.getFullAddress();
         _selectedLatitude = result.latitude;
         _selectedLongitude = result.longitude;
+        _showLocationFiltered = true;
       });
+      ref.read(snakeLocationProvider.notifier).fetchSnakesByLocation(
+        latitude: result.latitude,
+        longitude: result.longitude,
+      );
     }
   }
 
@@ -1974,7 +1971,98 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
     );
   }
 
+  Widget _buildFilterChip({
+    required String label,
+    required bool selected,
+    bool loading = false,
+    int? count,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF228B22) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? const Color(0xFF228B22) : Colors.grey[300]!,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (loading && selected) ...[
+              const SizedBox(
+                width: 10,
+                height: 10,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.5,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : Colors.grey[700],
+              ),
+            ),
+            if (count != null && !loading) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? Colors.white.withOpacity(0.25)
+                      : Colors.grey[200],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: selected ? Colors.white : Colors.grey[700],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSpeciesTab() {
+    final locationState = ref.watch(snakeLocationProvider);
+
+    // Compute display list: location-filtered (sorted by priority) or all
+    List<SnakeSpecies> displaySpecies;
+    if (_showLocationFiltered && locationState.data != null) {
+      final regionIds = {for (final s in locationState.data!.snakes) s.id};
+      final priorityMap = {for (final s in locationState.data!.snakes) s.id: s.priority};
+      displaySpecies = _allSpecies
+          .where((s) => regionIds.contains(s.id))
+          .toList()
+        ..sort((a, b) =>
+            (priorityMap[a.id] ?? 99).compareTo(priorityMap[b.id] ?? 99));
+    } else {
+      displaySpecies = List.from(_allSpecies);
+    }
+
+    final query = _searchController.text.toLowerCase();
+    if (query.isNotEmpty) {
+      displaySpecies = displaySpecies
+          .where((s) =>
+              s.commonName.toLowerCase().contains(query) ||
+              s.scientificName.toLowerCase().contains(query))
+          .toList();
+    }
+
     return CustomScrollView(
       slivers: [
         // Info Banner
@@ -2017,13 +2105,37 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                         ),
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        'Dựa trên vị trí GPS của bạn',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.blue[700],
+                      if (locationState.isLoading)
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: 10,
+                              height: 10,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                                color: Colors.blue[600],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Đang tải rắn theo vùng...',
+                              style: TextStyle(fontSize: 11, color: Colors.blue[700]),
+                            ),
+                          ],
+                        )
+                      else if (locationState.data != null)
+                        Text(
+                          'Khu vực: ${locationState.data!.region.name}',
+                          style: TextStyle(fontSize: 11, color: Colors.blue[700]),
+                        )
+                      else
+                        Text(
+                          'Dựa trên vị trí GPS của bạn',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.blue[700],
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -2083,6 +2195,31 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
             ),
           ),
         ),
+
+        // Location filter toggle (shown only once location is selected)
+        if (_selectedLatitude != null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Row(
+                children: [
+                  _buildFilterChip(
+                    label: 'Gần tôi',
+                    selected: _showLocationFiltered,
+                    loading: locationState.isLoading,
+                    count: locationState.data?.snakes.length,
+                    onTap: () => setState(() => _showLocationFiltered = true),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildFilterChip(
+                    label: 'Tất cả loài',
+                    selected: !_showLocationFiltered,
+                    onTap: () => setState(() => _showLocationFiltered = false),
+                  ),
+                ],
+              ),
+            ),
+          ),
 
         // Selected Species List (for few/many)
         if (widget.quantity != 'single' && _selectedSpeciesMap.isNotEmpty)
@@ -2158,7 +2295,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
         ),
 
         // Snake Species Grid
-        if (_isLoadingSpecies)
+        if (_isLoadingSpecies || (_showLocationFiltered && locationState.isLoading))
           const SliverFillRemaining(
             child: Center(
               child: CircularProgressIndicator(
@@ -2205,7 +2342,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
               ),
             ),
           )
-        else if (_filteredSpecies.isEmpty)
+        else if (displaySpecies.isEmpty)
           SliverFillRemaining(
             child: Center(
               child: Padding(
@@ -2245,11 +2382,11 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
               ),
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
-                  final species = _filteredSpecies[index];
+                  final species = displaySpecies[index];
                   final isSelected = _selectedSpecies?.id == species.id;
                   return _buildSpeciesCard(species, isSelected);
                 },
-                childCount: _filteredSpecies.length,
+                childCount: displaySpecies.length,
               ),
             ),
           ),

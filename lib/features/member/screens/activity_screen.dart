@@ -54,11 +54,6 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                     ),
                   ),
                   const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: _refreshChild,
-                    tooltip: 'Làm mới',
-                  ),
                   TextButton.icon(
                     onPressed: () => context.push('/member-history'),
                     icon: const Icon(

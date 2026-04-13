@@ -57,6 +57,7 @@ class RescuerHomeScreen extends ConsumerStatefulWidget {
 class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
   int _selectedIndex = 0;
   final AudioPlayer _snakeCatchingAudioPlayer = AudioPlayer();
+  final AudioPlayer _sosAudioPlayer = AudioPlayer();
 
   final List<Widget> _screens = [
     const _HomeTab(),
@@ -223,6 +224,7 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
   @override
   void dispose() {
     _snakeCatchingAudioPlayer.dispose();
+    _sosAudioPlayer.dispose();
     super.dispose();
   }
 
@@ -522,19 +524,18 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
     } catch (_) {}
   }
 
-  /// Play loud alert sound + vibrate when a catching job is assigned
+  /// Play loud alert sound + vibrate for SOS emergency request
   Future<void> _playSnakebiteIncidentAlert() async {
-    // Sound — requires assets/sounds/snake_alert.mp3 (see assets/sounds/README.md)
+    // Sound — requires assets/sounds/sos_alert.mp3
     try {
-      // Reset player state before playing to avoid stuck state
-      await _snakeCatchingAudioPlayer.stop();
-      await _snakeCatchingAudioPlayer.setVolume(1.0);
-      await _snakeCatchingAudioPlayer.setReleaseMode(ReleaseMode.loop);
-      await _snakeCatchingAudioPlayer.play(
-        AssetSource('sounds/snake_alert.mp3'),
+      await _sosAudioPlayer.stop();
+      await _sosAudioPlayer.setVolume(1.0);
+      await _sosAudioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _sosAudioPlayer.play(
+        AssetSource('sounds/sos_alert.mp3'),
       );
     } catch (e) {
-      debugPrint('⚠️ Could not play snake alert sound: $e');
+      debugPrint('⚠️ Could not play SOS alert sound: $e');
     }
     // Vibration
     try {
@@ -546,10 +547,10 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
     }
   }
 
-  /// Stop alert sound and vibration
+  /// Stop SOS alert sound and vibration
   void _stopSnakebiteIncidentAlert() {
     try {
-      _snakeCatchingAudioPlayer.stop();
+      _sosAudioPlayer.stop();
     } catch (_) {}
     try {
       Vibration.cancel();
@@ -608,6 +609,7 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
   /// Show emergency alert modal - works across all tabs
   void _showEmergencyAlert(dynamic request) {
     debugPrint('🚨 [GLOBAL] Showing emergency alert modal...');
+    _playSnakebiteIncidentAlert();
 
     // Show modal popup (can be minimized)
     showDialog(
@@ -623,7 +625,7 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
           }
         },
       ),
-    );
+    ).then((_) => _stopSnakebiteIncidentAlert());
   }
 
   Widget _buildNavItem(int index, IconData icon, String label, {int unreadCount = 0}) {
