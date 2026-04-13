@@ -2032,7 +2032,7 @@ class _MemberIncidentFinishedDetailScreenState
                       const SizedBox(height: 10),
                       snakeMedia.isEmpty
                           ? _buildEmptyMediaState(
-                              'Chưa có ảnh rắn từ incident.',
+                              'Chưa có ảnh rắn được cung cấp.',
                             )
                           : _buildMediaGrid(
                               snakeMedia
@@ -2053,7 +2053,7 @@ class _MemberIncidentFinishedDetailScreenState
                       const SizedBox(height: 10),
                       evidenceGroups.isEmpty
                           ? _buildEmptyMediaState(
-                              'Chưa có ảnh bằng chứng từ rescue mission.',
+                              'Chưa có ảnh bằng chứng từ nhiệm vụ cứu hộ.',
                             )
                           : Column(
                               children: evidenceGroups.map((group) {

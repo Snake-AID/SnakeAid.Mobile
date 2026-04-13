@@ -57,12 +57,14 @@ class PayosRepository {
     try {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       debugPrint('💳 Creating PayOS Payment Link');
-      debugPrint('📍 Endpoint: /api/snakecatching/create-link');
-      debugPrint('📦 requestId: $snakeCatchingRequestId | amount: $amount | type: $transactionType');
+      debugPrint('📍 Endpoint: /api/snakecatching/payment/create-link');
+      debugPrint(
+        '📦 requestId: $snakeCatchingRequestId | amount: $amount | type: $transactionType',
+      );
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       final response = await _httpService.post(
-        '/api/snakecatching/create-link',
+        '/api/snakecatching/payment/create-link',
         data: {
           'snakeCatchingRequestId': snakeCatchingRequestId,
           'amount': amount.toInt(),
@@ -90,10 +92,13 @@ class PayosRepository {
       if (e.response?.statusCode == 400) {
         final msg = e.response?.data['message'] ?? 'Dữ liệu không hợp lệ';
         throw Exception(msg);
-      } else if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
+      } else if (e.response?.statusCode == 401 ||
+          e.response?.statusCode == 403) {
         throw Exception('Bạn cần đăng nhập để thanh toán.');
       }
-      throw Exception('Không thể kết nối dịch vụ thanh toán. Vui lòng thử lại.');
+      throw Exception(
+        'Không thể kết nối dịch vụ thanh toán. Vui lòng thử lại.',
+      );
     } catch (e) {
       debugPrint('❌ PayOS Exception: $e');
       rethrow;
