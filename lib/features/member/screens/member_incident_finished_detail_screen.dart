@@ -27,7 +27,10 @@ class MemberIncidentFinishedDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _MemberIncidentFinishedDetailScreenState
-    extends ConsumerState<MemberIncidentFinishedDetailScreen> {
+    extends ConsumerState<MemberIncidentFinishedDetailScreen>
+    with WidgetsBindingObserver {
+  static const Duration _kPayOsOverlayTimeout = Duration(seconds: 8);
+
   bool _isProcessingPayment = false;
   bool _isConfirmingPayOs = false;
   bool _hasPaid = false;
@@ -36,6 +39,7 @@ class _MemberIncidentFinishedDetailScreenState
   bool _isAwaitingPayOsReturn = false;
   int? _lastHandledDeepLinkEventId;
   StreamSubscription<PaymentDeepLinkEvent>? _deepLinkSub;
+  Timer? _awaitingOverlayTimer;
 
   void _handleBackNavigation() {
     if (Navigator.of(context).canPop()) {
@@ -48,6 +52,7 @@ class _MemberIncidentFinishedDetailScreenState
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initDeepLinks();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.incidentId.isNotEmpty) {
@@ -59,9 +64,48 @@ class _MemberIncidentFinishedDetailScreenState
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted) return;
+    if (state == AppLifecycleState.resumed &&
+        _isAwaitingPayOsReturn &&
+        !_isConfirmingPayOs) {
+      _startAwaitingOverlayTimeout();
+    }
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      _cancelAwaitingOverlayTimeout();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _cancelAwaitingOverlayTimeout();
     _deepLinkSub?.cancel();
     super.dispose();
+  }
+
+  void _startAwaitingOverlayTimeout() {
+    _cancelAwaitingOverlayTimeout();
+    _awaitingOverlayTimer = Timer(_kPayOsOverlayTimeout, () {
+      if (!mounted || !_isAwaitingPayOsReturn || _isConfirmingPayOs) return;
+      setState(() {
+        _isAwaitingPayOsReturn = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Chưa nhận được callback PayOS. Bạn có thể quay lại cổng thanh toán hoặc tiếp tục chờ.',
+          ),
+        ),
+      );
+    });
+  }
+
+  void _cancelAwaitingOverlayTimeout() {
+    _awaitingOverlayTimer?.cancel();
+    _awaitingOverlayTimer = null;
   }
 
   void _initDeepLinks() {
@@ -87,6 +131,7 @@ class _MemberIncidentFinishedDetailScreenState
     _lastHandledDeepLinkEventId = event.eventId;
 
     if (event.isCancelled) {
+      _cancelAwaitingOverlayTimeout();
       setState(() {
         _pendingPayOsOrderCode = null;
         _pendingPayOsTransactionId = null;
@@ -122,6 +167,7 @@ class _MemberIncidentFinishedDetailScreenState
     }
 
     if (!mounted) return;
+    _cancelAwaitingOverlayTimeout();
     setState(() {
       _isAwaitingPayOsReturn = true;
       _isConfirmingPayOs = true;
@@ -171,6 +217,7 @@ class _MemberIncidentFinishedDetailScreenState
           _isAwaitingPayOsReturn = false;
           _isConfirmingPayOs = false;
         });
+        _cancelAwaitingOverlayTimeout();
 
         await ref
             .read(detailedIncidentProvider.notifier)
@@ -205,15 +252,14 @@ class _MemberIncidentFinishedDetailScreenState
         _pendingPayOsTransactionId = null;
       }
     });
+    _cancelAwaitingOverlayTimeout();
 
     if (!mounted) return;
     if (completedFromIncident) {
       await _showPaymentSuccessDialog(
         title: 'Thanh Toán Thành Công',
         subtitle: 'Thanh toán qua PayOS đã được xác nhận.',
-        amount: _getPaymentAmount(
-          ref.read(detailedIncidentProvider).incident!,
-        ),
+        amount: _getPaymentAmount(ref.read(detailedIncidentProvider).incident!),
         method: 'PayOS',
       );
       return;
@@ -316,7 +362,9 @@ class _MemberIncidentFinishedDetailScreenState
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF0F9F0),
                         borderRadius: BorderRadius.circular(12),
@@ -327,7 +375,9 @@ class _MemberIncidentFinishedDetailScreenState
                           const Text(
                             'Số tiền',
                             style: TextStyle(
-                                fontSize: 14, color: Color(0xFF666666)),
+                              fontSize: 14,
+                              color: Color(0xFF666666),
+                            ),
                           ),
                           Text(
                             _formatCurrency(amount),
@@ -343,20 +393,27 @@ class _MemberIncidentFinishedDetailScreenState
                     const SizedBox(height: 10),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8F8F8),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.account_balance_wallet,
-                              size: 18, color: Color(0xFF228B22)),
+                          const Icon(
+                            Icons.account_balance_wallet,
+                            size: 18,
+                            color: Color(0xFF228B22),
+                          ),
                           const SizedBox(width: 10),
                           const Text(
                             'Phương thức',
                             style: TextStyle(
-                                fontSize: 13, color: Color(0xFF666666)),
+                              fontSize: 13,
+                              color: Color(0xFF666666),
+                            ),
                           ),
                           const Spacer(),
                           Text(
@@ -373,25 +430,33 @@ class _MemberIncidentFinishedDetailScreenState
                     const SizedBox(height: 10),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8F8F8),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.access_time,
-                              size: 18, color: Color(0xFF888888)),
+                          const Icon(
+                            Icons.access_time,
+                            size: 18,
+                            color: Color(0xFF888888),
+                          ),
                           const SizedBox(width: 10),
                           const Text(
                             'Thời gian',
                             style: TextStyle(
-                                fontSize: 13, color: Color(0xFF666666)),
+                              fontSize: 13,
+                              color: Color(0xFF666666),
+                            ),
                           ),
                           const Spacer(),
                           Text(
-                            DateFormat('HH:mm — dd/MM/yyyy')
-                                .format(DateTime.now()),
+                            DateFormat(
+                              'HH:mm — dd/MM/yyyy',
+                            ).format(DateTime.now()),
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -411,13 +476,16 @@ class _MemberIncidentFinishedDetailScreenState
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 15),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           elevation: 0,
                         ),
                         child: const Text(
                           'Hoàn Tất',
                           style: TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.bold),
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
@@ -515,6 +583,7 @@ class _MemberIncidentFinishedDetailScreenState
         _pendingPayOsTransactionId = paymentResponse.transactionId;
         _isAwaitingPayOsReturn = true;
       });
+      _cancelAwaitingOverlayTimeout();
 
       if (paymentResponse.checkoutUrl != null &&
           paymentResponse.checkoutUrl!.isNotEmpty) {
@@ -544,6 +613,7 @@ class _MemberIncidentFinishedDetailScreenState
           _isConfirmingPayOs = false;
         });
       }
+      _cancelAwaitingOverlayTimeout();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('PayOS payment thất bại: ${e.toString()}')),
       );
