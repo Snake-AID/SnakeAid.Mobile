@@ -44,8 +44,13 @@ class WalletInfo {
 class TopupResult {
   final String transactionId;
   final String checkoutUrl;
+  final int? orderCode;
 
-  const TopupResult({required this.transactionId, required this.checkoutUrl});
+  const TopupResult({
+    required this.transactionId,
+    required this.checkoutUrl,
+    this.orderCode,
+  });
 }
 
 class WalletRepository {
@@ -83,10 +88,15 @@ class WalletRepository {
         '/api/wallet/topup',
         data: {'amount': amount, 'description': description},
       );
-      final data = (response.data as Map<String, dynamic>)['data']
-          as Map<String, dynamic>?;
+      final data =
+          (response.data as Map<String, dynamic>)['data']
+              as Map<String, dynamic>?;
       final url = data?['checkoutUrl'] as String?;
       final transactionId = data?['transactionId'] as String?;
+      final rawOrderCode = data == null ? null : data['orderCode'];
+      final orderCode = rawOrderCode is int
+          ? rawOrderCode
+          : int.tryParse(data?['orderCode']?.toString() ?? '');
       if (url == null || url.isEmpty) {
         throw Exception('Không nhận được link thanh toán.');
       }
@@ -94,11 +104,17 @@ class WalletRepository {
         throw Exception('Không nhận được mã giao dịch.');
       }
       debugPrint('✅ Topup  transactionId=$transactionId  checkoutUrl=$url');
-      return TopupResult(transactionId: transactionId, checkoutUrl: url);
+      return TopupResult(
+        transactionId: transactionId,
+        checkoutUrl: url,
+        orderCode: orderCode,
+      );
     } on DioException catch (e) {
       debugPrint('❌ createTopupLink DioException: ${e.message}');
       final msg = e.response?.data?['message'] as String?;
-      throw Exception(msg ?? 'Không thể tạo yêu cầu nạp tiền. Vui lòng thử lại.');
+      throw Exception(
+        msg ?? 'Không thể tạo yêu cầu nạp tiền. Vui lòng thử lại.',
+      );
     } catch (e) {
       if (e is Exception) rethrow;
       throw Exception('Lỗi không xác định: $e');
@@ -111,7 +127,9 @@ class WalletRepository {
   Future<void> confirmPayment({required String transactionId}) async {
     try {
       debugPrint('——————————————————————————————————————————');
-      debugPrint('✅ Confirm payment: POST /api/v1/PayOs/confirm-payment  transactionId=$transactionId');
+      debugPrint(
+        '✅ Confirm payment: POST /api/v1/PayOs/confirm-payment  transactionId=$transactionId',
+      );
       await _httpService.post(
         '/api/v1/PayOs/confirm-payment',
         data: {'transactionId': transactionId},
@@ -137,7 +155,9 @@ class WalletRepository {
     try {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       debugPrint('💸 Wallet Payment: POST /api/snakecatching/payment/wallet');
-      debugPrint('   requestId: $snakeCatchingRequestId | amount: $amount | type: $transactionType');
+      debugPrint(
+        '   requestId: $snakeCatchingRequestId | amount: $amount | type: $transactionType',
+      );
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       final response = await _httpService.post(
@@ -159,8 +179,8 @@ class WalletRepository {
       // Extract transactionId from response
       final respData = response.data as Map<String, dynamic>?;
       final dataMap = respData?['data'] as Map<String, dynamic>?;
-      final transactionId = dataMap?['transactionId'] as String? ??
-          dataMap?['id'] as String?;
+      final transactionId =
+          dataMap?['transactionId'] as String? ?? dataMap?['id'] as String?;
       if (transactionId == null || transactionId.isEmpty) {
         throw Exception('Không nhận được mã giao dịch từ máy chủ.');
       }
@@ -172,7 +192,8 @@ class WalletRepository {
       final msg = e.response?.data?['message'] as String?;
       if (e.response?.statusCode == 400) {
         throw Exception(msg ?? 'Số dư không đủ hoặc yêu cầu không hợp lệ.');
-      } else if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
+      } else if (e.response?.statusCode == 401 ||
+          e.response?.statusCode == 403) {
         throw Exception('Không có quyền thực hiện thanh toán.');
       }
       throw Exception(msg ?? 'Thanh toán thất bại. Vui lòng thử lại.');
@@ -182,4 +203,3 @@ class WalletRepository {
     }
   }
 }
-
