@@ -31,9 +31,10 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
   // Data toggles
   bool _offlineSync = true;
 
-  // Consultation fee
-  double _consultationFee = 300000;
-  bool _isSavingFee = false;
+  // Consultation fees
+  double _scheduledConsultationFee = 300000;
+  double _emergencyConsultationFee = 500000;
+  bool _isSavingFees = false;
 
   // Biography
   String _biography = '';
@@ -98,7 +99,12 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
       if (mounted) {
         setState(() {
           _biography = expert.bio ?? '';
-          _consultationFee = expert.consultationFee > 0 ? expert.consultationFee : 300000;
+          _scheduledConsultationFee = expert.scheduledConsultationFee > 0
+              ? expert.scheduledConsultationFee
+              : (expert.consultationFee > 0 ? expert.consultationFee : 300000);
+          _emergencyConsultationFee = expert.emergencyConsultationFee > 0
+              ? expert.emergencyConsultationFee
+              : 500000;
           _isLoadingProfile = false;
         });
       }
@@ -172,13 +178,22 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
     );
   }
 
-  Future<void> _saveConsultationFee(double fee) async {
-    setState(() => _isSavingFee = true);
+  Future<void> _saveConsultationFees({
+    required double scheduledFee,
+    required double emergencyFee,
+  }) async {
+    setState(() => _isSavingFees = true);
     try {
       final repo = ref.read(consultationRepositoryProvider);
-      await repo.updateExpertSettings(consultationFee: fee);
+      await repo.updateExpertSettings(
+        scheduledConsultationFee: scheduledFee,
+        emergencyConsultationFee: emergencyFee,
+      );
       if (mounted) {
-        setState(() => _consultationFee = fee);
+        setState(() {
+          _scheduledConsultationFee = scheduledFee;
+          _emergencyConsultationFee = emergencyFee;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Đã cập nhật phí tư vấn')),
         );
@@ -190,13 +205,16 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _isSavingFee = false);
+      if (mounted) setState(() => _isSavingFees = false);
     }
   }
 
-  void _showEditFeeDialog() {
-    final controller = TextEditingController(
-      text: _consultationFee.toStringAsFixed(0),
+  void _showEditFeesDialog() {
+    final scheduledController = TextEditingController(
+      text: _scheduledConsultationFee.toStringAsFixed(0),
+    );
+    final emergencyController = TextEditingController(
+      text: _emergencyConsultationFee.toStringAsFixed(0),
     );
     showDialog(
       context: context,
@@ -204,18 +222,36 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
-          'Phí tư vấn đặt lịch',
+          'Cập nhật phí tư vấn',
           style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2D2D2D)),
         ),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          decoration: const InputDecoration(
-            suffixText: 'VNĐ',
-            hintText: 'Nhập phí tư vấn',
-            border: OutlineInputBorder(),
-          ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: scheduledController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                suffixText: 'VNĐ',
+                labelText: 'Phí đặt lịch',
+                hintText: 'Nhập phí tư vấn đặt lịch',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: emergencyController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                suffixText: 'VNĐ',
+                labelText: 'Phí khẩn cấp (SOS)',
+                hintText: 'Nhập phí tư vấn khẩn cấp',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -228,10 +264,15 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
               foregroundColor: Colors.white,
             ),
             onPressed: () {
-              final value = double.tryParse(controller.text);
-              if (value == null || value <= 0) return;
+              final scheduled = double.tryParse(scheduledController.text);
+              final emergency = double.tryParse(emergencyController.text);
+              if (scheduled == null || scheduled <= 0) return;
+              if (emergency == null || emergency <= 0) return;
               Navigator.of(ctx).pop();
-              _saveConsultationFee(value);
+              _saveConsultationFees(
+                scheduledFee: scheduled,
+                emergencyFee: emergency,
+              );
             },
             child: const Text('Lưu'),
           ),
@@ -427,21 +468,26 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
               children: [
                 _buildFeeRow(
                   title: 'Tư vấn đặt lịch (Patient)',
-                  subtitle: 'Bạn nhận: ${((_consultationFee * 0.9)).toStringAsFixed(0)} VNĐ (90%)',
+                  subtitle: 'Bạn nhận: ${((_scheduledConsultationFee * 0.9)).toStringAsFixed(0)} VNĐ (90%)',
                   amount: _isLoadingProfile
                       ? '...'
-                      : _isSavingFee
+                      : _isSavingFees
                           ? 'Đang lưu...'
-                          : '${_consultationFee.toStringAsFixed(0)} VNĐ',
+                          : '${_scheduledConsultationFee.toStringAsFixed(0)} VNĐ',
                   editable: true,
-                  onEdit: _showEditFeeDialog,
+                  onEdit: _showEditFeesDialog,
                 ),
                 const Divider(height: 1),
                 _buildFeeRow(
                   title: 'Tư vấn khẩn cấp (SOS)',
-                  subtitle: 'Bạn nhận: 450,000 VNĐ (90%)',
-                  amount: '500,000 VNĐ',
-                  info: true,
+                  subtitle: 'Bạn nhận: ${((_emergencyConsultationFee * 0.9)).toStringAsFixed(0)} VNĐ (90%)',
+                  amount: _isLoadingProfile
+                      ? '...'
+                      : _isSavingFees
+                          ? 'Đang lưu...'
+                          : '${_emergencyConsultationFee.toStringAsFixed(0)} VNĐ',
+                  editable: true,
+                  onEdit: _showEditFeesDialog,
                 ),
                 const Divider(height: 1),
                 _buildFeeRow(

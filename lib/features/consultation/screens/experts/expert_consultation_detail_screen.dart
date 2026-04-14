@@ -79,12 +79,7 @@ class _ExpertConsultationDetailScreenState
   }
 
   String _formatDateTimePlus7(int ms) {
-    final dt = DateTime.fromMillisecondsSinceEpoch(ms);
-    final d = dt.day.toString().padLeft(2, '0');
-    final m = dt.month.toString().padLeft(2, '0');
-    final h = dt.hour.toString().padLeft(2, '0');
-    final min = dt.minute.toString().padLeft(2, '0');
-    return '$d/$m/${dt.year}  $h:$min';
+    return _formatDateTime(ms);
   }
 
   String _formatCurrency(num amount) {
@@ -286,7 +281,7 @@ class _ExpertConsultationDetailScreenState
                         label: 'Ngày & Giờ',
                         value: scheduledMs > 0
                             ? _formatDateTime(scheduledMs)
-                            : 'Chưa xác định',
+                            : '--',
                       ),
                       const _Divider(),
                       _DetailRow(
@@ -387,6 +382,11 @@ class _ExpertConsultationDetailScreenState
                           value: _formatDateTime(slotEndMs),
                         ),
                       ],
+                      if (bookedAtMs != null ||
+                          paymentDeadlineMs != null ||
+                          slotStartMs != null ||
+                          slotEndMs != null)
+                        const _Divider(),
                     ],
                   ),
                 ),

@@ -851,17 +851,26 @@ class ConsultationRepository {
   ///
   /// API: `PUT /api/experts/me/settings`
   ///
-  /// Provide at least one of [consultationFee], [biography], [specializations].
+  /// Provide at least one of [scheduledConsultationFee],
+  /// [emergencyConsultationFee], [biography], [specializations].
   /// Null values are omitted from the request body.
   ///
   /// Throws on 400/422 (invalid payload), 401/403 (unauthenticated / wrong role).
   Future<void> updateExpertSettings({
+    double? scheduledConsultationFee,
+    double? emergencyConsultationFee,
+    // Backward-compatible alias for scheduled fee.
     double? consultationFee,
     String? biography,
     List<String>? specializations,
   }) async {
+    final resolvedScheduledFee = scheduledConsultationFee ?? consultationFee;
+
     final body = <String, dynamic>{
-      if (consultationFee != null) 'consultationFee': consultationFee,
+      if (resolvedScheduledFee != null)
+        'scheduledConsultationFee': resolvedScheduledFee,
+      if (emergencyConsultationFee != null)
+        'emergencyConsultationFee': emergencyConsultationFee,
       if (biography != null) 'biography': biography,
       if (specializations != null) 'specializations': specializations,
     };
@@ -1120,7 +1129,10 @@ class ConsultationRepository {
 
   /// Get all bookings for the current logged-in expert.
   ///
-  /// API: `GET /api/experts/me/consultations`
+  /// API priority:
+  /// 1) `GET /api/experts/me/consultations`
+  /// 2) `GET /api/experts/me/consultations/scheduled`
+  /// 3) `GET /api/experts/me/consultation-bookings` (legacy fallback)
   Future<List<ConsultationBookingResponse>> getExpertBookings({
     String? status,
     String? type,
@@ -1144,6 +1156,7 @@ class ConsultationRepository {
 
       Response<dynamic> response;
       try {
+        // Prefer aggregate endpoint to include both scheduled and emergency consultations.
         response = await httpService.get(
           '/api/experts/me/consultations',
           queryParameters: query,
@@ -1184,6 +1197,39 @@ class ConsultationRepository {
         }
 
         return items.map((e) {
+          int? parseAmount(dynamic value) {
+          if (value is num) return value.toInt();
+          if (value == null) return null;
+          final raw = value.toString().trim();
+          if (raw.isEmpty) return null;
+          return int.tryParse(raw);
+          }
+
+          final payment = e['payment'] is Map
+            ? Map<String, dynamic>.from(e['payment'] as Map)
+            : <String, dynamic>{};
+          final paymentInfo = e['paymentInfo'] is Map
+            ? Map<String, dynamic>.from(e['paymentInfo'] as Map)
+            : <String, dynamic>{};
+          final consultationPayment = e['consultationPayment'] is Map
+            ? Map<String, dynamic>.from(e['consultationPayment'] as Map)
+            : <String, dynamic>{};
+
+          final resolvedFee =
+            parseAmount(e['price']) ??
+            parseAmount(e['feeCost']) ??
+            parseAmount(e['fee']) ??
+            parseAmount(e['amount']) ??
+            parseAmount(e['scheduledConsultationFee']) ??
+            parseAmount(e['emergencyConsultationFee']) ??
+            parseAmount(payment['amount']) ??
+            parseAmount(payment['feeCost']) ??
+            parseAmount(paymentInfo['amount']) ??
+            parseAmount(paymentInfo['feeCost']) ??
+            parseAmount(consultationPayment['amount']) ??
+            parseAmount(consultationPayment['feeCost']) ??
+            0;
+
           final endpointType = (e['type'] ?? '').toString().toLowerCase();
           final endpointStatus = (e['status'] ?? '').toString().toLowerCase();
 
@@ -1221,10 +1267,9 @@ class ConsultationRepository {
             'slotStartTime': e['slotStartTime'] ?? e['startTime'],
             'slotEndTime': e['slotEndTime'] ?? e['endTime'],
             'status': normalizedStatus,
-            'feeCost': e['price'],
-            'price': e['price'],
+            'feeCost': resolvedFee,
+            'price': resolvedFee,
             'bookedAt': e['startTime'],
-            'problemDescription': e['problemDescription'],
           };
 
           return ConsultationBookingResponse.fromJson(normalized);
