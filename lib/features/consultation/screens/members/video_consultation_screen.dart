@@ -664,11 +664,12 @@ class _VideoConsultationScreenState
     if (event.consultationId != widget.consultationId) return;
 
     _isHandlingRoomExpiry = true;
+    final normalizedReason = event.reason.trim().toLowerCase();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          event.reason == 'timeout'
+          normalizedReason == 'timeout'
               ? 'Phiên tư vấn đã hết thời gian. Đang kết thúc cuộc gọi...'
               : 'Phiên tư vấn đã kết thúc. Đang rời cuộc gọi...',
         ),
