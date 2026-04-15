@@ -52,11 +52,11 @@ class ConsultationChatMessage {
   }
 }
 
-class ConsultationRoomExpiringEvent {
+class ConsultationCallEndedEvent {
   final String consultationId;
   final String reason;
 
-  const ConsultationRoomExpiringEvent({
+  const ConsultationCallEndedEvent({
     required this.consultationId,
     required this.reason,
   });
@@ -75,8 +75,8 @@ class ConsultationChatSignalRService {
       StreamController<ConsultationChatMessage>.broadcast();
   final _signalController =
       StreamController<({String eventType, String payload})>.broadcast();
-  final _roomExpiringController =
-      StreamController<ConsultationRoomExpiringEvent>.broadcast();
+  final _consultationCallEndedController =
+      StreamController<ConsultationCallEndedEvent>.broadcast();
   final _connectionStateController =
       StreamController<HubConnectionState>.broadcast();
 
@@ -84,19 +84,19 @@ class ConsultationChatSignalRService {
       _messageController.stream;
   Stream<({String eventType, String payload})> get signalStream =>
       _signalController.stream;
-  Stream<ConsultationRoomExpiringEvent> get roomExpiringStream =>
-      _roomExpiringController.stream;
+  Stream<ConsultationCallEndedEvent> get consultationCallEndedStream =>
+      _consultationCallEndedController.stream;
   Stream<HubConnectionState> get connectionStateStream =>
       _connectionStateController.stream;
 
-  void _emitRoomExpiringFromMap(Map<String, dynamic> map) {
+  void _emitConsultationCallEndedFromMap(Map<String, dynamic> map) {
     final consultationId =
         (map['ConsultationId'] ?? map['consultationId'] ?? '').toString();
     final reason = (map['Reason'] ?? map['reason'] ?? '').toString();
     if (consultationId.isEmpty) return;
 
-    _roomExpiringController.add(
-      ConsultationRoomExpiringEvent(
+    _consultationCallEndedController.add(
+      ConsultationCallEndedEvent(
         consultationId: consultationId,
         reason: reason,
       ),
@@ -303,18 +303,18 @@ class ConsultationChatSignalRService {
       _hubConnection!.on(eventName, messageHandler);
     }
 
-    _hubConnection!.on('RoomExpiring', (arguments) {
+    _hubConnection!.on('ConsultationCallEnded', (arguments) {
       try {
         if (arguments == null || arguments.isEmpty) return;
         final map = _tryParseMap(arguments[0]);
         if (map == null) return;
-        _emitRoomExpiringFromMap(map);
+        _emitConsultationCallEndedFromMap(map);
       } catch (e) {
-        debugPrint('Failed to parse RoomExpiring: $e');
+        debugPrint('Failed to parse ConsultationCallEnded: $e');
       }
     });
 
-    _hubConnection!.on('SignalReceived', (arguments) {
+    _hubConnection!.on('Signal', (arguments) {
       try {
         if (arguments == null || arguments.isEmpty) return;
 
@@ -323,10 +323,10 @@ class ConsultationChatSignalRService {
           final payload = arguments[1].toString();
           _signalController.add((eventType: eventType, payload: payload));
 
-          if (eventType.trim().toLowerCase() == 'roomexpiring') {
+          if (eventType.trim().toLowerCase() == 'consultationcallended') {
             final map = _tryParseMap(payload);
             if (map != null) {
-              _emitRoomExpiringFromMap(map);
+              _emitConsultationCallEndedFromMap(map);
             }
           }
           return;
@@ -340,7 +340,7 @@ class ConsultationChatSignalRService {
           ));
         }
       } catch (e) {
-        debugPrint('Failed to parse SignalReceived: $e');
+        debugPrint('Failed to parse Signal: $e');
       }
     });
   }
@@ -387,7 +387,7 @@ class ConsultationChatSignalRService {
     await disconnect();
     await _messageController.close();
     await _signalController.close();
-    await _roomExpiringController.close();
+    await _consultationCallEndedController.close();
     await _connectionStateController.close();
   }
 }
