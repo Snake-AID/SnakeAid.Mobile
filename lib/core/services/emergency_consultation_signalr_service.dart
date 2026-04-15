@@ -91,6 +91,8 @@ class EmergencyRequestStatusChanged {
   final String? consultationId;
   final String? roomId;
   final DateTime? updatedAtUtc;
+  final DateTime? respondedAtUtc;
+  final DateTime? expiresAtUtc;
 
   const EmergencyRequestStatusChanged({
     required this.requestId,
@@ -98,16 +100,83 @@ class EmergencyRequestStatusChanged {
     this.consultationId,
     this.roomId,
     this.updatedAtUtc,
+    this.respondedAtUtc,
+    this.expiresAtUtc,
   });
 
   factory EmergencyRequestStatusChanged.fromJson(Map<String, dynamic> json) {
+    final nestedData = json['data'] is Map
+        ? Map<String, dynamic>.from(json['data'] as Map)
+        : <String, dynamic>{};
+    final nestedPayload = json['payload'] is Map
+        ? Map<String, dynamic>.from(json['payload'] as Map)
+        : <String, dynamic>{};
+    final nestedEvent = json['event'] is Map
+        ? Map<String, dynamic>.from(json['event'] as Map)
+        : <String, dynamic>{};
+
+    String? readString(List<String> keys) {
+      for (final key in keys) {
+        final value = json[key] ??
+            nestedData[key] ??
+            nestedPayload[key] ??
+            nestedEvent[key];
+        if (value == null) continue;
+        final parsed = value.toString().trim();
+        if (parsed.isNotEmpty) return parsed;
+      }
+      return null;
+    }
+
+    String normalizeStatus(String raw) {
+      final normalized = raw.trim().toLowerCase();
+      switch (normalized) {
+        case 'pendingpayment':
+        case 'pending_payment':
+          return 'PendingPayment';
+        case 'pendingexpertresponse':
+        case 'pending_expert_response':
+          return 'PendingExpertResponse';
+        case 'acceptedbyexpert':
+        case 'accepted_by_expert':
+          return 'AcceptedByExpert';
+        case 'declinedbyexpert':
+        case 'declined_by_expert':
+        case 'declined':
+        case 'rejectedbyexpert':
+        case 'rejected_by_expert':
+        case 'rejected':
+          return 'DeclinedByExpert';
+        case 'expired':
+        case 'timedout':
+        case 'timeout':
+          return 'Expired';
+        default:
+          return raw;
+      }
+    }
+
+    final rawStatus =
+        readString(['status', 'Status', 'requestStatus', 'RequestStatus']) ??
+            '';
+
     return EmergencyRequestStatusChanged(
-      requestId: (json['requestId'] ?? '').toString(),
-      status: (json['status'] ?? '').toString(),
-      consultationId: json['consultationId']?.toString(),
-      roomId: json['roomId']?.toString(),
-      updatedAtUtc: json['updatedAtUtc'] != null
-          ? DateTime.tryParse(json['updatedAtUtc'].toString())
+      requestId: readString(['requestId', 'RequestId', 'requestID']) ?? '',
+      status: normalizeStatus(rawStatus),
+      consultationId:
+          readString(['consultationId', 'ConsultationId', 'consultId']),
+      roomId: readString(['roomId', 'RoomId']),
+      updatedAtUtc: readString(['updatedAtUtc', 'updatedAt', 'UpdatedAtUtc']) !=
+              null
+          ? DateTime.tryParse(
+              readString(['updatedAtUtc', 'updatedAt', 'UpdatedAtUtc'])!,
+            )
+          : null,
+      respondedAtUtc: readString(['respondedAt', 'RespondedAt']) != null
+          ? DateTime.tryParse(readString(['respondedAt', 'RespondedAt'])!)
+          : null,
+      expiresAtUtc: readString(['expiresAt', 'ExpiresAt']) != null
+          ? DateTime.tryParse(readString(['expiresAt', 'ExpiresAt'])!)
           : null,
     );
   }
@@ -181,6 +250,33 @@ class EmergencyConsultationSignalRService {
     return null;
   }
 
+  Map<String, dynamic>? _tryParseStatusChangedPayload(List<Object?>? arguments) {
+    if (arguments == null || arguments.isEmpty) return null;
+
+    // Preferred shape: single object payload.
+    final firstAsMap = _tryParseMap(arguments[0]);
+    if (firstAsMap != null) return firstAsMap;
+
+    // Fallback shape: positional args from Hub method.
+    // Typical order: requestId, status, consultationId, roomId, updatedAtUtc.
+    if (arguments.length >= 2) {
+      String asText(dynamic value) => (value ?? '').toString();
+      final requestId = asText(arguments[0]).trim();
+      final status = asText(arguments[1]).trim();
+      if (requestId.isNotEmpty && status.isNotEmpty) {
+        return {
+          'requestId': requestId,
+          'status': status,
+          if (arguments.length > 2) 'consultationId': asText(arguments[2]),
+          if (arguments.length > 3) 'roomId': asText(arguments[3]),
+          if (arguments.length > 4) 'updatedAtUtc': asText(arguments[4]),
+        };
+      }
+    }
+
+    return null;
+  }
+
   Future<HubConnection> _buildAndStartConnection() async {
     final prefs = await SharedPreferences.getInstance();
     final token =
@@ -205,9 +301,13 @@ class EmergencyConsultationSignalRService {
 
     conn.on('EmergencyRequestStatusChanged', (arguments) {
       try {
-        if (arguments == null || arguments.isEmpty) return;
-        final data = _tryParseMap(arguments[0]);
-        if (data == null) return;
+        debugPrint('🔔 EmergencyRequestStatusChanged raw args: $arguments');
+        final data = _tryParseStatusChangedPayload(arguments);
+        if (data == null) {
+          debugPrint('⚠️ Unable to parse EmergencyRequestStatusChanged payload');
+          return;
+        }
+        debugPrint('📦 EmergencyRequestStatusChanged payload: $data');
         _statusChangedController.add(
           EmergencyRequestStatusChanged.fromJson(data),
         );
@@ -282,6 +382,13 @@ class EmergencyConsultationSignalRService {
     }
 
     _hubConnection = await _buildAndStartConnection();
+
+    try {
+      await _hubConnection!.invoke('JoinAsMember');
+    } catch (e) {
+      // Some hub versions don't require/implement JoinAsMember for request room.
+      debugPrint('JoinAsMember skipped: $e');
+    }
 
     await _hubConnection!.invoke(
       'JoinEmergencyRequestRoom',

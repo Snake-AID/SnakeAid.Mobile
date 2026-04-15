@@ -567,6 +567,38 @@ class ConsultationRepository {
     throw Exception(body['message'] ?? 'Không thể từ chối yêu cầu tư vấn ngay');
   }
 
+  /// Get current status of an emergency consultation request.
+  ///
+  /// Preferred API: `GET /api/consultations/instant/{requestId}`
+  /// Fallback API: `GET /api/consultations/instant/{requestId}/status`
+  ///
+  /// Returns null when endpoint is unavailable to keep UI resilient.
+  Future<EmergencyConsultationRequest?> getEmergencyRequestStatus(
+    String requestId,
+  ) async {
+    final candidates = <String>[
+      '/api/consultations/instant/$requestId',
+      '/api/consultations/instant/$requestId/status',
+    ];
+
+    for (final path in candidates) {
+      try {
+        final response = await httpService.get(path);
+        final body = response.data;
+        if (body is! Map<String, dynamic>) continue;
+        if (body['is_success'] == true && body['data'] is Map<String, dynamic>) {
+          return EmergencyConsultationRequest.fromJson(
+            body['data'] as Map<String, dynamic>,
+          );
+        }
+      } catch (_) {
+        // Ignore and try next candidate.
+      }
+    }
+
+    return null;
+  }
+
   // ---------------------------------------------------------------------------
   // In-room chat utility methods
   // ---------------------------------------------------------------------------

@@ -70,6 +70,7 @@ class _PaymentConfirmationScreenState
       'last_emergency_request_for_expert_';
 
   PaymentMethod _selectedPaymentMethod = PaymentMethod.payos;
+  PaymentMethod? _lockedPaymentMethod;
   bool _agreedToTerms = false;
   bool _isPaymentLoading = false;
   double? _walletBalance;
@@ -354,6 +355,7 @@ class _PaymentConfirmationScreenState
           requestId: emergencyRequestId,
           expertId: widget.expertId,
           expertName: widget.expertName ?? 'Chuyên gia',
+          initialStatus: 'PendingExpertResponse',
         );
       } else {
         context.go(
@@ -430,6 +432,7 @@ class _PaymentConfirmationScreenState
           requestId: emergencyRequestId,
           expertId: widget.expertId,
           expertName: widget.expertName ?? 'Chuyên gia',
+          initialStatus: 'PendingExpertResponse',
         );
       } else {
         context.go(
@@ -700,9 +703,32 @@ class _PaymentConfirmationScreenState
           requestId: resolvedRequestId,
           expertId: widget.expertId,
           expertName: widget.expertName ?? 'Chuyên gia',
+          initialStatus: 'PendingExpertResponse',
         );
       } catch (e) {
         if (!mounted) return;
+        final raw = e.toString().toLowerCase();
+        final likelyMethodLockedByBackend =
+            raw.contains('already been paid') ||
+            raw.contains('already paid') ||
+            raw.contains('đã được trả') ||
+            raw.contains('đã thanh toán');
+        if (_selectedPaymentMethod == PaymentMethod.snakeaidPay &&
+            likelyMethodLockedByBackend) {
+          setState(() {
+            _lockedPaymentMethod = PaymentMethod.payos;
+            _selectedPaymentMethod = PaymentMethod.payos;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Yêu cầu này đã được khởi tạo thanh toán bằng PayOS. Vui lòng tiếp tục với PayOS.',
+              ),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Color(0xFFFF8F00),
+            ),
+          );
+        }
         setState(() => _isPaymentLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -758,6 +784,28 @@ class _PaymentConfirmationScreenState
       );
     } catch (e) {
       if (!mounted) return;
+      final raw = e.toString().toLowerCase();
+      final likelyMethodLockedByBackend =
+          raw.contains('already been paid') ||
+          raw.contains('already paid') ||
+          raw.contains('đã được trả') ||
+          raw.contains('đã thanh toán');
+      if (_selectedPaymentMethod == PaymentMethod.snakeaidPay &&
+          likelyMethodLockedByBackend) {
+        setState(() {
+          _lockedPaymentMethod = PaymentMethod.payos;
+          _selectedPaymentMethod = PaymentMethod.payos;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Đơn này đã được khởi tạo thanh toán bằng PayOS. Vui lòng tiếp tục với PayOS.',
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Color(0xFFFF8F00),
+          ),
+        );
+      }
       setState(() => _isPaymentLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -797,10 +845,14 @@ class _PaymentConfirmationScreenState
       throw Exception('Không thể mở cổng thanh toán PayOS');
     }
 
-    _pendingPayOsTransactionId = transactionId;
-    _pendingPayOsOrderCode = payment.orderCode;
-    _pendingEmergencyRequestId = emergencyRequestId;
-    _pendingBookingId = bookingId;
+    setState(() {
+      _pendingPayOsTransactionId = transactionId;
+      _pendingPayOsOrderCode = payment.orderCode;
+      _pendingEmergencyRequestId = emergencyRequestId;
+      _pendingBookingId = bookingId;
+      _lockedPaymentMethod = PaymentMethod.payos;
+      _selectedPaymentMethod = PaymentMethod.payos;
+    });
   }
 
   /// Show wallet payment confirmation dialog
@@ -1128,6 +1180,12 @@ class _PaymentConfirmationScreenState
 
                         // Security Info Box
                         _buildSecurityInfo(theme),
+                        const SizedBox(height: 12),
+
+                        // Payment policy dropdown
+                        _buildPaymentPolicyDropdown(theme),
+                        const SizedBox(height: 8),
+                        _buildTermsCheckbox(theme),
                         const SizedBox(height: 24),
                       ],
                     ),
@@ -1512,6 +1570,34 @@ class _PaymentConfirmationScreenState
           theme,
           subtitle: 'Thanh toán từ ví SnakeAid của bạn',
         ),
+        if (_lockedPaymentMethod != null) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF8E1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFFFE0B2)),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline, size: 16, color: Color(0xFFB45309)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Đơn này đã được khởi tạo thanh toán bằng PayOS. Vui lòng tiếp tục với PayOS.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF92400E),
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -1569,9 +1655,23 @@ class _PaymentConfirmationScreenState
     String? subtitle,
   }) {
     final isSelected = _selectedPaymentMethod == method;
+    final isLockedToOther =
+        _lockedPaymentMethod != null && _lockedPaymentMethod != method;
 
     return InkWell(
       onTap: () {
+        if (isLockedToOther) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Phương thức thanh toán của đơn này đã được khóa theo PayOS.',
+              ),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Color(0xFFFF8F00),
+            ),
+          );
+          return;
+        }
         setState(() {
           _selectedPaymentMethod = method;
         });
@@ -1585,6 +1685,11 @@ class _PaymentConfirmationScreenState
             color: isSelected ? _primaryColor : Colors.grey.shade200,
             width: isSelected ? 2 : 1,
           ),
+          gradient: isLockedToOther
+              ? LinearGradient(
+                  colors: [Colors.grey.shade50, Colors.grey.shade100],
+                )
+              : null,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
@@ -1724,6 +1829,15 @@ class _PaymentConfirmationScreenState
                 ],
               ),
             ),
+            if (isLockedToOther)
+              const Padding(
+                padding: EdgeInsets.only(left: 8),
+                child: Icon(
+                  Icons.lock_outline,
+                  size: 16,
+                  color: Color(0xFF9CA3AF),
+                ),
+              ),
           ],
         ),
       ),
@@ -1759,10 +1873,103 @@ class _PaymentConfirmationScreenState
     );
   }
 
-  /// Build terms checkbox
+  Widget _buildPaymentPolicyDropdown(ThemeData theme) {
+    final isInstant = _isInstantFlow;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Theme(
+        data: theme.copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          leading: Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: _primaryColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            alignment: Alignment.center,
+            child: const Icon(
+              Icons.policy_outlined,
+              size: 17,
+              color: _primaryColor,
+            ),
+          ),
+          title: Text(
+            'Chính Sách Thanh Toán',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF1F2937),
+            ),
+          ),
+          subtitle: Text(
+            'Xem quy định trước khi xác nhận',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: const Color(0xFF6B7280),
+            ),
+          ),
+          children: [
+            _buildPolicyBullet(
+              theme,
+              'Sau khi thanh toán thành công, không thể tự hủy đơn tư vấn.',
+            ),
+            if (isInstant)
+              _buildPolicyBullet(
+                theme,
+                'Đối với tư vấn ngay: nếu không được chuyên gia chấp nhận, hệ thống sẽ hoàn tiền.',
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPolicyBullet(ThemeData theme, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            margin: const EdgeInsets.only(top: 6),
+            decoration: const BoxDecoration(
+              color: Color(0xFF6B7280),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.bodySmall?.copyWith(
+                height: 1.45,
+                color: const Color(0xFF374151),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build policy acknowledgement checkbox
   Widget _buildTermsCheckbox(ThemeData theme) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Checkbox(
           value: _agreedToTerms,
@@ -1772,37 +1979,15 @@ class _PaymentConfirmationScreenState
             });
           },
           activeColor: _primaryColor,
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
         ),
         Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: RichText(
-              text: TextSpan(
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                children: [
-                  const TextSpan(text: 'Tôi đồng ý với '),
-                  TextSpan(
-                    text: 'Điều khoản dịch vụ',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: Colors.blue.shade600,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                  const TextSpan(text: ' và '),
-                  TextSpan(
-                    text: 'Chính sách hoàn tiền',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: Colors.blue.shade600,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                  const TextSpan(text: '.'),
-                ],
-              ),
+          child: Text(
+            'Tôi đã đọc và hiểu Chính Sách Thanh Toán bên trên.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.35,
             ),
           ),
         ),
@@ -1812,6 +1997,8 @@ class _PaymentConfirmationScreenState
 
   /// Build bottom actions
   Widget _buildBottomActions(ThemeData theme) {
+    final canProceed = _agreedToTerms && !_isPaymentLoading;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1827,9 +2014,29 @@ class _PaymentConfirmationScreenState
               width: double.infinity,
               height: 48,
               child: FilledButton(
-                onPressed: _isPaymentLoading ? null : _handlePayment,
+                onPressed: _isPaymentLoading
+                    ? null
+                    : () {
+                        if (!_agreedToTerms) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Vui lòng xác nhận bạn đã đọc Chính Sách Thanh Toán trước khi tiếp tục.',
+                              ),
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: Color(0xFFFF8F00),
+                            ),
+                          );
+                          return;
+                        }
+                        _handlePayment();
+                      },
                 style: FilledButton.styleFrom(
-                  backgroundColor: _primaryColor,
+                  backgroundColor: canProceed
+                      ? _primaryColor
+                      : Colors.grey.shade400,
+                  disabledBackgroundColor: Colors.grey.shade400,
+                  disabledForegroundColor: Colors.white70,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
