@@ -49,6 +49,51 @@ Tài liệu này định nghĩa danh sách các Module Code (Cụm Test Case) ch
 | 31 | Notification Tab & SignalR Broadcasts  | 0 | 0 | 0 | 0 | 0 |
 | 32 | Submit Ratings & Read Feedback  | 0 | 0 | 0 | 0 | 0 |
 | 33 | View Mission & Consultation History (Filtering, Detail)  | 0 | 0 | 0 | 0 | 0 |
+| **G** | **Web Portal & Dashboard Management (Admin/Operator)** | | | | | |
+| 34 | Operator Dashboard & General Analytics | 0 | 0 | 0 | 0 | 0 |
+| 35 | Staff Workshifts Management | 0 | 0 | 0 | 0 | 0 |
+| 36 | Users Account & Role Management | 0 | 0 | 0 | 0 | 0 |
+| 37 | System Incidents Management | 0 | 0 | 0 | 0 | 0 |
+| 38 | Snake Catchings Requests Management | 0 | 0 | 0 | 0 | 0 |
+| 39 | Consultations Booking Management | 0 | 0 | 0 | 0 | 0 |
+| 40 | Snakes Catalog Management | 0 | 0 | 0 | 0 | 0 |
+| 41 | Antivenoms Inventory & Management | 0 | 0 | 0 | 0 | 0 |
+| 42 | Treatment Facilities Database Management | 0 | 0 | 0 | 0 | 0 |
+| 43 | Finance: Transactions & Withdrawals Management | 0 | 0 | 0 | 0 | 0 |
+| 44 | Report Media (User Reports) Management | 0 | 0 | 0 | 0 | 0 |
+| 45 | Portal System Settings & Configuration | 0 | 0 | 0 | 0 | 0 |
+| 46 | Learning: Lessons Database Management | 0 | 0 | 0 | 0 | 0 |
+| 47 | Content: Blogs Database Management | 0 | 0 | 0 | 0 | 0 |
+| **G** | **Web Portal & Dashboard Management (Admin/Operator)** | | | | | |
+| 34 | Operator Dashboard & General Analytics | 0 | 0 | 0 | 0 | 0 |
+| 35 | Staff Workshifts Management | 0 | 0 | 0 | 0 | 0 |
+| 36 | Users Account & Role Management | 0 | 0 | 0 | 0 | 0 |
+| 37 | System Incidents Management | 0 | 0 | 0 | 0 | 0 |
+| 38 | Snake Catchings Requests Management | 0 | 0 | 0 | 0 | 0 |
+| 39 | Consultations Booking Management | 0 | 0 | 0 | 0 | 0 |
+| 40 | Snakes Catalog Management | 0 | 0 | 0 | 0 | 0 |
+| 41 | Antivenoms Inventory & Management | 0 | 0 | 0 | 0 | 0 |
+| 42 | Treatment Facilities Database Management | 0 | 0 | 0 | 0 | 0 |
+| 43 | Finance: Transactions & Withdrawals Management | 0 | 0 | 0 | 0 | 0 |
+| 44 | Report Media (User Reports) Management | 0 | 0 | 0 | 0 | 0 |
+| 45 | Portal System Settings & Configuration | 0 | 0 | 0 | 0 | 0 |
+| 46 | Learning: Lessons Database Management | 0 | 0 | 0 | 0 | 0 |
+| 47 | Content: Blogs Database Management | 0 | 0 | 0 | 0 | 0 |
+| **G** | **Web Portal & Dashboard Management (Admin/Operator)** | | | | | |
+| 34 | Operator Dashboard & General Analytics | 0 | 0 | 0 | 0 | 0 |
+| 35 | Staff Workshifts Management | 0 | 0 | 0 | 0 | 0 |
+| 36 | Users Account & Role Management | 0 | 0 | 0 | 0 | 0 |
+| 37 | System Incidents Management | 0 | 0 | 0 | 0 | 0 |
+| 38 | Snake Catchings Requests Management | 0 | 0 | 0 | 0 | 0 |
+| 39 | Consultations Booking Management | 0 | 0 | 0 | 0 | 0 |
+| 40 | Snakes Catalog Management | 0 | 0 | 0 | 0 | 0 |
+| 41 | Antivenoms Inventory & Management | 0 | 0 | 0 | 0 | 0 |
+| 42 | Treatment Facilities Database Management | 0 | 0 | 0 | 0 | 0 |
+| 43 | Finance: Transactions & Withdrawals Management | 0 | 0 | 0 | 0 | 0 |
+| 44 | Report Media (User Reports) Management | 0 | 0 | 0 | 0 | 0 |
+| 45 | Portal System Settings & Configuration | 0 | 0 | 0 | 0 | 0 |
+| 46 | Learning: Lessons Management | 0 | 0 | 0 | 0 | 0 |
+| 47 | Content: Blogs Management | 0 | 0 | 0 | 0 | 0 |
 | | **TOTAL** | **0** | **0** | **0** | **0** | **0** |
 
 ---
