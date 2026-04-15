@@ -209,69 +209,68 @@ flowchart LR
 
 ### 3.3.1 Description
 
-
 | # | Feature | Screen | Description |
 |---|---------|--------|-------------|
-| 1 | Feature | Splash | Description |
-| 2 | Feature | Member Registration | Description |
-| 3 | Feature | OTP Verification | Description |
-| 4 | Feature | Registration Success | Description |
-| 5 | Feature | Member Login | Description |
-| 6 | Feature | Forgot Password | Description |
-| 7 | Feature | Forgot Password OTP | Description |
-| 8 | Feature | Reset Password | Description |
-| 9 | Feature | Password Reset Success | Description |
-| 10 | Feature | Member Home | Description |
-| 11 | Feature | Community Alert | Description |
-| 12 | Feature | Notification Tab | Description |
-| 13 | Feature | Emergency Action | Description |
-| 14 | Feature | Snake Identification | Description |
-| 15 | Feature | Snake Selection by Location | Description |
-| 16 | Feature | Snake Confirmation | Description |
-| 17 | Feature | First Aid Steps | Description |
-| 18 | Feature | Symptom Report | Description |
-| 19 | Feature | Severity Assessment | Description |
-| 20 | Feature | Emergency Tracking | Description |
-| 21 | Feature | Member Incident Finished | Description |
-| 22 | Feature | Snake Catching | Description |
-| 23 | Feature | Snake Quantity Selection | Description |
-| 24 | Feature | Snake Report Detail | Description |
-| 25 | Feature | Snake Catching Success | Description |
-| 26 | Feature | Consultation Home | Description |
-| 27 | Feature | Expert List | Description |
-| 28 | Feature | Expert Detail | Description |
-| 29 | Feature | Service Selection | Description |
-| 30 | Feature | Consultation Time Selection | Description |
-| 31 | Feature | Consultation Documents | Description |
-| 32 | Feature | Payment Confirmation | Description |
-| 33 | Feature | Emergency Request Waiting | Description |
-| 34 | Feature | Video Waiting Room | Description |
-| 35 | Feature | Video Consultation | Description |
-| 36 | Feature | Consultation Complete | Description |
-| 37 | Feature | Snake Library | Description |
-| 38 | Feature | Snake Detail | Description |
-| 39 | Feature | Snake First Aid Guide | Description |
-| 40 | Feature | Blog List | Description |
-| 41 | Feature | Blog Detail | Description |
-| 42 | Feature | Profile Tab | Description |
-| 43 | Feature | Edit Profile | Description |
-| 44 | Feature | Role Selection | Description |
-| 45 | Feature | Edit Community Report | Description |
-| 46 | Feature | History Community | Description |
-| 47 | Feature | Upload Community Report | Description |
-| 48 | Feature | Rescuer Arrived | Description |
-| 49 | Feature | Activity Tab | Description |
-| 50 | Feature | Snake Catching Detail | Description |
-| 51 | Feature | History Transaction | Description |
-| 52 | Feature | Transaction Detail | Description |
-| 53 | Feature | Top-up | Description |
-| 54 | Feature | Withdrawal | Description |
-| 55 | Feature | History Wallet | Description |
-| 56 | Feature | Scheduled Consultation | Description |
-| 57 | Feature | Emergency Consultation | Description |
-| 58 | Feature | Settings | Description |
-| 59 | Feature | Activity Detail | Description |
-| 60 | Feature | Activity History | Description |
+| 1 | Auth & Account Management | Splash | Initial app loading and routing |
+| 2 | Auth & Account Management | Member Registration | Register a new member account |
+| 3 | Auth & Account Management | OTP Verification | Verify phone/email with OTP |
+| 4 | Auth & Account Management | Registration Success | Confirmation of successful registration |
+| 5 | Auth & Account Management | Member Login | Authenticate member |
+| 6 | Auth & Account Management | Forgot Password | Initiate password recovery |
+| 7 | Auth & Account Management | Forgot Password OTP | Validate OTP for recovery |
+| 8 | Auth & Account Management | Reset Password | Enter new password |
+| 9 | Auth & Account Management | Password Reset Success | Confirmation of reset |
+| 10 | Member Home & Notifications | Member Home | Main dashboard |
+| 11 | Community Alerts & Reporting | Community Alert | View nearby community reports |
+| 12 | Member Home & Notifications | Notification Tab | View alerts and system messages |
+| 13 | Emergency SOS Initiation | Emergency Action | Start SOS and snake identification |
+| 14 | Emergency SOS Initiation | Snake Identification | AI-based snake scan/identification |
+| 15 | Emergency SOS Initiation | Snake Selection by Location | Manual snake search by area |
+| 16 | Emergency SOS Initiation | Snake Confirmation | Confirm identified snake species |
+| 17 | First Aid & Symptom Reporting | First Aid Steps | Step-by-step immediate first aid |
+| 18 | First Aid & Symptom Reporting | Symptom Report | Select patient symptoms |
+| 19 | First Aid & Symptom Reporting | Severity Assessment | AI/System determines emergency level |
+| 20 | Emergency Tracking & Resolution | Emergency Tracking | Live tracking of inbound rescuer |
+| 21 | Emergency Tracking & Resolution | Member Incident Finished | Summary after SOS resolution |
+| 22 | Snake Catching Service | Snake Catching | Initiate non-emergency catch request |
+| 23 | Snake Catching Service | Snake Quantity Selection | Estimate number of snakes |
+| 24 | Snake Catching Service | Snake Report Detail | Provide incident context |
+| 25 | Snake Catching Service | Snake Catching Success | Confirmation of request submission |
+| 26 | Expert Consultation Booking | Consultation Home | Hub for telemedicine services |
+| 27 | Expert Consultation Booking | Expert List | Directory of available experts |
+| 28 | Expert Consultation Booking | Expert Detail | Expert profile and reviews |
+| 29 | Expert Consultation Booking | Service Selection | Choose consultation type/tier |
+| 30 | Expert Consultation Booking | Consultation Time Selection | Pick date/time for scheduled call |
+| 31 | Expert Consultation Booking | Consultation Documents | Upload media/notes for doctor |
+| 32 | Expert Consultation Booking | Payment Confirmation | Escrow payment before consultation |
+| 33 | Expert Consultation Booking | Emergency Request Waiting | Wait queue for emergency consult |
+| 34 | Expert Consultation Booking | Video Waiting Room | Pre-call lobby |
+| 35 | Expert Consultation Booking | Video Consultation | Live WebRTC video session |
+| 36 | Expert Consultation Booking | Consultation Complete | Call summary and prescription |
+| 37 | Knowledge Base | Snake Library | Browse encyclopedic snake data |
+| 38 | Knowledge Base | Snake Detail | Specific snake info and risks |
+| 39 | Knowledge Base | Snake First Aid Guide | Detailed first-aid for species |
+| 40 | Knowledge Base | Blog List | Browse educational articles |
+| 41 | Knowledge Base | Blog Detail | Read article content |
+| 42 | Profile, Activity & Settings | Profile Tab | User profile summary |
+| 43 | Profile, Activity & Settings | Edit Profile | Modify personal details |
+| 44 | Auth & Account Management | Role Selection | Choose Member or Rescuer login |
+| 45 | Community Alerts & Reporting | Edit Community Report | Modify own community alert |
+| 46 | Community Alerts & Reporting | History Community | Log of user's past reports |
+| 47 | Community Alerts & Reporting | Upload Community Report | Submit new community alert |
+| 48 | Emergency Tracking & Resolution | Rescuer Arrived | Rescuer on-scene confirmation |
+| 49 | Profile, Activity & Settings | Activity Tab | Overview of past activities |
+| 50 | Snake Catching Service | Snake Catching Detail | Review completed catching mission |
+| 51 | User Wallet & Transactions | History Transaction | Log of fiat/wallet operations |
+| 52 | User Wallet & Transactions | Transaction Detail | Specific payment receipt |
+| 53 | User Wallet & Transactions | Top-up | Add funds to wallet |
+| 54 | User Wallet & Transactions | Withdrawal | Request payout from wallet |
+| 55 | User Wallet & Transactions | History Wallet | Balance changes overview |
+| 56 | Expert Consultation Booking | Scheduled Consultation | View upcoming scheduled calls |
+| 57 | Expert Consultation Booking | Emergency Consultation | Quick connect for urgent cases |
+| 58 | Profile, Activity & Settings | Settings | App preferences and configurations |
+| 59 | Profile, Activity & Settings | Activity Detail | Breakdown of specific past activity |
+| 60 | Profile, Activity & Settings | Activity History | Full list of historical events |
 
 ### 3.3.2 Authorization
 
