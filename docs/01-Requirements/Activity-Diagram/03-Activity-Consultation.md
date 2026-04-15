@@ -1,4 +1,4 @@
-# ACTIVITY DIAGRAM - LUỒNG TƯ VẤN CHUYÊN GIA (CONSULTATION)
+﻿# ACTIVITY DIAGRAM - LUỒNG TƯ VẤN CHUYÊN GIA (CONSULTATION)
 
 ## Thông tin tài liệu
 - **Tên dự án:** AI-Powered Platform for Snakebite First Aid and Rescue Support (SnakeAid)
@@ -248,18 +248,6 @@ hướng dẫn y tế đặc thù);
 |Expert|
 :Trả lời và hướng dẫn xử lý;
 
-if (Cần gia hạn thời gian?) then (Có)
-  |SnakeAid System|
-  :Thông báo sắp hết giờ, cần thanh toán thêm;
-  |Member|
-  :Xác nhận & thanh toán bổ sung;
-  |Payment Gateway|
-  :Xử lý giao dịch bổ sung;
-  |SnakeAid System|
-  :Gia hạn phiên tư vấn;
-else (Không)
-endif
-
 |Member|
 :Kết thúc phiên tư vấn;
 
@@ -295,16 +283,16 @@ stop
 title GIAI ĐOẠN 3 - HỦY LỊCH HẸN
 
 |#FFD5D5|Member|
-|#LightYellow|SnakeAid System|
 |#D5E8FF|Expert|
+|#LightYellow|SnakeAid System|
 |#FFE0CC|Payment Gateway|
 
-|Member|
+|Expert|
 start
-note left
+note right
   Điều kiện được phép hủy:
   - Booking đang **Confirmed**
-  - Hủy trước giờ hẹn theo policy
+  - Lưu ý: Chỉ Expert mới có quyền hủy
 end note
 :Chọn "Hủy lịch hẹn";
 :Chọn lý do hủy;
@@ -313,24 +301,15 @@ end note
 |SnakeAid System|
 :Cập nhật Booking
 **[Status: Cancelled]**;
-:Mở lại slot trong lịch của Expert;
 
-if (Đủ điều kiện hoàn tiền?) then (Có — hủy sớm)
-  |Payment Gateway|
-  :Hoàn tiền Escrow về Member;
-  |Member|
-  :Nhận hoàn tiền;
-else (Không — hủy muộn)
-  |Payment Gateway|
-  :Giải phóng Escrow → Expert
-  (phí hủy muộn);
-endif
+|Payment Gateway|
+:Hoàn tiền Escrow 100% về Member;
 
 |SnakeAid System|
-:Gửi thông báo hủy đến Expert;
+:Gửi thông báo hủy đến Member;
 
-|Expert|
-:Nhận thông báo lịch hẹn bị hủy;
+|Member|
+:Nhận thông báo & nhận hoàn tiền;
 
 stop
 @enduml
@@ -350,7 +329,7 @@ Pending --> Confirmed : Thanh toán Escrow thành công
 Pending --> Cancelled : Thanh toán thất bại
 
 Confirmed --> InProgress : Cả hai vào Waiting Room\n(đúng giờ / ngay lập tức)
-Confirmed --> Cancelled : Member hủy trước giờ hẹn
+Confirmed --> Cancelled : Expert hủy lịch hẹn
 
 InProgress --> Completed : Phiên tư vấn kết thúc\n(Escrow giải phóng cho Expert)
 InProgress --> Disputed : Có tranh chấp\n(xử lý thủ công)
@@ -363,11 +342,6 @@ Completed --> [*]
 note right of Confirmed
   Scheduled: chờ đến giờ hẹn
   Instant: vào Waiting Room ngay
-end note
-
-note right of InProgress
-  Có thể gia hạn phiên nếu
-  Member thanh toán bổ sung
 end note
 
 @enduml
@@ -383,18 +357,18 @@ end note
 | Điều kiện | Expert đang online & khả dụng | Expert có slot trống |
 | Thời gian bắt đầu | Ngay lập tức | Theo lịch đã đặt |
 | Thanh toán | Trước khi vào Waiting Room | Khi xác nhận đặt lịch |
-| Hủy | Trước khi Expert vào Waiting Room | Trước giờ hẹn theo policy |
+| Hủy | Chỉ Expert được hủy (Member không có quyền) | Chỉ Expert được hủy (Member không có quyền) |
 
 ### Cơ chế thanh toán Escrow
 | Bước | Thời điểm | Hành động |
 |---|---|---|
 | Giữ tiền | Khi Booking `Confirmed` | Payment Gateway khóa tiền của Member |
 | Giải phóng | Khi Booking `Completed` | Chuyển cho Expert sau khi tư vấn xong |
-| Hoàn trả | Khi Booking `Cancelled` (đủ điều kiện) | Hoàn về ví / tài khoản Member |
+| Hoàn trả | Khi Booking `Cancelled` (do Expert hủy) | Hoàn 100% về ví / tài khoản Member |
 
 ### Quy tắc hủy & hoàn tiền
-- Hủy trước **24 giờ** so với giờ hẹn → hoàn tiền **100%**
-- Hủy trong vòng **24 giờ** → áp phí hủy muộn (theo policy)
+- **Member không được phép hủy lịch hẹn** (trên UI Member không có tính năng Hủy).
+- **Expert hủy lịch**: Hoàn tiền **100%** cho Member.
 - Không được hủy khi Booking đang `InProgress`
 
 ---
