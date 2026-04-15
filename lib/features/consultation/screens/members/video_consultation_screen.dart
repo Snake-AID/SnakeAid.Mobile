@@ -87,7 +87,7 @@ class _VideoConsultationScreenState
   ConsultationChatSignalRService? _chatService;
   StreamSubscription<ConsultationChatMessage>? _chatSub;
   StreamSubscription<({String eventType, String payload})>? _signalSub;
-  StreamSubscription<ConsultationRoomExpiringEvent>? _roomExpiringSub;
+  StreamSubscription<ConsultationCallEndedEvent>? _consultationCallEndedSub;
   final ValueNotifier<List<ConsultationChatMessage>> _chatMessagesNotifier =
       ValueNotifier<List<ConsultationChatMessage>>([]);
   final ValueNotifier<bool> _remoteIsTypingNotifier = ValueNotifier(false);
@@ -346,7 +346,7 @@ class _VideoConsultationScreenState
     _room.dispose();
     _chatSub?.cancel();
     _signalSub?.cancel();
-    _roomExpiringSub?.cancel();
+    _consultationCallEndedSub?.cancel();
     _typingAutoHideTimer?.cancel();
     _chatService?.dispose();
     _chatMessagesNotifier.dispose();
@@ -387,9 +387,10 @@ class _VideoConsultationScreenState
         _handleSignalEvent(signal.eventType, signal.payload);
       });
 
-      _roomExpiringSub = _chatService!.roomExpiringStream.listen((event) {
-        _handleRoomExpiringEvent(event);
-      });
+      _consultationCallEndedSub = _chatService!.consultationCallEndedStream
+          .listen((event) {
+            _handleConsultationCallEndedEvent(event);
+          });
 
       await _chatService!.connect(widget.consultationId);
       if (!mounted) return;
@@ -605,12 +606,12 @@ class _VideoConsultationScreenState
   void _handleSignalEvent(String eventType, String payload) {
     final type = eventType.trim().toLowerCase();
 
-    if (type == 'roomexpiring') {
+    if (type == 'consultationcallended') {
       try {
         final decoded = jsonDecode(payload);
         if (decoded is Map<String, dynamic>) {
-          _handleRoomExpiringEvent(
-            ConsultationRoomExpiringEvent(
+          _handleConsultationCallEndedEvent(
+            ConsultationCallEndedEvent(
               consultationId:
                   (decoded['ConsultationId'] ?? decoded['consultationId'] ?? '')
                       .toString(),
@@ -619,7 +620,7 @@ class _VideoConsultationScreenState
           );
         }
       } catch (_) {
-        // Ignore malformed RoomExpiring payload.
+        // Ignore malformed ConsultationCallEnded payload.
       }
       return;
     }
@@ -656,8 +657,8 @@ class _VideoConsultationScreenState
     }
   }
 
-  Future<void> _handleRoomExpiringEvent(
-    ConsultationRoomExpiringEvent event,
+  Future<void> _handleConsultationCallEndedEvent(
+    ConsultationCallEndedEvent event,
   ) async {
     if (!mounted || _isHandlingRoomExpiry) return;
     if (event.consultationId != widget.consultationId) return;
@@ -665,9 +666,11 @@ class _VideoConsultationScreenState
     _isHandlingRoomExpiry = true;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Text(
-          'Phòng sắp đóng do hết giờ. Đang kết thúc phiên tư vấn...',
+          event.reason == 'timeout'
+              ? 'Phiên tư vấn đã hết thời gian. Đang kết thúc cuộc gọi...'
+              : 'Phiên tư vấn đã kết thúc. Đang rời cuộc gọi...',
         ),
         behavior: SnackBarBehavior.floating,
       ),
