@@ -187,7 +187,7 @@ flowchart LR
 
 ---
 
-### 3.4.1 Authentication & Account
+### 3.4.1 Authentication
 **Function trigger:** Launching the app unauthenticated, choosing role, or tapping Forgot Password.
 **Function description:**
 - **Actor:** Rescuer.
