@@ -6,10 +6,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/handlers/payment_deep_link_coordinator.dart';
+import '../../../../core/payments/payos_payment_verifier.dart';
+import '../../../../core/payments/payos_pending_context.dart';
 import '../../providers/expert_detail_provider.dart';
 import '../../providers/consultation_bookings_provider.dart';
 import '../../models/consultation_payment_response.dart';
 import '../../repository/consultation_repository.dart';
+import '../../../wallet/repository/wallet_repository.dart';
 import 'emergency_request_waiting_screen.dart';
 
 // Primary color constant
@@ -75,10 +78,12 @@ class _PaymentConfirmationScreenState
   bool _isHandlingPayOsCallback = false;
   bool _isShowingPaymentStatusDialog = false;
   int? _lastHandledPayOsEventId;
+  int? _pendingPayOsOrderCode;
   String? _pendingPayOsTransactionId;
   String? _pendingEmergencyRequestId;
   String? _pendingBookingId;
   String? _pendingWalletTopupTransactionId;
+  int? _pendingWalletTopupOrderCode;
   DateTime? _pendingWalletTopupStartedAt;
 
   Future<void> _cacheLastEmergencyRequestId(String requestId) async {
@@ -148,17 +153,17 @@ class _PaymentConfirmationScreenState
 
   void _initPayOsCallbackListener() {
     final coordinator = ref.read(paymentDeepLinkCoordinatorProvider);
-    _payOsCallbackSub = coordinator.stream.listen(_handlePayOsCallbackEvent);
+    _payOsCallbackSub = coordinator.stream.listen(_dispatchPayOsCallbackEvent);
 
     final latest = coordinator.latestEvent;
     if (latest != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _handlePayOsCallbackEvent(latest);
+        _dispatchPayOsCallbackEvent(latest);
       });
     }
   }
 
-  Future<void> _handlePayOsCallbackEvent(PaymentDeepLinkEvent event) async {
+  Future<void> _dispatchPayOsCallbackEvent(PaymentDeepLinkEvent event) async {
     if (!mounted || _lastHandledPayOsEventId == event.eventId) return;
     _lastHandledPayOsEventId = event.eventId;
 
@@ -170,38 +175,29 @@ class _PaymentConfirmationScreenState
         _pendingWalletTopupTransactionId!.isNotEmpty;
 
     if (!hasPendingConsultationPayment && !hasPendingWalletTopup) return;
+    if (hasPendingConsultationPayment &&
+        _pendingPayOsOrderCode != null &&
+        event.orderCode != _pendingPayOsOrderCode) {
+      return;
+    }
     if (_isHandlingPayOsCallback) return;
     _isHandlingPayOsCallback = true;
 
     try {
       if (hasPendingConsultationPayment) {
-        await _handlePayOsCallbackUri(event.uri);
+        await _handlePayOsCallbackEvent(event);
       } else {
-        await _handleWalletTopupCallbackUri(event.uri);
+        await _handleWalletTopupCallbackEvent(event);
       }
     } finally {
       _isHandlingPayOsCallback = false;
     }
   }
 
-  Future<void> _handleWalletTopupCallbackUri(Uri uri) async {
-    final status = uri.queryParameters['status']?.toUpperCase();
-    final cancelParam = uri.queryParameters['cancel']?.toLowerCase() == 'true';
-    final path = uri.path.toLowerCase();
-
-    final isCancelled =
-        cancelParam ||
-        status == 'CANCELLED' ||
-        status == 'CANCELED' ||
-        status == 'FAILED' ||
-        path.endsWith('/cancel');
-
-    final isPaid =
-        (status == 'PAID' || status == 'SUCCESS' || status == 'COMPLETED') ||
-        path.endsWith('/return') ||
-        path.endsWith('/success');
-
-    if (isCancelled) {
+  Future<void> _handleWalletTopupCallbackEvent(
+    PaymentDeepLinkEvent event,
+  ) async {
+    if (event.isCancelled) {
       _clearPendingWalletTopupContext();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -214,37 +210,75 @@ class _PaymentConfirmationScreenState
       return;
     }
 
-    if (!isPaid) return;
+    if (!event.isSuccess) return;
 
-    _clearPendingWalletTopupContext();
-    await _fetchWallet();
+    final txId = _pendingWalletTopupTransactionId;
+    if (txId == null || txId.isEmpty) {
+      return;
+    }
+
+    final verifier = ref.read(payOsPaymentVerifierProvider);
+    var result = await verifier.verify(
+      context: PayOsPendingContext(
+        flowType: PayOsFlowType.topup,
+        transactionId: txId,
+        orderCode: _pendingWalletTopupOrderCode,
+        startedAt: _pendingWalletTopupStartedAt ?? DateTime.now(),
+      ),
+      event: event,
+    );
+
+    if (result.shouldFallbackConfirm) {
+      await ref
+          .read(walletRepositoryProvider)
+          .confirmPayment(transactionId: txId);
+      result = await verifier.verify(
+        context: PayOsPendingContext(
+          flowType: PayOsFlowType.topup,
+          transactionId: txId,
+          orderCode: _pendingWalletTopupOrderCode,
+          startedAt: _pendingWalletTopupStartedAt ?? DateTime.now(),
+        ),
+      );
+    }
+
+    if (result.status == PayOsVerificationStatus.confirmed) {
+      _clearPendingWalletTopupContext();
+      await _fetchWallet();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nạp tiền vào ví đã được xác nhận.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (result.status == PayOsVerificationStatus.mismatch) {
+      _clearPendingWalletTopupContext();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.message),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Đã quay lại từ PayOS. Vui lòng kiểm tra lại số dư ví.'),
+        content: Text('Topup đã quay về app nhưng backend chưa xác nhận xong.'),
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
-  Future<void> _handlePayOsCallbackUri(Uri uri) async {
-    final status = uri.queryParameters['status']?.toUpperCase();
-    final cancelParam = uri.queryParameters['cancel']?.toLowerCase() == 'true';
-    final path = uri.path.toLowerCase();
-
-    final isCancelled =
-        cancelParam ||
-        status == 'CANCELLED' ||
-        status == 'CANCELED' ||
-        status == 'FAILED' ||
-        path.endsWith('/cancel');
-
-    final isPaid =
-        (status == 'PAID' || status == 'SUCCESS' || status == 'COMPLETED') ||
-        path.endsWith('/return') ||
-        path.endsWith('/success');
-
-    if (isCancelled) {
+  Future<void> _handlePayOsCallbackEvent(PaymentDeepLinkEvent event) async {
+    if (event.isCancelled) {
       if (!mounted) return;
       setState(() {
         _isPaymentLoading = false;
@@ -260,7 +294,7 @@ class _PaymentConfirmationScreenState
       return;
     }
 
-    if (!isPaid) return;
+    if (!event.isSuccess) return;
 
     final txId = _pendingPayOsTransactionId;
     if (txId == null || txId.isEmpty) {
@@ -286,16 +320,25 @@ class _PaymentConfirmationScreenState
     _showPaymentStatusDialog();
 
     try {
-      final repo = ref.read(consultationRepositoryProvider);
-      final confirmedPayment = await repo.confirmConsultationPayment(txId);
-      if (!confirmedPayment.isEscrowed) {
-        throw Exception(
-          'Thanh toán chưa hoàn tất (trạng thái: ${confirmedPayment.status})',
-        );
+      final verifier = ref.read(payOsPaymentVerifierProvider);
+      final pendingContext = PayOsPendingContext(
+        flowType: PayOsFlowType.consultation,
+        transactionId: txId,
+        orderCode: _pendingPayOsOrderCode,
+        startedAt: DateTime.now(),
+      );
+      var result = await verifier.verify(context: pendingContext, event: event);
+
+      if (result.shouldFallbackConfirm) {
+        await _confirmConsultationPayOs(txId);
+        result = await verifier.verify(context: pendingContext);
+      }
+
+      if (result.status != PayOsVerificationStatus.confirmed) {
+        throw Exception(result.message);
       }
 
       ref.invalidate(consultationBookingsProvider);
-
       final emergencyRequestId = _pendingEmergencyRequestId;
       final bookingId = _pendingBookingId;
       _clearPendingPayOsContext();
@@ -309,7 +352,7 @@ class _PaymentConfirmationScreenState
         showEmergencyRequestModal(
           context,
           requestId: emergencyRequestId,
-          expertId: widget.expertId ?? '',
+          expertId: widget.expertId,
           expertName: widget.expertName ?? 'Chuyên gia',
         );
       } else {
@@ -336,6 +379,13 @@ class _PaymentConfirmationScreenState
     }
   }
 
+  Future<ConsultationPaymentResponse> _confirmConsultationPayOs(
+    String transactionId,
+  ) async {
+    final repo = ref.read(consultationRepositoryProvider);
+    return repo.confirmConsultationPayment(transactionId);
+  }
+
   Future<void> _tryAutoFinalizePendingPayOs() async {
     final txId = _pendingPayOsTransactionId;
     if (!mounted || txId == null || txId.isEmpty) return;
@@ -344,12 +394,22 @@ class _PaymentConfirmationScreenState
     _isHandlingPayOsCallback = true;
     _showPaymentStatusDialog();
     try {
-      final repo = ref.read(consultationRepositoryProvider);
-      final confirmedPayment = await repo.confirmConsultationPayment(txId);
+      final verifier = ref.read(payOsPaymentVerifierProvider);
+      final pendingContext = PayOsPendingContext(
+        flowType: PayOsFlowType.consultation,
+        transactionId: txId,
+        orderCode: _pendingPayOsOrderCode,
+        startedAt: DateTime.now(),
+      );
+      var result = await verifier.verify(context: pendingContext);
 
       if (!mounted) return;
-      if (!confirmedPayment.isEscrowed) {
-        // Keep pending context so user can return and retry confirm later.
+      if (result.shouldFallbackConfirm) {
+        await _confirmConsultationPayOs(txId);
+        result = await verifier.verify(context: pendingContext);
+      }
+
+      if (result.status != PayOsVerificationStatus.confirmed) {
         return;
       }
 
@@ -368,7 +428,7 @@ class _PaymentConfirmationScreenState
         showEmergencyRequestModal(
           context,
           requestId: emergencyRequestId,
-          expertId: widget.expertId ?? '',
+          expertId: widget.expertId,
           expertName: widget.expertName ?? 'Chuyên gia',
         );
       } else {
@@ -395,6 +455,34 @@ class _PaymentConfirmationScreenState
         DateTime.now().difference(startedAt) > const Duration(hours: 2)) {
       _clearPendingWalletTopupContext();
       return;
+    }
+
+    final verifier = ref.read(payOsPaymentVerifierProvider);
+    var result = await verifier.verify(
+      context: PayOsPendingContext(
+        flowType: PayOsFlowType.topup,
+        transactionId: txId,
+        orderCode: _pendingWalletTopupOrderCode,
+        startedAt: startedAt ?? DateTime.now(),
+      ),
+    );
+
+    if (result.shouldFallbackConfirm) {
+      await ref
+          .read(walletRepositoryProvider)
+          .confirmPayment(transactionId: txId);
+      result = await verifier.verify(
+        context: PayOsPendingContext(
+          flowType: PayOsFlowType.topup,
+          transactionId: txId,
+          orderCode: _pendingWalletTopupOrderCode,
+          startedAt: startedAt ?? DateTime.now(),
+        ),
+      );
+    }
+
+    if (result.status == PayOsVerificationStatus.confirmed) {
+      _clearPendingWalletTopupContext();
     }
 
     await _fetchWallet();
@@ -443,6 +531,7 @@ class _PaymentConfirmationScreenState
   }
 
   void _clearPendingPayOsContext() {
+    _pendingPayOsOrderCode = null;
     _pendingPayOsTransactionId = null;
     _pendingEmergencyRequestId = null;
     _pendingBookingId = null;
@@ -450,6 +539,7 @@ class _PaymentConfirmationScreenState
 
   void _clearPendingWalletTopupContext() {
     _pendingWalletTopupTransactionId = null;
+    _pendingWalletTopupOrderCode = null;
     _pendingWalletTopupStartedAt = null;
   }
 
@@ -468,6 +558,9 @@ class _PaymentConfirmationScreenState
 
       final checkoutUrl = topup['checkoutUrl']?.toString() ?? '';
       final topupTransactionId = topup['transactionId']?.toString() ?? '';
+      final topupOrderCode = topup['orderCode'] is int
+          ? topup['orderCode'] as int
+          : int.tryParse(topup['orderCode']?.toString() ?? '');
       if (checkoutUrl.isEmpty) {
         throw Exception('Topup khong tra ve checkoutUrl');
       }
@@ -488,6 +581,7 @@ class _PaymentConfirmationScreenState
       _pendingWalletTopupTransactionId = topupTransactionId.isEmpty
           ? null
           : topupTransactionId;
+      _pendingWalletTopupOrderCode = topupOrderCode;
       _pendingWalletTopupStartedAt = DateTime.now();
 
       if (!mounted) return;
@@ -604,7 +698,7 @@ class _PaymentConfirmationScreenState
         showEmergencyRequestModal(
           context,
           requestId: resolvedRequestId,
-          expertId: widget.expertId ?? '',
+          expertId: widget.expertId,
           expertName: widget.expertName ?? 'Chuyên gia',
         );
       } catch (e) {
@@ -704,6 +798,7 @@ class _PaymentConfirmationScreenState
     }
 
     _pendingPayOsTransactionId = transactionId;
+    _pendingPayOsOrderCode = payment.orderCode;
     _pendingEmergencyRequestId = emergencyRequestId;
     _pendingBookingId = bookingId;
   }
@@ -1596,9 +1691,11 @@ class _PaymentConfirmationScreenState
                               Icon(
                                 Icons.account_balance_wallet_outlined,
                                 size: 13,
-                                color: _walletBalance != null &&
+                                color:
+                                    _walletBalance != null &&
                                         _walletBalance! >=
-                                            (int.tryParse(_getPriceAmount()) ?? 0)
+                                            (int.tryParse(_getPriceAmount()) ??
+                                                0)
                                     ? _primaryColor
                                     : Colors.red.shade400,
                               ),
@@ -1610,9 +1707,13 @@ class _PaymentConfirmationScreenState
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
-                                  color: _walletBalance != null &&
+                                  color:
+                                      _walletBalance != null &&
                                           _walletBalance! >=
-                                              (int.tryParse(_getPriceAmount()) ?? 0)
+                                              (int.tryParse(
+                                                    _getPriceAmount(),
+                                                  ) ??
+                                                  0)
                                       ? _primaryColor
                                       : Colors.red.shade400,
                                 ),

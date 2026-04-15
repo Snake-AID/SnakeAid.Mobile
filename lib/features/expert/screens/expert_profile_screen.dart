@@ -189,7 +189,9 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
                       _buildMenuItem(
                         icon: Icons.settings,
                         title: 'Cài Đặt',
-                        onTap: () {},
+                        onTap: () {
+                          context.pushNamed('expert_settings');
+                        },
                       ),
                     ],
                   ),

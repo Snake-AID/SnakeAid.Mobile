@@ -1,10 +1,13 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/handlers/payment_deep_link_coordinator.dart';
+import '../../../core/payments/payos_payment_verifier.dart';
+import '../../../core/payments/payos_pending_context.dart';
+import '../../../core/payments/payos_pending_store.dart';
 import '../../wallet/repository/wallet_repository.dart';
 
 /// Deposit Money Screen — top up the SnakeAidPay wallet via PayOS.
@@ -22,17 +25,22 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
   WalletInfo? _walletInfo;
   bool _isLoadingWallet = true;
   bool _isCreatingPayment = false;
-  String? _pendingTransactionId;
+  PayOsPendingContext? _pendingTopupContext;
   String? _pendingCheckoutUrl;
 
-  static const _kPrefTxId = 'topup_pending_transaction_id';
-  static const _kPrefUrl  = 'topup_pending_checkout_url';
+  static const _kPrefUrl = 'topup_pending_checkout_url';
+  static const _pendingStore = PayOsPendingStore('payos_pending_topup_context');
 
   StreamSubscription<PaymentDeepLinkEvent>? _deepLinkSub;
   int? _lastHandledDeepLinkEventId;
 
   static const List<int> _quickAmounts = [
-    50000, 100000, 200000, 500000, 1000000, 2000000,
+    50000,
+    100000,
+    200000,
+    500000,
+    1000000,
+    2000000,
   ];
 
   @override
@@ -53,35 +61,47 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
   Future<void> _loadWallet() async {
     try {
       final wallet = await ref.read(walletRepositoryProvider).getWalletInfo();
-      if (mounted) setState(() { _walletInfo = wallet; _isLoadingWallet = false; });
+      if (mounted)
+        setState(() {
+          _walletInfo = wallet;
+          _isLoadingWallet = false;
+        });
     } catch (_) {
       if (mounted) setState(() => _isLoadingWallet = false);
     }
   }
 
   Future<void> _loadPendingTopup() async {
+    final pendingContext = await _pendingStore.load();
     final prefs = await SharedPreferences.getInstance();
-    final txId = prefs.getString(_kPrefTxId);
-    final url  = prefs.getString(_kPrefUrl);
-    if (txId != null && url != null && mounted) {
+    final url = prefs.getString(_kPrefUrl);
+    if (pendingContext != null && url != null && mounted) {
       setState(() {
-        _pendingTransactionId = txId;
-        _pendingCheckoutUrl   = url;
+        _pendingTopupContext = pendingContext;
+        _pendingCheckoutUrl = url;
       });
     }
   }
 
-  Future<void> _savePendingTopup(String txId, String url) async {
+  Future<void> _savePendingTopup(
+    PayOsPendingContext pendingContext,
+    String url,
+  ) async {
+    await _pendingStore.save(pendingContext);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kPrefTxId, txId);
     await prefs.setString(_kPrefUrl, url);
   }
 
   Future<void> _clearPendingTopup() async {
+    await _pendingStore.clear();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_kPrefTxId);
     await prefs.remove(_kPrefUrl);
-    if (mounted) setState(() { _pendingTransactionId = null; _pendingCheckoutUrl = null; });
+    if (mounted) {
+      setState(() {
+        _pendingTopupContext = null;
+        _pendingCheckoutUrl = null;
+      });
+    }
   }
 
   void _initDeepLinks() {
@@ -99,20 +119,71 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
   Future<void> _handleDeepLinkEvent(PaymentDeepLinkEvent event) async {
     if (!mounted || _lastHandledDeepLinkEventId == event.eventId) return;
     _lastHandledDeepLinkEventId = event.eventId;
+    final pendingContext = _pendingTopupContext;
+    if (pendingContext == null) return;
 
-    final success = event.isSuccess && !event.isCancelled;
-    if (success && _pendingTransactionId != null) {
-      await ref.read(walletRepositoryProvider).confirmPayment(
-        transactionId: _pendingTransactionId!,
-      );
+    if (event.isCancelled) {
       await _clearPendingTopup();
-    } else if (event.isCancelled) {
+      await _loadWallet();
+      if (!mounted) return;
+      _showResultDialog(
+        success: false,
+        title: 'Đã hủy thanh toán',
+        message: 'Bạn đã hủy giao dịch nạp tiền PayOS.',
+      );
+      return;
+    }
+
+    if (!event.isSuccess) {
+      return;
+    }
+
+    final verifier = ref.read(payOsPaymentVerifierProvider);
+    var result = await verifier.verify(context: pendingContext, event: event);
+
+    if (result.shouldFallbackConfirm) {
+      await ref
+          .read(walletRepositoryProvider)
+          .confirmPayment(transactionId: pendingContext.transactionId);
+      result = await verifier.verify(context: pendingContext);
+    }
+
+    if (result.status == PayOsVerificationStatus.confirmed ||
+        result.status == PayOsVerificationStatus.mismatch) {
       await _clearPendingTopup();
     }
 
     await _loadWallet();
     if (!mounted) return;
-    _showResultDialog(success: success);
+    switch (result.status) {
+      case PayOsVerificationStatus.confirmed:
+        _showResultDialog(
+          success: true,
+          title: 'Nạp tiền thành công',
+          message:
+              'Số dư ví đã được cập nhật sau khi PayOS xác nhận giao dịch.',
+        );
+        break;
+      case PayOsVerificationStatus.mismatch:
+        _showResultDialog(
+          success: false,
+          title: 'Không thể xác nhận giao dịch',
+          message: result.message,
+        );
+        break;
+      case PayOsVerificationStatus.pendingBackendConfirmation:
+      case PayOsVerificationStatus.notFound:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Đã quay lại từ PayOS nhưng giao dịch chưa được backend xác nhận. Bạn có thể kiểm tra lại sau.',
+            ),
+          ),
+        );
+        break;
+      case PayOsVerificationStatus.cancelled:
+        break;
+    }
   }
 
   Future<void> _onDeposit() async {
@@ -122,13 +193,17 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
         context: context,
         builder: (_) => AlertDialog(
           backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: const Row(
             children: [
               Icon(Icons.pending_actions_rounded, color: Color(0xFFFF9800)),
               SizedBox(width: 8),
-              Text('Bạn có đơn chưa hoàn tất',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(
+                'Bạn có đơn chưa hoàn tất',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
             ],
           ),
           content: const Text(
@@ -138,7 +213,10 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('§Óng', style: TextStyle(color: Color(0xFF888888))),
+              child: const Text(
+                '§Óng',
+                style: TextStyle(color: Color(0xFF888888)),
+              ),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -152,7 +230,8 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
                 backgroundColor: const Color(0xFFFF9800),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
               child: const Text('Tiếp tục thanh toán'),
             ),
@@ -163,15 +242,26 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
     }
 
     if (!_formKey.currentState!.validate()) return;
-    final raw = _amountController.text.replaceAll('.', '').replaceAll(',', '').trim();
+    final raw = _amountController.text
+        .replaceAll('.', '')
+        .replaceAll(',', '')
+        .trim();
     final amount = int.tryParse(raw) ?? 0;
     setState(() => _isCreatingPayment = true);
     try {
-      final result = await ref.read(walletRepositoryProvider).createTopupLink(amount: amount);
+      final result = await ref
+          .read(walletRepositoryProvider)
+          .createTopupLink(amount: amount);
       if (!mounted) return;
-      _pendingTransactionId = result.transactionId;
-      _pendingCheckoutUrl   = result.checkoutUrl;
-      await _savePendingTopup(result.transactionId, result.checkoutUrl);
+      final pendingContext = PayOsPendingContext(
+        flowType: PayOsFlowType.topup,
+        transactionId: result.transactionId,
+        orderCode: result.orderCode,
+        startedAt: DateTime.now(),
+      );
+      _pendingTopupContext = pendingContext;
+      _pendingCheckoutUrl = result.checkoutUrl;
+      await _savePendingTopup(pendingContext, result.checkoutUrl);
       setState(() => _isCreatingPayment = false);
       final uri = Uri.parse(result.checkoutUrl);
       if (await canLaunchUrl(uri)) {
@@ -180,22 +270,30 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
         await Clipboard.setData(ClipboardData(text: result.checkoutUrl));
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Đã sao chép link thanh toán vào clipboard.')),
+            const SnackBar(
+              content: Text('Đã sao chép link thanh toán vào clipboard.'),
+            ),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isCreatingPayment = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e.toString().replaceFirst('Exception: ', '')),
-          backgroundColor: const Color(0xFFDC3545),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            backgroundColor: const Color(0xFFDC3545),
+          ),
+        );
       }
     }
   }
 
-  void _showResultDialog({required bool success}) {
+  void _showResultDialog({
+    required bool success,
+    required String title,
+    required String message,
+  }) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -215,25 +313,28 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
               ),
               child: Icon(
                 success ? Icons.check_circle : Icons.cancel,
-                color: success ? const Color(0xFF228B22) : const Color(0xFFDC3545),
+                color: success
+                    ? const Color(0xFF228B22)
+                    : const Color(0xFFDC3545),
                 size: 40,
               ),
             ),
             const SizedBox(height: 16),
             Text(
-              success ? 'Nạp tiền thành công!' : 'Giao dịch đã bị hủy',
+              title,
               style: const TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF333333),
+              ),
               textAlign: TextAlign.center,
             ),
-            if (success) ...[
-              const SizedBox(height: 8),
-              const Text(
-                'Số dư ví sẽ được cập nhật ngay sau khi giao dịch xác nhận.',
-                style: TextStyle(fontSize: 14, color: Color(0xFF888888)),
-                textAlign: TextAlign.center,
-              ),
-            ],
+            const SizedBox(height: 8),
+            Text(
+              message,
+              style: const TextStyle(fontSize: 14, color: Color(0xFF888888)),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
         actions: [
@@ -245,7 +346,9 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
             child: Text(
               'Đóng',
               style: TextStyle(
-                color: success ? const Color(0xFF228B22) : const Color(0xFFDC3545),
+                color: success
+                    ? const Color(0xFF228B22)
+                    : const Color(0xFFDC3545),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -256,9 +359,9 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
   }
 
   String _formatBalance(double amount) {
-    final f = amount.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.',
-    );
+    final f = amount
+        .toStringAsFixed(0)
+        .replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
     return '$f đ';
   }
 
@@ -272,7 +375,9 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
           Container(
             decoration: const BoxDecoration(
               color: Colors.white,
-              border: Border(bottom: BorderSide(color: Color(0xFFDDDDDD), width: 1)),
+              border: Border(
+                bottom: BorderSide(color: Color(0xFFDDDDDD), width: 1),
+              ),
             ),
             child: SafeArea(
               bottom: false,
@@ -281,9 +386,14 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
                 child: Stack(
                   children: [
                     Positioned(
-                      left: 0, top: 0, bottom: 0,
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
                       child: IconButton(
-                        icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF333333)),
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new,
+                          color: Color(0xFF333333),
+                        ),
                         onPressed: () => Navigator.of(context).pop(),
                       ),
                     ),
@@ -291,7 +401,9 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
                       child: Text(
                         'Nạp Tiền',
                         style: TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF333333),
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF333333),
                         ),
                       ),
                     ),
@@ -323,7 +435,8 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
                         boxShadow: [
                           BoxShadow(
                             color: const Color(0xFF228B22).withOpacity(0.3),
-                            blurRadius: 10, offset: const Offset(0, 4),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
@@ -332,30 +445,52 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
                         children: [
                           const Row(
                             children: [
-                              Icon(Icons.account_balance_wallet, color: Colors.white70, size: 20),
+                              Icon(
+                                Icons.account_balance_wallet,
+                                color: Colors.white70,
+                                size: 20,
+                              ),
                               SizedBox(width: 8),
-                              Text('Ví SnakeAidPay',
-                                  style: TextStyle(fontSize: 14, color: Colors.white70)),
+                              Text(
+                                'Ví SnakeAidPay',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white70,
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 8),
-                          const Text('Số dư hiện tại',
-                              style: TextStyle(fontSize: 14, color: Colors.white70)),
+                          const Text(
+                            'Số dư hiện tại',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white70,
+                            ),
+                          ),
                           const SizedBox(height: 4),
                           if (_isLoadingWallet)
                             const SizedBox(
                               height: 40,
-                              child: Center(child: SizedBox(
-                                width: 24, height: 24,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white54),
-                              )),
+                              child: Center(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white54,
+                                  ),
+                                ),
+                              ),
                             )
                           else
                             Text(
                               _formatBalance(_walletInfo?.balance ?? 0),
                               style: const TextStyle(
-                                  fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
                         ],
                       ),
@@ -369,47 +504,73 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
                       ),
 
                     // Amount input
-                    const Text('Số tiền nạp',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF333333))),
+                    const Text(
+                      'Số tiền nạp',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF333333),
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _amountController,
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       style: const TextStyle(
-                          fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF228B22)),
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF228B22),
+                      ),
                       decoration: InputDecoration(
                         hintText: '0',
                         suffixText: 'đ',
                         suffixStyle: const TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF888888)),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF888888),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFFDDDDDD), width: 2),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFDDDDDD),
+                            width: 2,
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFF228B22), width: 2),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF228B22),
+                            width: 2,
+                          ),
                         ),
                         filled: true,
                         fillColor: Colors.white,
                       ),
                       validator: (value) {
                         final v = int.tryParse(
-                            (value ?? '').replaceAll('.', '').replaceAll(',', ''));
+                          (value ?? '').replaceAll('.', '').replaceAll(',', ''),
+                        );
                         if (v == null || v <= 0) return 'Vui lòng nhập số tiền';
                         if (v < 10000) return 'Số tiền tối thiểu là 10.000đ';
-                        if (v > 50000000) return 'Số tiền tối đa là 50.000.000đ';
+                        if (v > 50000000)
+                          return 'Số tiền tối đa là 50.000.000đ';
                         return null;
                       },
                     ),
                     const SizedBox(height: 16),
                     // Quick amounts
-                    const Text('Chọn nhanh',
-                        style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF888888))),
+                    const Text(
+                      'Chọn nhanh',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF888888),
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     Wrap(
                       spacing: 8,
@@ -417,7 +578,8 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
                       children: _quickAmounts.map((amount) {
                         return _QuickAmountButton(
                           amount: amount,
-                          onTap: () => _amountController.text = amount.toString(),
+                          onTap: () =>
+                              _amountController.text = amount.toString(),
                         );
                       }).toList(),
                     ),
@@ -429,30 +591,38 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
                         color: const Color(0xFFF0F8FF),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                            color: const Color(0xFF228B22).withOpacity(0.3)),
+                          color: const Color(0xFF228B22).withOpacity(0.3),
+                        ),
                       ),
                       child: const Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.qr_code_scanner,
-                              color: Color(0xFF228B22), size: 24),
+                          Icon(
+                            Icons.qr_code_scanner,
+                            color: Color(0xFF228B22),
+                            size: 24,
+                          ),
                           SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Thanh toán qua PayOS',
-                                    style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF333333))),
+                                Text(
+                                  'Thanh toán qua PayOS',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF333333),
+                                  ),
+                                ),
                                 SizedBox(height: 4),
                                 Text(
                                   'Sau khi nhấn "Thanh Toán Qua PayOS", bạn sẽ được chuyển đến trang thanh toán. Quét mã QR hoặc dùng Internet Banking để hoàn tất.',
                                   style: TextStyle(
-                                      fontSize: 13,
-                                      color: Color(0xFF555555),
-                                      height: 1.5),
+                                    fontSize: 13,
+                                    color: Color(0xFF555555),
+                                    height: 1.5,
+                                  ),
                                 ),
                               ],
                             ),
@@ -471,8 +641,11 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
                       child: const Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.warning_amber_rounded,
-                              color: Color(0xFFFF9800), size: 20),
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            color: Color(0xFFFF9800),
+                            size: 20,
+                          ),
                           SizedBox(width: 12),
                           Expanded(
                             child: Text(
@@ -480,9 +653,10 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
                               '• Số tiền tối đa: 50.000.000đ\n'
                               '• Tiền được cộng vào ví ngay sau khi giao dịch thành công',
                               style: TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF333333),
-                                  height: 1.5),
+                                fontSize: 13,
+                                color: Color(0xFF333333),
+                                height: 1.5,
+                              ),
                             ),
                           ),
                         ],
@@ -500,12 +674,15 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          border: const Border(top: BorderSide(color: Color(0xFFDDDDDD), width: 1)),
+          border: const Border(
+            top: BorderSide(color: Color(0xFFDDDDDD), width: 1),
+          ),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, -2)),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
           ],
         ),
         child: SafeArea(
@@ -514,7 +691,9 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
             child: SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: (_isCreatingPayment || _pendingCheckoutUrl != null) ? null : _onDeposit,
+                onPressed: (_isCreatingPayment || _pendingCheckoutUrl != null)
+                    ? null
+                    : _onDeposit,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _pendingCheckoutUrl != null
                       ? const Color(0xFFFF9800)
@@ -522,7 +701,8 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   elevation: 0,
                   disabledBackgroundColor: _pendingCheckoutUrl != null
                       ? const Color(0xFFFF9800).withOpacity(0.6)
@@ -533,14 +713,18 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
                         width: 22,
                         height: 22,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : Text(
                         _pendingCheckoutUrl != null
                             ? 'Có Đơn Nạp Tiền Chưa Hoàn Tất'
                             : 'Thanh Toán Qua PayOS',
                         style: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
               ),
             ),
@@ -557,7 +741,10 @@ class _PendingTopupBanner extends StatelessWidget {
   final String checkoutUrl;
   final VoidCallback onDismiss;
 
-  const _PendingTopupBanner({required this.checkoutUrl, required this.onDismiss});
+  const _PendingTopupBanner({
+    required this.checkoutUrl,
+    required this.onDismiss,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -572,20 +759,29 @@ class _PendingTopupBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.pending_actions_rounded, color: Color(0xFFFF9800), size: 22),
+          const Icon(
+            Icons.pending_actions_rounded,
+            color: Color(0xFFFF9800),
+            size: 22,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Bạn có đơn nạp tiền chưa hoàn tất',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF333333))),
+                const Text(
+                  'Bạn có đơn nạp tiền chưa hoàn tất',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF333333),
+                  ),
+                ),
                 const SizedBox(height: 4),
-                const Text('Nhấn "Tiếp tục" để quay lại trang thanh toán.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF666666))),
+                const Text(
+                  'Nhấn "Tiếp tục" để quay lại trang thanh toán.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF666666)),
+                ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -593,16 +789,27 @@ class _PendingTopupBanner extends StatelessWidget {
                       onPressed: () async {
                         final uri = Uri.parse(checkoutUrl);
                         if (await canLaunchUrl(uri)) {
-                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          await launchUrl(
+                            uri,
+                            mode: LaunchMode.externalApplication,
+                          );
                         }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFFF9800),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                         elevation: 0,
-                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        textStyle: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       child: const Text('Tiếp tục'),
                     ),
@@ -611,7 +818,10 @@ class _PendingTopupBanner extends StatelessWidget {
                       onPressed: onDismiss,
                       style: TextButton.styleFrom(
                         foregroundColor: const Color(0xFF888888),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
                         textStyle: const TextStyle(fontSize: 12),
                       ),
                       child: const Text('Bỏ qua'),
@@ -650,9 +860,10 @@ class _QuickAmountButton extends StatelessWidget {
         child: Text(
           _fmt(amount),
           style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF228B22)),
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF228B22),
+          ),
         ),
       ),
     );
