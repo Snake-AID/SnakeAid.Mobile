@@ -222,7 +222,7 @@ flowchart LR
 | 9 | Authentication | Password Reset Success | Screen confirming that the password has been successfully updated. |
 | 10 | Member Workspace | Member Home | Main dashboard providing quick access to emergency services and alerts. |
 | 11 | Community Alerts | Community Alert | Screen displaying nearby active incidents and user-submitted reports. |
-| 12 | Notification | Notification Tab | Centralized inbox for system alerts and message updates. |
+| 12 | Notification Tab | Notification Tab | Centralized inbox for system alerts and message updates. |
 | 13 | Emergency Response | Emergency Action | Entry point for initiating SOS and triggering snake identification. |
 | 14 | Emergency Response | Snake Identification | Real-time AI camera interface for scanning and identifying snake species. |
 | 15 | Emergency Response | Snake Selection by Location | Search interface for manually filtering snake species based on region. |
@@ -295,7 +295,7 @@ flowchart LR
 | Rescuer Home | | X | | | |
 | Expert Home | | | X | | |
 | Notification Tab | X | | | | |
-| Notification Inbox | | X | | | |
+| Notification Tab | | X | | | |
 | Notification | | | X | | |
 | Community Alert | X | | | | |
 | Emergency Action | X | | | | |
@@ -411,194 +411,198 @@ flowchart LR
 
 ---
 
-### 3.4.1 Authentication
-**Function trigger:** Launching the app unauthenticated, or choosing to log out.
+### 3.4.1 Authentication & Registration
+**Function trigger:** App launches unauthenticated. Navigation path: Splash -> Role Selection -> (Member Registration -> OTP Verification -> Registration Success) or (Member Login -> Forgot Password flow).
 **Function description:**
 - **Actor:** Guest / Member.
-- **Purpose:** Allow users to securely register, verify identity via OTP, log in, and recover forgotten passwords.
-- **Interface:** Role selection, input forms for phone/email, OTP input fields, success confirmations.
-- **Data processing:** Validates credentials against identity provider (e.g., Firebase Auth or custom backend).
+- **Purpose:** Securely onboard new members, verify identity, and manage authenticated session lifecycles.
+- **Interface:** Role selection cards, data capture forms, OTP keypad, and standardized identity validation views.
+- **Data processing:** Issue registration payloads to Auth service, dispatch and verify SMS/Email OTP, return session tokens.
 - **Screen layout:** 
+
 **Function details:**
-- **Related Screens:** Splash, Role Selection, Member Registration, OTP Verification, Registration Success, Member Login, Forgot Password, Forgot Password OTP, Reset Password, Password Reset Success.
-- **Data:** Credentials (email/phone, password), OTP codes, User details (name, DOB).
-- **Validation:** Password strength, valid email/phone format, valid unexpired OTP.
-- **Business rules:** Account must be verified via OTP before first login.
-- **Normal cases:** User registers -> receives OTP -> verifies -> logs in successfully.
-- **Abnormal cases:** Invalid OTP -> display error; User exists -> prompt to log in.
+- **Data:** PII credentials (phone, email, DOB, name), validation tokens, JWT session objects.
+- **Validation:** Enforce strong password complexity; Ensure unique identity (no duplicate emails/phones); OTP strict expiration.
+- **Business rules:** Unverified accounts cannot access core emergency or consultation features; Logins demand exact credential matches.
+- **Normal cases:** User registers, validates OTP, and seamlessly drops into Member Workspace.
+- **Abnormal cases:** Identity collision triggers "Account Exists" warning; Exhausted OTP attempts halt registration temporarily.
 
 ---
 
-### 3.4.2 Member Home & Notifications
-**Function trigger:** Successful login or navigating from bottom tabs.
+### 3.4.2 Member Workspace & Notifications
+**Function trigger:** Authenticated user enters the app. Navigation path: Member Login -> Member Home <-> Notification Tab.
 **Function description:**
-- **Actor:** Member.
-- **Purpose:** Central hub providing quick access to primary actions (SOS, Catching, Consult) and displaying important alerts.
-- **Interface:** Bottom navigation, SOS hero button, quick access grid, Notification Tab.
-- **Data processing:** Fetch profile summary, unread notifications, and active ongoing incidents.
+- **Actor:** Member (with System alerting).
+- **Purpose:** Serve as the primary routing hub, surfacing critical emergency CTAs and personal alerts.
+- **Interface:** Dominant SOS action hero button, service navigation grid, and system alert inbox.
+- **Data processing:** Fetch active user state, aggregate unread notification counts, identify any ongoing active emergency operations.
 - **Screen layout:** 
+
 **Function details:**
-- **Related Screens:** Member Home, Notification Tab.
-- **Data:** Profile state, Notification array (alerts, system messages).
-- **Validation:** Requires active session.
-- **Business rules:** If an Active Emergency exists, show a persistent tracking banner at the top of Home. 
-- **Normal cases:** Dashboard loads, user taps "Notification Tab" to view read/unread alerts.
-- **Abnormal cases:** Offline mode -> display cached dashboard with "No internet" indicator.
+- **Data:** User contextual profile, system notification payload array, active mission state flags.
+- **Validation:** Valid member session.
+- **Business rules:** If the member has an active emergency dispatch, the Home screen must forcefully display an immediate "Return to Tracking" persistent banner.
+- **Normal cases:** Workspace renders fully; User taps Notification Tab to review unread system updates.
+- **Abnormal cases:** Network failure gracefully loads offline cache with a disabled SOS warning banner.
 
 ---
 
-### 3.4.3 Community Alerts & Reporting
-**Function trigger:** Selecting Community Alert on the home page.
+### 3.4.3 Community Alerts
+**Function trigger:** User investigates local environment safety. Navigation path: Member Home -> Community Alert -> (Upload Community Report) or (Edit Community Report / History Community).
 **Function description:**
 - **Actor:** Member.
-- **Purpose:** View nearby community alerts or upload new alert/report.
-- **Interface:** Map or list of alerts, History Community, form to create/edit new reports.
-- **Data processing:** Fetching geolocated alerts and posting user reports.
+- **Purpose:** Enable crowdsourced hazard reporting and situational awareness of nearby snake sightings.
+- **Interface:** Geospatial map/list of incidents, media upload forms, and historical logs of personal reports.
+- **Data processing:** Query geofenced hazard datasets, process multipart form uploads (images + location), log reporting history.
 - **Screen layout:** 
+
 **Function details:**
-- **Related Screens:** Community Alert, History Community, Upload Community Report, Edit Community Report.
-- **Data:** Location (lat/lng), description, photos.
-- **Validation:** Report needs at least a photo and description.
-- **Business rules:** Reports might require moderation or are shown with a warning label.
-- **Normal cases:** User sees a snake -> Uploads Community Report -> Report is broadcasted.
+- **Data:** Incident coordinates, sighting descriptions, image media, timestamp metadata.
+- **Validation:** Location coordinates are mandatory; At least one visual evidence attachment must be provided.
+- **Business rules:** User-submitted reports append a "Community Verified" metadata flag; Users can only edit their own active reports.
+- **Normal cases:** Member spots a hazard, maps the coordinates, uploads a photo, and the alert broadcasts to nearby users.
+- **Abnormal cases:** GPS permission denied blocks report creation; Media upload timeouts generate robust retry prompts.
 
 ---
 
-### 3.4.4 Emergency SOS Initiation & Identification
-**Function trigger:** Tapping the prominent "Emergency Action" (SOS) button on the Home screen.
+### 3.4.4 Emergency SOS & Identification
+**Function trigger:** Member triggers critical emergency workflow. Navigation path: Member Home -> Emergency Action -> Snake Identification -> Snake Selection by Location -> Snake Confirmation.
 **Function description:**
 - **Actor:** Member.
-- **Purpose:** Start the crucial emergency flow to identify the threat quickly.
-- **Interface:** AI Camera view for real-time scanning, Filtered Results, Location-based selection, and Final Confirmation.
-- **Data processing:** Camera feed processing using ML models. Question-based/location-based filtering logic.
+- **Purpose:** Provide rapid, high-stress interface to initiate SOS protocols and utilize AI for immediate threat identification.
+- **Interface:** Distraction-free camera scanner, ML bounding-box view, geolocation-based fallback lists, and definitive confirmation modals.
+- **Data processing:** Stream camera frames to Edge/Cloud ML models, execute computer vision inference, return top-K species matches, fallback to geospatial narrowing.
 - **Screen layout:** 
+
 **Function details:**
-- **Related Screens:** Emergency Action, Snake Identification, Snake Selection by Location, Snake Confirmation.
-- **Data:** Image frames, Device Location (lat/lng), manual IDs.
-- **Validation:** Camera/Location permissions required.
-- **Business rules:** Speed is critical. If AI fails, fallback to Question-based or Location-based filtering securely.
-- **Normal cases:** User takes a photo -> AI identifies snake -> Filtered Results -> Confirmation.
-- **Abnormal cases:** AI fails to predict -> Fallback gracefully to manual location search.
+- **Data:** Real-time visual frames, inferred species ID arrays, confidence thresholds, fallback regional species logic.
+- **Validation:** Device camera and location permissions are strictly required to proceed.
+- **Business rules:** Execution speed is paramount; AI inference must return within set latency bounds or auto-trigger the location-based manual fallback flow.
+- **Normal cases:** AI detects species with high confidence -> User confirms -> System progresses to Clinical Assessment.
+- **Abnormal cases:** Pitch-black image or blurry motion fails AI thresholds -> Instantly redirects user to manual "Snake Selection by Location".
 
 ---
 
-### 3.4.5 First Aid & Symptom Reporting
-**Function trigger:** Post-snake-identification or directly if the snake is unknown.
+### 3.4.5 Clinical Assessment & First Aid
+**Function trigger:** SOS species is confirmed or declared unknown. Navigation path: Snake Confirmation -> First Aid Steps -> Symptom Report -> Severity Assessment.
 **Function description:**
-- **Actor:** Member.
-- **Purpose:** Provide immediate life-saving instructions and assess patient condition.
-- **Interface:** Step-by-step visual guides, Symptom ticking/selection forms.
-- **Data processing:** Map the identified snake to correct first aid protocols. Calculate priority based on reported symptoms.
+- **Actor:** Member (aided by Automated Assessment).
+- **Purpose:** Administer immediate life-saving directives and autonomously triage the victim's clinical severity to inform dispatch systems.
+- **Interface:** High-visibility procedural steps, symptom ticking checklists, and urgent severity determination outcome screens.
+- **Data processing:** Map identified species to specific clinical protocols, process selected symptoms against severity matrix algorithms.
 - **Screen layout:** 
+
 **Function details:**
-- **Related Screens:** First Aid Steps, Symptom Report, Severity Assessment.
-- **Data:** Chosen symptoms, time elapsed since bite.
-- **Validation:** Must select at least "No symptoms yet" to proceed.
-- **Business rules:** Never give medical diagnostic guarantees, only triage severity to push to rescuer/hospital.
-- **Normal cases:** Reads first aid -> Inputs symptoms -> System assesses severity -> Continues to tracking.
-- **Abnormal cases:** User skips -> Default to highest unknown severity to be safe.
+- **Data:** Snake species ID, Boolean symptom array, computed triage level (e.g., Low, High, Critical).
+- **Validation:** At least one symptom state (including "No symptoms") must be explicitly selected to advance.
+- **Business rules:** App never provides definitive medical diagnoses, only algorithmic triage to rank dispatch priorities; Unknown species default to High/Critical precaution levels.
+- **Normal cases:** Member reads protocol -> checks symptoms -> system determines "Critical" -> directly initiates Rescuer dispatch sequence.
+- **Abnormal cases:** User abandons flow mid-way -> System holds the SOS state active and prompts resumption upon next app launch.
 
 ---
 
-### 3.4.6 Emergency Tracking & Resolution
-**Function trigger:** After SOS is fully dispatched and help is en route.
+### 3.4.6 Emergency Tracking
+**Function trigger:** SOS is actively dispatched to a rescuer. Navigation path: Severity Assessment -> Emergency Tracking -> Rescuer Arrived -> Member Incident Finished.
 **Function description:**
-- **Actor:** Member.
-- **Purpose:** Real-time visibility into the rescue operation and incident closure.
-- **Interface:** Live map, ETA timers, status updates, completion summary.
-- **Data processing:** WebSocket/MQTT location streaming from responding rescuer.
+- **Actor:** Member (receiving telemetry from Rescuer).
+- **Purpose:** Provide psychological relief and operational visibility by tracking the inbound emergency responder in real-time.
+- **Interface:** Live map rendering dynamic polylines, ETA countdowns, responder profile snippets, and final incident resolution summaries.
+- **Data processing:** Consume incoming WebSocket/SignalR geolocation points, calculate route recalculations, and sync final state closure.
 - **Screen layout:** 
+
 **Function details:**
-- **Related Screens:** Emergency Tracking, Rescuer Arrived, Member Incident Finished.
-- **Data:** Rescuer live coordinates, Status milestones (Assigned, En Route, Arrived, Resolved).
-- **Validation:** Location tracking relies on active background services of the rescuer.
-- **Business rules:** Member cannot cancel if rescuer is already arrived.
-- **Normal cases:** Watch rescuer approach -> Rescuer Arrived -> Incident finishes -> Shows summary.
-- **Abnormal cases:** Rescuer disconnects -> Reassign to another rescuer automatically.
+- **Data:** Rescuer live coordinates, updated ETA metrics, discrete mission states (Assigned, En Route, Arrived, Resolved).
+- **Validation:** Ensures rescuer maintains an active transmit heartbeat.
+- **Business rules:** Member cannot abort the mission once the rescuer transitions to "Arrived" state.
+- **Normal cases:** Rescuer dot approaches on map -> State flips to Arrived -> Operation concludes and renders summary.
+- **Abnormal cases:** Rescuer goes offline -> UI shows "Signal Lost" while system attempts re-routing or re-assignment in background.
 
 ---
 
 ### 3.4.7 Snake Catching Service
-**Function trigger:** User selects the "Snake Catching" feature from the Home Screen.
+**Function trigger:** Member opts for non-medical snake removal. Navigation path: Member Home -> Snake Catching -> Snake Quantity Selection -> Snake Report Detail -> Snake Catching Success.
 **Function description:**
 - **Actor:** Member.
-- **Purpose:** Request professional help to remove a snake from a property (Non-medical emergency).
-- **Interface:** Location pin, quantity selection, detailed report form.
-- **Data processing:** Matches request with available catchers nearby.
+- **Purpose:** Orchestrate the request and logistics for professional, non-urgent snake catching and property safeguarding.
+- **Interface:** Address confirmation map, quantity counter, environmental context forms, and final success confirmation.
+- **Data processing:** Geocode address endpoints, construct specialized dispatch payloads, query availability of non-emergency responders.
 - **Screen layout:** 
+
 **Function details:**
-- **Related Screens:** Snake Catching, Snake Quantity Selection, Snake Report Detail, Snake Catching Success, Snake Catching Detail.
-- **Data:** Address, Number of snakes, Situation description/photo.
-- **Validation:** Address must be valid and within service range.
-- **Business rules:** Catching requests are prioritized lower than SOS medical emergencies.
-- **Normal cases:** Selects location -> Details the issue -> Catches dispatched -> Success summary.
-- **Abnormal cases:** No catchers available -> Display "No nearby responders" message.
+- **Data:** Geocoordinates, quantity integer, environmental text description, attached situational photographs.
+- **Validation:** Provided address must fall within the platform's operational service polygons.
+- **Business rules:** Snake Catching requests explicitly sit at a lower dispatch priority compared to SOS Medical workflows.
+- **Normal cases:** Member defines the parameters, submits form -> System secures a catcher -> Shows success confirmation dispatch.
+- **Abnormal cases:** No active responders available in radius -> UI clearly declines the request and suggests alternative contact methods.
 
 ---
 
-### 3.4.8 Expert Consultation Booking & Live Video
-**Function trigger:** Navigating to "Consultation Home" from Home.
+### 3.4.8 Expert Consultation
+**Function trigger:** Member requires professional clinical or zoological advice. Navigation path: Member Home -> Consultation Home -> Expert List -> Expert Detail -> Service Selection -> Consultation Time Selection -> Consultation Documents -> Payment Confirmation -> (Video Waiting Room -> Video Consultation) -> Consultation Complete.
 **Function description:**
-- **Actor:** Member.
-- **Purpose:** Schedule a telemedicine or advice session with a verified snake/medical expert. Also conduct the video call.
-- **Interface:** Expert directory, scheduled or emergency options, document uploads, and video/audio interface.
-- **Data processing:** Booking slots handling. Setting up WebRTC streams for video calls.
+- **Actor:** Member & Expert.
+- **Purpose:** Facilitate synchronous telemedicine and expert advisory sessions via scheduled or ad-hoc video links.
+- **Interface:** Filterable expert directories, calendar pickers, medical document upload forms, checkout gateways, and WebRTC video interfaces.
+- **Data processing:** Execute calendar scheduling logic, process escrow payment transactions, instantiate WebRTC signaling and media streams.
 - **Screen layout:** 
+
 **Function details:**
-- **Related Screens:** Consultation Home, Scheduled Consultation, Emergency Consultation, Expert List, Expert Detail, Service Selection, Consultation Time Selection, Consultation Documents, Payment Confirmation, Emergency Request Waiting, Video Waiting Room, Video Consultation, Consultation Complete.
-- **Data:** Selected expert, Timeslot, Uploaded images (e.g., wound), WebRTC streams.
-- **Validation:** Selected time must not overlap. Payment must succeed.
-- **Business rules:** Payment held in escrow until consultation concludes. Emergency consultation routes to any available on-call expert directly.
-- **Normal cases:** Books expert -> Waits for time -> Joins Waiting Room -> Video Consults -> Complete.
+- **Data:** Selected expert ID, ISO8601 timeslots, multipart clinical documents, payment intent tokens, RTC connection descriptors.
+- **Validation:** Scheduled timeslots must strictly avoid overlap; Escrow payment capture must perfectly succeed before session locks.
+- **Business rules:** Emergency consultations bypass standard scheduling to ping all "On-Call" experts globally; Funds are held in escrow pending successful session completion.
+- **Normal cases:** Member schedules doc -> pays -> enters waiting room at T-minus 5 -> conducts call -> receives digital prescription logic.
+- **Abnormal cases:** WebRTC ICE failure drops video -> UI gracefully downgrades to audio-only or text chat; Payment gateway rejects card.
 
 ---
 
-### 3.4.9 Knowledge Base (Library & Blogs)
-**Function trigger:** Tapping Library or Blog sections.
+### 3.4.9 Knowledge Base
+**Function trigger:** Member accesses educational resources. Navigation path: Member Home -> (Snake Library -> Snake Detail -> Snake First Aid Guide) or (Blog List -> Blog Detail).
 **Function description:**
 - **Actor:** Member.
-- **Purpose:** Educate users on snake species, habitats, and general safety tips.
-- **Interface:** Searchable lists, detailed encyclopedic views.
-- **Data processing:** Fetching CMS data.
+- **Purpose:** Equip the general public with authoritative zoological parameters and comprehensive safety/preventative literature.
+- **Interface:** Rich media libraries, searchable encyclopedic UI, detailed taxonomy cards, and long-form markdown blog readers.
+- **Data processing:** Fetch structured JSON/CMS taxonomies, cache heavy assets locally, parse and render markdown safely.
 - **Screen layout:** 
+
 **Function details:**
-- **Related Screens:** Snake Library, Snake Detail, Snake First Aid Guide, Blog List, Blog Detail.
-- **Data:** Species taxonomies, high-res images, markdown blog articles.
-- **Validation:** N/A (Read-only).
-- **Business rules:** Keep data cached for offline access where possible.
-- **Normal cases:** Searching for "Cobra" -> views details -> reads specific first aid.
-- **Abnormal cases:** Search yields no results -> "Not found" illustration.
+- **Data:** Species taxonomy databases, risk classification metrics, geographical habitats, raw markdown blog payloads.
+- **Validation:** N/A (Mostly Read-only queries).
+- **Business rules:** Snake Detail views must prominently feature a direct CTA to that specific species' First Aid Guide to cut down navigation time in edge-case panics.
+- **Normal cases:** Member queries "Viper" -> Reads habitat detail -> Swipes to verify recommended first-aid.
+- **Abnormal cases:** Heavy network latency -> App serves last cached version of the Library to ensure availability.
 
 ---
 
-### 3.4.10 User Wallet & Transactions
-**Function trigger:** Navigating to Wallet or Transaction History.
+### 3.4.10 Member Wallet & Transactions
+**Function trigger:** User accesses financial settings or completes a paid flow. Navigation path: Profile Tab -> History Wallet -> (Top-up / Withdrawal / History Transaction -> Transaction Detail).
 **Function description:**
 - **Actor:** Member.
-- **Purpose:** Manage platform funds for paying consultations or premium catching services.
-- **Interface:** Wallet overview, Top-up forms, Withdrawal requests, Transaction logs.
-- **Data processing:** Handling logic with payment gateways (Stripe/Paypal/Momo).
+- **Purpose:** Manage platform-native funds serving as the primary payment method for consultations and premium catching services.
+- **Interface:** Financial ledger dashboards, input fields for deposit/withdraw amounts, and detailed transactional receipts.
+- **Data processing:** Mutate digital ledger states, interface with 3rd-party Payment Processor APIs (e.g., Stripe/PayOS/Momo), process webhooks.
 - **Screen layout:** 
+
 **Function details:**
-- **Related Screens:** History Wallet, History Transaction, Transaction Detail, Top-up, Withdrawal.
-- **Data:** Account balance, Fiat currency logs, Gateway tokens.
-- **Validation:** Minimum withdrawal amounts. Successful top-up callbacks.
-- **Business rules:** Balance is deducted instantly when a paid service is locked in.
-- **Normal cases:** User tops up -> Balance updates -> Uses for consultation.
+- **Data:** Integer/Decimal balance structures, fiat currency exchange mappings, unique transaction IDs, status enumerations (Pending, Completed, Failed).
+- **Validation:** Withdrawal requests must exceed minimum systemic thresholds and cannot exceed available unheld balance.
+- **Business rules:** Wallet balances are instantly deducted and held in escrow when a service is booked; Failed services automatically refund to the wallet.
+- **Normal cases:** Member tops up via Momo -> webhook confirms -> Balance reflects change -> Member pays for Consultation.
+- **Abnormal cases:** Third-party gateway delays webhook -> UI marks transaction as "Processing" and polls until definitive state is reached.
 
 ---
 
-### 3.4.11 Profile, Activity & Settings
-**Function trigger:** Navigating to Profile Tab or Settings.
+### 3.4.11 Profile & Activity Overviews
+**Function trigger:** Member inspects personal records. Navigation path: Profile Tab -> (Edit Profile / Settings) or Activity Tab -> (Activity Detail / Activity History).
 **Function description:**
 - **Actor:** Member.
-- **Purpose:** Manage personal settings, modify profile, and review past incidents/consultations.
-- **Interface:** Standard settings lists, historical timeline cards, edit forms.
-- **Data processing:** Fetching detailed user history logs and updating profile states.
+- **Purpose:** Authorize profile modifications, toggle application configurations, and maintain a rigorous audit trail of all historical engagements.
+- **Interface:** Interactive form components, global toggle switches (dark mode/language), and complex chronologically sorted activity cards.
+- **Data processing:** Perform CRUD operations on user schematics, aggregate scattered microservice logs into unified Activity timelines.
 - **Screen layout:** 
+
 **Function details:**
-- **Related Screens:** Profile Tab, Edit Profile, Settings, Activity Tab, Activity Detail, Activity History.
-- **Data:** User details, app preferences (language, notification).
-- **Validation:** Profile updates must meet constraints.
-- **Business rules:** Incident history cannot be deleted by the user for legal/safety tracking reasons.
-- **Normal cases:** Open Profile -> Edits info -> Save -> Open Settings -> Toggles dark mode.
+- **Data:** Core demographic PII, application state preferences, unified incident/consultation discrete historical payload objects.
+- **Validation:** PII changes subject to strict regex constraints (Email/Phone format integrity).
+- **Business rules:** Historical activity records are tightly bound and immutable (cannot be deleted by user for legal/audit safety reasons).
+- **Normal cases:** Member adjusts App Language -> Preferences save locally and sync -> UI re-renders instantly.
+- **Abnormal cases:** Upstream microservice failure preventing Activity History aggregation -> UI informs user of temporary partial data availability.

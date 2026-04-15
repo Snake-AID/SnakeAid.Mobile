@@ -42,7 +42,7 @@ flowchart LR
 
     HOME --> HIST[Mission History]
     HIST --> HISTD[History Detail]
-    HOME --> NOTIF[Notification Inbox]
+    HOME --> NOTIF[Notification Tab]
 
     HOME --> PROFILE[Profile Tab]
     PROFILE --> EDITP[Edit Profile]
@@ -126,7 +126,7 @@ flowchart LR
 | 21 | Emergency Response | Mission Success - Emergency | Final summary screen outlining the completed SOS emergency response. |
 | 22 | Activity & History | Mission History | Chronological log displaying completed past rescue and catching operations. |
 | 23 | Activity & History | History Detail | In-depth breakdown validating operational and financial specifics of a past mission. |
-| 24 | Notification | Notification Inbox | Centralized paginated inbox handling system alerts and read/unread tracking. |
+| 24 | Notification Tab | Notification Tab | Centralized paginated inbox handling system alerts and read/unread tracking. |
 | 25 | Rescuer Profile | Profile Tab | Rescuer profile summary detailing performance metrics and ratings. |
 | 26 | Rescuer Profile | Edit Profile | Form interface for modifying personal rescuer details and avatars. |
 | 27 | Rescuer Profile | Settings | Application configuration interface for work modes and notification toggles. |
@@ -189,125 +189,107 @@ flowchart LR
 ---
 
 ### 3.4.1 Authentication
-**Function trigger:** Launching the app unauthenticated, choosing role, or tapping Forgot Password.
+**Function trigger:** App initializes with an unauthenticated state or user initiates logout. Navigation path: Splash -> Role Selection -> Rescuer Login -> (Forgot Password -> Forgot Password OTP -> Reset Password -> Password Reset Success).
 **Function description:**
 - **Actor:** Rescuer.
-- **Purpose:** Let rescuer securely login or recover their password.
-- **Interface:** Role selection, input forms for email/password, OTP validation, success notices.
-- **Data processing:** Validation against Auth API and OTP generation.
+- **Purpose:** Ensure secure identity verification, account access, and credential recovery for rescuer personnel.
+- **Interface:** Role selection toggle, secure login forms, OTP input fields, and success confirmation overlays.
+- **Data processing:** Validate credentials via Auth API, process OTP generation/verification for recovery, establish secure JWT sessions.
 - **Screen layout:** 
+
 **Function details:**
-- **Related Screens:** Splash, Role Selection, Rescuer Login, Forgot Password, Forgot Password OTP, Reset Password, Password Reset Success.
-- **Data:** Credentials (email, password), OTP codes.
-- **Validation:** Valid email format, OTP matches.
-- **Business rules:** OTP expires after 5 minutes.
-- **Normal cases:** Login success routes to Rescuer Home.
-- **Abnormal cases:** Invalid credentials trigger error messages.
+- **Data:** User credentials (email, password), OTP tokens, session JWT.
+- **Validation:** Strict format enforcement for email/password; OTP must match and validate within the expiry window.
+- **Business rules:** Rescuers must maintain an active authenticated session to access dispatch features; OTP expires after 5 minutes.
+- **Normal cases:** Rescuer authenticates successfully and routes to Rescuer Home.
+- **Abnormal cases:** Invalid credentials or expired OTP yield explicit error states; Auth API timeouts prompt retry.
 
 ---
 
-### 3.4.2 Rescuer Core & Notifications
-**Function trigger:** Successful login or navigating from bottom tabs.
+### 3.4.2 Rescuer Workspace & Notifications
+**Function trigger:** User successfully authenticated. Navigation path: Rescuer Login -> Rescuer Home <-> Notification Tab.
 **Function description:**
-- **Actor:** Rescuer.
-- **Purpose:** Central mission hub routing to all major feature areas and managing notifications.
-- **Interface:** Bottom navigation bar, daily stats dashboard, SOS alert modal, assignment modal, notification list.
-- **Data processing:** Subscribes to SignalR streams for events, loads notifications, marks as read.
+- **Actor:** Rescuer (with system event triggers).
+- **Purpose:** Serve as the central mission control hub, providing daily operational stats and global alert management.
+- **Interface:** Dashboard with metrics, bottom navigation bar, active duty toggle, and paginated notification list.
+- **Data processing:** Fetch daily statistics, establish SignalR connection for live dispatch events, synchronize read/unread notification states.
 - **Screen layout:** 
+
 **Function details:**
-- **Related Screens:** Rescuer Home, Notification Tab.
-- **Data:** Rescuer ID, daily stats, assignments, notification list.
-- **Validation:** Authenticated session required, Rescue Mode active to receive jobs.
-- **Business rules:** Notifications marked read before opening details; alerts suppressed if busy.
-- **Normal cases:** Stats load successfully, correct unread dots for notifications.
-- **Abnormal cases:** SignalR failure attempts silent reconnect.
+- **Data:** Rescuer ID, operational stats (completed missions, rating), active duty status, notification payload array.
+- **Validation:** Rescuer must hold an active JWT and valid role mapping.
+- **Business rules:** Notifications are marked read immediately upon interaction; Rescuer must toggle 'Active' to receive inbound dispatch events.
+- **Normal cases:** Dashboard data loads seamlessly; Real-time dispatch alerts surface cleanly.
+- **Abnormal cases:** SignalR connection drops trigger silent background reconnects; Network partitions show offline indicators.
 
 ---
 
 ### 3.4.3 Snake Catching Workflow
-**Function trigger:** Tap "Available Jobs" in bottom navigation or accept a request from Home modal.
+**Function trigger:** Rescuer selects an available job. Navigation path: Rescuer Home -> Available Jobs -> Request Detail -> Accept Request -> En Route -> Tracking -> Result Confirmation -> Mission Success - Snake Catching.
 **Function description:**
-- **Actor:** Rescuer.
-- **Purpose:** Manage assigned snake-catching requests, check distance, navigate to site, capture evidence, and submit mission results.
-- **Interface:** Filter pills, job card list, equipment checklist, OSRM route map, camera capture, snake species selector, fee breakdown.
-- **Data processing:** Polling status every 10 seconds, calculates distance via GPS, photo uploads via media API, results submitted via mission API.
+- **Actor:** Rescuer (interacting with User request events).
+- **Purpose:** Provide an end-to-end operational flow for accepting and executing non-emergency snake removal requests.
+- **Interface:** Tabular job list, detailed request context cards, live route mapping, camera capture for evidence, and fee breakdown summaries.
+- **Data processing:** Query geospatial job queues, calculate ETA via OSRM, process media evidence uploads, and submit finalized mission payloads.
 - **Screen layout:** 
+
 **Function details:**
-- **Related Screens:** Available Jobs Tab, Request Detail, Accept Request, En Route, Tracking, Result Confirmation, Mission Success — Snake Catching.
-- **Data:** Assigned requests, current GPS, photos, selected catch environment, snake species list, fee breakdown.
-- **Validation:** Payment must be verified before starting mission; 1 uploaded photo required to proceed; GPS required.
-- **Business rules:** Job routes based on live status. Platform deducts base service fee portion. Checklist must be completed before En Route.
-- **Normal cases:** Mission tracks properly, evidence uploads, fee is processed correctly.
-- **Abnormal cases:** OSRM/Geolocator fails, falling back to straight-line distance; upload retries on fail.
+- **Data:** Job request payload, target coordinates, equipment checklist state, photo evidence, confirmed snake species ID, calculated service fee.
+- **Validation:** Target location must be resolvable; Mandatory photo evidence required before mission closure.
+- **Business rules:** Acceptance binds the rescuer to the request SLA; System deducts platform commission from the final service fee.
+- **Normal cases:** Rescuer navigates to location, captures snake, uploads evidence, and system records successful mission closure.
+- **Abnormal cases:** OSRM routing fails gracefully to straight-line fallback; Evidence upload interruptions trigger retry queue.
 
 ---
 
-### 3.4.4 SOS Emergency Workflow
-**Function trigger:** Accept an SOS request alert from the Rescuer Home.
+### 3.4.4 Emergency Response Workflow
+**Function trigger:** System emits high-priority SOS dispatch. Navigation path: Rescuer Home (SOS Alert) -> Mission Detail - SOS -> Navigation Map -> On-scene Support -> (Find Hospital) -> Mission Completion -> Mission Success - Emergency.
 **Function description:**
-- **Actor:** Rescuer.
-- **Purpose:** Central control for rapid response to an emergency, navigating to the victim, providing AI support, and arranging hospital transfer.
-- **Interface:** Live map navigation (rescuer & victim pins), elapsed timer, AI first aid recommendation card, hospital list, camera capture for completion.
-- **Data processing:** Streams rescuer GPS, receives victim live GPS via MissionHub SignalR. Loads hospital data and AI-generated first aid content.
+- **Actor:** Rescuer (responding to SOS system events).
+- **Purpose:** Orchestrate critical, time-sensitive emergency interventions including navigation, AI-backed first-aid, and medical facility routing.
+- **Interface:** High-contrast SOS modal, live multi-pin tracking map, AI clinical support cards, and hospital proximity directory.
+- **Data processing:** Bidirectional live GPS streaming via WebSocket, query AI triage models, fetch geospatial medical facility data.
 - **Screen layout:** 
+
 **Function details:**
-- **Related Screens:** Mission Detail — SOS, Navigation Map, On-scene Support, Find Hospital, Mission Completion, Mission Success — Emergency.
-- **Data:** SOS mission details, live locations, AI recommendation text, hospital list, route polyline, evidence photos.
-- **Validation:** Active GPS and MissionHub connection required.
-- **Business rules:** AI first-aid tailored specific to incident's snake bite. Victim cancellation forces redirect to Home.
-- **Normal cases:** Route tracks live pins, AI content loads, hospital selected properly.
-- **Abnormal cases:** Victim GPS not updating retains last position; AI API error provides retry button.
+- **Data:** Victim live coordinates, clinical symptoms payload, AI first-aid recommendations, hospital geodata, mission resolution timestamp.
+- **Validation:** Requires real-time GPS permissions and persistent telemetry connection.
+- **Business rules:** SOS missions explicitly override standard job queues; AI recommendations dynamically adjust based on mapped snake species/symptoms.
+- **Normal cases:** Rapid dispatch acceptance, precise victim location tracking, successful on-scene stabilization, and optional hospital handover.
+- **Abnormal cases:** Victim tracking telemetry cuts out (retains last known pin); AI recommendation endpoint degrades (shows cached generic first-aid).
 
 ---
 
-### 3.4.5 Profile & History
-**Function trigger:** Tap "Profile" or "History" bottom tabs.
+### 3.4.5 Profile, Activity & Settings
+**Function trigger:** Navigation via global menubar. Navigation path: Rescuer Home -> (Profile Tab -> Edit Profile / Settings / Feedback) or (Mission History -> History Detail).
 **Function description:**
 - **Actor:** Rescuer.
-- **Purpose:** Manage rescuer identity, view past performance history, edit profile details.
-- **Interface:** Profile avatar, reputation badge, history mission cards with fee summary, edit info forms.
-- **Data processing:** Fetches profile info, background enrichment loop for historical requests' income, uploads new avatars.
+- **Purpose:** Manage personal identity, configure application behavior, and audit historical operational performance.
+- **Interface:** Profile summaries, editable form fields, historical timeline lists, reputation badges, and preference toggles.
+- **Data processing:** Retrieve and mutate profile records, fetch paginated historical mission ledgers, aggregate user reputation scores.
 - **Screen layout:** 
+
 **Function details:**
-- **Related Screens:** Profile Tab, Edit Profile, Mission History, History Detail.
-- **Data:** Rescuer profile (name, phone, rating, completed count), terminal-status mission list, new avatar image.
-- **Validation:** Form validation for changes, valid JWT.
-- **Business rules:** Reputation badge changes color based on rating. Income falls back to price if actual cost unavailable.
-- **Normal cases:** Profile edits save, history lists fully load with rich income data.
-- **Abnormal cases:** Avatar upload failure retains old image; load errors handled securely.
+- **Data:** Rescuer biographical data, historical mission payloads (financials & status), application configuration states, aggregated review text.
+- **Validation:** Input constraints on profile updates (e.g., valid phone regex).
+- **Business rules:** Mission history ledgers are immutable read-only records; Reputation status recalibrates nightly based on user feedback.
+- **Normal cases:** Rescuer updates profile avatar successfully; Historical ledger loads deep pagination correctly.
+- **Abnormal cases:** Avatar media upload fails returning standard server error; Corrupted historical records render safe fallback states.
 
 ---
 
-### 3.4.6 Settings & Feedback
-**Function trigger:** Tap "Settings" or "Feedback" from Profile page.
+### 3.4.6 Knowledge Base
+**Function trigger:** Rescuer explores educational modules. Navigation path: Rescuer Home -> (Lessons -> Lesson Detail) or (Snake Library -> Snake Detail -> First Aid Guide).
 **Function description:**
 - **Actor:** Rescuer.
-- **Purpose:** Configure app work mode, maps, notifications, and view received customer feedback.
-- **Interface:** Toggle switches for alerts, max request sliders, static rating distributions, review cards, sign-out button.
-- **Data processing:** Local in-memory states for settings. Sign-out clears auth token. Feedback displays static mock info.
+- **Purpose:** Provide authoritative reference materials for species identification and procedural training.
+- **Interface:** Categorized lesson lists, article viewers, searchable species dictionary, and structured first-aid protocol cards.
+- **Data processing:** Fetch static CMS content, process client-side search filtering, load high-resolution taxonomy imagery.
 - **Screen layout:** 
-**Function details:**
-- **Related Screens:** Settings, Feedback.
-- **Data:** Local preferences, auth states, static mock ratings.
-- **Validation:** N/A for toggles.
-- **Business rules:** Sign-out calls backend to invalidate token. Mock info used pending real integration.
-- **Normal cases:** Sign-out successfully redirects to Login.
-- **Abnormal cases:** Sign-out error triggers snackbar alert.
 
----
-
-### 3.4.7 Knowledge Base (Lessons & Library)
-**Function trigger:** Tap "Lessons" or "Snake Library" from Home layout.
-**Function description:**
-- **Actor:** Rescuer.
-- **Purpose:** Review educational rescuer content, browse comprehensive snake library, lookup species, and view exact first-aid details.
-- **Interface:** Lesson category tabs, video playback actions, search bar, species reference cards, symptom timelines, emergency CTA for first-aid.
-- **Data processing:** Fetches published lessons and snake detail provider. Client-side filtering for species search.
-- **Screen layout:** 
 **Function details:**
-- **Related Screens:** Lessons, Lesson Detail, Snake Library, Snake Detail, First Aid Guide.
-- **Data:** Articles, snake details (risk level, venom, identification), structured first aid instructions, video URLs.
-- **Validation:** Valid external URL for video.
-- **Business rules:** CTA from specific snake navigates immediately to its custom first-aid route.
-- **Normal cases:** Media functions appropriately, search runs without delay in client space.
-- **Abnormal cases:** Detail API failure allows retry functionality.
+- **Data:** Structured training content, species taxonomy (venom type, identifiers), procedural first-aid step arrays.
+- **Validation:** Search queries sanitize input strings.
+- **Business rules:** Critical first-aid data must be heavily cached for offline/remote access during field operations.
+- **Normal cases:** Rescuer seamlessly searches and identifies an unknown species, immediately accessing its targeted first-aid protocol.
+- **Abnormal cases:** Remote media loading stalls in low-bandwidth areas (displays cached placeholders).
