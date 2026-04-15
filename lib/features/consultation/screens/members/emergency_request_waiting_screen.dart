@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/http_provider.dart';
 import '../../../../core/services/emergency_consultation_signalr_service.dart';
+import '../../repository/consultation_repository.dart';
 
 // ── Helper to show the modal from anywhere ─────────────────────────────────────
 void showEmergencyRequestModal(
@@ -13,6 +14,7 @@ void showEmergencyRequestModal(
   required String requestId,
   required String expertId,
   required String expertName,
+  String initialStatus = 'PendingExpertResponse',
 }) {
   showDialog(
     context: context,
@@ -22,6 +24,7 @@ void showEmergencyRequestModal(
       requestId: requestId,
       expertId: expertId,
       expertName: expertName,
+      initialStatus: initialStatus,
     ),
   );
 }
@@ -31,12 +34,14 @@ class EmergencyRequestWaitingScreen extends StatelessWidget {
   final String requestId;
   final String expertId;
   final String expertName;
+  final String initialStatus;
 
   const EmergencyRequestWaitingScreen({
     super.key,
     required this.requestId,
     required this.expertId,
     required this.expertName,
+    this.initialStatus = 'PendingExpertResponse',
   });
 
   @override
@@ -47,6 +52,7 @@ class EmergencyRequestWaitingScreen extends StatelessWidget {
         requestId: requestId,
         expertId: expertId,
         expertName: expertName,
+        initialStatus: initialStatus,
       );
     });
     return const Scaffold(backgroundColor: Color(0xFFF6F8F6));
@@ -58,12 +64,14 @@ class EmergencyRequestWaitingDialog extends ConsumerStatefulWidget {
   final String requestId;
   final String expertId;
   final String expertName;
+  final String initialStatus;
 
   const EmergencyRequestWaitingDialog({
     super.key,
     required this.requestId,
     required this.expertId,
     required this.expertName,
+    this.initialStatus = 'PendingExpertResponse',
   });
 
   @override
@@ -80,17 +88,21 @@ class _EmergencyRequestWaitingDialogState
 
   EmergencyConsultationSignalRService? _signalR;
   StreamSubscription<EmergencyRequestStatusChanged>? _statusSub;
+  Timer? _statusPollTimer;
   late AnimationController _pulseCtrl;
   late Animation<double> _pulseAnim;
 
-  String _status = 'PendingPayment';
+  String _status = 'PendingExpertResponse';
   String? _statusMessage;
   bool _isConnecting = true;
+  bool _isPollingStatus = false;
   String? _acceptedConsultationId;
 
   @override
   void initState() {
     super.initState();
+    _status = _canonicalStatus(widget.initialStatus);
+    _statusMessage = _mapStatusToMessage(_status);
     _pulseCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
@@ -101,16 +113,104 @@ class _EmergencyRequestWaitingDialogState
     Future.microtask(_initRealtime);
   }
 
+  String _canonicalStatus(String status) {
+    final normalized = status.trim().toLowerCase();
+    switch (normalized) {
+      case 'pendingpayment':
+      case 'pending_payment':
+        return 'PendingPayment';
+      case 'pendingexpertresponse':
+      case 'pending_expert_response':
+        return 'PendingExpertResponse';
+      case 'acceptedbyexpert':
+      case 'accepted_by_expert':
+        return 'AcceptedByExpert';
+      case 'declinedbyexpert':
+      case 'declined_by_expert':
+      case 'declined':
+      case 'rejectedbyexpert':
+      case 'rejected_by_expert':
+      case 'rejected':
+        return 'DeclinedByExpert';
+      case 'expired':
+      case 'timedout':
+      case 'timeout':
+        return 'Expired';
+      default:
+        return status;
+    }
+  }
+
+  bool _isKnownStatus(String status) {
+    return status == 'PendingPayment' ||
+        status == 'PendingExpertResponse' ||
+        status == 'AcceptedByExpert' ||
+        status == 'DeclinedByExpert' ||
+        status == 'Expired';
+  }
+
+  String _resolveStatus(EmergencyRequestStatusChanged event) {
+    final canonical = _canonicalStatus(event.status);
+    if (_isKnownStatus(canonical)) return canonical;
+
+    if (event.consultationId != null && event.consultationId!.isNotEmpty) {
+      return 'AcceptedByExpert';
+    }
+
+    final raw = event.status.trim().toLowerCase();
+    if (RegExp(r'^\d+$').hasMatch(raw)) {
+      switch (raw) {
+        case '1':
+          return 'PendingPayment';
+        case '2':
+          return 'PendingExpertResponse';
+        case '3':
+          // Some backends store "responded without consultation" as declined.
+          if (event.respondedAtUtc != null) return 'DeclinedByExpert';
+          return 'PendingExpertResponse';
+        case '4':
+          return 'DeclinedByExpert';
+        case '5':
+          return 'Expired';
+      }
+    }
+
+    if (event.expiresAtUtc != null &&
+        DateTime.now().toUtc().isAfter(event.expiresAtUtc!.toUtc())) {
+      return 'Expired';
+    }
+
+    return canonical;
+  }
+
   Future<void> _initRealtime() async {
     try {
       final baseUrl = ref.read(httpServiceProvider).baseUrl;
       _signalR = EmergencyConsultationSignalRService(baseUrl: baseUrl);
+      debugPrint('🔌 [EmergencyWaiting] Connecting realtime for request=${widget.requestId}');
 
       _statusSub = _signalR!.statusChangedStream.listen((event) {
+        if (event.requestId.isNotEmpty && event.requestId != widget.requestId) {
+          debugPrint(
+            '↩️ [EmergencyWaiting] Ignore status for other request ${event.requestId} (current ${widget.requestId})',
+          );
+          return;
+        }
+
+        final canonicalStatus = _resolveStatus(event);
+        debugPrint(
+          '📡 [EmergencyWaiting] Realtime status raw=${event.status} canonical=$canonicalStatus request=${event.requestId}',
+        );
+        if (!_isKnownStatus(canonicalStatus)) {
+          debugPrint(
+            'Ignore unknown emergency status payload for ${widget.requestId}: ${event.status}',
+          );
+          return;
+        }
         if (!mounted) return;
         setState(() {
-          _status = event.status;
-          _statusMessage = _mapStatusToMessage(event.status);
+          _status = canonicalStatus;
+          _statusMessage = _mapStatusToMessage(canonicalStatus);
           _isConnecting = false;
           if (event.consultationId != null &&
               event.consultationId!.isNotEmpty) {
@@ -118,7 +218,7 @@ class _EmergencyRequestWaitingDialogState
           }
         });
 
-        if (event.status == 'AcceptedByExpert' &&
+        if (canonicalStatus == 'AcceptedByExpert' &&
             event.consultationId != null &&
             event.consultationId!.isNotEmpty) {
           if (mounted) Navigator.of(context).pop();
@@ -133,6 +233,8 @@ class _EmergencyRequestWaitingDialogState
       });
 
       await _signalR!.connectAndJoinRequestRoom(widget.requestId);
+      _startStatusPolling();
+      debugPrint('✅ [EmergencyWaiting] Joined request room ${widget.requestId}');
 
       if (!mounted) return;
       setState(() {
@@ -140,6 +242,8 @@ class _EmergencyRequestWaitingDialogState
         _statusMessage = _mapStatusToMessage(_status);
       });
     } catch (e) {
+      _startStatusPolling();
+      debugPrint('❌ [EmergencyWaiting] Realtime init failed: $e');
       if (!mounted) return;
       setState(() {
         _isConnecting = false;
@@ -147,6 +251,57 @@ class _EmergencyRequestWaitingDialogState
             'Không thể kết nối realtime. Yêu cầu đã tạo nhưng chưa theo dõi được trạng thái.';
       });
     }
+  }
+
+  void _startStatusPolling() {
+    _statusPollTimer?.cancel();
+    debugPrint('🔁 [EmergencyWaiting] Start polling fallback for ${widget.requestId}');
+    _statusPollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      if (!mounted || _isPollingStatus || _isTerminal || _isAccepted) return;
+
+      _isPollingStatus = true;
+      try {
+        final repo = ref.read(consultationRepositoryProvider);
+        final request = await repo.getEmergencyRequestStatus(widget.requestId);
+        if (!mounted || request == null) return;
+
+        final canonicalStatus = _canonicalStatus(request.status);
+        debugPrint(
+          '🛰️ [EmergencyWaiting] Poll status raw=${request.status} canonical=$canonicalStatus request=${request.requestId}',
+        );
+        if (!_isKnownStatus(canonicalStatus)) return;
+
+        if (canonicalStatus == _status &&
+            (request.consultationId?.isNotEmpty != true ||
+                request.consultationId == _acceptedConsultationId)) {
+          return;
+        }
+
+        setState(() {
+          _status = canonicalStatus;
+          _statusMessage = _mapStatusToMessage(canonicalStatus);
+          if (request.consultationId != null &&
+              request.consultationId!.isNotEmpty) {
+            _acceptedConsultationId = request.consultationId;
+          }
+        });
+
+        if (canonicalStatus == 'AcceptedByExpert' &&
+            request.consultationId != null &&
+            request.consultationId!.isNotEmpty) {
+          if (mounted) Navigator.of(context).pop();
+          context.go(
+            '/video-waiting/${request.consultationId}',
+            extra: {
+              'expertName': widget.expertName,
+              'expertSpecialty': 'Tư vấn ngay',
+            },
+          );
+        }
+      } finally {
+        _isPollingStatus = false;
+      }
+    });
   }
 
   String _mapStatusToMessage(String status) {
@@ -158,9 +313,9 @@ class _EmergencyRequestWaitingDialogState
       case 'AcceptedByExpert':
         return 'Chuyên gia đã chấp nhận! Đang chuyển vào phòng tư vấn...';
       case 'DeclinedByExpert':
-        return 'Chuyên gia đã từ chối yêu cầu. Vui lòng chọn chuyên gia khác.';
+        return 'Chuyên gia đã từ chối yêu cầu. Tiền sẽ được hoàn về ví của bạn. Vui lòng chọn chuyên gia khác.';
       case 'Expired':
-        return 'Yêu cầu đã hết hạn. Vui lòng tạo yêu cầu mới.';
+        return 'Yêu cầu đã hết hạn. Tiền sẽ được hoàn về ví của bạn. Vui lòng tạo yêu cầu mới.';
       default:
         return 'Đang theo dõi trạng thái tư vấn ngay...';
     }
@@ -185,6 +340,7 @@ class _EmergencyRequestWaitingDialogState
   @override
   void dispose() {
     _pulseCtrl.dispose();
+    _statusPollTimer?.cancel();
     _statusSub?.cancel();
     _signalR?.dispose();
     super.dispose();

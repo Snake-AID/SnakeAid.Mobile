@@ -19,7 +19,6 @@ class ExpertProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
-  bool _isAvailable = true;
   WalletInfo? _walletInfo;
   bool _isLoadingWallet = true;
   Timer? _walletRefreshTimer;
@@ -39,7 +38,6 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
       if (mounted) {
         setState(() {
           _profile = profile;
-          _isAvailable = profile.isOnline;
         });
       }
     } catch (_) {}
@@ -96,7 +94,7 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
       body: Stack(
         children: [
           SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 100),
+            padding: const EdgeInsets.only(bottom: 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -199,14 +197,6 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
                 const SizedBox(height: 24),
               ],
             ),
-          ),
-
-          // Fixed Availability Toggle at Bottom
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: _buildAvailabilityToggle(),
           ),
         ],
       ),
@@ -726,79 +716,4 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
     );
   }
 
-  Widget _buildAvailabilityToggle() {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFF6C47C2).withOpacity(0.2),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Sẵn Sàng Nhận Tư Vấn',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D2D2D),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF28A745),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _isAvailable
-                          ? 'Đang bật - Bạn sẽ nhận được yêu cầu'
-                          : 'Đang tắt - Không nhận yêu cầu',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: _isAvailable
-                            ? const Color(0xFF28A745)
-                            : Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: _isAvailable,
-            onChanged: (value) {
-              setState(() {
-                _isAvailable = value;
-              });
-            },
-            activeThumbColor: const Color(0xFF6C47C2),
-          ),
-        ],
-      ),
-    );
-  }
 }

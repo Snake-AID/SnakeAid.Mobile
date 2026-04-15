@@ -78,10 +78,6 @@ class _ExpertConsultationDetailScreenState
     return '$d/$m/${dt.year}  $h:$min';
   }
 
-  String _formatDateTimePlus7(int ms) {
-    return _formatDateTime(ms);
-  }
-
   String _formatCurrency(num amount) {
     final intVal = amount.toInt();
     final formatted = intVal.toString().replaceAllMapped(
@@ -141,7 +137,6 @@ class _ExpertConsultationDetailScreenState
     final patientPhone = data['patientPhone'] as String? ?? '';
     final consultationType = data['consultationType'] as String? ?? '';
     final scheduledMs = (data['scheduledTime'] as int?) ?? 0;
-    final bookedAtMs = data['bookedAt'] as int?;
     final paymentDeadlineMs = data['paymentDeadline'] as int?;
     final slotStartMs = data['slotStartTime'] as int?;
     final slotEndMs = data['slotEndTime'] as int?;
@@ -347,22 +342,11 @@ class _ExpertConsultationDetailScreenState
                   label: 'Thông Tin Phiên Tư Vấn',
                   child: Column(
                     children: [
-                      if (bookedAtMs != null)
-                        _DetailRow(
-                          icon: Icons.event_available_outlined,
-                          label: 'Đặt lúc',
-                          value: _formatDateTimePlus7(bookedAtMs),
-                        ),
-                      if (bookedAtMs != null &&
-                          (paymentDeadlineMs != null ||
-                              slotStartMs != null ||
-                              slotEndMs != null))
-                        const _Divider(),
                       if (paymentDeadlineMs != null) ...[
                         _DetailRow(
                           icon: Icons.timer_outlined,
                           label: 'Hạn thanh toán',
-                          value: _formatDateTimePlus7(paymentDeadlineMs),
+                          value: _formatDateTime(paymentDeadlineMs),
                         ),
                         if (slotStartMs != null || slotEndMs != null)
                           const _Divider(),
@@ -382,8 +366,7 @@ class _ExpertConsultationDetailScreenState
                           value: _formatDateTime(slotEndMs),
                         ),
                       ],
-                      if (bookedAtMs != null ||
-                          paymentDeadlineMs != null ||
+                      if (paymentDeadlineMs != null ||
                           slotStartMs != null ||
                           slotEndMs != null)
                         const _Divider(),
