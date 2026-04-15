@@ -1,4 +1,4 @@
-﻿﻿﻿# RESCUER SCREEN FLOW — SnakeAid Mobile
+﻿﻿# RESCUER SCREEN FLOW — SnakeAid Mobile
 
 **Phiên bản:** 1.1 | **Ngày:** 12/04/2026
 
@@ -86,7 +86,7 @@ flowchart LR
 | 20 | Mission Completion | `/rescuer/mission-completion` | ✅ |
 | 21 | Mission Success — Emergency | `/rescuer/mission-success` | ✅ |
 | 22 | Mission History | `/rescuer-history` | ✅ |
-| 23 | **Notification Inbox** | embedded in Home shell | ✅ |
+| 23 | **Notification Tab** | embedded in Home shell | ✅ |
 | 24 | Profile Tab | embedded in Home shell | ✅ |
 | 25 | Edit Profile | `/rescuer-edit-profile` | ✅ |
 | 26 | **Settings** | `/rescuer-settings` | 🚧 |
@@ -103,39 +103,40 @@ flowchart LR
 
 | # | Feature | Screen | Description |
 |---|---------|--------|-------------|
-| 1 | Auth & Account | Splash | Entry screen that initializes app state and routes users. |
-| 2 | Auth & Account | Role Selection | Lets users choose their app role before authentication. |
-| 3 | Auth & Account | Rescuer Login | Authenticates rescuer and opens main app. |
-| 4 | Auth & Account | Forgot Password | Starts password recovery process. |
-| 5 | Auth & Account | Forgot Password OTP | Validates OTP for password reset. |
-| 6 | Auth & Account | Reset Password | Lets user set a new password. |
-| 7 | Auth & Account | Password Reset Success | Confirms password reset completed. |
-| 8 | Rescuer Core | Rescuer Home | Main hub with mission status and quick navigation. |
-| 9 | Snake Catching | Available Jobs | Displays assigned and available snake-catching requests. |
-| 10 | Snake Catching | Request Detail | Shows full details of a selected job request. |
-| 11 | Snake Catching | Accept Request | Confirms job acceptance and mission start readiness. |
-| 12 | Snake Catching | En Route | Tracks rescuer movement to incident location. |
-| 13 | Snake Catching | Tracking | Handles on-site progress and evidence tracking. |
-| 14 | Snake Catching | Result Confirmation | Reviews and submits mission result data. |
-| 15 | Snake Catching | Mission Success - Snake Catching | Displays success summary for snake-catching mission. |
-| 16 | SOS Emergency | Mission Detail - SOS | Shows emergency mission information and actions. |
-| 17 | SOS Emergency | Navigation Map | Provides map guidance to emergency location. |
-| 18 | SOS Emergency | On-scene Support | Supports on-site emergency handling workflow. |
-| 19 | SOS Emergency | Find Hospital | Finds nearby hospitals for escalation. |
-| 20 | SOS Emergency | Mission Completion | Finalizes emergency mission with completion details. |
-| 21 | SOS Emergency | Mission Success - Emergency | Shows emergency mission completion summary. |
-| 22 | Profile & History | Mission History | Lists past missions and status records. |
-| 23 | Profile & History | History Detail | Lists detail past missions and status records. |
-| 24 | Rescuer Core | Notification Inbox | Displays paginated in-app notifications with read/unread tracking. |
-| 25 | Profile & History | Profile Tab | Displays rescuer profile overview and options. |
-| 26 | Profile & History | Edit Profile | Updates personal profile information. |
-| 27 | Profile & Settings | Settings | Manages app preferences and account settings. |
-| 28 | Profile & Settings | Feedback | Collects user feedback and ratings. |
-| 29 | Knowledge | Lessons | Lists training lessons for rescuers. |
-| 30 | Knowledge | Lesson Detail | Shows full content of a selected lesson. |
-| 31 | Knowledge | Snake Library | Provides snake species reference information. |
-| 32 | Knowledge | Snake Detail | Shows full species identification, venom, and symptom details. |
-| 33 | Knowledge | First Aid Guide | Provides species-specific first-aid instructions for snake bite incidents. |
+| 1 | App Bootstrapping | Splash | App startup screen that validates session state and performs initial routing. |
+| 2 | Authentication | Role Selection | Screen for selecting the user role before sign-in or sign-up. |
+| 3 | Authentication | Rescuer Login | Login screen for rescuer users. |
+| 4 | Authentication | Forgot Password | Screen to enter account/email and start the password recovery flow. |
+| 5 | Authentication | Forgot Password OTP | OTP verification screen for the forgot-password flow. |
+| 6 | Authentication | Reset Password | Screen for inputting and confirming a new secure password. |
+| 7 | Authentication | Password Reset Success | Screen confirming that the password has been successfully updated. |
+| 8 | Home & Dashboard | Rescuer Home | Primary mission control dashboard providing daily statistics and current status. |
+| 9 | Specialized Operations | Available Jobs | List interface displaying open and active snake-catching requests nearby. |
+| 10 | Specialized Operations | Request Detail | Detailed view of a snake-catching request including photos and context. |
+| 11 | Telemetry & Operations | Accept Request | Confirmation dialog for committing to a dispatched rescue mission. |
+| 12 | Telemetry & Operations | En Route | Status screen tracking transit progress toward the target location. |
+| 13 | Telemetry & Operations | Tracking | Live monitoring interface maintaining system state during an active mission. |
+| 14 | Mission Closure | Result Confirmation | Validation screen for confirming caught snake quantities and species. |
+| 15 | Mission Closure | Mission Success - Snake Catching | Final summary screen concluding the completion of a snake catching job. |
+| 16 | Emergency Response | Mission Detail - SOS | In-depth operational view for an active SOS medical emergency dispatch. |
+| 17 | Telemetry & Operations | Navigation Map | Real-time map interface mapping the optimal routing to the victim. |
+| 18 | Clinical Protocol | On-scene Support | Interface detailing AI-recommended first-aid actions to perform on-scene. |
+| 19 | Evacuation Protocol | Find Hospital | Directory and routing interface for locating the nearest equipped hospital. |
+| 20 | Mission Closure | Mission Completion | Check-out interface for finalizing the rescue operation and capturing evidence. |
+| 21 | Mission Closure | Mission Success - Emergency | Final summary screen outlining the completed SOS emergency response. |
+| 22 | Activity Logs | Mission History | Chronological log displaying completed past rescue and catching operations. |
+| 23 | Activity Logs | History Detail | In-depth breakdown validating operational and financial specifics of a past mission. |
+| 24 | Notification Management | Notification Inbox | Centralized paginated inbox handling system alerts and read/unread tracking. |
+| 25 | Account Settings | Profile Tab | Rescuer profile summary detailing performance metrics and ratings. |
+| 26 | Account Settings | Edit Profile | Form interface for modifying personal rescuer details and avatars. |
+| 27 | Account Settings | Settings | Application configuration interface for work modes and notification toggles. |
+| 28 | Performance Analytics | Feedback | Interface for reviewing customer ratings and textual feedback. |
+| 29 | Knowledge Management | Lessons | Educational hub providing modular training and procedural guides. |
+| 30 | Knowledge Management | Lesson Detail | Content viewer screen for accessing specific training multimedia. |
+| 31 | Knowledge Management | Snake Library | Encyclopedic database outlining snake species for field reference. |
+| 32 | Knowledge Management | Snake Detail | Specific informational profile highlighting characteristics and handling risks. |
+| 33 | Knowledge Management | First Aid Guide | Structured guide supplying exact first-aid procedures linked to species. |
+
 
 ---
 
@@ -166,7 +167,7 @@ flowchart LR
 | Mission Success - Emergency |  | X |  |  |  |
 | Mission History |  | X |  |  |  |
 | History Detail |  | X |  |  |  |
-| Notification Inbox |  | X |  |  |  |
+| Notification Tab |  | X |  |  |  |
 | Profile Tab |  | X |  |  |  |
 | Edit Profile |  | X |  |  |  |
 | Settings |  | X |  |  |  |
@@ -205,7 +206,7 @@ flowchart LR
 
 ---
 
-### 3.4.2 Rescuer Core & Inbox
+### 3.4.2 Rescuer Core & Notifications
 **Function trigger:** Successful login or navigating from bottom tabs.
 **Function description:**
 - **Actor:** Rescuer.
