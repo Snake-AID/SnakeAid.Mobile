@@ -274,21 +274,30 @@ flowchart LR
 
 ### 3.3.2 Authorization
 
-
 | Screen | Member | Rescuer | Expert | Admin | Operator |
 |--------|:------:|:-------:|:------:|:-----:|:--------:|
-| Splash | X | | | | |
-| Member Registration | X | | | | |
-| OTP Verification | X | | | | |
-| Registration Success | X | | | | |
+| Splash | X | X | X | | |
+| Role Selection | X | X | X | | |
 | Member Login | X | | | | |
-| Forgot Password | X | | | | |
-| Forgot Password OTP | X | | | | |
-| Reset Password | X | | | | |
-| Password Reset Success | X | | | | |
+| Rescuer Login | | X | | | |
+| Expert Login | | | X | | |
+| Forgot Password | X | X | X | | |
+| Forgot Password OTP | X | X | X | | |
+| Reset Password | X | X | X | | |
+| Password Reset Success | X | X | X | | |
+| Member Registration | X | | | | |
+| Expert Registration | | | X | | |
+| Expert Credentials | | | X | | |
+| OTP Verification | X | X | X | | |
+| Registration Success | X | X | X | | |
+| Registration Pending | | | X | | |
 | Member Home | X | | | | |
-| Community Alert | X | | | | |
+| Rescuer Home | | X | | | |
+| Expert Home | | | X | | |
 | Notification Tab | X | | | | |
+| Notification Inbox | | X | | | |
+| Notification | | | X | | |
+| Community Alert | X | | | | |
 | Emergency Action | X | | | | |
 | Snake Identification | X | | | | |
 | Snake Selection by Location | X | | | | |
@@ -311,16 +320,21 @@ flowchart LR
 | Payment Confirmation | X | | | | |
 | Emergency Request Waiting | X | | | | |
 | Video Waiting Room | X | | | | |
-| Video Consultation | X | | | | |
+| Video Consultation | X | | X | | |
 | Consultation Complete | X | | | | |
-| Snake Library | X | | | | |
-| Snake Detail | X | | | | |
+| Snake Library | X | X | | | |
+| Expert Snake Library | | | X | | |
+| Snake Detail | X | X | X | | |
 | Snake First Aid Guide | X | | | | |
+| First Aid Guide | | X | | | |
+| Expert Snake First Aid | | | X | | |
 | Blog List | X | | | | |
 | Blog Detail | X | | | | |
-| Profile Tab | X | | | | |
-| Edit Profile | X | | | | |
-| Role Selection | X | | | | |
+| Expert Blog List | | | X | | |
+| Expert Blog Form | | | X | | |
+| Profile Tab | X | X | | | |
+| Expert Profile Tab | | | X | | |
+| Edit Profile | X | X | X | | |
 | Edit Community Report | X | | | | |
 | History Community | X | | | | |
 | Upload Community Report | X | | | | |
@@ -334,9 +348,61 @@ flowchart LR
 | History Wallet | X | | | | |
 | Scheduled Consultation | X | | | | |
 | Emergency Consultation | X | | | | |
-| Settings | X | | | | |
+| Settings | X | X | | | |
+| Expert Settings | | | X | | |
 | Activity Detail | X | | | | |
 | Activity History | X | | | | |
+| Available Jobs | | X | | | |
+| Request Detail | | X | | | |
+| Accept Request | | X | | | |
+| En Route | | X | | | |
+| Tracking | | X | | | |
+| Result Confirmation | | X | | | |
+| Mission Success - Snake Catching | | X | | | |
+| Mission Detail - SOS | | X | | | |
+| Navigation Map | | X | | | |
+| On-scene Support | | X | | | |
+| Find Hospital | | X | | | |
+| Mission Completion | | X | | | |
+| Mission Success - Emergency | | X | | | |
+| Mission History | | X | | | |
+| History Detail | | X | | | |
+| Feedback | | X | | | |
+| Expert Feedback | | | X | | |
+| Lessons | | X | | | |
+| Lesson Detail | | X | | | |
+| Working Hours | | | X | | |
+| Withdraw Money | | | X | | |
+| AI Review Queue | | | X | | |
+| AI Review Detail | | | X | | |
+| Expert Consultation Detail | | | X | | |
+| Expert Video Waiting | | | X | | |
+| Expert Consultation Complete | | | X | | |
+| Expert Global Emergency Popup Listener | | | X | | |
+| Accept Emergency Request | | | X | | |
+| Reject Emergency Request | | | X | | |
+| Consultation List/History Tab | | | X | | |
+| Income Tab | | | X | | |
+| Web Login | | | | X | X |
+| Admin Login Form | | | | X | |
+| Operator Login Form | | | | | X |
+| Admin Dashboard | | | | X | |
+| Operator Dashboard | | | | | X |
+| Workshifts Management | | | | X | |
+| Users Management | | | | X | |
+| Incidents Management | | | | X | X |
+| Snake Catching Management | | | | X | X |
+| Consultations Management | | | | X | X |
+| Snakes Management | | | | X | |
+| Antivenoms Management | | | | X | |
+| Treatment Facilities Management | | | | X | |
+| Transactions & Withdrawals Management | | | | X | |
+| Management Withdrawals | | | | X | |
+| Settings Management | | | | X | |
+| Report Media Management | | | | X | X |
+| Lessons Management | | | | X | |
+| Blogs Management | | | | X | |
+
 
 
 
