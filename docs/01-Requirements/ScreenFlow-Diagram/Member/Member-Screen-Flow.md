@@ -212,17 +212,17 @@ flowchart LR
 | # | Feature | Screen | Description |
 |---|---------|--------|-------------|
 | 1 | App Bootstrapping | Splash | App startup screen that validates session state and performs initial routing. |
-| 2 | Authentication | Member Registration | Screen for capturing new member account credentials and details. |
-| 3 | Authentication | OTP Verification | Screen for validating member identity via phone or email OTP. |
-| 4 | Authentication | Registration Success | Screen displaying confirmation of successful member account creation. |
+| 2 | Member Registration | Member Registration | Screen for capturing new member account credentials and details. |
+| 3 | Member Registration | OTP Verification | Screen for validating member identity via phone or email OTP. |
+| 4 | Member Registration | Registration Success | Screen displaying confirmation of successful member account creation. |
 | 5 | Authentication | Member Login | Main authentication screen for member users to securely log in. |
 | 6 | Authentication | Forgot Password | Screen to enter account/email and start the password recovery flow. |
 | 7 | Authentication | Forgot Password OTP | OTP verification screen for the forgot-password flow. |
 | 8 | Authentication | Reset Password | Screen for inputting and confirming a new secure password. |
 | 9 | Authentication | Password Reset Success | Screen confirming that the password has been successfully updated. |
-| 10 | Home & Dashboard | Member Home | Main dashboard providing quick access to emergency services and alerts. |
+| 10 | Member Workspace | Member Home | Main dashboard providing quick access to emergency services and alerts. |
 | 11 | Community Alerts | Community Alert | Screen displaying nearby active incidents and user-submitted reports. |
-| 12 | Notification Management | Notification Tab | Centralized inbox for system alerts and message updates. |
+| 12 | Notification | Notification Tab | Centralized inbox for system alerts and message updates. |
 | 13 | Emergency Response | Emergency Action | Entry point for initiating SOS and triggering snake identification. |
 | 14 | Emergency Response | Snake Identification | Real-time AI camera interface for scanning and identifying snake species. |
 | 15 | Emergency Response | Snake Selection by Location | Search interface for manually filtering snake species based on region. |
@@ -232,45 +232,45 @@ flowchart LR
 | 19 | Clinical Assessment | Severity Assessment | Automated system screen determining the clinical urgency level of the bite. |
 | 20 | Emergency Tracking | Emergency Tracking | Live map interface tracking the inbound rescuer's geolocation. |
 | 21 | Emergency Tracking | Member Incident Finished | Final mission summary detailing the resolved emergency incident. |
-| 22 | Specialized Services | Snake Catching | Request interface for initiating non-emergency snake removal services. |
-| 23 | Specialized Services | Snake Quantity Selection | Input screen for defining the estimated number of snakes to catch. |
-| 24 | Specialized Services | Snake Report Detail | Form for providing additional situational context and attachments. |
-| 25 | Specialized Services | Snake Catching Success | Confirmation screen validating the successful submission of the catch request. |
-| 26 | Telemedicine | Consultation Home | Central hub for navigating telemedicine and expert consultation services. |
-| 27 | Telemedicine | Expert List | Directory listing of verified medical and snake handling experts. |
-| 28 | Telemedicine | Expert Detail | Detailed profile showcasing expert qualifications, reviews, and availability. |
-| 29 | Telemedicine | Service Selection | Interface for selecting the appropriate tier or type of consultation. |
-| 30 | Telemedicine | Consultation Time Selection | Scheduling interface for booking future consultation appointments. |
-| 31 | Telemedicine | Consultation Documents | Upload screen for attaching media and medical notes prior to the call. |
-| 32 | Telemedicine | Payment Confirmation | Escrow payment gateway interface securing funds before the consultation. |
-| 33 | Telemedicine | Emergency Request Waiting | Queue interface while matching with an available on-call expert. |
-| 34 | Telemedicine | Video Waiting Room | Pre-call lobby verifying connection state before the live session. |
-| 35 | Telemedicine | Video Consultation | Live WebRTC video and audio interface for remote expert consultation. |
-| 36 | Telemedicine | Consultation Complete | Post-call summary providing medical prescriptions and expert notes. |
-| 37 | Knowledge Management | Snake Library | Encyclopedic database of snake species, descriptions, and habitats. |
-| 38 | Knowledge Management | Snake Detail | Specific informational profile detailing snake characteristics and risks. |
-| 39 | Knowledge Management | Snake First Aid Guide | Comprehensive first-aid protocols mapped to specific snake species. |
-| 40 | Knowledge Management | Blog List | Educational repository listing published safety and awareness articles. |
-| 41 | Knowledge Management | Blog Detail | Article view screen for reading comprehensive educational content. |
-| 42 | Account Settings | Profile Tab | User profile summary outlining personal information and status. |
-| 43 | Account Settings | Edit Profile | Form interface for modifying user personal details and avatars. |
+| 22 | Snake Catching | Snake Catching | Request interface for initiating non-emergency snake removal services. |
+| 23 | Snake Catching | Snake Quantity Selection | Input screen for defining the estimated number of snakes to catch. |
+| 24 | Snake Catching | Snake Report Detail | Form for providing additional situational context and attachments. |
+| 25 | Snake Catching | Snake Catching Success | Confirmation screen validating the successful submission of the catch request. |
+| 26 | Expert Consultation | Consultation Home | Central hub for navigating telemedicine and expert consultation services. |
+| 27 | Expert Consultation | Expert List | Directory listing of verified medical and snake handling experts. |
+| 28 | Expert Consultation | Expert Detail | Detailed profile showcasing expert qualifications, reviews, and availability. |
+| 29 | Expert Consultation | Service Selection | Interface for selecting the appropriate tier or type of consultation. |
+| 30 | Expert Consultation | Consultation Time Selection | Scheduling interface for booking future consultation appointments. |
+| 31 | Expert Consultation | Consultation Documents | Upload screen for attaching media and medical notes prior to the call. |
+| 32 | Expert Consultation | Payment Confirmation | Escrow payment gateway interface securing funds before the consultation. |
+| 33 | Expert Consultation | Emergency Request Waiting | Queue interface while matching with an available on-call expert. |
+| 34 | Expert Consultation | Video Waiting Room | Pre-call lobby verifying connection state before the live session. |
+| 35 | Expert Consultation | Video Consultation | Live WebRTC video and audio interface for remote expert consultation. |
+| 36 | Expert Consultation | Consultation Complete | Post-call summary providing medical prescriptions and expert notes. |
+| 37 | Knowledge Base | Snake Library | Encyclopedic database of snake species, descriptions, and habitats. |
+| 38 | Knowledge Base | Snake Detail | Specific informational profile detailing snake characteristics and risks. |
+| 39 | Knowledge Base | Snake First Aid Guide | Comprehensive first-aid protocols mapped to specific snake species. |
+| 40 | Knowledge Base | Blog List | Educational repository listing published safety and awareness articles. |
+| 41 | Knowledge Base | Blog Detail | Article view screen for reading comprehensive educational content. |
+| 42 | Member Profile | Profile Tab | User profile summary outlining personal information and status. |
+| 43 | Member Profile | Edit Profile | Form interface for modifying user personal details and avatars. |
 | 44 | Authentication | Role Selection | Screen for selecting the user role before sign-in or sign-up. |
 | 45 | Community Alerts | Edit Community Report | Interface for modifying details of a previously submitted community alert. |
 | 46 | Community Alerts | History Community | Historical log interface displaying the user's past community reports. |
 | 47 | Community Alerts | Upload Community Report | Submission form for broadcasting a new community incident. |
 | 48 | Emergency Tracking | Rescuer Arrived | Live status confirmation screen when the rescuer reaches the location. |
-| 49 | Activity Logs | Activity Tab | Overview dashboard summarizing the user's historical actions and requests. |
-| 50 | Specialized Services | Snake Catching Detail | Detailed view of a past or completed snake catching mission. |
-| 51 | Financial Operations | History Transaction | Comprehensive ledger of past fiat and wallet processing events. |
-| 52 | Financial Operations | Transaction Detail | Specific receipt detailing a single financial transaction. |
-| 53 | Financial Operations | Top-up | Payment gateway interface for adding funds to the user wallet. |
-| 54 | Financial Operations | Withdrawal | Request interface for initiating a payout from the digital wallet. |
-| 55 | Financial Operations | History Wallet | Overview interface tracking balance fluctuations and wallet history. |
-| 56 | Telemedicine | Scheduled Consultation | Log interface for viewing upcoming booked expert consultations. |
-| 57 | Telemedicine | Emergency Consultation | Quick-access interface for initiating an immediate urgent consultation. |
-| 58 | Account Settings | Settings | Application configuration interface for preferences and notification toggles. |
-| 59 | Activity Logs | Activity Detail | In-depth breakdown interface highlighting details of a specific past activity. |
-| 60 | Activity Logs | Activity History | Complete chronological list displaying all historical user events. |
+| 49 | Activity & History | Activity Tab | Overview dashboard summarizing the user's historical actions and requests. |
+| 50 | Snake Catching | Snake Catching Detail | Detailed view of a past or completed snake catching mission. |
+| 51 | Member Wallet | History Transaction | Comprehensive ledger of past fiat and wallet processing events. |
+| 52 | Member Wallet | Transaction Detail | Specific receipt detailing a single financial transaction. |
+| 53 | Member Wallet | Top-up | Payment gateway interface for adding funds to the user wallet. |
+| 54 | Member Wallet | Withdrawal | Request interface for initiating a payout from the digital wallet. |
+| 55 | Member Wallet | History Wallet | Overview interface tracking balance fluctuations and wallet history. |
+| 56 | Expert Consultation | Scheduled Consultation | Log interface for viewing upcoming booked expert consultations. |
+| 57 | Emergency Consultation | Emergency Consultation | Quick-access interface for initiating an immediate urgent consultation. |
+| 58 | Member Profile | Settings | Application configuration interface for preferences and notification toggles. |
+| 59 | Activity & History | Activity Detail | In-depth breakdown interface highlighting details of a specific past activity. |
+| 60 | Activity & History | Activity History | Complete chronological list displaying all historical user events. |
 
 ### 3.3.2 Authorization
 

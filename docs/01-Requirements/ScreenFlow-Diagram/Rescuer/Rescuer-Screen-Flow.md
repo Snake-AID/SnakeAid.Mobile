@@ -110,32 +110,32 @@ flowchart LR
 | 5 | Authentication | Forgot Password OTP | OTP verification screen for the forgot-password flow. |
 | 6 | Authentication | Reset Password | Screen for inputting and confirming a new secure password. |
 | 7 | Authentication | Password Reset Success | Screen confirming that the password has been successfully updated. |
-| 8 | Home & Dashboard | Rescuer Home | Primary mission control dashboard providing daily statistics and current status. |
-| 9 | Specialized Operations | Available Jobs | List interface displaying open and active snake-catching requests nearby. |
-| 10 | Specialized Operations | Request Detail | Detailed view of a snake-catching request including photos and context. |
-| 11 | Telemetry & Operations | Accept Request | Confirmation dialog for committing to a dispatched rescue mission. |
-| 12 | Telemetry & Operations | En Route | Status screen tracking transit progress toward the target location. |
-| 13 | Telemetry & Operations | Tracking | Live monitoring interface maintaining system state during an active mission. |
-| 14 | Mission Closure | Result Confirmation | Validation screen for confirming caught snake quantities and species. |
-| 15 | Mission Closure | Mission Success - Snake Catching | Final summary screen concluding the completion of a snake catching job. |
+| 8 | Rescuer Workspace | Rescuer Home | Primary mission control dashboard providing daily statistics and current status. |
+| 9 | Snake Catching | Available Jobs | List interface displaying open and active snake-catching requests nearby. |
+| 10 | Snake Catching | Request Detail | Detailed view of a snake-catching request including photos and context. |
+| 11 | Snake Catching | Accept Request | Confirmation dialog for committing to a dispatched rescue mission. |
+| 12 | Snake Catching | En Route | Status screen tracking transit progress toward the target location. |
+| 13 | Snake Catching | Tracking | Live monitoring interface maintaining system state during an active mission. |
+| 14 | Snake Catching | Result Confirmation | Validation screen for confirming caught snake quantities and species. |
+| 15 | Snake Catching | Mission Success - Snake Catching | Final summary screen concluding the completion of a snake catching job. |
 | 16 | Emergency Response | Mission Detail - SOS | In-depth operational view for an active SOS medical emergency dispatch. |
-| 17 | Telemetry & Operations | Navigation Map | Real-time map interface mapping the optimal routing to the victim. |
-| 18 | Clinical Protocol | On-scene Support | Interface detailing AI-recommended first-aid actions to perform on-scene. |
-| 19 | Evacuation Protocol | Find Hospital | Directory and routing interface for locating the nearest equipped hospital. |
-| 20 | Mission Closure | Mission Completion | Check-out interface for finalizing the rescue operation and capturing evidence. |
-| 21 | Mission Closure | Mission Success - Emergency | Final summary screen outlining the completed SOS emergency response. |
-| 22 | Activity Logs | Mission History | Chronological log displaying completed past rescue and catching operations. |
-| 23 | Activity Logs | History Detail | In-depth breakdown validating operational and financial specifics of a past mission. |
-| 24 | Notification Management | Notification Inbox | Centralized paginated inbox handling system alerts and read/unread tracking. |
-| 25 | Account Settings | Profile Tab | Rescuer profile summary detailing performance metrics and ratings. |
-| 26 | Account Settings | Edit Profile | Form interface for modifying personal rescuer details and avatars. |
-| 27 | Account Settings | Settings | Application configuration interface for work modes and notification toggles. |
-| 28 | Performance Analytics | Feedback | Interface for reviewing customer ratings and textual feedback. |
-| 29 | Knowledge Management | Lessons | Educational hub providing modular training and procedural guides. |
-| 30 | Knowledge Management | Lesson Detail | Content viewer screen for accessing specific training multimedia. |
-| 31 | Knowledge Management | Snake Library | Encyclopedic database outlining snake species for field reference. |
-| 32 | Knowledge Management | Snake Detail | Specific informational profile highlighting characteristics and handling risks. |
-| 33 | Knowledge Management | First Aid Guide | Structured guide supplying exact first-aid procedures linked to species. |
+| 17 | Emergency Response | Navigation Map | Real-time map interface mapping the optimal routing to the victim. |
+| 18 | Emergency Response | On-scene Support | Interface detailing AI-recommended first-aid actions to perform on-scene. |
+| 19 | Emergency Response | Find Hospital | Directory and routing interface for locating the nearest equipped hospital. |
+| 20 | Emergency Response | Mission Completion | Check-out interface for finalizing the rescue operation and capturing evidence. |
+| 21 | Emergency Response | Mission Success - Emergency | Final summary screen outlining the completed SOS emergency response. |
+| 22 | Activity & History | Mission History | Chronological log displaying completed past rescue and catching operations. |
+| 23 | Activity & History | History Detail | In-depth breakdown validating operational and financial specifics of a past mission. |
+| 24 | Notification | Notification Inbox | Centralized paginated inbox handling system alerts and read/unread tracking. |
+| 25 | Rescuer Profile | Profile Tab | Rescuer profile summary detailing performance metrics and ratings. |
+| 26 | Rescuer Profile | Edit Profile | Form interface for modifying personal rescuer details and avatars. |
+| 27 | Rescuer Profile | Settings | Application configuration interface for work modes and notification toggles. |
+| 28 | Rescuer Reputation | Feedback | Interface for reviewing customer ratings and textual feedback. |
+| 29 | Knowledge Base | Lessons | Educational hub providing modular training and procedural guides. |
+| 30 | Knowledge Base | Lesson Detail | Content viewer screen for accessing specific training multimedia. |
+| 31 | Knowledge Base | Snake Library | Encyclopedic database outlining snake species for field reference. |
+| 32 | Knowledge Base | Snake Detail | Specific informational profile highlighting characteristics and handling risks. |
+| 33 | Knowledge Base | First Aid Guide | Structured guide supplying exact first-aid procedures linked to species. |
 
 
 ---
