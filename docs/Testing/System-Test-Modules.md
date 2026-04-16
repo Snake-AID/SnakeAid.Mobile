@@ -38,32 +38,33 @@ Tài liệu này định nghĩa danh sách các Module Code (Cụm Test Case) ch
 | 22 | WebRTC Video Room & Waiting Room Logic  | 0 | 0 | 0 | 0 | 0 |
 | 23 | Cancellation & Escrow Refund (Expert-only cancel rule)  | 0 | 0 | 0 | 0 | 0 |
 | **E** | **Community, Blog & Knowledge Base (Luồng Phụ)** | | | | | |
-| 24 | Read Community Blog & Safety Alerts  | 0 | 0 | 0 | 0 | 0 |
-| 25 | Confirm AI Snake Detection Image (Expert)  | 0 | 0 | 0 | 0 | 0 |
-| 26 | Search & View Snake Library (Encyclopedia)  | 0 | 0 | 0 | 0 | 0 |
-| 27 | Search & View First Aid Protocol Guides  | 0 | 0 | 0 | 0 | 0 |
-| 28 | Access Rescuer Training Lessons  | 0 | 0 | 0 | 0 | 0 |
+| 24 | Read Community Report   | 0 | 0 | 0 | 0 | 10 |
+| 25 | Read Blog  | 0 | 0 | 0 | 0 | 0 |
+| 26 | Confirm AI Snake Detection Image (Expert)  | 0 | 0 | 0 | 0 | 0 |
+| 27 | Search & View Snake Library (Encyclopedia)  | 0 | 0 | 0 | 0 | 0 |
+| 28 | Search & View First Aid Protocol Guides  | 0 | 0 | 0 | 0 | 0 |
+| 29 | Access Rescuer Training Lessons  | 0 | 0 | 0 | 0 | 0 |
 | **F** | **System, Wallet & Utilities** | | | | | |
-| 29 | Manage SnakeAidPay Wallet (Top-up, History, Withdraw)  | 0 | 0 | 0 | 0 | 0 |
-| 30 | External Payment Interface (PayOS Callback)  | 0 | 0 | 0 | 0 | 0 |
-| 31 | Notification Tab & SignalR Broadcasts  | 0 | 0 | 0 | 0 | 0 |
-| 32 | Submit Ratings & Read Feedback  | 0 | 0 | 0 | 0 | 0 |
-| 33 | View Mission & Consultation History (Filtering, Detail)  | 0 | 0 | 0 | 0 | 0 |
+| 30 | Manage SnakeAidPay Wallet (Top-up, History, Withdraw)  | 0 | 0 | 0 | 0 | 0 |
+| 31 | External Payment Interface (PayOS Callback)  | 0 | 0 | 0 | 0 | 0 |
+| 32 | Notification Tab & SignalR Broadcasts  | 0 | 0 | 0 | 0 | 0 |
+| 33 | Submit Ratings & Read Feedback  | 0 | 0 | 0 | 0 | 0 |
+| 34 | View Mission & Consultation History (Filtering, Detail)  | 0 | 0 | 0 | 0 | 0 |
 | **G** | **Web Portal & Dashboard Management (Admin/Operator)** | | | | | |
-| 34 | Operator Dashboard & Admin Dashboard | 0 | 0 | 0 | 0 | 0 |
-| 35 | Staff Workshifts Management | 0 | 0 | 0 | 0 | 0 |
-| 36 | Users Account & Role Management | 0 | 0 | 0 | 0 | 0 |
-| 37 | System Incidents Management | 0 | 0 | 0 | 0 | 0 |
-| 38 | Snake Catchings Requests Management | 0 | 0 | 0 | 0 | 0 |
-| 39 | Consultations Booking Management | 0 | 0 | 0 | 0 | 0 |
-| 40 | Snakes Catalog Management | 0 | 0 | 0 | 0 | 0 |
-| 41 | Antivenoms Inventory & Management | 0 | 0 | 0 | 0 | 0 |
-| 42 | Treatment Facilities Database Management | 0 | 0 | 0 | 0 | 0 |
-| 43 | Finance: Transactions & Withdrawals Management | 0 | 0 | 0 | 0 | 0 |
-| 44 | Report Media (User Reports) Management | 0 | 0 | 0 | 0 | 0 |
-| 45 | Portal System Settings & Configuration | 0 | 0 | 0 | 0 | 0 |
-| 46 | Learning: Lessons Database Management | 0 | 0 | 0 | 0 | 0 |
-| 47 | Content: Blogs Database Management | 0 | 0 | 0 | 0 | 0 |
+| 35 | Operator Dashboard & Admin Dashboard | 0 | 0 | 0 | 0 | 0 |
+| 36 | Staff Workshifts Management | 0 | 0 | 0 | 0 | 0 |
+| 37 | Users Account & Role Management | 0 | 0 | 0 | 0 | 0 |
+| 38 | System Incidents Management | 0 | 0 | 0 | 0 | 0 |
+| 39 | Snake Catchings Requests Management | 0 | 0 | 0 | 0 | 0 |
+| 40 | Consultations Booking Management | 0 | 0 | 0 | 0 | 0 |
+| 41 | Snakes Catalog Management | 0 | 0 | 0 | 0 | 0 |
+| 42 | Antivenoms Inventory & Management | 0 | 0 | 0 | 0 | 0 |
+| 43 | Treatment Facilities Database Management | 0 | 0 | 0 | 0 | 0 |
+| 44 | Finance: Transactions & Withdrawals Management | 0 | 0 | 0 | 0 | 0 |
+| 45 | Report Media (User Reports) Management | 0 | 0 | 0 | 0 | 0 |
+| 46 | Portal System Settings & Configuration | 0 | 0 | 0 | 0 | 0 |
+| 47 | Learning: Lessons Database Management | 0 | 0 | 0 | 0 | 0 |
+| 48 | Content: Blogs Database Management | 0 | 0 | 0 | 0 | 0 |
 
 | | **TOTAL** | **0** | **0** | **0** | **0** | **0** |
 
