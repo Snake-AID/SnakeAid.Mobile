@@ -343,15 +343,6 @@ class _ExpertProfileDetailScreenState
                   height: 1.5,
                 ),
               ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {
-                    // TODO: Show full bio
-                  },
-                  child: const Text('Xem thêm'),
-                ),
-              ),
             ],
           ),
         ),
@@ -464,27 +455,7 @@ class _ExpertProfileDetailScreenState
                 ),
               ),
 
-              // Response Time
-              Expanded(
-                child: Column(
-                  children: [
-                    Text(
-                      expert.averageResponseTime,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Thời gian phản hồi',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
+              
 
               // Success Rate
               Expanded(
@@ -675,14 +646,21 @@ class _ExpertProfileDetailScreenState
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Đánh Giá Từ Bệnh Nhân',
+              'Đánh Giá Từ Người Dùng',
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             TextButton(
               onPressed: () {
-                // TODO: Show all reviews
+                context.push(
+                  '/expert-reviews/${expert.id}',
+                  extra: {
+                    'expertName': expert.displayName,
+                    'rating': expert.rating,
+                    'reviewCount': expert.reviewCount,
+                  },
+                );
               },
               style: TextButton.styleFrom(
                 foregroundColor: theme.colorScheme.onSurfaceVariant,
@@ -692,6 +670,21 @@ class _ExpertProfileDetailScreenState
           ],
         ),
         const SizedBox(height: 8),
+        if (expert.reviews.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              'Chưa có đánh giá nào.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
         ...expert.reviews.take(2).map<Widget>((review) {
           return Container(
             width: double.infinity,

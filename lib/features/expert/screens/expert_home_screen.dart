@@ -115,7 +115,13 @@ _ExpertConsultation _bookingToExpertConsultation(
 /// Expert Home Screen - Dashboard for snake experts
 class ExpertHomeScreen extends StatefulWidget {
   final int initialTab;
-  const ExpertHomeScreen({super.key, this.initialTab = 0});
+  final int initialConsultationsTab;
+
+  const ExpertHomeScreen({
+    super.key,
+    this.initialTab = 0,
+    this.initialConsultationsTab = 0,
+  });
 
   @override
   State<ExpertHomeScreen> createState() => _ExpertHomeScreenState();
@@ -138,7 +144,10 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
         key: _homeKey,
         onSeeAll: () => setState(() => _selectedIndex = 1),
       ),
-      _ConsultationsTab(key: _consultationsKey),
+      _ConsultationsTab(
+        key: _consultationsKey,
+        initialTab: widget.initialConsultationsTab,
+      ),
       const _IncomeTab(),
       _ProfileTab(onGoToHistory: _goToConsultationHistory),
     ];
@@ -1985,7 +1994,9 @@ class _ExpertConsultation {
 }
 
 class _ConsultationsTab extends ConsumerStatefulWidget {
-  const _ConsultationsTab({super.key});
+  final int initialTab;
+
+  const _ConsultationsTab({super.key, this.initialTab = 0});
 
   @override
   ConsumerState<_ConsultationsTab> createState() => _ConsultationsTabState();
@@ -2030,7 +2041,9 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    final initialTab =
+        widget.initialTab < 0 ? 0 : (widget.initialTab > 1 ? 1 : widget.initialTab);
+    _tabController = TabController(length: 2, vsync: this, initialIndex: initialTab);
     final today = DateTime.now();
     _selectedDay = DateTime(today.year, today.month, today.day);
     // Week starts from today (not Monday), showing today + next 6 days

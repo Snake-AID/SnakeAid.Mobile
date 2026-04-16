@@ -194,11 +194,39 @@ class ExpertPresenceChangedEvent {
   });
 
   factory ExpertPresenceChangedEvent.fromJson(Map<String, dynamic> json) {
+    bool parseBool(dynamic value) {
+      if (value is bool) return value;
+      if (value is num) return value != 0;
+      if (value == null) return false;
+      final normalized = value.toString().trim().toLowerCase();
+      return normalized == 'true' ||
+          normalized == '1' ||
+          normalized == 'online' ||
+          normalized == 'active';
+    }
+
     return ExpertPresenceChangedEvent(
-      expertId: (json['expertId'] ?? '').toString(),
-      isOnline: (json['isOnline'] as bool?) ?? false,
-      changedAtUtc: json['changedAtUtc'] != null
-          ? DateTime.tryParse(json['changedAtUtc'].toString())
+      expertId: (json['expertId'] ??
+              json['ExpertId'] ??
+              json['userId'] ??
+              json['UserId'] ??
+              '')
+          .toString(),
+      isOnline: parseBool(
+        json['isOnline'] ?? json['IsOnline'] ?? json['online'] ?? json['Online'],
+      ),
+      changedAtUtc: (json['changedAtUtc'] ??
+                  json['ChangedAtUtc'] ??
+                  json['changedAt'] ??
+                  json['ChangedAt']) !=
+              null
+          ? DateTime.tryParse(
+              (json['changedAtUtc'] ??
+                      json['ChangedAtUtc'] ??
+                      json['changedAt'] ??
+                      json['ChangedAt'])
+                  .toString(),
+            )
           : null,
     );
   }
@@ -247,6 +275,79 @@ class EmergencyConsultationSignalRService {
         return null;
       }
     }
+    return null;
+  }
+
+  Set<String> _extractOnlineExpertIds(List<Object?>? arguments) {
+    if (arguments == null || arguments.isEmpty) return <String>{};
+
+    Set<String> normalizeIds(Iterable<dynamic> values) {
+      return values
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toSet();
+    }
+
+    final first = arguments[0];
+
+    // Shape A: first arg is raw list of ids.
+    if (first is List) {
+      return normalizeIds(first);
+    }
+
+    // Shape B: first arg is map/json object containing list field.
+    final rawMap = _tryParseMap(first);
+    if (rawMap != null) {
+      final keys = [
+        'onlineExpertIds',
+        'onlineExperts',
+        'expertIds',
+        'onlineUserIds',
+        'OnlineExpertIds',
+        'OnlineExperts',
+        'ExpertIds',
+        'OnlineUserIds',
+      ];
+
+      for (final key in keys) {
+        final value = rawMap[key];
+        if (value is List) return normalizeIds(value);
+      }
+
+      // Shape C: map itself is id->bool map.
+      if (rawMap.isNotEmpty && rawMap.values.any((v) => v is bool || v is num)) {
+        return rawMap.entries
+            .where((e) {
+              final v = e.value;
+              if (v is bool) return v;
+              if (v is num) return v != 0;
+              return false;
+            })
+            .map((e) => e.key.toString().trim())
+            .where((e) => e.isNotEmpty)
+            .toSet();
+      }
+    }
+
+    // Shape D: positional args are ids.
+    return normalizeIds(arguments);
+  }
+
+  Map<String, dynamic>? _tryParsePresenceChangedPayload(List<Object?>? arguments) {
+    if (arguments == null || arguments.isEmpty) return null;
+
+    final firstAsMap = _tryParseMap(arguments[0]);
+    if (firstAsMap != null) return firstAsMap;
+
+    // Fallback positional shape: expertId, isOnline, changedAtUtc
+    if (arguments.length >= 2) {
+      return {
+        'expertId': (arguments[0] ?? '').toString(),
+        'isOnline': arguments[1],
+        if (arguments.length > 2) 'changedAtUtc': (arguments[2] ?? '').toString(),
+      };
+    }
+
     return null;
   }
 
@@ -331,12 +432,10 @@ class EmergencyConsultationSignalRService {
 
     conn.on('OnlineExpertsSnapshot', (arguments) {
       try {
-        if (arguments == null || arguments.isEmpty) return;
-        final raw = _tryParseMap(arguments[0]);
-        if (raw == null) return;
-        final ids = (raw['onlineExpertIds'] as List<dynamic>? ?? const [])
-            .map((e) => e.toString())
-            .toSet();
+        final ids = _extractOnlineExpertIds(arguments);
+        if (ids.isEmpty) {
+          debugPrint('⚠️ OnlineExpertsSnapshot parsed empty ids from: $arguments');
+        }
         _onlineExpertsSnapshotController.add(ids);
       } catch (e) {
         debugPrint('Failed to parse OnlineExpertsSnapshot: $e');
@@ -345,8 +444,7 @@ class EmergencyConsultationSignalRService {
 
     conn.on('ExpertPresenceChanged', (arguments) {
       try {
-        if (arguments == null || arguments.isEmpty) return;
-        final raw = _tryParseMap(arguments[0]);
+        final raw = _tryParsePresenceChangedPayload(arguments);
         if (raw == null) return;
         _expertPresenceChangedController.add(
           ExpertPresenceChangedEvent.fromJson(raw),

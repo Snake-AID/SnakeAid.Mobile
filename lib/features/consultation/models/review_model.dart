@@ -25,7 +25,9 @@ class ReviewModel {
   factory ReviewModel.fromJson(Map<String, dynamic> json) {
     return ReviewModel(
       id: json['id'] as String? ?? '',
-      expertId: json['expertId'] as String? ?? '',
+      expertId:
+          (json['expertId'] ?? json['targetUserId'] ?? json['expert_id'] ?? '')
+              as String,
       // Backend variants: patientId/userId/raterId.
       patientId:
         (json['patientId'] ?? json['userId'] ?? json['raterId'] ?? '') as String,

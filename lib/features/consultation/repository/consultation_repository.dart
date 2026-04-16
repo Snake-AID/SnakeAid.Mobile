@@ -277,6 +277,81 @@ class ConsultationRepository {
     }
   }
 
+  /// Get paged reviews for an expert including metadata.
+  ///
+  /// API: `GET /api/experts/{expertId}/reviews`
+  Future<({
+    List<ReviewModel> items,
+    int totalPages,
+    int totalItems,
+    int currentPage,
+    int pageSize,
+  })> getExpertReviewsPaged(
+    String expertId, {
+    int pageNumber = 1,
+    int pageSize = 10,
+  }) async {
+    try {
+      debugPrint('📋 Fetching paged reviews for expert: $expertId');
+
+      final response = await httpService.get(
+        '/api/experts/$expertId/reviews',
+        queryParameters: {'pageNumber': pageNumber, 'pageSize': pageSize},
+      );
+
+      final body = response.data as Map<String, dynamic>;
+      if (body['is_success'] == true && body['data'] != null) {
+        final data = body['data'] as Map<String, dynamic>;
+        final itemsRaw = (data['items'] ?? data['data'] ?? []) as List<dynamic>;
+        final meta = data['meta'] as Map<String, dynamic>? ?? <String, dynamic>{};
+
+        final items = itemsRaw
+            .map((e) => ReviewModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+
+        int parseInt(dynamic value, int fallback) {
+          if (value is int) return value;
+          if (value is num) return value.toInt();
+          return int.tryParse(value?.toString() ?? '') ?? fallback;
+        }
+
+        return (
+          items: items,
+          totalPages: parseInt(meta['total_pages'], 1),
+          totalItems: parseInt(meta['total_items'], items.length),
+          currentPage: parseInt(meta['current_page'], pageNumber),
+          pageSize: parseInt(meta['page_size'], pageSize),
+        );
+      }
+
+      return (
+        items: const <ReviewModel>[],
+        totalPages: 1,
+        totalItems: 0,
+        currentPage: pageNumber,
+        pageSize: pageSize,
+      );
+    } on DioException catch (e) {
+      debugPrint('❌ Failed to fetch paged reviews: ${e.message}');
+      return (
+        items: const <ReviewModel>[],
+        totalPages: 1,
+        totalItems: 0,
+        currentPage: pageNumber,
+        pageSize: pageSize,
+      );
+    } catch (e) {
+      debugPrint('❌ Unexpected error fetching paged reviews: $e');
+      return (
+        items: const <ReviewModel>[],
+        totalPages: 1,
+        totalItems: 0,
+        currentPage: pageNumber,
+        pageSize: pageSize,
+      );
+    }
+  }
+
   /// Get available time slots for an expert
   ///
   /// API: `GET /api/experts/{expertId}/time-slots`

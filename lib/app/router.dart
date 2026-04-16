@@ -75,6 +75,7 @@ import 'package:snakeaid_mobile/features/emergency/models/route_navigation_data.
 import 'package:snakeaid_mobile/features/consultation/screens/members/consultation_home_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/members/expert_list_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/members/expert_profile_detail_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/expert_reviews_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/members/service_selection_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/members/consultation_documents_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/members/consultation_time_selection_screen.dart';
@@ -170,7 +171,12 @@ final router = GoRouter(
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>?;
         final initialTab = (extra?['initialTab'] as int?) ?? 0;
-        return ExpertHomeScreen(initialTab: initialTab);
+        final initialConsultationsTab =
+            (extra?['initialConsultationsTab'] as int?) ?? 0;
+        return ExpertHomeScreen(
+          initialTab: initialTab,
+          initialConsultationsTab: initialConsultationsTab,
+        );
       },
     ),
 
@@ -562,6 +568,22 @@ final router = GoRouter(
       builder: (context, state) {
         final expertId = state.pathParameters['expertId']!;
         return ExpertProfileDetailScreen(expertId: expertId);
+      },
+    ),
+
+    // Expert Reviews (all)
+    GoRoute(
+      path: '/expert-reviews/:expertId',
+      name: 'expert_reviews',
+      builder: (context, state) {
+        final expertId = state.pathParameters['expertId']!;
+        final extra = state.extra as Map<String, dynamic>?;
+        return ExpertReviewsScreen(
+          expertId: expertId,
+          expertName: extra?['expertName'] as String? ?? 'Chuyên gia',
+          initialRating: (extra?['rating'] as num?)?.toDouble() ?? 0,
+          initialReviewCount: (extra?['reviewCount'] as num?)?.toInt() ?? 0,
+        );
       },
     ),
 

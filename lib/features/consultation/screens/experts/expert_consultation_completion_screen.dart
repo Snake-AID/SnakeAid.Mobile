@@ -1,10 +1,13 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../models/consultation_booking_response.dart';
+import '../../repository/consultation_repository.dart';
 
 /// Màn hình hoàn thành tư vấn dành cho chuyên gia.
 /// Nhận dữ liệu qua [data] map từ router extra.
-class ExpertConsultationCompletionScreen extends StatefulWidget {
+class ExpertConsultationCompletionScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> data;
 
   const ExpertConsultationCompletionScreen({
@@ -13,40 +16,111 @@ class ExpertConsultationCompletionScreen extends StatefulWidget {
   });
 
   @override
-  State<ExpertConsultationCompletionScreen> createState() =>
+  ConsumerState<ExpertConsultationCompletionScreen> createState() =>
       _ExpertConsultationCompletionScreenState();
 }
 
 class _ExpertConsultationCompletionScreenState
-    extends State<ExpertConsultationCompletionScreen> {
+    extends ConsumerState<ExpertConsultationCompletionScreen> {
   static const _purple = Color(0xFF6C47C2);
   static const _green = Color(0xFF16A34A);
 
-  late int _countdown;
-  Timer? _timer;
+  bool _isSyncingSessionData = false;
+  late String _patientName;
+  late int _durationSeconds;
+  late int _feeCost;
+  DateTime? _sessionTime;
+  String? _problemDescription;
 
   @override
   void initState() {
     super.initState();
-    _countdown = 3;
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) {
-        t.cancel();
-        return;
-      }
-      if (_countdown <= 1) {
-        t.cancel();
-        context.go('/expert-home');
-      } else {
-        setState(() => _countdown--);
-      }
-    });
+    _patientName = (widget.data['patientName'] as String?)?.trim().isNotEmpty == true
+        ? (widget.data['patientName'] as String).trim()
+        : 'Bệnh Nhân';
+    _durationSeconds = _toInt(widget.data['durationSeconds']);
+    _feeCost = _toInt(widget.data['feeCost']);
+    _sessionTime = widget.data['sessionTime'] as DateTime?;
+    _problemDescription = (widget.data['problemDescription'] as String?)?.trim();
+
+    _syncCompletedSessionData();
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
+  int _toInt(dynamic value, {int fallback = 0}) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
+  Future<void> _syncCompletedSessionData() async {
+    final consultationId =
+        (widget.data['consultationId'] ?? '').toString().trim();
+    if (consultationId.isEmpty) return;
+
+    setState(() => _isSyncingSessionData = true);
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      ConsultationBookingResponse? matched;
+
+      Future<void> scan({String? status}) async {
+        for (var page = 1; page <= 3 && matched == null; page++) {
+          final items = await repo.getExpertBookings(
+            status: status,
+            pageNumber: page,
+            pageSize: 25,
+          );
+          if (items.isEmpty) break;
+
+          for (final item in items) {
+            final itemConsultationId = (item.consultationId ?? '').trim();
+            if (itemConsultationId == consultationId || item.id == consultationId) {
+              matched = item;
+              break;
+            }
+          }
+        }
+      }
+
+      await scan(status: 'Completed');
+      if (matched == null) {
+        await scan();
+      }
+
+      if (!mounted || matched == null) return;
+
+      final booking = matched!;
+      final resolvedName = (booking.userName ?? '').trim();
+      final resolvedDurationSeconds =
+          booking.slotStartTime != null && booking.slotEndTime != null
+              ? booking.slotEndTime!
+                  .difference(booking.slotStartTime!)
+                  .inSeconds
+              : 0;
+
+      setState(() {
+        if (resolvedName.isNotEmpty) {
+          _patientName = resolvedName;
+        }
+        if (booking.feeCost > 0) {
+          _feeCost = booking.feeCost;
+        }
+        if (_durationSeconds <= 0 && resolvedDurationSeconds > 0) {
+          _durationSeconds = resolvedDurationSeconds;
+        }
+        _sessionTime = booking.slotStartTime ?? booking.scheduledTime;
+
+        final problem = (booking.problemDescription ?? '').trim();
+        if (problem.isNotEmpty) {
+          _problemDescription = problem;
+        }
+      });
+    } catch (e) {
+      debugPrint('⚠️ Could not sync completion data from history: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isSyncingSessionData = false);
+      }
+    }
   }
 
   String _fmtDuration(int seconds) {
@@ -70,14 +144,13 @@ class _ExpertConsultationCompletionScreenState
 
   @override
   Widget build(BuildContext context) {
-    final patientName =
-        widget.data['patientName'] as String? ?? 'Bệnh Nhân';
-    final durationSeconds = (widget.data['durationSeconds'] as int?) ?? 0;
-    final feeCost = (widget.data['feeCost'] as int?) ?? 0;
+    final patientName = _patientName;
+    final durationSeconds = _durationSeconds;
+    final feeCost = _feeCost;
     final platformFee = (feeCost * 0.1).round();
     final netAmount = feeCost - platformFee;
 
-    final now = DateTime.now();
+    final now = _sessionTime ?? DateTime.now();
     final dateStr =
         '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}'
         ' - ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
@@ -241,6 +314,27 @@ class _ExpertConsultationCompletionScreenState
                               ),
                             ],
                           ),
+                          if ((_problemDescription ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF9FAFB),
+                                borderRadius: BorderRadius.circular(10),
+                                border:
+                                    Border.all(color: const Color(0xFFE5E7EB)),
+                              ),
+                              child: Text(
+                                _problemDescription!,
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  color: Color(0xFF4B5563),
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -412,10 +506,13 @@ class _ExpertConsultationCompletionScreenState
                   child: OutlinedButton.icon(
                     onPressed: () => context.go(
                       '/expert-home',
-                      extra: {'initialTab': 2},
+                      extra: {
+                        'initialTab': 1,
+                        'initialConsultationsTab': 1,
+                      },
                     ),
                     icon: const Icon(Icons.description_outlined, size: 20),
-                    label: const Text('Xem Báo Cáo'),
+                    label: const Text('Về Lịch Sử Tư Vấn'),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: _purple, width: 1.5),
                       foregroundColor: _purple,
@@ -446,7 +543,9 @@ class _ExpertConsultationCompletionScreenState
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Tự động chuyển về trang chủ sau $_countdown giây...',
+                  _isSyncingSessionData
+                      ? 'Đang đồng bộ dữ liệu phiên vừa tư vấn...'
+                      : 'Bạn có thể xem lại phiên tư vấn trong Lịch Sử bất kỳ lúc nào.',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                       fontSize: 12, color: Color(0xFFAAAAAA)),
