@@ -260,35 +260,71 @@ flowchart LR
 
 ---
 
-### 3.4.5 Profile, Activity & Settings
-**Function trigger:** Navigation via global menubar. Navigation path: Rescuer Home -> (Profile Tab -> Edit Profile / Settings / Feedback) or (Mission History -> History Detail).
+### 3.4.5 Profile
+**Function trigger:** Navigation via global menubar. Navigation path: Rescuer Home -> Profile Tab -> Edit Profile.
 **Function description:**
 - **Actor:** Rescuer.
-- **Purpose:** Manage personal identity, configure application behavior, and audit historical operational performance.
-- **Interface:** Profile summaries, editable form fields, historical timeline lists, reputation badges, and preference toggles.
-- **Data processing:** Retrieve and mutate profile records, fetch paginated historical mission ledgers, aggregate user reputation scores.
+- **Purpose:** Manage personal identity through profile editing.
+- **Interface:** Profile summaries and editable form fields.
+- **Data processing:** Retrieve and mutate profile records.
 - **Screen layout:** 
 
 **Function details:**
-- **Data:** Rescuer biographical data, historical mission payloads (financials & status), application configuration states, aggregated review text.
+- **Data:** Rescuer biographical data.
 - **Validation:** Input constraints on profile updates (e.g., valid phone regex).
-- **Business rules:** Mission history ledgers are immutable read-only records; Reputation status recalibrates nightly based on user feedback.
-- **Normal cases:** Rescuer updates profile avatar successfully; Historical ledger loads deep pagination correctly.
-- **Abnormal cases:** Avatar media upload fails returning standard server error; Corrupted historical records render safe fallback states.
+- **Business rules:** Profile updates must preserve account identity and contact integrity.
+- **Normal cases:** Rescuer updates profile avatar successfully.
+- **Abnormal cases:** Avatar media upload fails returning standard server error.
 
 ---
 
-### 3.4.6 Knowledge Base
-**Function trigger:** Rescuer explores educational modules. Navigation path: Rescuer Home -> (Lessons -> Lesson Detail) or (Snake Library -> Snake Detail -> First Aid Guide).
+### 3.4.6 Mission History
+**Function trigger:** Navigation via global menubar. Navigation path: Rescuer Home -> Mission History -> History Detail.
 **Function description:**
 - **Actor:** Rescuer.
-- **Purpose:** Provide authoritative reference materials for species identification and procedural training.
-- **Interface:** Categorized lesson lists, article viewers, searchable species dictionary, and structured first-aid protocol cards.
-- **Data processing:** Fetch static CMS content, process client-side search filtering, load high-resolution taxonomy imagery.
+- **Purpose:** Audit historical operational performance.
+- **Interface:** Historical timeline lists and mission detail views.
+- **Data processing:** Fetch paginated historical mission ledgers.
 - **Screen layout:** 
 
 **Function details:**
-- **Data:** Structured training content, species taxonomy (venom type, identifiers), procedural first-aid step arrays.
+- **Data:** Historical mission payloads (financials & status).
+- **Validation:** None beyond authenticated access.
+- **Business rules:** Mission history ledgers are immutable read-only records.
+- **Normal cases:** Historical ledger loads deep pagination correctly.
+- **Abnormal cases:** Corrupted historical records render safe fallback states.
+
+---
+
+### 3.4.7 Lessons
+**Function trigger:** Navigation via global menubar. Navigation path: Rescuer Home -> Lessons -> Lesson Detail.
+**Function description:**
+- **Actor:** Rescuer.
+- **Purpose:** Provide educational training content for rescuer users.
+- **Interface:** Categorized lesson lists and article viewers.
+- **Data processing:** Fetch static CMS content, process client-side search filtering, load media assets.
+- **Screen layout:** 
+
+**Function details:**
+- **Data:** Structured training content.
+- **Validation:** Search queries sanitize input strings.
+- **Business rules:** Educational content should remain accessible and concise for field use.
+- **Normal cases:** Rescuer opens a lesson and reads the associated content successfully.
+- **Abnormal cases:** Remote media loading stalls in low-bandwidth areas (displays cached placeholders).
+
+---
+
+### 3.4.8 Snake Library
+**Function trigger:** Navigation via global menubar. Navigation path: Rescuer Home -> Snake Library -> Snake Detail -> First Aid Guide.
+**Function description:**
+- **Actor:** Rescuer.
+- **Purpose:** Provide authoritative reference materials for species identification and procedural training.
+- **Interface:** Searchable species dictionary and structured first-aid protocol cards.
+- **Data processing:** Fetch taxonomy data, process species search filtering, load high-resolution imagery.
+- **Screen layout:** 
+
+**Function details:**
+- **Data:** Species taxonomy (venom type, identifiers), procedural first-aid step arrays.
 - **Validation:** Search queries sanitize input strings.
 - **Business rules:** Critical first-aid data must be heavily cached for offline/remote access during field operations.
 - **Normal cases:** Rescuer seamlessly searches and identifies an unknown species, immediately accessing its targeted first-aid protocol.
