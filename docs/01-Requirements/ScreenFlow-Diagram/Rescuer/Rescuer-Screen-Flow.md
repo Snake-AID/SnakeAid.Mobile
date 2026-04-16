@@ -43,6 +43,7 @@ flowchart LR
     HOME --> HIST[Mission History]
     HIST --> HISTD[History Detail]
     HOME --> NOTIF[Notification Tab]
+    HOME --> SCHEDULE[Schedule Work]
 
     HOME --> PROFILE[Profile Tab]
     PROFILE --> EDITP[Edit Profile]
@@ -87,15 +88,16 @@ flowchart LR
 | 21 | Mission Success — Emergency | `/rescuer/mission-success` | ✅ |
 | 22 | Mission History | `/rescuer-history` | ✅ |
 | 23 | **Notification Tab** | embedded in Home shell | ✅ |
-| 24 | Profile Tab | embedded in Home shell | ✅ |
-| 25 | Edit Profile | `/rescuer-edit-profile` | ✅ |
-| 26 | **Settings** | `/rescuer-settings` | 🚧 |
-| 27 | **Feedback** | `/rescuer-feedback` | 🚧 |
-| 28 | Lessons | `/rescuer-lessons` | ✅ |
-| 29 | Lesson Detail | `Navigator.push` | ✅ |
-| 30 | Snake Library | `/rescuer/snake-species` | ✅ |
-| 31 | Snake Detail | `/snake-species/:id` | ✅ |
-| 32 | First Aid Guide | `/snake-first-aid/:id` | ✅ |
+| 24 | Schedule Work | `/rescuer-schedule` | ✅ |
+| 25 | Profile Tab | embedded in Home shell | ✅ |
+| 26 | Edit Profile | `/rescuer-edit-profile` | ✅ |
+| 27 | **Settings** | `/rescuer-settings` | 🚧 |
+| 28 | **Feedback** | `/rescuer-feedback` | 🚧 |
+| 29 | Lessons | `/rescuer-lessons` | ✅ |
+| 30 | Lesson Detail | `Navigator.push` | ✅ |
+| 31 | Snake Library | `/rescuer/snake-species` | ✅ |
+| 32 | Snake Detail | `/snake-species/:id` | ✅ |
+| 33 | First Aid Guide | `/snake-first-aid/:id` | ✅ |
 
 ---
 
@@ -207,18 +209,18 @@ flowchart LR
 ---
 
 ### 3.4.2 Rescuer Workspace & Notifications
-**Function trigger:** User successfully authenticated. Navigation path: Rescuer Login -> Rescuer Home <-> Notification Tab.
+**Function trigger:** User successfully authenticated. Navigation path: Rescuer Login -> Rescuer Home <-> Notification Tab / Schedule Work.
 **Function description:**
 - **Actor:** Rescuer (with system event triggers).
 - **Purpose:** Serve as the central mission control hub, providing daily operational stats and global alert management.
-- **Interface:** Dashboard with metrics, bottom navigation bar, active duty toggle, and paginated notification list.
-- **Data processing:** Fetch daily statistics, establish SignalR connection for live dispatch events, synchronize read/unread notification states.
+- **Interface:** Dashboard with metrics, bottom navigation bar, active duty toggle, paginated notification list, and weekly schedule view.
+- **Data processing:** Fetch daily statistics, establish SignalR connection for live dispatch events, synchronize read/unread notification states, and load weekly work assignments.
 - **Screen layout:** 
 
 **Function details:**
-- **Data:** Rescuer ID, operational stats (completed missions, rating), active duty status, notification payload array.
+- **Data:** Rescuer ID, operational stats (completed missions, rating), active duty status, notification payload array, schedule assignments.
 - **Validation:** Rescuer must hold an active JWT and valid role mapping.
-- **Business rules:** Notifications are marked read immediately upon interaction; Rescuer must toggle 'Active' to receive inbound dispatch events.
+- **Business rules:** Notifications are marked read immediately upon interaction; Rescuer must toggle 'Active' to receive inbound dispatch events; schedule items are grouped by day and week.
 - **Normal cases:** Dashboard data loads seamlessly; Real-time dispatch alerts surface cleanly.
 - **Abnormal cases:** SignalR connection drops trigger silent background reconnects; Network partitions show offline indicators.
 
