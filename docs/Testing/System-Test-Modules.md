@@ -49,7 +49,7 @@ Verd| 29 | Access Rescuer Training Lessons  | 0 | 0 | 0 | 0 | 8 |
 | 31 | External Payment Interface (PayOS Callback)  | 0 | 0 | 0 | 0 | 9 |
 | 32 | Notification Tab & SignalR Broadcasts  | 0 | 0 | 0 | 0 | 10 |
 | 33 | Submit Ratings & Read Feedback  | 0 | 0 | 0 | 0 | 10 |
-| 34 | View Mission & Consultation History (Filtering, Detail)  | 0 | 0 | 0 | 0 | 0 |
+| 34 | View Mission & Consultation History (Filtering, Detail)  | 0 | 0 | 0 | 0 | 10 |
 | **G** | **Web Portal & Dashboard Management (Admin/Operator)** | | | | | |
 | 35 | Operator Dashboard & Admin Dashboard | 0 | 0 | 0 | 0 | 0 |
 | 36 | Staff Workshifts Management | 0 | 0 | 0 | 0 | 0 |
