@@ -618,17 +618,17 @@ flowchart LR
 - **Abnormal cases:** WebRTC ICE failure drops video -> UI gracefully downgrades to audio-only or text chat; ICE server fails connection completely.
 
 ---
-### 3.4.12 Knowledge Base
-**Function trigger:** Member accesses educational resources. Navigation path: Member Home -> (Snake Library -> Snake Detail -> Snake First Aid Guide) or (Blog List -> Blog Detail).
+### 3.4.12 Snake Library
+**Function trigger:** Member accesses educational resources about snakes. Navigation path: Member Home -> Snake Library -> Snake Detail -> Snake First Aid Guide.
 **Function description:**
 - **Actor:** Member.
-- **Purpose:** Equip the general public with authoritative zoological parameters and comprehensive safety/preventative literature.
-- **Interface:** Rich media libraries, searchable encyclopedic UI, detailed taxonomy cards, and long-form markdown blog readers.
-- **Data processing:** Fetch structured JSON/CMS taxonomies, cache heavy assets locally, parse and render markdown safely.
+- **Purpose:** Equip the general public with authoritative zoological parameters and comprehensive safety/preventative literature about different snake species.
+- **Interface:** Rich media libraries, searchable encyclopedic UI, detailed taxonomy cards.
+- **Data processing:** Fetch structured JSON/CMS taxonomies, cache heavy assets locally.
 - **Screen layout:** 
 
 **Function details:**
-- **Data:** Species taxonomy databases, risk classification metrics, geographical habitats, raw markdown blog payloads.
+- **Data:** Species taxonomy databases, risk classification metrics, geographical habitats.
 - **Validation:** N/A (Mostly Read-only queries).
 - **Business rules:** Snake Detail views must prominently feature a direct CTA to that specific species' First Aid Guide to cut down navigation time in edge-case panics.
 - **Normal cases:** Member queries "Viper" -> Reads habitat detail -> Swipes to verify recommended first-aid.
@@ -636,36 +636,108 @@ flowchart LR
 
 ---
 
-### 3.4.13 Member Wallet & Transactions
-**Function trigger:** User accesses financial settings or completes a paid flow. Navigation path: Profile Tab -> History Wallet -> (Top-up / Withdrawal / History Transaction -> Transaction Detail).
+### 3.4.13 Blog List
+**Function trigger:** Member reads articles and community updates. Navigation path: Member Home -> Blog List -> Blog Detail.
 **Function description:**
 - **Actor:** Member.
-- **Purpose:** Manage platform-native funds serving as the primary payment method for consultations and premium catching services.
-- **Interface:** Financial ledger dashboards, input fields for deposit/withdraw amounts, and detailed transactional receipts.
-- **Data processing:** Mutate digital ledger states, interface with 3rd-party Payment Processor APIs (e.g., Stripe/PayOS/Momo), process webhooks.
+- **Purpose:** Provide members with ongoing news, tips, and long-form articles related to snake safety and ecosystem awareness.
+- **Interface:** Long-form markdown blog readers, categorized lists of articles.
+- **Data processing:** Fetch and parse markdown payloads safely.
 - **Screen layout:** 
 
 **Function details:**
-- **Data:** Integer/Decimal balance structures, fiat currency exchange mappings, unique transaction IDs, status enumerations (Pending, Completed, Failed).
-- **Validation:** Withdrawal requests must exceed minimum systemic thresholds and cannot exceed available unheld balance.
-- **Business rules:** Wallet balances are instantly deducted and held in escrow when a service is booked; Failed services automatically refund to the wallet.
-- **Normal cases:** Member tops up via Momo -> webhook confirms -> Balance reflects change -> Member pays for Consultation.
-- **Abnormal cases:** Third-party gateway delays webhook -> UI marks transaction as "Processing" and polls until definitive state is reached.
+- **Data:** Raw markdown blog payloads, author details, publication dates.
+- **Validation:** N/A (Mostly Read-only queries).
+- **Business rules:** Blogs that mention specific snakes should visually link back to the Snake Library.
+- **Normal cases:** Member opens Blog List -> Selects a recent article -> Reads the content.
+- **Abnormal cases:** Network failure prevents fetching new articles -> Shows offline cache.
 
 ---
 
-### 3.4.14 Profile & Activity Overviews
-**Function trigger:** Member inspects personal records. Navigation path: Profile Tab -> (Edit Profile / Settings) or Activity Tab -> (Activity Detail / Activity History).
+### 3.4.14 Top-up
+**Function trigger:** Member needs to add funds to their wallet. Navigation path: Profile Tab -> History Wallet -> Top-up.
 **Function description:**
 - **Actor:** Member.
-- **Purpose:** Authorize profile modifications, toggle application configurations, and maintain a rigorous audit trail of all historical engagements.
-- **Interface:** Interactive form components, global toggle switches (dark mode/language), and complex chronologically sorted activity cards.
-- **Data processing:** Perform CRUD operations on user schematics, aggregate scattered microservice logs into unified Activity timelines.
+- **Purpose:** Allow members to deposit funds into their SnakeAidPay wallet using external gateways.
+- **Interface:** Input fields for deposit amounts, payment gateway selection, and confirmation screens.
+- **Data processing:** Interface with 3rd-party Payment Processor APIs (e.g., PayOS/Momo), process webhooks to update ledger.
 - **Screen layout:** 
 
 **Function details:**
-- **Data:** Core demographic PII, application state preferences, unified incident/consultation discrete historical payload objects.
+- **Data:** Fiat currency amount, payment intent tokens.
+- **Validation:** Top-up amounts must be greater than the minimum permitted value.
+- **Business rules:** Wallet balances are updated only after a successful webhook confirmation from the payment provider.
+- **Normal cases:** Member inputs 500,000 VND -> Pays via PayOS -> Webhook confirms -> Balance reflects change.
+- **Abnormal cases:** Payment gateway delays webhook -> UI marks transaction as "Processing" and polls until definitive state is reached.
+
+---
+
+### 3.4.15 Withdraw
+**Function trigger:** Member wishes to extract funds from their wallet. Navigation path: Profile Tab -> History Wallet -> Withdrawal.
+**Function description:**
+- **Actor:** Member.
+- **Purpose:** Allow members to transfer available balance from their SnakeAidPay wallet to a linked bank account.
+- **Interface:** Bank account selection, withdrawal amount input, and confirmation dialogs.
+- **Data processing:** Mutate digital ledger states, log withdrawal request for admin processing/automated payout.
+- **Screen layout:** 
+
+**Function details:**
+- **Data:** Withdrawal amount, linked bank account details.
+- **Validation:** Withdrawal requests must exceed minimum systemic thresholds and cannot exceed available unheld balance.
+- **Business rules:** Funds are immediately locked/deducted from available balance upon request.
+- **Normal cases:** Member requests withdrawal of 200,000 VND -> Request approved -> Funds arrive in bank account.
+- **Abnormal cases:** Member tries to withdraw more than available -> UI blocks action with an error message.
+
+---
+
+### 3.4.16 History Transaction
+**Function trigger:** Member wants to review past financial activity. Navigation path: Profile Tab -> History Wallet -> History Transaction -> Transaction Detail.
+**Function description:**
+- **Actor:** Member.
+- **Purpose:** Provide a transparent, auditable ledger of all deposits, withdrawals, and service payments.
+- **Interface:** Chronologically sorted list of transactions, filterable by type, with detailed receipt views.
+- **Data processing:** Fetch and paginate transactional records from the database.
+- **Screen layout:** 
+
+**Function details:**
+- **Data:** Unique transaction IDs, status enumerations (Pending, Completed, Failed), amounts, timestamps, transaction types.
+- **Validation:** N/A (Read-only view).
+- **Business rules:** All historical financial records are immutable.
+- **Normal cases:** Member opens History -> Taps a recent payment -> Views detailed receipt.
+- **Abnormal cases:** Network drops during pagination -> UI shows retry button.
+
+---
+
+### 3.4.17 Profile
+**Function trigger:** Member inspects or updates personal records. Navigation path: Profile Tab -> Edit Profile / Settings.
+**Function description:**
+- **Actor:** Member.
+- **Purpose:** Authorize profile modifications and toggle application configurations.
+- **Interface:** Interactive form components, global toggle switches (dark mode/language).
+- **Data processing:** Perform CRUD operations on user schematics.
+- **Screen layout:** 
+
+**Function details:**
+- **Data:** Core demographic PII, application state preferences.
 - **Validation:** PII changes subject to strict regex constraints (Email/Phone format integrity).
-- **Business rules:** Historical activity records are tightly bound and immutable (cannot be deleted by user for legal/audit safety reasons).
+- **Business rules:** Profile updates sync across devices and sessions.
 - **Normal cases:** Member adjusts App Language -> Preferences save locally and sync -> UI re-renders instantly.
+- **Abnormal cases:** Validation fails on phone number update -> UI highlights invalid field.
+
+---
+
+### 3.4.18 Activity
+**Function trigger:** Member reviews past operations and engagements. Navigation path: Activity Tab -> Activity Detail / Activity History.
+**Function description:**
+- **Actor:** Member.
+- **Purpose:** Maintain a rigorous audit trail of all historical engagements such as SOS requests, snake catching requests, and consultations.
+- **Interface:** Complex chronologically sorted activity cards.
+- **Data processing:** Aggregate scattered microservice logs into unified Activity timelines.
+- **Screen layout:** 
+
+**Function details:**
+- **Data:** Unified incident/consultation discrete historical payload objects.
+- **Validation:** N/A (Read-only view).
+- **Business rules:** Historical activity records are tightly bound and immutable (cannot be deleted by user for legal/audit safety reasons).
+- **Normal cases:** Member opens Activity Tab -> Scrolls through past completed consultations -> Taps one for details.
 - **Abnormal cases:** Upstream microservice failure preventing Activity History aggregation -> UI informs user of temporary partial data availability.

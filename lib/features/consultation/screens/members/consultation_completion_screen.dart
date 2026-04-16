@@ -134,12 +134,6 @@ class _ConsultationCompletionScreenState
                         _buildSessionCard(),
                         const SizedBox(height: 24),
 
-                        // Payment details card
-                        _buildSectionTitle('Thanh Toán Đã Xử Lý'),
-                        const SizedBox(height: 12),
-                        _buildPaymentCard(),
-                        const SizedBox(height: 24),
-
                         // Star rating
                         _buildSectionTitle('Đánh Giá Chuyên Gia'),
                         const SizedBox(height: 12),
