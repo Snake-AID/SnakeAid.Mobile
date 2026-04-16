@@ -28,7 +28,7 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
     super.initState();
     // Reload data mỗi khi vào màn hình
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(expertListProvider.notifier).refresh();
+      ref.read(expertListProvider.notifier).resetForMemberListUi();
       _initPresenceRealtime();
     });
   }
@@ -79,13 +79,11 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
             // Top App Bar
             _buildAppBar(context),
 
+            // Inline Search
+            _buildSearchSection(expertState),
+
             // Filter Section
             _buildFilterSection(context, expertState),
-
-            // Active Filter Chips
-            if (expertState.selectedSpecialty != null ||
-                expertState.isOnlineFilter != null)
-              _buildFilterChips(context, expertState),
 
             // Stats
             _buildStatsSection(expertState),
@@ -139,50 +137,69 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
             ),
           ),
 
-          // Search Button
-          InkWell(
-            onTap: () => _showSearchDialog(context),
-            child: Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.search,
-                color: Color(0xFF1F2937),
-              ),
-            ),
+          const SizedBox(
+            width: 40,
+            height: 40,
           ),
         ],
       ),
     );
   }
 
-  /// Build filter section with dropdowns
+  /// Build inline search section (search by expert name)
+  Widget _buildSearchSection(ExpertListState state) {
+    if (_searchController.text != state.searchQuery) {
+      _searchController.text = state.searchQuery;
+      _searchController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _searchController.text.length),
+      );
+    }
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (value) {
+          ref.read(expertListProvider.notifier).setSearchQuery(value);
+        },
+        decoration: InputDecoration(
+          hintText: 'Tìm theo tên chuyên gia...',
+          prefixIcon: const Icon(Icons.search),
+          suffixIcon: state.searchQuery.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    _searchController.clear();
+                    ref.read(expertListProvider.notifier).setSearchQuery('');
+                  },
+                ),
+          filled: true,
+          fillColor: const Color(0xFFF6F8F6),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build filter section with only sort dropdown
   Widget _buildFilterSection(BuildContext context, ExpertListState state) {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          // Specialty Filter
-          Expanded(
-            child: _buildDropdownField(
-              label: 'Chuyên môn',
-              value: state.selectedSpecialty ?? 'Tất cả chuyên môn',
-              onTap: () => _showSpecialtyPicker(context, state),
-            ),
-          ),
-          const SizedBox(width: 12),
-
-          // Sort By Filter
-          Expanded(
-            child: _buildDropdownField(
-              label: 'Sắp xếp theo',
-              value: _getSortByLabel(state.sortBy),
-              onTap: () => _showSortByPicker(context, state),
-            ),
-          ),
-        ],
+      child: _buildDropdownField(
+        label: 'Sắp xếp theo',
+        value: _getSortByLabel(state.sortBy),
+        onTap: () => _showSortByPicker(context, state),
       ),
     );
   }
@@ -236,86 +253,6 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  /// Build filter chips
-  Widget _buildFilterChips(BuildContext context, ExpertListState state) {
-    return Container(
-      color: const Color(0xFFF6F8F6),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            // Specialty Chip
-            if (state.selectedSpecialty != null &&
-                state.selectedSpecialty != 'Tất cả chuyên môn')
-              _buildFilterChip(
-                label: state.selectedSpecialty!,
-                onRemove: () {
-                  ref
-                      .read(expertListProvider.notifier)
-                      .filterBySpecialty(null);
-                },
-              ),
-
-            // IsOnline Filter Chip
-            if (state.isOnlineFilter != null)
-              Padding(
-                padding: EdgeInsets.only(
-                    left: state.selectedSpecialty != null ? 8 : 0),
-                child: _buildFilterChip(
-                  label: state.isOnlineFilter == true
-                      ? 'Chỉ Online'
-                      : 'Chỉ Offline',
-                  onRemove: () {
-                    ref
-                        .read(expertListProvider.notifier)
-                        .setIsOnlineFilter(null);
-                  },
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Build single filter chip
-  Widget _buildFilterChip({
-    required String label,
-    required VoidCallback onRemove,
-  }) {
-    return Container(
-      height: 32,
-      padding: const EdgeInsets.only(left: 16, right: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF228B22).withOpacity(0.2),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF228B22),
-            ),
-          ),
-          const SizedBox(width: 4),
-          InkWell(
-            onTap: onRemove,
-            child: const Icon(
-              Icons.close,
-              size: 16,
-              color: Color(0xFF228B22),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -622,95 +559,11 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
     );
   }
 
-  /// Show search dialog
-  void _showSearchDialog(BuildContext context) {
-    final current = ref.read(expertListProvider).searchQuery;
-    _searchController.text = current;
-    _searchController.selection = TextSelection.fromPosition(
-      TextPosition(offset: _searchController.text.length),
-    );
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Tìm kiếm chuyên gia'),
-        content: TextField(
-          controller: _searchController,
-          decoration: const InputDecoration(
-            hintText: 'Nhập tên chuyên gia...',
-            prefixIcon: Icon(Icons.search),
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final query = _searchController.text.trim();
-              ref.read(expertListProvider.notifier).setSearchQuery(query);
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF228B22),
-            ),
-            child: const Text('Tìm'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Show specialty picker
-  void _showSpecialtyPicker(BuildContext context, ExpertListState state) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Chọn chuyên môn',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              ...state.specialties.map((specialty) {
-                final isSelected = state.selectedSpecialty == specialty;
-                return ListTile(
-                  title: Text(specialty),
-                  trailing: isSelected
-                      ? const Icon(Icons.check, color: Color(0xFF228B22))
-                      : null,
-                  onTap: () {
-                    ref
-                        .read(expertListProvider.notifier)
-                        .filterBySpecialty(specialty);
-                    Navigator.pop(context);
-                  },
-                );
-              }).toList(),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   /// Show sort by picker
   void _showSortByPicker(BuildContext context, ExpertListState state) {
-    final sortOptions = {
+    const sortOptions = {
       'online': 'Đang Online',
       'Rating': 'Đánh giá cao nhất',
-      'ConsultationFee': 'Phí thấp nhất',
-      'ReviewCount': 'Nhiều đánh giá nhất',
     };
 
     showModalBottomSheet(
@@ -757,10 +610,6 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
     switch (sortBy) {
       case 'Rating':
         return 'Đánh giá cao nhất';
-      case 'ConsultationFee':
-        return 'Phí thấp nhất';
-      case 'ReviewCount':
-        return 'Nhiều đánh giá nhất';
       case 'online':
       default:
         return 'Đang Online';
