@@ -566,41 +566,59 @@ flowchart LR
 ---
 
 ### 3.4.9 Scheduled Expert Consultation
-**Function trigger:** Member requires scheduled professional clinical or zoological advice. Navigation path: Member Home -> Consultation Home -> Expert List -> Expert Detail -> Service Selection -> Consultation Time Selection -> Consultation Documents -> Payment Confirmation -> (Video Waiting Room -> Video Consultation) -> Consultation Complete.
+**Function trigger:** Member requires scheduled professional clinical or zoological advice. Navigation path: Member Home -> Consultation Home -> Expert List -> Expert Detail -> Service Selection -> Consultation Time Selection -> Consultation Documents -> Payment Confirmation.
 **Function description:**
-- **Actor:** Member & Expert.
-- **Purpose:** Facilitate synchronous telemedicine and expert advisory sessions via scheduled video links.
-- **Interface:** Filterable expert directories, calendar pickers, medical document upload forms, checkout gateways, and WebRTC video interfaces.
-- **Data processing:** Execute calendar scheduling logic, process escrow payment transactions, instantiate WebRTC signaling and media streams.
+- **Actor:** Member.
+- **Purpose:** Schedule future synchronous telemedicine and expert advisory sessions.
+- **Interface:** Filterable expert directories, calendar pickers, medical document upload forms, and checkout gateways.
+- **Data processing:** Execute calendar scheduling logic, process escrow payment transactions.
 - **Screen layout:** 
 
 **Function details:**
-- **Data:** Selected expert ID, ISO8601 timeslots, multipart clinical documents, payment intent tokens, RTC connection descriptors.
+- **Data:** Selected expert ID, ISO8601 timeslots, multipart clinical documents, payment intent tokens.
 - **Validation:** Scheduled timeslots must strictly avoid overlap; Escrow payment capture must perfectly succeed before session locks.
 - **Business rules:** Scheduled sessions commit funds into escrow pending successful timeline execution and session completion.
-- **Normal cases:** Member schedules doc -> pays -> enters waiting room at T-minus 5 -> conducts call -> receives digital prescription.
+- **Normal cases:** Member schedules doc -> pays -> receives scheduled appointment confirmation.
 - **Abnormal cases:** Scheduling conflicts return block errors; Payment gateway rejects card.
 
 ---
 
 ### 3.4.10 Instant Expert Consultation
-**Function trigger:** Member requires immediate professional advice without waiting. Navigation path: Member Home -> Consultation Home -> Expert List -> Expert Detail -> Service Selection -> Consultation Documents -> Payment Confirmation -> (Video Waiting Room -> Video Consultation) -> Consultation Complete.
+**Function trigger:** Member requires immediate professional advice without waiting. Navigation path: Member Home -> Consultation Home -> Expert List -> Expert Detail -> Service Selection -> Consultation Documents -> Payment Confirmation -> Emergency Request Waiting.
 **Function description:**
 - **Actor:** Member & On-Call Expert.
-- **Purpose:** Immediately connect members with available on-call experts for ad-hoc video consultations.
-- **Interface:** Filterable active directories, instant-connect medical document upload forms, checkout gateways, and fast-track WebRTC video interfaces.
-- **Data processing:** Query active status (On-Call) logic, process immediate escrow payment, instantiate WebRTC signaling routing.
+- **Purpose:** Immediately request an ad-hoc consultation with an available on-call expert and enter the priority queue.
+- **Interface:** Filterable active directories, instant-connect medical document upload forms, checkout gateways, and queue waiting interface.
+- **Data processing:** Query active status (On-Call) logic, process immediate escrow payment, assign expert.
 - **Screen layout:** 
 
 **Function details:**
-- **Data:** Targeted active expert ID, multipart clinical payloads, payment intent tokens, rapid RTC connection descriptors.
+- **Data:** Targeted active expert ID, multipart clinical payloads, payment intent tokens.
 - **Validation:** Selected expert must be flagged 'Active/On-Call'; Payment processing must be prioritized for instant clearance.
 - **Business rules:** Bypasses standard scheduling grids; Locks current availability immediately upon successful escrow commit.
-- **Normal cases:** Member selects on-call expert -> pays -> instantly routes to waiting room -> expert joins -> completes session.
-- **Abnormal cases:** Selected expert drops offline just before payment clears (system triggers refund or re-routes); ICE server fails connection.
+- **Normal cases:** Member selects on-call expert -> pays -> instantly routes to Emergency Request Waiting.
+- **Abnormal cases:** Selected expert drops offline just before payment clears (system triggers refund or re-routes).
 
 ---
-### 3.4.11 Knowledge Base
+
+### 3.4.11 Video Consultation & Completion
+**Function trigger:** Time arrives for a scheduled appointment OR an instant consultation request is accepted. Navigation path: Video Waiting Room -> Video Consultation -> Consultation Complete.
+**Function description:**
+- **Actor:** Member & Expert.
+- **Purpose:** Facilitate the actual synchronous telemedicine video session and provide final medical notes/prescriptions.
+- **Interface:** Pre-call lobby, live WebRTC video and audio interfaces, and post-call summary views.
+- **Data processing:** Instantiate WebRTC signaling and media streams, process session completion to release escrow funds.
+- **Screen layout:** 
+
+**Function details:**
+- **Data:** RTC connection descriptors, final medical prescription data, expert notes.
+- **Validation:** Device camera/mic permissions required. Stable network connection.
+- **Business rules:** Consultation is officially marked complete only after the expert ends the session and provides the summary, triggering the release of escrow funds.
+- **Normal cases:** Member enters waiting room -> connects with expert -> finishes call -> views completion summary.
+- **Abnormal cases:** WebRTC ICE failure drops video -> UI gracefully downgrades to audio-only or text chat; ICE server fails connection completely.
+
+---
+### 3.4.12 Knowledge Base
 **Function trigger:** Member accesses educational resources. Navigation path: Member Home -> (Snake Library -> Snake Detail -> Snake First Aid Guide) or (Blog List -> Blog Detail).
 **Function description:**
 - **Actor:** Member.
@@ -618,7 +636,7 @@ flowchart LR
 
 ---
 
-### 3.4.12 Member Wallet & Transactions
+### 3.4.13 Member Wallet & Transactions
 **Function trigger:** User accesses financial settings or completes a paid flow. Navigation path: Profile Tab -> History Wallet -> (Top-up / Withdrawal / History Transaction -> Transaction Detail).
 **Function description:**
 - **Actor:** Member.
@@ -636,7 +654,7 @@ flowchart LR
 
 ---
 
-### 3.4.13 Profile & Activity Overviews
+### 3.4.14 Profile & Activity Overviews
 **Function trigger:** Member inspects personal records. Navigation path: Profile Tab -> (Edit Profile / Settings) or Activity Tab -> (Activity Detail / Activity History).
 **Function description:**
 - **Actor:** Member.
