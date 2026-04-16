@@ -235,7 +235,7 @@ class _SnakeIdentificationResultScreenState
                   const Icon(Icons.verified, color: Colors.white, size: 16),
                   const SizedBox(width: 8),
                   Text(
-                    'AI tin cậy cao: ${(_aiDetection?.confidence ?? 0) * 100}%',
+                    'AI tin cậy cao: ${((_aiDetection?.confidence ?? 0) * 100).toStringAsFixed(0)}%',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: Colors.white,
@@ -374,8 +374,10 @@ class _SnakeIdentificationResultScreenState
                           '/symptom-report',
                           extra: {
                             'incidentId': widget.incident.id,
-                            'recognitionResultId': widget.detectionData.recognitionResultId,
-                            'isDirectEntry': false, // From snake verification flow
+                            'recognitionResultId':
+                                widget.detectionData.recognitionResultId,
+                            'isDirectEntry':
+                                false, // From snake verification flow
                           },
                         );
                       },
@@ -405,7 +407,9 @@ class _SnakeIdentificationResultScreenState
                       onPressed: () {
                         // Pop all sub-screens back to tracking
                         // This preserves tracking screen state
-                        Navigator.of(context).popUntil((route) => route.isFirst);
+                        Navigator.of(
+                          context,
+                        ).popUntil((route) => route.isFirst);
                       },
                       icon: const Icon(Icons.skip_next, size: 20),
                       label: const Text(

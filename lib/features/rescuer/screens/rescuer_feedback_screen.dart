@@ -1,36 +1,86 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../snake_catching/repository/feedback_repository.dart';
 
-/// Rescuer Feedback Screen - View and respond to customer reviews
-/// Màn hình đánh giá & phản hồi của Rescuer
-class RescuerFeedbackScreen extends StatefulWidget {
-  const RescuerFeedbackScreen({super.key});
+/// Rescuer Feedback Screen - View customer reviews
+class RescuerFeedbackScreen extends ConsumerStatefulWidget {
+  final String targetUserId;
+  const RescuerFeedbackScreen({super.key, required this.targetUserId});
 
   @override
-  State<RescuerFeedbackScreen> createState() => _RescuerFeedbackScreenState();
+  ConsumerState<RescuerFeedbackScreen> createState() =>
+      _RescuerFeedbackScreenState();
 }
 
-class _RescuerFeedbackScreenState extends State<RescuerFeedbackScreen> {
+class _RescuerFeedbackScreenState extends ConsumerState<RescuerFeedbackScreen> {
   int _selectedFilter = 0;
-  final List<String> _filters = ['Tất cả', '5 sao', 'Có bình luận', 'Chưa phản hồi'];
+  final List<String> _filters = ['Tất cả', '5 sao', '4 sao', 'Có bình luận'];
+
+  List<FeedbackData> _feedbacks = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFeedbacks();
+  }
+
+  Future<void> _loadFeedbacks() async {
+    try {
+      final data = await ref
+          .read(feedbackRepositoryProvider)
+          .getFeedbacksByUser(widget.targetUserId);
+      if (mounted) {
+        setState(() {
+          _feedbacks = data
+            ..sort(
+              (a, b) => (b.createdAt ?? DateTime.now()).compareTo(
+                a.createdAt ?? DateTime.now(),
+              ),
+            );
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  List<FeedbackData> get _filteredFeedbacks {
+    if (_selectedFilter == 0) return _feedbacks;
+    if (_selectedFilter == 1)
+      return _feedbacks.where((f) => f.rating == 5).toList();
+    if (_selectedFilter == 2)
+      return _feedbacks.where((f) => f.rating == 4).toList();
+    if (_selectedFilter == 3)
+      return _feedbacks
+          .where((f) => f.comments != null && f.comments!.isNotEmpty)
+          .toList();
+    return _feedbacks;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7F5),
       appBar: _buildAppBar(),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildOverallRatingCard(),
-            _buildHighlightsCard(),
-            _buildFilterTabs(),
-            _buildReviewList(),
-            _buildBottomStatsCard(),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFFFF8800)),
+            )
+          : SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildOverallRatingCard(),
+                  _buildFilterTabs(),
+                  _buildReviewList(),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
     );
   }
 
@@ -44,7 +94,7 @@ class _RescuerFeedbackScreenState extends State<RescuerFeedbackScreen> {
         onPressed: () => context.pop(),
       ),
       title: const Text(
-        'Đánh Giá & Phản Hồi',
+        'Đánh Giá',
         style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
@@ -61,6 +111,17 @@ class _RescuerFeedbackScreenState extends State<RescuerFeedbackScreen> {
   }
 
   Widget _buildOverallRatingCard() {
+    final total = _feedbacks.length;
+    final average = total > 0
+        ? _feedbacks.map((f) => f.rating).reduce((a, b) => a + b) / total
+        : 0.0;
+
+    final count5 = _feedbacks.where((f) => f.rating == 5).length;
+    final count4 = _feedbacks.where((f) => f.rating == 4).length;
+    final count3 = _feedbacks.where((f) => f.rating == 3).length;
+    final count2 = _feedbacks.where((f) => f.rating == 2).length;
+    final count1 = _feedbacks.where((f) => f.rating == 1).length;
+
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
@@ -85,9 +146,9 @@ class _RescuerFeedbackScreenState extends State<RescuerFeedbackScreen> {
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  const Text(
-                    '4.8',
-                    style: TextStyle(
+                  Text(
+                    average.toStringAsFixed(1),
+                    style: const TextStyle(
                       fontSize: 40,
                       fontWeight: FontWeight.w900,
                       color: Color(0xFF1D150C),
@@ -107,19 +168,20 @@ class _RescuerFeedbackScreenState extends State<RescuerFeedbackScreen> {
               Row(
                 children: List.generate(5, (index) {
                   return Icon(
-                    index < 4 ? Icons.star : Icons.star_half,
+                    index < average.floor()
+                        ? Icons.star
+                        : (index < average
+                              ? Icons.star_half
+                              : Icons.star_border),
                     color: const Color(0xFFFFD700),
                     size: 20,
                   );
                 }),
               ),
               const SizedBox(height: 8),
-              const Text(
-                '125 đánh giá',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF999999),
-                ),
+              Text(
+                '$total đánh giá',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF999999)),
               ),
             ],
           ),
@@ -128,15 +190,40 @@ class _RescuerFeedbackScreenState extends State<RescuerFeedbackScreen> {
           Expanded(
             child: Column(
               children: [
-                _buildRatingBar(5, 85, 68, const Color(0xFF10B981)),
+                _buildRatingBar(
+                  5,
+                  count5,
+                  total > 0 ? (count5 / total * 100).round() : 0,
+                  const Color(0xFF10B981),
+                ),
                 const SizedBox(height: 8),
-                _buildRatingBar(4, 30, 24, const Color(0xFF84CC16)),
+                _buildRatingBar(
+                  4,
+                  count4,
+                  total > 0 ? (count4 / total * 100).round() : 0,
+                  const Color(0xFF84CC16),
+                ),
                 const SizedBox(height: 8),
-                _buildRatingBar(3, 8, 6, const Color(0xFFF59E0B)),
+                _buildRatingBar(
+                  3,
+                  count3,
+                  total > 0 ? (count3 / total * 100).round() : 0,
+                  const Color(0xFFF59E0B),
+                ),
                 const SizedBox(height: 8),
-                _buildRatingBar(2, 2, 2, const Color(0xFFF97316)),
+                _buildRatingBar(
+                  2,
+                  count2,
+                  total > 0 ? (count2 / total * 100).round() : 0,
+                  const Color(0xFFF97316),
+                ),
                 const SizedBox(height: 8),
-                _buildRatingBar(1, 0, 0, const Color(0xFFEF4444)),
+                _buildRatingBar(
+                  1,
+                  count1,
+                  total > 0 ? (count1 / total * 100).round() : 0,
+                  const Color(0xFFEF4444),
+                ),
               ],
             ),
           ),
@@ -196,10 +283,7 @@ class _RescuerFeedbackScreenState extends State<RescuerFeedbackScreen> {
           child: Text(
             '$percentage%',
             textAlign: TextAlign.right,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF999999),
-            ),
+            style: const TextStyle(fontSize: 14, color: Color(0xFF999999)),
           ),
         ),
       ],
@@ -241,10 +325,7 @@ class _RescuerFeedbackScreenState extends State<RescuerFeedbackScreen> {
                   children: [
                     const Text(
                       'Đã phản hồi',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF999999),
-                      ),
+                      style: TextStyle(fontSize: 14, color: Color(0xFF999999)),
                     ),
                     const SizedBox(height: 4),
                     const Text(
@@ -264,10 +345,7 @@ class _RescuerFeedbackScreenState extends State<RescuerFeedbackScreen> {
                   children: [
                     const Text(
                       'Thời gian phản hồi',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF999999),
-                      ),
+                      style: TextStyle(fontSize: 14, color: Color(0xFF999999)),
                     ),
                     const SizedBox(height: 4),
                     const Text(
@@ -311,9 +389,7 @@ class _RescuerFeedbackScreenState extends State<RescuerFeedbackScreen> {
       margin: const EdgeInsets.only(top: 24, bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Color(0xFFE5E5E5)),
-        ),
+        border: Border(bottom: BorderSide(color: Color(0xFFE5E5E5))),
       ),
       child: Row(
         children: [
@@ -367,11 +443,7 @@ class _RescuerFeedbackScreenState extends State<RescuerFeedbackScreen> {
                   color: Color(0xFF666666),
                 ),
               ),
-              const Icon(
-                Icons.expand_more,
-                size: 18,
-                color: Color(0xFF666666),
-              ),
+              const Icon(Icons.expand_more, size: 18, color: Color(0xFF666666)),
             ],
           ),
         ],
@@ -380,41 +452,52 @@ class _RescuerFeedbackScreenState extends State<RescuerFeedbackScreen> {
   }
 
   Widget _buildReviewList() {
+    final list = _filteredFeedbacks;
+    if (list.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(
+          child: Text(
+            'Chưa có đánh giá nào.',
+            style: TextStyle(color: Color(0xFF999999), fontSize: 16),
+          ),
+        ),
+      );
+    }
+
     return Column(
-      children: [
-        _buildReviewCard(
-          userName: 'Nguyễn Văn A',
-          userAvatar: 'https://via.placeholder.com/40',
-          date: '15 Thg 12',
-          rating: 5,
-          missionCode: '#RSC-2025-1234',
-          comment:
-              'Đội cứu hộ đến rất nhanh, chuyên nghiệp và cẩn thận. Rất hài lòng với dịch vụ!',
-          images: [
-            'https://via.placeholder.com/80',
-            'https://via.placeholder.com/80',
-          ],
-          tags: ['Nhanh chóng', 'Chuyên nghiệp'],
-          hasResponse: true,
-          rescuerName: 'Trần Văn Cường',
-          rescuerAvatar: 'https://via.placeholder.com/32',
-          responseDate: '16 Thg 12',
-          response: 'Cảm ơn anh đã tin tưởng! Rất vui được hỗ trợ.',
-        ),
-        const SizedBox(height: 12),
-        _buildReviewCard(
-          userName: 'Lê Thị B',
-          userAvatar: 'https://via.placeholder.com/40',
-          date: '14 Thg 12',
-          rating: 4,
-          missionCode: '#RSC-2025-1201',
-          comment:
-              'Nhân viên rất thân thiện và nhiệt tình trả lời các câu hỏi của tôi.',
-          tags: ['Thân thiện'],
-          hasResponse: false,
-        ),
-      ],
+      children: list
+          .map(
+            (feedback) => _buildReviewCard(
+              userName: feedback.raterName ?? 'Người dùng',
+              userAvatar:
+                  'https://via.placeholder.com/40', // Hardcoded avatar for now
+              date: feedback.createdAt != null
+                  ? '${feedback.createdAt!.day}/${feedback.createdAt!.month}/${feedback.createdAt!.year}'
+                  : 'Vừa xong',
+              rating: feedback.rating,
+              type: feedback.type,
+              comment: feedback.comments?.isNotEmpty == true
+                  ? feedback.comments!
+                  : 'Không có',
+              tags: const [], // Mocking tags since api doesn't have it yet
+            ),
+          )
+          .toList(),
     );
+  }
+
+  String _getTypeText(String type) {
+    switch (type) {
+      case 'Catching':
+        return 'Đơn bắt rắn';
+      case 'Emergency':
+        return 'Đơn rắn cắn';
+      case 'Consultation':
+        return 'Đơn tư vấn';
+      default:
+        return 'Đơn dịch vụ';
+    }
   }
 
   Widget _buildReviewCard({
@@ -422,15 +505,10 @@ class _RescuerFeedbackScreenState extends State<RescuerFeedbackScreen> {
     required String userAvatar,
     required String date,
     required int rating,
-    required String missionCode,
+    required String type,
     required String comment,
     List<String>? images,
     required List<String> tags,
-    required bool hasResponse,
-    String? rescuerName,
-    String? rescuerAvatar,
-    String? responseDate,
-    String? response,
   }) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -492,25 +570,20 @@ class _RescuerFeedbackScreenState extends State<RescuerFeedbackScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          GestureDetector(
-            onTap: () {},
-            child: Row(
-              children: [
-                Text(
-                  missionCode,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF999999),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(
-                  Icons.arrow_forward,
-                  size: 14,
-                  color: Color(0xFF999999),
-                ),
-              ],
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              _getTypeText(type),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF6B7280),
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -526,18 +599,20 @@ class _RescuerFeedbackScreenState extends State<RescuerFeedbackScreen> {
             const SizedBox(height: 12),
             Row(
               children: images
-                  .map((url) => Container(
-                        width: 80,
-                        height: 80,
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          image: DecorationImage(
-                            image: NetworkImage(url),
-                            fit: BoxFit.cover,
-                          ),
+                  .map(
+                    (url) => Container(
+                      width: 80,
+                      height: 80,
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        image: DecorationImage(
+                          image: NetworkImage(url),
+                          fit: BoxFit.cover,
                         ),
-                      ))
+                      ),
+                    ),
+                  )
                   .toList(),
             ),
           ],
@@ -546,98 +621,27 @@ class _RescuerFeedbackScreenState extends State<RescuerFeedbackScreen> {
             spacing: 8,
             runSpacing: 8,
             children: tags
-                .map((tag) => Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF8800).withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(16),
+                .map(
+                  (tag) => Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF8800).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      tag,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFFFF8800),
                       ),
-                      child: Text(
-                        tag,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFFFF8800),
-                        ),
-                      ),
-                    ))
-                .toList(),
-          ),
-          const Divider(height: 32),
-          if (hasResponse && response != null) ...[
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF3B82F6).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundImage: NetworkImage(rescuerAvatar!),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              rescuerName!,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1D150C),
-                              ),
-                            ),
-                            Text(
-                              'Đã phản hồi $responseDate',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF999999),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          response,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF333333),
-                          ),
-                        ),
-                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
-          ] else ...[
-            Align(
-              alignment: Alignment.centerRight,
-              child: OutlinedButton(
-                onPressed: () {},
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFFF8800)),
-                  foregroundColor: const Color(0xFFFF8800),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                ),
-                child: const Text(
-                  'Phản Hồi',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ],
+                )
+                .toList(),
+          ),
         ],
       ),
     );
@@ -672,18 +676,11 @@ class _RescuerFeedbackScreenState extends State<RescuerFeedbackScreen> {
   Widget _buildStatItem(IconData icon, String label, String value) {
     return Column(
       children: [
-        Icon(
-          icon,
-          color: const Color(0xFFFF8800),
-          size: 24,
-        ),
+        Icon(icon, color: const Color(0xFFFF8800), size: 24),
         const SizedBox(height: 8),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Color(0xFF666666),
-          ),
+          style: const TextStyle(fontSize: 12, color: Color(0xFF666666)),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 4),

@@ -748,9 +748,11 @@ final router = GoRouter(
 
     // Rescuer Feedback
     GoRoute(
-      path: '/rescuer-feedback',
+      path: '/rescuer-feedback/:targetUserId',
       name: 'rescuer_feedback',
-      builder: (context, state) => const RescuerFeedbackScreen(),
+      builder: (context, state) => RescuerFeedbackScreen(
+        targetUserId: state.pathParameters['targetUserId'] ?? '',
+      ),
     ),
 
     // Rescuer ID Documents

@@ -30,54 +30,39 @@ class SecondaryMenuGrid extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              _MenuItem(
-                icon: Icons.support_agent,
-                label: 'Tư vấn\nchuyên gia',
-                hasStatusDot: true,
-                onTap: () => context.push('/consultation-home'),
-              ),
-              const SizedBox(width: 12),
-              _MenuItem(
-                icon: Icons.health_and_safety_outlined,
-                label: 'Hướng dẫn\nsơ cứu',
-                onTap: () => context.push('/snake-first-aid-guide'),
-              ),
-              const SizedBox(width: 12),
-              _MenuItem(
-                icon: Icons.menu_book_outlined,
-                label: 'Thư viện\nloài rắn',
-                badge: snakeCountBadge,
-                onTap: () => context.push('/snake-species'),
-              ),
-            ],
+          _MenuItem(
+            icon: Icons.health_and_safety_outlined,
+            label: 'Hướng dẫn\nsơ cứu',
+            onTap: () => context.push('/snake-first-aid-guide'),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _MenuItem(
-                icon: Icons.warning_amber_rounded,
-                label: 'Cảnh báo\nkhu vực',
-                badge: alertBadge,
-                badgeColor: const Color(0xFFDC3545),
-                onTap: () => context.pushNamed('community_alert_map'),
+          const SizedBox(width: 8),
+          _MenuItem(
+            icon: Icons.menu_book_outlined,
+            label: 'Thư viện\nloài rắn',
+            badge: snakeCountBadge,
+            onTap: () => context.push('/snake-species'),
+          ),
+          const SizedBox(width: 8),
+          _MenuItem(
+            icon: Icons.warning_amber_rounded,
+            label: 'Cảnh báo\nkhu vực',
+            badge: alertBadge,
+            badgeColor: const Color(0xFFDC3545),
+            onTap: () => context.pushNamed('community_alert_map'),
+          ),
+          const SizedBox(width: 8),
+          _MenuItem(
+            icon: Icons.receipt_long_outlined,
+            label: 'Thanh toán\n& lịch sử',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const PaymentHistoryScreen(),
               ),
-              const SizedBox(width: 12),
-              _MenuItem(
-                icon: Icons.receipt_long_outlined,
-                label: 'Thanh toán\n& lịch sử',
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const PaymentHistoryScreen(),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(child: SizedBox()),
-            ],
+            ),
           ),
         ],
       ),

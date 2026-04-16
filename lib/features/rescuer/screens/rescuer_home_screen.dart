@@ -16,6 +16,8 @@ import '../managers/location_manager.dart';
 import '../providers/tracking_provider.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_accept_request_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_available_jobs_screen.dart';
+import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_tracking_screen.dart';
+import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_en_route_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/repository/snake_catching_repository.dart';
 import 'package:snakeaid_mobile/features/snake_catching/models/snake_catching_request.dart';
 import '../../notifications/providers/notification_inbox_provider.dart';
@@ -27,24 +29,39 @@ import '../models/rescuer_daily_stats.dart';
 // ── Rescuer daily statistics provider ────────────────────────────────────────
 final _rescuerDailyStatsProvider =
     FutureProvider.autoDispose<RescuerDailyStats>((ref) async {
-  final repo = ref.watch(rescuerAnalyticsRepositoryProvider);
-  return repo.getStatistics(period: 'day');
-});
+      final repo = ref.watch(rescuerAnalyticsRepositoryProvider);
+      return repo.getStatistics(period: 'day');
+    });
 
 // ── Active snake catching job provider ──────────────────────────────────
 final _activeCatchingJobProvider =
     FutureProvider.autoDispose<SnakeCatchingRequestData?>((ref) async {
-  final currentUser = ref.watch(currentUserProvider);
-  if (currentUser == null) return null;
-  final repo = ref.watch(snakeCatchingRepositoryProvider);
-  final response = await repo.getRequests(assignedRescuerId: currentUser.id);
-  const terminalStatuses = {
-    'completed', 'cancelled', 'expired', 'rejected', 'failed', 'finished',
-  };
-  return response.data
-      .where((r) => !terminalStatuses.contains(r.status.toLowerCase()))
-      .firstOrNull;
-});
+      final currentUser = ref.watch(currentUserProvider);
+      if (currentUser == null) return null;
+      final repo = ref.watch(snakeCatchingRepositoryProvider);
+      final response = await repo.getRequests(
+        assignedRescuerId: currentUser.id,
+      );
+      const terminalStatuses = {
+        'completed',
+        'cancelled',
+        'expired',
+        'rejected',
+        'failed',
+        'finished',
+      };
+      return response.data.where((r) {
+        if (terminalStatuses.contains(r.status.toLowerCase())) return false;
+
+        // Also check mission status if it exists.
+        if (r.mission != null) {
+          final mStatus = r.mission!.status.toLowerCase();
+          if (terminalStatuses.contains(mStatus)) return false;
+        }
+
+        return true;
+      }).firstOrNull;
+    });
 
 /// Rescuer Home Screen - Dashboard for rescue team members
 class RescuerHomeScreen extends ConsumerStatefulWidget {
@@ -531,9 +548,7 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
       await _sosAudioPlayer.stop();
       await _sosAudioPlayer.setVolume(1.0);
       await _sosAudioPlayer.setReleaseMode(ReleaseMode.loop);
-      await _sosAudioPlayer.play(
-        AssetSource('sounds/sos_alert.mp3'),
-      );
+      await _sosAudioPlayer.play(AssetSource('sounds/sos_alert.mp3'));
     } catch (e) {
       debugPrint('⚠️ Could not play SOS alert sound: $e');
     }
@@ -628,7 +643,12 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
     ).then((_) => _stopSnakebiteIncidentAlert());
   }
 
-  Widget _buildNavItem(int index, IconData icon, String label, {int unreadCount = 0}) {
+  Widget _buildNavItem(
+    int index,
+    IconData icon,
+    String label, {
+    int unreadCount = 0,
+  }) {
     final isSelected = _selectedIndex == index;
     final color = isSelected
         ? const Color(0xFFFF6B35)
@@ -648,7 +668,12 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Icon(icon, color: color, size: 28, weight: isSelected ? 700 : 400),
+                Icon(
+                  icon,
+                  color: color,
+                  size: 28,
+                  weight: isSelected ? 700 : 400,
+                ),
                 if (unreadCount > 0)
                   Positioned(
                     top: -2,
@@ -952,7 +977,9 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                     const Spacer(),
                     Builder(
                       builder: (context) {
-                        final unread = ref.watch(notificationInboxProvider).unreadCount;
+                        final unread = ref
+                            .watch(notificationInboxProvider)
+                            .unreadCount;
                         return Stack(
                           children: [
                             IconButton(
@@ -1429,11 +1456,17 @@ class _HomeTabState extends ConsumerState<_HomeTab>
       ),
       error: (_, __) => Row(
         children: [
-          Expanded(child: _buildStatCard('--', 'Yêu cầu', const Color(0xFF333333))),
+          Expanded(
+            child: _buildStatCard('--', 'Yêu cầu', const Color(0xFF333333)),
+          ),
           const SizedBox(width: 12),
-          Expanded(child: _buildStatCard('--', 'Hoàn thành', const Color(0xFF10B981))),
+          Expanded(
+            child: _buildStatCard('--', 'Hoàn thành', const Color(0xFF10B981)),
+          ),
           const SizedBox(width: 12),
-          Expanded(child: _buildStatCard('--', 'Rắn cắn', const Color(0xFFE53935))),
+          Expanded(
+            child: _buildStatCard('--', 'Rắn cắn', const Color(0xFFE53935)),
+          ),
         ],
       ),
       data: (stats) {
@@ -1519,8 +1552,16 @@ class _HomeTabState extends ConsumerState<_HomeTab>
         title: 'Nhiệm vụ cứu hộ rắn cắn',
         subtitle:
             'Đang xử lý • Mã: ...${mission.missionId.length >= 6 ? mission.missionId.substring(mission.missionId.length - 6) : mission.missionId}',
-        onContinue: () =>
-            context.push('/rescuer/mission-detail/${mission.missionId}'),
+        onContinue: () {
+          if (mission.status.toLowerCase() == 'en route' ||
+              mission.status.toLowerCase() == 'arrived') {
+            context.push(
+              '/rescuer/navigation/${mission.incidentId}?missionId=${mission.missionId}',
+            );
+          } else {
+            context.push('/rescuer/mission-detail/${mission.missionId}');
+          }
+        },
       );
     }
 
@@ -1536,17 +1577,45 @@ class _HomeTabState extends ConsumerState<_HomeTab>
       error: (_, __) => _buildNoActiveMissionCard(),
       data: (job) {
         if (job == null) return _buildNoActiveMissionCard();
+
+        final mStatus =
+            job.mission?.status.toLowerCase() ?? job.status.toLowerCase();
+
         return _buildMissionCard(
           typeLabel: 'BẮT RẮN',
           typeLabelColor: const Color(0xFF228B22),
           icon: Icons.catching_pokemon,
           title: 'Yêu cầu bắt rắn',
           subtitle: job.address.isNotEmpty ? job.address : 'Địa chỉ không có',
-          onContinue: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => RescuerAcceptRequestScreen(requestData: job),
-            ),
-          ),
+          onContinue: () {
+            if (mStatus == 'arrived' || mStatus == 'catching') {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => RescuerTrackingScreen(
+                    requestData: job,
+                    missionId: job.mission?.id ?? '',
+                  ),
+                ),
+              );
+            } else if (mStatus == 'en_route' ||
+                mStatus == 'en route' ||
+                mStatus == 'enroute') {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => RescuerEnRouteScreen(
+                    requestData: job,
+                    missionId: job.mission?.id ?? '',
+                  ),
+                ),
+              );
+            } else {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => RescuerAcceptRequestScreen(requestData: job),
+                ),
+              );
+            }
+          },
         );
       },
     );
@@ -1579,8 +1648,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: typeLabelColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(4),
@@ -1596,8 +1664,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
               ),
               const SizedBox(width: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: const Color(0xFFDC3545).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(4),
@@ -1867,8 +1934,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                 title: 'Hướng Dẫn\nSơ Cứu',
                 subtitle: 'Xử lý khi bị cắn',
                 color: accentColor,
-                onTap: () =>
-                    context.pushNamed('rescuer_snake_first_aid_guide'),
+                onTap: () => context.pushNamed('rescuer_snake_first_aid_guide'),
               ),
             ),
           ],
@@ -2074,8 +2140,11 @@ class _RescuerSnakeLibraryCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.arrow_forward_ios,
-                  size: 13, color: color.withOpacity(0.6)),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 13,
+                color: color.withOpacity(0.6),
+              ),
             ],
           ),
         ),

@@ -246,7 +246,7 @@ class ActiveMissionNotifier extends StateNotifier<ActiveMissionState> {
         missionId: detailedMission.id,
         incidentId: detailedMission.incident.id,
         status: detailedMission.status,
-        startedAt: detailedMission.startedAt,
+        startedAt: detailedMission.startedAt ?? detailedMission.createdAt,
         acceptedAt: detailedMission.createdAt,
       );
 

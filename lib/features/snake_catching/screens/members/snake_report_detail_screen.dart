@@ -6,7 +6,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 import '../../models/snake_species.dart';
 import '../../models/snake_catching_request.dart';
-import '../../providers/snake_location_provider.dart' hide snakeSpeciesRepositoryProvider;
+import '../../providers/snake_location_provider.dart'
+    hide snakeSpeciesRepositoryProvider;
 import '../../repository/snake_species_repository.dart';
 import '../../repository/snake_catching_repository.dart';
 import '../../widgets/location_picker_dialog.dart';
@@ -16,35 +17,34 @@ import '../../../emergency/models/snake_detection_response.dart';
 class SnakeReportDetailScreen extends ConsumerStatefulWidget {
   final String quantity; // 'single', 'few', 'many'
 
-  const SnakeReportDetailScreen({
-    super.key,
-    required this.quantity,
-  });
+  const SnakeReportDetailScreen({super.key, required this.quantity});
 
   @override
   ConsumerState<SnakeReportDetailScreen> createState() =>
       _SnakeReportDetailScreenState();
 }
 
-class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScreen> {
+class _SnakeReportDetailScreenState
+    extends ConsumerState<SnakeReportDetailScreen> {
   bool _isPhotoTab = true; // true = Chụp Ảnh, false = Chọn Loài Rắn
 
   // Photo slots: slot 1 = main (required), 2-5 = additional
   // 'single'/'many': max 3   |   'few': max 5
   final Map<int, File> _photos = {};
 
-  final _addressDetailController = TextEditingController(); // Ghi chú địa chỉ chi tiết
+  final _addressDetailController =
+      TextEditingController(); // Ghi chú địa chỉ chi tiết
   final _specificLocationController = TextEditingController();
   final _behaviorController = TextEditingController();
   final _searchController = TextEditingController();
   String? _selectedSize;
   bool _isSubmitting = false;
-  
+
   // Location state
   String? _selectedAddress;
   double? _selectedLatitude;
   double? _selectedLongitude;
-  
+
   // Snake species state (for single snake)
   List<SnakeSpecies> _allSpecies = [];
   List<SnakeSpecies> _filteredSpecies = [];
@@ -52,7 +52,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
   bool _isLoadingSpecies = false;
   String? _speciesError;
   bool _showLocationFiltered = false;
-  
+
   // Multi-species state (for few/many snakes)
   // Map<SnakeSpecies, int> - species to quantity mapping
   Map<SnakeSpecies, int> _selectedSpeciesMap = {};
@@ -122,7 +122,9 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
   }
 
   void _onSearchChanged() {
-    setState(() {}); // triggers rebuild; displaySpecies computed inline in _buildSpeciesTab
+    setState(
+      () {},
+    ); // triggers rebuild; displaySpecies computed inline in _buildSpeciesTab
   }
 
   String get _titleText {
@@ -153,7 +155,9 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
 
   bool get _canSubmit {
     // Must have location
-    if (_selectedAddress == null || _selectedLatitude == null || _selectedLongitude == null) {
+    if (_selectedAddress == null ||
+        _selectedLatitude == null ||
+        _selectedLongitude == null) {
       return false;
     }
 
@@ -161,19 +165,18 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
     if (_addressDetailController.text.trim().isEmpty) {
       return false;
     }
-    
+
     // Can submit if either:
     // 1. Photo tab: has main photo
-    // 2. Species tab: 
+    // 2. Species tab:
     //    - For single: has selected species
     //    - For few/many: has at least one species in map
     if (_isPhotoTab) {
       if (!_photos.containsKey(1)) return false;
       // Block while upload/AI detection is still running — mediaIds not ready yet
-      if (_isAnalyzingSlot.values.any((analyzing) => analyzing == true)) return false;
-      // Require at least one successful AI detection — user must either retake photo
-      // with a visible snake or switch to the species tab to select manually
-      if (!_detectionResults.values.any((r) => r != null)) return false;
+      if (_isAnalyzingSlot.values.any((analyzing) => analyzing == true))
+        return false;
+      // We no longer block if AI fails to detect, just warn on submit.
       return true;
     } else {
       if (widget.quantity == 'single') {
@@ -274,16 +277,18 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
               .whereType<DetectionResult>()
               .map((r) => r.snake.id)
               .toSet();
-          _speciesQuantityMap.removeWhere((id, _) => !remainingIds.contains(id));
+          _speciesQuantityMap.removeWhere(
+            (id, _) => !remainingIds.contains(id),
+          );
         });
         // Upload + AI detection in background (non-blocking)
         _uploadAndDetect(slot, file);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: ${e.toString()}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Lỗi: ${e.toString()}')));
       }
     }
   }
@@ -358,9 +363,8 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
   Future<void> _openLocationPicker() async {
     final result = await showDialog<LocationResult>(
       context: context,
-      builder: (context) => LocationPickerDialog(
-        initialLocation: _selectedAddress,
-      ),
+      builder: (context) =>
+          LocationPickerDialog(initialLocation: _selectedAddress),
     );
 
     if (result != null) {
@@ -370,10 +374,12 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
         _selectedLongitude = result.longitude;
         _showLocationFiltered = true;
       });
-      ref.read(snakeLocationProvider.notifier).fetchSnakesByLocation(
-        latitude: result.latitude,
-        longitude: result.longitude,
-      );
+      ref
+          .read(snakeLocationProvider.notifier)
+          .fetchSnakesByLocation(
+            latitude: result.latitude,
+            longitude: result.longitude,
+          );
     }
   }
 
@@ -477,10 +483,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                 const SizedBox(height: 8),
                 Text(
                   'Chọn cách bạn muốn báo cáo',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
             ),
@@ -501,9 +504,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: Colors.white,
-          border: Border(
-            top: BorderSide(color: Colors.grey[200]!, width: 1),
-          ),
+          border: Border(top: BorderSide(color: Colors.grey[200]!, width: 1)),
         ),
         child: SafeArea(
           child: Column(
@@ -512,7 +513,9 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
               SizedBox(
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: (_canSubmit && !_isSubmitting) ? _handleSubmit : null,
+                  onPressed: (_canSubmit && !_isSubmitting)
+                      ? _handleSubmit
+                      : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF228B22),
                     foregroundColor: Colors.white,
@@ -532,10 +535,13 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         )
-                      else if (_isPhotoTab && _isAnalyzingSlot.values.any((v) => v == true))
+                      else if (_isPhotoTab &&
+                          _isAnalyzingSlot.values.any((v) => v == true))
                         const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -544,13 +550,18 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                               height: 18,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               ),
                             ),
                             SizedBox(width: 10),
                             Text(
                               'Đang tải ảnh...',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         )
@@ -562,9 +573,13 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                      if (!_isSubmitting && !(_isPhotoTab && _isAnalyzingSlot.values.any((v) => v == true)))
+                      if (!_isSubmitting &&
+                          !(_isPhotoTab &&
+                              _isAnalyzingSlot.values.any((v) => v == true)))
                         const SizedBox(width: 8),
-                      if (!_isSubmitting && !(_isPhotoTab && _isAnalyzingSlot.values.any((v) => v == true)))
+                      if (!_isSubmitting &&
+                          !(_isPhotoTab &&
+                              _isAnalyzingSlot.values.any((v) => v == true)))
                         const Icon(Icons.arrow_forward, size: 20),
                     ],
                   ),
@@ -574,14 +589,23 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Builder(builder: (_) {
-                    // Contextual hint below submit button
-                    final isAnalyzing = _isPhotoTab && _isAnalyzingSlot.values.any((v) => v == true);
-                    final hasPhoto = _photos.containsKey(1);
-                    final hasDetection = _detectionResults.values.any((r) => r != null);
-                    final showNoDetectionHint = _isPhotoTab && hasPhoto && !isAnalyzing && !hasDetection;
+                  Builder(
+                    builder: (_) {
+                      // Contextual hint below submit button
+                      final isAnalyzing =
+                          _isPhotoTab &&
+                          _isAnalyzingSlot.values.any((v) => v == true);
+                      final hasPhoto = _photos.containsKey(1);
+                      final hasDetection = _detectionResults.values.any(
+                        (r) => r != null,
+                      );
+                      final showNoDetectionHint =
+                          _isPhotoTab &&
+                          hasPhoto &&
+                          !isAnalyzing &&
+                          !hasDetection;
 
-                   if (showNoDetectionHint) {
+                      if (showNoDetectionHint) {
                         return Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -605,20 +629,28 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                           ),
                         );
                       }
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.smart_toy, size: 16, color: Colors.grey[400]),
-                        const SizedBox(width: 6),
-                        Text(
-                          _isPhotoTab
-                              ? 'AI sẽ phân tích loài rắn'
-                              : 'Thông tin giúp cứu hộ nhanh hơn',
-                          style: TextStyle(fontSize: 12, color: Colors.grey[400]),
-                        ),
-                      ],
-                    );
-                  }),
+                      return Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.smart_toy,
+                            size: 16,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _isPhotoTab
+                                ? 'AI sẽ phân tích loài rắn'
+                                : 'Thông tin giúp cứu hộ nhanh hơn',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[400],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                 ],
               ),
             ],
@@ -638,12 +670,14 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
     // Compute how many slots to render:
     // last filled slot + 1 (shows one empty "add" placeholder), min 3, capped at maxSlots.
     // For single/many always 3 fixed.
-    final int lastFilled = [1, 2, 3, 4, 5].lastWhere(
-      (s) => _photos.containsKey(s),
-      orElse: () => 0,
-    );
-    final int actualVisible =
-        isFew ? (lastFilled + 1).clamp(3, maxSlots) : 3;
+    final int lastFilled = [
+      1,
+      2,
+      3,
+      4,
+      5,
+    ].lastWhere((s) => _photos.containsKey(s), orElse: () => 0);
+    final int actualVisible = isFew ? (lastFilled + 1).clamp(3, maxSlots) : 3;
 
     // Slot label helpers
     String slotLabel(int slot) {
@@ -651,8 +685,8 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
         return isSingle
             ? 'Ảnh rắn (bắt buộc)'
             : isMany
-                ? 'Ảnh khu vực (bắt buộc)'
-                : 'Ảnh tổng quát (bắt buộc)';
+            ? 'Ảnh khu vực (bắt buộc)'
+            : 'Ảnh tổng quát (bắt buộc)';
       }
       if (isSingle) {
         return slot == 2 ? 'Góc khác\n(khuyến nghị)' : 'Góc phụ\n(tùy chọn)';
@@ -698,34 +732,36 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
       final int slotA = i;
       final int slotB = i + 1;
       gridRows.add(const SizedBox(height: 12));
-      gridRows.add(Row(
-        children: [
-          Expanded(
-            child: _buildPhotoSlot(
-              slot: slotA,
-              label: slotLabel(slotA),
-              badgeText: badgeTextFor(slotA),
-              badgeColor: badgeColorFor(slotA),
-              aspectRatio: 1,
-              photo: _photos[slotA],
-            ),
-          ),
-          if (slotB <= actualVisible) ...[
-            const SizedBox(width: 12),
+      gridRows.add(
+        Row(
+          children: [
             Expanded(
               child: _buildPhotoSlot(
-                slot: slotB,
-                label: slotLabel(slotB),
-                badgeText: badgeTextFor(slotB),
-                badgeColor: badgeColorFor(slotB),
+                slot: slotA,
+                label: slotLabel(slotA),
+                badgeText: badgeTextFor(slotA),
+                badgeColor: badgeColorFor(slotA),
                 aspectRatio: 1,
-                photo: _photos[slotB],
+                photo: _photos[slotA],
               ),
             ),
-          ] else
-            const Expanded(child: SizedBox()),
-        ],
-      ));
+            if (slotB <= actualVisible) ...[
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildPhotoSlot(
+                  slot: slotB,
+                  label: slotLabel(slotB),
+                  badgeText: badgeTextFor(slotB),
+                  badgeColor: badgeColorFor(slotB),
+                  aspectRatio: 1,
+                  photo: _photos[slotB],
+                ),
+              ),
+            ] else
+              const Expanded(child: SizedBox()),
+          ],
+        ),
+      );
     }
 
     return Column(
@@ -745,8 +781,8 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
           isSingle
               ? 'Chụp ảnh rõ nét từ khoảng cách an toàn'
               : isMany
-                  ? 'Chụp cảnh khu vực, không cần lại gần ổ rắn'
-                  : 'Mỗi ảnh nên thể hiện một loài rắn khác nhau (tối đa $maxSlots ảnh)',
+              ? 'Chụp cảnh khu vực, không cần lại gần ổ rắn'
+              : 'Mỗi ảnh nên thể hiện một loài rắn khác nhau (tối đa $maxSlots ảnh)',
           style: TextStyle(fontSize: 12, color: Colors.grey[600]),
         ),
         const SizedBox(height: 12),
@@ -847,8 +883,11 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
       ),
       child: Row(
         children: [
-          const Icon(Icons.format_list_numbered,
-              size: 16, color: Color(0xFF228B22)),
+          const Icon(
+            Icons.format_list_numbered,
+            size: 16,
+            color: Color(0xFF228B22),
+          ),
           const SizedBox(width: 8),
           const Expanded(
             child: Column(
@@ -912,8 +951,11 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
         children: [
           Row(
             children: [
-              const Icon(Icons.format_list_numbered,
-                  size: 16, color: Color(0xFF228B22)),
+              const Icon(
+                Icons.format_list_numbered,
+                size: 16,
+                color: Color(0xFF228B22),
+              ),
               const SizedBox(width: 6),
               const Text(
                 'Số lượng theo loài',
@@ -973,8 +1015,10 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                 if (isVenomous)
                   Container(
                     margin: const EdgeInsets.only(top: 2),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 1,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.red[50],
                       borderRadius: BorderRadius.circular(4),
@@ -998,8 +1042,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
             value: qty,
             min: 1,
             max: widget.quantity == 'few' ? 5 : 99,
-            onChanged: (v) =>
-                setState(() => _speciesQuantityMap[snakeId] = v),
+            onChanged: (v) => setState(() => _speciesQuantityMap[snakeId] = v),
           ),
         ],
       ),
@@ -1007,15 +1050,14 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
   }
 
   Widget _snakeIconBox() => Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: const Color(0xFFDCFCE7),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Icon(Icons.pest_control,
-            size: 22, color: Color(0xFF228B22)),
-      );
+    width: 40,
+    height: 40,
+    decoration: BoxDecoration(
+      color: const Color(0xFFDCFCE7),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: const Icon(Icons.pest_control, size: 22, color: Color(0xFF228B22)),
+  );
 
   Widget _buildInlineStepper({
     required int value,
@@ -1080,7 +1122,8 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
     File? photo,
   }) {
     final isAnalyzing = _isAnalyzingSlot[slot] == true;
-    final hasDetection = _detectionResults.containsKey(slot) && _detectionResults[slot] != null;
+    final hasDetection =
+        _detectionResults.containsKey(slot) && _detectionResults[slot] != null;
 
     return GestureDetector(
       onTap: () => _pickImage(slot),
@@ -1173,7 +1216,11 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                         color: Colors.black.withOpacity(0.65),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.close, size: 16, color: Colors.white),
+                      child: const Icon(
+                        Icons.close,
+                        size: 16,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
@@ -1193,7 +1240,9 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                               height: 28,
                               child: CircularProgressIndicator(
                                 strokeWidth: 3,
-                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4CAF50)),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF4CAF50),
+                                ),
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -1218,7 +1267,10 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                   bottom: 8,
                   left: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF228B22),
                       borderRadius: BorderRadius.circular(6),
@@ -1226,7 +1278,11 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.smart_toy, size: 12, color: Colors.white),
+                        const Icon(
+                          Icons.smart_toy,
+                          size: 12,
+                          color: Colors.white,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           'AI ✓',
@@ -1305,7 +1361,10 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
     );
   }
 
-  Widget _buildAiDetectionCard(DetectionResult result, {String slotLabel = 'Ảnh chính'}) {
+  Widget _buildAiDetectionCard(
+    DetectionResult result, {
+    String slotLabel = 'Ảnh chính',
+  }) {
     final ai = result.aiDetection;
     final snake = result.snake;
     final confidencePct = (ai.confidence * 100).toStringAsFixed(0);
@@ -1346,7 +1405,11 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                     color: const Color(0xFF228B22),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.smart_toy, size: 16, color: Colors.white),
+                  child: const Icon(
+                    Icons.smart_toy,
+                    size: 16,
+                    color: Colors.white,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -1363,20 +1426,26 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                       ),
                       const Text(
                         'Kết quả phân tích từ ảnh chụp',
-                        style: TextStyle(fontSize: 11, color: Color(0xFF15803D)),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF15803D),
+                        ),
                       ),
                     ],
                   ),
                 ),
                 // Confidence badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: isHighConfidence
                         ? const Color(0xFF228B22)
                         : isMediumConfidence
-                            ? Colors.orange
-                            : Colors.red,
+                        ? Colors.orange
+                        : Colors.red,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -1416,14 +1485,22 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                             width: 72,
                             height: 72,
                             color: const Color(0xFFF0FDF4),
-                            child: const Icon(Icons.pets, color: Color(0xFF228B22), size: 30),
+                            child: const Icon(
+                              Icons.pets,
+                              color: Color(0xFF228B22),
+                              size: 30,
+                            ),
                           ),
                         )
                       : Container(
                           width: 72,
                           height: 72,
                           color: const Color(0xFFF0FDF4),
-                          child: const Icon(Icons.pets, color: Color(0xFF228B22), size: 30),
+                          child: const Icon(
+                            Icons.pets,
+                            color: Color(0xFF228B22),
+                            size: 30,
+                          ),
                         ),
                 ),
                 const SizedBox(width: 14),
@@ -1436,7 +1513,9 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                         children: [
                           Expanded(
                             child: Text(
-                              snake.commonName.isNotEmpty ? snake.commonName : ai.className,
+                              snake.commonName.isNotEmpty
+                                  ? snake.commonName
+                                  : ai.className,
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,
@@ -1446,7 +1525,10 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                           ),
                           if (snake.isVenomous)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.red[50],
                                 borderRadius: BorderRadius.circular(6),
@@ -1455,7 +1537,11 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.warning_amber_rounded, size: 12, color: Colors.red[700]),
+                                  Icon(
+                                    Icons.warning_amber_rounded,
+                                    size: 12,
+                                    color: Colors.red[700],
+                                  ),
                                   const SizedBox(width: 2),
                                   Text(
                                     'Độc',
@@ -1489,22 +1575,25 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                             children: [
                               Text(
                                 'Độ tin cậy',
-                                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
+                                ),
                               ),
                               Text(
                                 isHighConfidence
                                     ? 'Cao'
                                     : isMediumConfidence
-                                        ? 'Trung bình'
-                                        : 'Thấp',
+                                    ? 'Trung bình'
+                                    : 'Thấp',
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
                                   color: isHighConfidence
                                       ? const Color(0xFF228B22)
                                       : isMediumConfidence
-                                          ? Colors.orange
-                                          : Colors.red,
+                                      ? Colors.orange
+                                      : Colors.red,
                                 ),
                               ),
                             ],
@@ -1519,8 +1608,8 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                                 isHighConfidence
                                     ? const Color(0xFF228B22)
                                     : isMediumConfidence
-                                        ? Colors.orange
-                                        : Colors.red,
+                                    ? Colors.orange
+                                    : Colors.red,
                               ),
                               minHeight: 6,
                             ),
@@ -1542,7 +1631,9 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                   : '⚠ Độ tin cậy thấp. Bạn có thể chụp lại hoặc chọn loài từ tab "Chọn Loài Rắn".',
               style: TextStyle(
                 fontSize: 11,
-                color: isHighConfidence ? const Color(0xFF15803D) : Colors.orange[800],
+                color: isHighConfidence
+                    ? const Color(0xFF15803D)
+                    : Colors.orange[800],
                 height: 1.4,
               ),
             ),
@@ -1611,10 +1702,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
           Expanded(
             child: Text(
               text,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey[700],
-              ),
+              style: TextStyle(fontSize: 13, color: Colors.grey[700]),
             ),
           ),
         ],
@@ -1624,7 +1712,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
 
   Widget _buildLocationSection() {
     final hasLocation = _selectedAddress != null;
-    
+
     return GestureDetector(
       onTap: _openLocationPicker,
       child: Container(
@@ -1643,16 +1731,12 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: hasLocation 
-                    ? const Color(0xFFDCFCE7) 
-                    : Colors.grey[100],
+                color: hasLocation ? const Color(0xFFDCFCE7) : Colors.grey[100],
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 hasLocation ? Icons.check_circle : Icons.location_on,
-                color: hasLocation 
-                    ? const Color(0xFF228B22) 
-                    : Colors.grey[400],
+                color: hasLocation ? const Color(0xFF228B22) : Colors.grey[400],
                 size: 20,
               ),
             ),
@@ -1671,8 +1755,8 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    hasLocation 
-                        ? _selectedAddress! 
+                    hasLocation
+                        ? _selectedAddress!
                         : 'Nhấn để chọn vị trí hoặc lấy vị trí hiện tại',
                     style: TextStyle(
                       fontSize: 14,
@@ -1683,10 +1767,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                 ],
               ),
             ),
-            Icon(
-              Icons.chevron_right,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.chevron_right, color: Colors.grey[400]),
           ],
         ),
       ),
@@ -1702,9 +1783,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isFilled
-              ? const Color(0xFF228B22)
-              : const Color(0xFFE53935),
+          color: isFilled ? const Color(0xFF228B22) : const Color(0xFFE53935),
           width: isFilled ? 2 : 1.5,
         ),
       ),
@@ -1716,7 +1795,9 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
               Icon(
                 Icons.location_on,
                 size: 18,
-                color: isFilled ? const Color(0xFF228B22) : const Color(0xFFE53935),
+                color: isFilled
+                    ? const Color(0xFF228B22)
+                    : const Color(0xFFE53935),
               ),
               const SizedBox(width: 8),
               Text(
@@ -1739,10 +1820,17 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
               ),
               const Spacer(),
               if (isFilled)
-                const Icon(Icons.check_circle, size: 16, color: Color(0xFF228B22))
+                const Icon(
+                  Icons.check_circle,
+                  size: 16,
+                  color: Color(0xFF228B22),
+                )
               else
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFEBEE),
                     borderRadius: BorderRadius.circular(4),
@@ -1775,9 +1863,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(
-                  color: isFilled
-                      ? const Color(0xFF228B22)
-                      : Colors.grey[300]!,
+                  color: isFilled ? const Color(0xFF228B22) : Colors.grey[300]!,
                 ),
               ),
               focusedBorder: OutlineInputBorder(
@@ -1803,7 +1889,9 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
               Icon(
                 isFilled ? Icons.check_circle_outline : Icons.info_outline,
                 size: 13,
-                color: isFilled ? const Color(0xFF228B22) : const Color(0xFFE53935),
+                color: isFilled
+                    ? const Color(0xFF228B22)
+                    : const Color(0xFFE53935),
               ),
               const SizedBox(width: 4),
               Text(
@@ -1812,7 +1900,9 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                     : 'Vui lòng điền để đội cứu hộ xác định đúng vị trí',
                 style: TextStyle(
                   fontSize: 12,
-                  color: isFilled ? const Color(0xFF228B22) : const Color(0xFFE53935),
+                  color: isFilled
+                      ? const Color(0xFF228B22)
+                      : const Color(0xFFE53935),
                 ),
               ),
             ],
@@ -1958,7 +2048,9 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                   child: Text(
                     item,
                     style: TextStyle(
-                      color: item == items[0] ? Colors.grey[400] : Colors.black87,
+                      color: item == items[0]
+                          ? Colors.grey[400]
+                          : Colors.black87,
                     ),
                   ),
                 );
@@ -2044,12 +2136,14 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
     List<SnakeSpecies> displaySpecies;
     if (_showLocationFiltered && locationState.data != null) {
       final regionIds = {for (final s in locationState.data!.snakes) s.id};
-      final priorityMap = {for (final s in locationState.data!.snakes) s.id: s.priority};
-      displaySpecies = _allSpecies
-          .where((s) => regionIds.contains(s.id))
-          .toList()
-        ..sort((a, b) =>
-            (priorityMap[a.id] ?? 99).compareTo(priorityMap[b.id] ?? 99));
+      final priorityMap = {
+        for (final s in locationState.data!.snakes) s.id: s.priority,
+      };
+      displaySpecies =
+          _allSpecies.where((s) => regionIds.contains(s.id)).toList()..sort(
+            (a, b) =>
+                (priorityMap[a.id] ?? 99).compareTo(priorityMap[b.id] ?? 99),
+          );
     } else {
       displaySpecies = List.from(_allSpecies);
     }
@@ -2057,9 +2151,11 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
     final query = _searchController.text.toLowerCase();
     if (query.isNotEmpty) {
       displaySpecies = displaySpecies
-          .where((s) =>
-              s.commonName.toLowerCase().contains(query) ||
-              s.scientificName.toLowerCase().contains(query))
+          .where(
+            (s) =>
+                s.commonName.toLowerCase().contains(query) ||
+                s.scientificName.toLowerCase().contains(query),
+          )
           .toList();
     }
 
@@ -2119,14 +2215,20 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                             const SizedBox(width: 6),
                             Text(
                               'Đang tải rắn theo vùng...',
-                              style: TextStyle(fontSize: 11, color: Colors.blue[700]),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.blue[700],
+                              ),
                             ),
                           ],
                         )
                       else if (locationState.data != null)
                         Text(
                           'Khu vực: ${locationState.data!.region.name}',
-                          style: TextStyle(fontSize: 11, color: Colors.blue[700]),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.blue[700],
+                          ),
                         )
                       else
                         Text(
@@ -2168,10 +2270,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Tìm loài rắn khác...',
-                hintStyle: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[400],
-                ),
+                hintStyle: TextStyle(fontSize: 14, color: Colors.grey[400]),
                 prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
                 filled: true,
                 fillColor: Colors.white,
@@ -2189,7 +2288,10 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
-                  borderSide: const BorderSide(color: Color(0xFF228B22), width: 2),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF228B22),
+                    width: 2,
+                  ),
                 ),
               ),
             ),
@@ -2295,12 +2397,11 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
         ),
 
         // Snake Species Grid
-        if (_isLoadingSpecies || (_showLocationFiltered && locationState.isLoading))
+        if (_isLoadingSpecies ||
+            (_showLocationFiltered && locationState.isLoading))
           const SliverFillRemaining(
             child: Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF228B22),
-              ),
+              child: CircularProgressIndicator(color: Color(0xFF228B22)),
             ),
           )
         else if (_speciesError != null)
@@ -2380,14 +2481,11 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
               ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final species = displaySpecies[index];
-                  final isSelected = _selectedSpecies?.id == species.id;
-                  return _buildSpeciesCard(species, isSelected);
-                },
-                childCount: displaySpecies.length,
-              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final species = displaySpecies[index];
+                final isSelected = _selectedSpecies?.id == species.id;
+                return _buildSpeciesCard(species, isSelected);
+              }, childCount: displaySpecies.length),
             ),
           ),
 
@@ -2540,7 +2638,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
     // For few/many, check if species is in map
     final isInMap = _selectedSpeciesMap.containsKey(species);
     final actuallySelected = widget.quantity == 'single' ? isSelected : isInMap;
-    
+
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -2564,7 +2662,9 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
         decoration: BoxDecoration(
           color: Colors.white,
           border: Border.all(
-            color: actuallySelected ? const Color(0xFF228B22) : Colors.grey[300]!,
+            color: actuallySelected
+                ? const Color(0xFF228B22)
+                : Colors.grey[300]!,
             width: actuallySelected ? 3 : 1,
           ),
           borderRadius: BorderRadius.circular(12),
@@ -2650,7 +2750,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                 ),
               ],
             ),
-            
+
             // Species info
             Flexible(
               child: Padding(
@@ -2698,11 +2798,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            size: 10,
-            color: Colors.grey[500],
-          ),
+          Icon(icon, size: 10, color: Colors.grey[500]),
           const SizedBox(width: 4),
           Expanded(
             child: Text(
@@ -2723,12 +2819,15 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
 
   String _extractSize(String summary) {
     // Try to extract size from identification summary
-    final regex = RegExp(r'(\d+\.?\d*)\s*-?\s*(\d+\.?\d*)\s*(m|cm)', caseSensitive: false);
+    final regex = RegExp(
+      r'(\d+\.?\d*)\s*-?\s*(\d+\.?\d*)\s*(m|cm)',
+      caseSensitive: false,
+    );
     final match = regex.firstMatch(summary);
     if (match != null) {
       return match.group(0) ?? 'Unknown';
     }
-    
+
     // If no size found, return first part of summary
     final parts = summary.split('.');
     return parts.isNotEmpty ? parts[0] : summary;
@@ -2760,7 +2859,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              
+
               Expanded(
                 child: ListView(
                   controller: scrollController,
@@ -2789,15 +2888,20 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                               child: const Icon(Icons.error, size: 48),
                             ),
                           ),
-                          
+
                           // Venomous badge
                           Positioned(
                             top: 12,
                             right: 12,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
                               decoration: BoxDecoration(
-                                color: species.isVenomous ? Colors.red : Colors.green,
+                                color: species.isVenomous
+                                    ? Colors.red
+                                    : Colors.green,
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
@@ -2813,9 +2917,9 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 20),
-                    
+
                     // Common name
                     Text(
                       species.commonName,
@@ -2825,9 +2929,9 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                         color: Colors.black87,
                       ),
                     ),
-                    
+
                     const SizedBox(height: 4),
-                    
+
                     // Scientific name
                     Text(
                       species.scientificName,
@@ -2837,9 +2941,9 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                         color: Colors.grey[600],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Description
                     if (species.description?.isNotEmpty ?? false) ...[
                       _buildDetailSection(
@@ -2849,7 +2953,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                       ),
                       const SizedBox(height: 20),
                     ],
-                    
+
                     // Identification summary
                     if (species.identificationSummary?.isNotEmpty ?? false) ...[
                       _buildDetailSection(
@@ -2859,9 +2963,10 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                       ),
                       const SizedBox(height: 20),
                     ],
-                    
+
                     // Physical traits
-                    if (species.identification?.physicalTraits.isNotEmpty ?? false) ...[
+                    if (species.identification?.physicalTraits.isNotEmpty ??
+                        false) ...[
                       _buildListSection(
                         'Đặc điểm vật lý',
                         Icons.visibility,
@@ -2869,9 +2974,10 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                       ),
                       const SizedBox(height: 20),
                     ],
-                    
+
                     // Behaviors
-                    if (species.identification?.behaviors.isNotEmpty ?? false) ...[
+                    if (species.identification?.behaviors.isNotEmpty ??
+                        false) ...[
                       _buildListSection(
                         'Hành vi',
                         Icons.pets,
@@ -2879,9 +2985,10 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                       ),
                       const SizedBox(height: 20),
                     ],
-                    
+
                     // Habitat
-                    if (species.identification?.habitat.isNotEmpty ?? false) ...[
+                    if (species.identification?.habitat.isNotEmpty ??
+                        false) ...[
                       _buildDetailSection(
                         'Môi trường sống',
                         Icons.terrain,
@@ -2889,15 +2996,16 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                       ),
                       const SizedBox(height: 20),
                     ],
-                    
+
                     // Risk level
                     if (species.riskLevel > 0) ...[
                       _buildRiskLevel(species.riskLevel, species.isVenomous),
                       const SizedBox(height: 20),
                     ],
-                    
+
                     // Venom type
-                    if (species.isVenomous && (species.primaryVenomType?.isNotEmpty ?? false)) ...[
+                    if (species.isVenomous &&
+                        (species.primaryVenomType?.isNotEmpty ?? false)) ...[
                       _buildDetailSection(
                         'Loại độc',
                         Icons.warning,
@@ -2906,7 +3014,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
                       ),
                       const SizedBox(height: 20),
                     ],
-                    
+
                     const SizedBox(height: 40),
                   ],
                 ),
@@ -2917,8 +3025,13 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
       ),
     );
   }
-  
-  Widget _buildDetailSection(String title, IconData icon, String content, {Color? color}) {
+
+  Widget _buildDetailSection(
+    String title,
+    IconData icon,
+    String content, {
+    Color? color,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2959,7 +3072,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
       ],
     );
   }
-  
+
   Widget _buildListSection(String title, IconData icon, List<String> items) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2985,44 +3098,46 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
           decoration: BoxDecoration(
             color: const Color(0xFF228B22).withOpacity(0.05),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: const Color(0xFF228B22).withOpacity(0.2),
-            ),
+            border: Border.all(color: const Color(0xFF228B22).withOpacity(0.2)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: items.map((item) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '• ',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF228B22),
-                      fontWeight: FontWeight.bold,
+            children: items
+                .map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '• ',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF228B22),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            item,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.black87,
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Expanded(
-                    child: Text(
-                      item,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.black87,
-                        height: 1.5,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )).toList(),
+                )
+                .toList(),
           ),
         ),
       ],
     );
   }
-  
+
   Widget _buildRiskLevel(double riskLevel, bool isVenomous) {
     Color getRiskColor() {
       if (riskLevel >= 7.0) {
@@ -3033,7 +3148,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
         return Colors.green;
       }
     }
-    
+
     String getRiskLabel() {
       if (riskLevel >= 7.0) {
         return 'Cao';
@@ -3043,13 +3158,13 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
         return 'Thấp';
       }
     }
-    
+
     String getRiskScore() {
       return '${riskLevel.toStringAsFixed(1)}/10';
     }
-    
+
     final color = getRiskColor();
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3072,10 +3187,7 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                color.withOpacity(0.1),
-                color.withOpacity(0.05),
-              ],
+              colors: [color.withOpacity(0.1), color.withOpacity(0.05)],
             ),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: color.withOpacity(0.3), width: 2),
@@ -3083,7 +3195,10 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: color,
                   borderRadius: BorderRadius.circular(20),
@@ -3118,7 +3233,9 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
 
   Future<void> _handleSubmit() async {
     // Validate location
-    if (_selectedAddress == null || _selectedLatitude == null || _selectedLongitude == null) {
+    if (_selectedAddress == null ||
+        _selectedLatitude == null ||
+        _selectedLongitude == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Vui lòng chọn vị trí trước khi gửi'),
@@ -3126,6 +3243,53 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
         ),
       );
       return;
+    }
+
+    if (_isPhotoTab && !_detectionResults.values.any((r) => r != null)) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Không nhận diện được rắn',
+                  style: TextStyle(fontSize: 18),
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Hệ thống AI chưa tìm thấy rắn trong ảnh của bạn. Bạn có muốn chuyển sang "Chọn Loài Rắn" để các chuyên gia cứu hộ dễ chuẩn bị công cụ xử lý không?\n\nBạn vẫn có thể tiếp tục gửi yêu cầu này nếu chắc chắn trong ảnh có rắn cần được bắt.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => context.pop(false),
+              child: const Text(
+                'Tiếp tục gửi',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => context.pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF228B22),
+              ),
+              child: const Text('Chọn loài rắn thủ công'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == null) return;
+      if (confirm == true) {
+        setState(() {
+          _isPhotoTab = false;
+        });
+        return;
+      }
     }
 
     // Build species list
@@ -3137,12 +3301,14 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
       for (final slot in [1, 2, 3]) {
         final r = _detectionResults[slot];
         if (r != null && r.snake.id > 0 && seen.add(r.snake.id)) {
-          snakeSpeciesList.add(SnakeSpeciesItem(
-            snakeSpeciesId: r.snake.id,
-            quantity: widget.quantity == 'single'
-                ? _singleQuantity
-                : (_speciesQuantityMap[r.snake.id] ?? 1),
-          ));
+          snakeSpeciesList.add(
+            SnakeSpeciesItem(
+              snakeSpeciesId: r.snake.id,
+              quantity: widget.quantity == 'single'
+                  ? _singleQuantity
+                  : (_speciesQuantityMap[r.snake.id] ?? 1),
+            ),
+          );
         }
       }
       // No detection → empty list is fine; BE records the media for manual review
@@ -3158,10 +3324,12 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
           );
           return;
         }
-        snakeSpeciesList.add(SnakeSpeciesItem(
-          snakeSpeciesId: _selectedSpecies!.id,
-          quantity: _singleQuantity,
-        ));
+        snakeSpeciesList.add(
+          SnakeSpeciesItem(
+            snakeSpeciesId: _selectedSpecies!.id,
+            quantity: _singleQuantity,
+          ),
+        );
       } else {
         if (_selectedSpeciesMap.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -3173,10 +3341,12 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
           return;
         }
         snakeSpeciesList = _selectedSpeciesMap.entries
-            .map((entry) => SnakeSpeciesItem(
-                  snakeSpeciesId: entry.key.id,
-                  quantity: entry.value,
-                ))
+            .map(
+              (entry) => SnakeSpeciesItem(
+                snakeSpeciesId: entry.key.id,
+                quantity: entry.value,
+              ),
+            )
             .toList();
       }
     }
@@ -3186,22 +3356,20 @@ class _SnakeReportDetailScreenState extends ConsumerState<SnakeReportDetailScree
 
     // notes = Các thông tin bổ sung khác (vị trí cụ thể, kích thước, hành vi)
     final notesParts = <String>[];
-    
+
     if (_specificLocationController.text.isNotEmpty) {
       notesParts.add('Vị trí cụ thể: ${_specificLocationController.text}');
     }
-    
+
     if (_selectedSize != null && _selectedSize != 'Chọn kích thước') {
       notesParts.add('Kích thước ước tính: $_selectedSize');
     }
-    
+
     if (_behaviorController.text.isNotEmpty) {
       notesParts.add('Hành vi của rắn: ${_behaviorController.text}');
     }
-    
-    final notes = notesParts.isNotEmpty 
-        ? notesParts.join(', ')
-        : null;
+
+    final notes = notesParts.isNotEmpty ? notesParts.join(', ') : null;
 
     // Create request
     final mediaIdList = _mediaIds.values.toList();

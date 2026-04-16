@@ -93,9 +93,13 @@ class _RescuerProfileScreenState extends ConsumerState<RescuerProfileScreen> {
             const SizedBox(height: 12),
             _buildMenuItem(
               icon: Icons.star,
-              title: 'Đánh Giá & Phản Hồi',
+              title: 'Đánh Giá',
               subtitle: '${_profile?.ratingCount ?? 0} đánh giá từ khách hàng',
-              onTap: () => context.pushNamed('rescuer_feedback'),
+              onTap: () {
+                if (_profile != null) {
+                  context.pushNamed('rescuer_feedback', pathParameters: {'targetUserId': _profile!.accountId});
+                }
+              },
             ),
             const SizedBox(height: 16),
 

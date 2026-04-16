@@ -380,8 +380,9 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8F6),
+      backgroundColor: Colors.white, // Changed to match AppBar and status bar
       body: SafeArea(
+        bottom: false, // Allows content to flow to the bottom edge if needed, or keep true if preferred
         child: Column(
           children: [
             // App Bar
@@ -392,23 +393,26 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
 
             // Tab Content
             Expanded(
-              child: (consultationsState.isLoading && bookingsState.isLoading)
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF228B22),
-                      ),
-                    )
-                  : TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _buildUpcomingTab(context, upcoming),
-                        _buildHistoryTab(
-                          context,
-                          _historyItems,
-                          isLoading: consultationsState.isLoading,
+              child: Container(
+                color: const Color(0xFFF6F8F6), // Moved the slightly grey background here
+                child: (consultationsState.isLoading && bookingsState.isLoading)
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF228B22),
                         ),
-                      ],
-                    ),
+                      )
+                    : TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildUpcomingTab(context, upcoming),
+                          _buildHistoryTab(
+                            context,
+                            _historyItems,
+                            isLoading: consultationsState.isLoading,
+                          ),
+                        ],
+                      ),
+              ),
             ),
           ],
         ),
