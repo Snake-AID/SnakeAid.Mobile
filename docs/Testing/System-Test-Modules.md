@@ -40,10 +40,10 @@ Tài liệu này định nghĩa danh sách các Module Code (Cụm Test Case) ch
 | **E** | **Community, Blog & Knowledge Base (Luồng Phụ)** | | | | | |
 | 24 | View Community Alerts & Reports   | 0 | 0 | 0 | 0 | 0 |
 | 25 | View & Create Blog  | 0 | 0 | 0 | 0 | 12 |
-| 26 | Confirm AI Snake Detection Image (Expert)  | 0 | 0 | 0 | 0 | 0 |
-| 27 | Search & View Snake Library (Encyclopedia)  | 0 | 0 | 0 | 0 | 0 |
-| 28 | Search & View First Aid Protocol Guides  | 0 | 0 | 0 | 0 | 0 |
-Verd| 29 | Access Rescuer Training Lessons  | 0 | 0 | 0 | 0 | 0 |
+| 26 | Confirm AI Snake Detection Image (Expert)  | 0 | 0 | 0 | 0 | 8 |
+| 27 | Search & View Snake Library (Encyclopedia)  | 0 | 0 | 0 | 0 | 8 |
+| 28 | Search & View First Aid Protocol Guides  | 0 | 0 | 0 | 0 | 8 |
+Verd| 29 | Access Rescuer Training Lessons  | 0 | 0 | 0 | 0 | 8 |
 | **F** | **System, Wallet & Utilities** | | | | | |
 | 30 | Manage SnakeAidPay Wallet (Top-up, History, Withdraw)  | 0 | 0 | 0 | 0 | 0 |
 | 31 | External Payment Interface (PayOS Callback)  | 0 | 0 | 0 | 0 | 0 |
