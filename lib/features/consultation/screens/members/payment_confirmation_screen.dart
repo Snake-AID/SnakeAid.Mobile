@@ -230,17 +230,24 @@ class _PaymentConfirmationScreenState
     );
 
     if (result.shouldFallbackConfirm) {
-      await ref
+      final isConfirmed = await ref
           .read(walletRepositoryProvider)
           .confirmPayment(transactionId: txId);
-      result = await verifier.verify(
-        context: PayOsPendingContext(
-          flowType: PayOsFlowType.topup,
-          transactionId: txId,
-          orderCode: _pendingWalletTopupOrderCode,
-          startedAt: _pendingWalletTopupStartedAt ?? DateTime.now(),
-        ),
-      );
+      if (isConfirmed) {
+        result = const PayOsVerificationResult(
+          status: PayOsVerificationStatus.confirmed,
+          message: 'Số dư ví đã được cập nhật sau khi PayOS xác nhận giao dịch.',
+        );
+      } else {
+        result = await verifier.verify(
+          context: PayOsPendingContext(
+            flowType: PayOsFlowType.topup,
+            transactionId: txId,
+            orderCode: _pendingWalletTopupOrderCode,
+            startedAt: _pendingWalletTopupStartedAt ?? DateTime.now(),
+          ),
+        );
+      }
     }
 
     if (result.status == PayOsVerificationStatus.confirmed) {
@@ -471,17 +478,24 @@ class _PaymentConfirmationScreenState
     );
 
     if (result.shouldFallbackConfirm) {
-      await ref
+      final isConfirmed = await ref
           .read(walletRepositoryProvider)
           .confirmPayment(transactionId: txId);
-      result = await verifier.verify(
-        context: PayOsPendingContext(
-          flowType: PayOsFlowType.topup,
-          transactionId: txId,
-          orderCode: _pendingWalletTopupOrderCode,
-          startedAt: startedAt ?? DateTime.now(),
-        ),
-      );
+      if (isConfirmed) {
+        result = const PayOsVerificationResult(
+          status: PayOsVerificationStatus.confirmed,
+          message: 'Số dư ví đã được cập nhật sau khi PayOS xác nhận giao dịch.',
+        );
+      } else {
+        result = await verifier.verify(
+          context: PayOsPendingContext(
+            flowType: PayOsFlowType.topup,
+            transactionId: txId,
+            orderCode: _pendingWalletTopupOrderCode,
+            startedAt: startedAt ?? DateTime.now(),
+          ),
+        );
+      }
     }
 
     if (result.status == PayOsVerificationStatus.confirmed) {

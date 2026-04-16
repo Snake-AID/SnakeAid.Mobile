@@ -108,7 +108,7 @@ class _FirstAidBody extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Khẩn cấp – Gọi 115 ngay!',
+                      'Khẩn cấp !',
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,

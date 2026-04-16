@@ -84,10 +84,17 @@ class _GlobalPaymentDeepLinkListenerState
     );
 
     if (result.shouldFallbackConfirm) {
-      await ref
+      final isConfirmed = await ref
           .read(walletRepositoryProvider)
           .confirmPayment(transactionId: pendingTopupContext.transactionId);
-      result = await verifier.verify(context: pendingTopupContext);
+      if (isConfirmed) {
+        result = const PayOsVerificationResult(
+          status: PayOsVerificationStatus.confirmed,
+          message: 'Số dư ví đã được cập nhật sau khi PayOS xác nhận giao dịch.',
+        );
+      } else {
+        result = await verifier.verify(context: pendingTopupContext);
+      }
     }
 
     if (result.status == PayOsVerificationStatus.confirmed ||

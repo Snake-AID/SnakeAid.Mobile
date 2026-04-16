@@ -142,10 +142,17 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
     var result = await verifier.verify(context: pendingContext, event: event);
 
     if (result.shouldFallbackConfirm) {
-      await ref
+      final isConfirmed = await ref
           .read(walletRepositoryProvider)
           .confirmPayment(transactionId: pendingContext.transactionId);
-      result = await verifier.verify(context: pendingContext);
+      if (isConfirmed) {
+        result = const PayOsVerificationResult(
+          status: PayOsVerificationStatus.confirmed,
+          message: 'Số dư ví đã được cập nhật sau khi PayOS xác nhận giao dịch.',
+        );
+      } else {
+        result = await verifier.verify(context: pendingContext);
+      }
     }
 
     if (result.status == PayOsVerificationStatus.confirmed ||
@@ -555,7 +562,7 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
                           (value ?? '').replaceAll('.', '').replaceAll(',', ''),
                         );
                         if (v == null || v <= 0) return 'Vui lòng nhập số tiền';
-                        if (v < 10000) return 'Số tiền tối thiểu là 10.000đ';
+                        if (v < 2000) return 'Số tiền tối thiểu là 2.000đ';
                         if (v > 50000000)
                           return 'Số tiền tối đa là 50.000.000đ';
                         return null;
@@ -649,7 +656,7 @@ class _DepositMoneyScreenState extends ConsumerState<DepositMoneyScreen> {
                           SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              '• Số tiền tối thiểu: 10.000đ\n'
+                              '• Số tiền tối thiểu: 2.000đ\n'
                               '• Số tiền tối đa: 50.000.000đ\n'
                               '• Tiền được cộng vào ví ngay sau khi giao dịch thành công',
                               style: TextStyle(

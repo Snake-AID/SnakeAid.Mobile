@@ -123,23 +123,26 @@ class WalletRepository {
 
   /// POST /api/v1/PayOs/confirm-payment — confirm PayOS top-up after returning from browser.
   /// [transactionId] is taken from [TopupResult.transactionId] returned by [createTopupLink].
-  /// Non-fatal: logs on error but does not rethrow so the wallet refresh still runs.
-  Future<void> confirmPayment({required String transactionId}) async {
+  /// Returns [true] if the confirmation was successful.
+  Future<bool> confirmPayment({required String transactionId}) async {
     try {
       debugPrint('——————————————————————————————————————————');
       debugPrint(
         '✅ Confirm payment: POST /api/v1/PayOs/confirm-payment  transactionId=$transactionId',
       );
-      await _httpService.post(
+      final response = await _httpService.post(
         '/api/v1/PayOs/confirm-payment',
         data: {'transactionId': transactionId},
       );
       debugPrint('✅ Payment confirmed');
+      return response.statusCode == 200 || response.statusCode == 201;
     } on DioException catch (e) {
       debugPrint('❌ confirmPayment DioException: ${e.message}');
       debugPrint('📥 Response: ${e.response?.data}');
+      return false;
     } catch (e) {
       debugPrint('❌ confirmPayment error: $e');
+      return false;
     }
   }
 
