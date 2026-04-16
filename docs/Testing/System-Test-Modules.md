@@ -45,7 +45,7 @@ Tài liệu này định nghĩa danh sách các Module Code (Cụm Test Case) ch
 | 28 | Search & View First Aid Protocol Guides  | 0 | 0 | 0 | 0 | 8 |
 Verd| 29 | Access Rescuer Training Lessons  | 0 | 0 | 0 | 0 | 8 |
 | **F** | **System, Wallet & Utilities** | | | | | |
-| 30 | Manage SnakeAidPay Wallet (Top-up, History, Withdraw)  | 0 | 0 | 0 | 0 | 0 |
+| 30 | Manage SnakeAidPay Wallet (Top-up, History, Withdraw)  | 0 | 0 | 0 | 0 | 10 |
 | 31 | External Payment Interface (PayOS Callback)  | 0 | 0 | 0 | 0 | 0 |
 | 32 | Notification Tab & SignalR Broadcasts  | 0 | 0 | 0 | 0 | 0 |
 | 33 | Submit Ratings & Read Feedback  | 0 | 0 | 0 | 0 | 0 |
