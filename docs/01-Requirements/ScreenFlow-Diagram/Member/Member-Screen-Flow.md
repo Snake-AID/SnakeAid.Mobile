@@ -523,25 +523,49 @@ flowchart LR
 
 ---
 
-### 3.4.7 Snake Catching Service
-**Function trigger:** Member opts for non-medical snake removal. Navigation path: Member Home -> Snake Catching -> Snake Quantity Selection -> Snake Report Detail -> Snake Catching Success.
+### 3.4.7 Snake Catching Request & Initial Payment
+**Function trigger:** Member opts for non-medical snake removal. Navigation path: Member Home -> Snake Catching -> Snake Quantity Selection -> Snake Report Detail -> Initial Payment (Travel Fee) -> Snake Catching Success.
 **Function description:**
 - **Actor:** Member.
-- **Purpose:** Orchestrate the request and logistics for professional, non-urgent snake catching and property safeguarding.
-- **Interface:** Address confirmation map, quantity counter, environmental context forms, and final success confirmation.
-- **Data processing:** Geocode address endpoints, construct specialized dispatch payloads, query availability of non-emergency responders.
+- **Purpose:** Orchestrate the creation of a professional, non-urgent snake catching request and process the upfront travel fee.
+- **Interface:** Address confirmation map, quantity counter, environmental context forms, checkout interface (phase 1), and success confirmation.
+- **Data processing:** Geocode address endpoints, construct dispatch payloads, query availability of non-emergency responders, and process the initial payment via SnakeAidPay Wallet or PayOS.
 - **Screen layout:** 
 
 **Function details:**
-- **Data:** Geocoordinates, quantity integer, environmental text description, attached situational photographs.
-- **Validation:** Provided address must fall within the platform's operational service polygons.
-- **Business rules:** Snake Catching requests explicitly sit at a lower dispatch priority compared to SOS Medical workflows.
-- **Normal cases:** Member defines the parameters, submits form -> System secures a catcher -> Shows success confirmation dispatch.
-- **Abnormal cases:** No active responders available in radius -> UI clearly declines the request and suggests alternative contact methods.
+- **Data:** Geocoordinates, quantity integer, environmental text description, attached situational photographs, Phase 1 invoice (Travel fee).
+- **Validation:** Provided address must fall within the platform's operational service polygons. Payment requires sufficient wallet balance or active PayOS transaction success.
+- **Business rules:** 
+  - Snake Catching requests explicitly sit at a lower dispatch priority compared to SOS Medical workflows.
+  - **Phase 1 Payment:** Member must pay the "Travel Fee" (Phí di chuyển) before the system dispatches a snake catcher.
+- **Normal cases:** Member defines parameters, submits form -> Pays Travel Fee -> System secures a catcher -> Shows success confirmation dispatch.
+- **Abnormal cases:** 
+  - No active responders available -> UI declines the request.
+  - Phase 1 Payment Fails -> Request is aborted/not dispatched.
 
 ---
 
-### 3.4.8 Scheduled Expert Consultation
+### 3.4.8 Snake Catching Tracking & Final Payment
+**Function trigger:** Snake catching request is accepted by a rescuer. Navigation path: Activity Tab -> Activity Detail -> (Mission Execution) -> Final Payment (Service Fee).
+**Function description:**
+- **Actor:** Member & Rescuer.
+- **Purpose:** Allow members to track the ongoing snake catching mission and finalize the remaining service fee once the rescuer completes the job.
+- **Interface:** Live map/status updates, rescuer profile snippets, mission completion summary, and phase 2 checkout interface.
+- **Data processing:** Consume incoming location/status updates, sync final mission closure, and process the final payment phase via SnakeAidPay Wallet or PayOS.
+- **Screen layout:** 
+
+**Function details:**
+- **Data:** Rescuer live coordinates, discrete mission states (En Route, Arrived, Resolved), Phase 2 invoice (Remaining service fee).
+- **Validation:** Payment requires sufficient wallet balance or active PayOS transaction success.
+- **Business rules:** 
+  - **Phase 2 Payment:** Member pays the "Remaining Balance" (Phí dịch vụ còn lại) once the catcher marks the mission as successfully resolved.
+- **Normal cases:** Catcher arrives -> Completes the job -> System generates final bill -> Member pays Remaining Balance via Wallet/PayOS.
+- **Abnormal cases:** 
+  - Phase 2 Payment Fails -> Incident remains in "Pending Final Settlement" state until the user successfully completes the second payment.
+
+---
+
+### 3.4.9 Scheduled Expert Consultation
 **Function trigger:** Member requires scheduled professional clinical or zoological advice. Navigation path: Member Home -> Consultation Home -> Expert List -> Expert Detail -> Service Selection -> Consultation Time Selection -> Consultation Documents -> Payment Confirmation -> (Video Waiting Room -> Video Consultation) -> Consultation Complete.
 **Function description:**
 - **Actor:** Member & Expert.
@@ -559,7 +583,7 @@ flowchart LR
 
 ---
 
-### 3.4.9 Instant Expert Consultation
+### 3.4.10 Instant Expert Consultation
 **Function trigger:** Member requires immediate professional advice without waiting. Navigation path: Member Home -> Consultation Home -> Expert List -> Expert Detail -> Service Selection -> Consultation Documents -> Payment Confirmation -> (Video Waiting Room -> Video Consultation) -> Consultation Complete.
 **Function description:**
 - **Actor:** Member & On-Call Expert.
@@ -576,7 +600,7 @@ flowchart LR
 - **Abnormal cases:** Selected expert drops offline just before payment clears (system triggers refund or re-routes); ICE server fails connection.
 
 ---
-### 3.4.10 Knowledge Base
+### 3.4.11 Knowledge Base
 **Function trigger:** Member accesses educational resources. Navigation path: Member Home -> (Snake Library -> Snake Detail -> Snake First Aid Guide) or (Blog List -> Blog Detail).
 **Function description:**
 - **Actor:** Member.
@@ -594,7 +618,7 @@ flowchart LR
 
 ---
 
-### 3.4.11 Member Wallet & Transactions
+### 3.4.12 Member Wallet & Transactions
 **Function trigger:** User accesses financial settings or completes a paid flow. Navigation path: Profile Tab -> History Wallet -> (Top-up / Withdrawal / History Transaction -> Transaction Detail).
 **Function description:**
 - **Actor:** Member.
@@ -612,7 +636,7 @@ flowchart LR
 
 ---
 
-### 3.4.12 Profile & Activity Overviews
+### 3.4.13 Profile & Activity Overviews
 **Function trigger:** Member inspects personal records. Navigation path: Profile Tab -> (Edit Profile / Settings) or Activity Tab -> (Activity Detail / Activity History).
 **Function description:**
 - **Actor:** Member.
