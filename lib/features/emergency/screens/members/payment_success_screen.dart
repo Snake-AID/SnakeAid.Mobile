@@ -1,9 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../providers/incident_provider.dart';
+
 /// Payment Success Screen - After completing emergency service payment
-class PaymentSuccessScreen extends StatelessWidget {
+class PaymentSuccessScreen extends ConsumerStatefulWidget {
   const PaymentSuccessScreen({super.key});
+
+  @override
+  ConsumerState<PaymentSuccessScreen> createState() =>
+      _PaymentSuccessScreenState();
+}
+
+class _PaymentSuccessScreenState extends ConsumerState<PaymentSuccessScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(activeIncidentProvider.notifier).clearActiveIncident();
+    });
+  }
+
+  void _goHome() {
+    ref.read(activeIncidentProvider.notifier).clearActiveIncident();
+    context.goNamed('member_home');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,9 +49,7 @@ class PaymentSuccessScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.close_rounded, color: Color(0xFF191910)),
-            onPressed: () {
-              context.goNamed('member_home');
-            },
+            onPressed: _goHome,
           ),
         ],
       ),
@@ -58,14 +78,14 @@ class PaymentSuccessScreen extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   // Action Buttons
-                  _buildActionButtons(context),
+                    _buildActionButtons(context),
                 ],
               ),
             ),
           ),
 
           // Bottom Button
-          _buildBottomButton(context),
+            _buildBottomButton(context),
         ],
       ),
     );
