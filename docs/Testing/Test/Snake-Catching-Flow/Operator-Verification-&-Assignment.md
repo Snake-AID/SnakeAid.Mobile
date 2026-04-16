@@ -1,202 +1,30 @@
-# Operator Verification & Assignment - Test Prompt Format For Web AI Bot
+# Operator Snake Catching Flow
 
-## Muc tieu
+## Summary
 
-Tai lieu nay dinh nghia cach viet prompt de AI web bot chay flow Operator tren web portal:
+| Field | Value |
+|---|---|
+| Feature | Operator Snake Catching Flow (Confirm, Assign Rescuer, Cancel, Monitoring) |
+| Test requirement | Verify operator can process snake-catching requests on dashboard with correct status transitions, dispatch constraints, and UI feedback |
+| Number of TCs | 8 |
 
-1. Operator xac nhan don (Pending -> Confirmed)
-2. Operator phan cong Rescuer (Confirmed -> Assigned)
-3. Ghi nhan ket qua test theo dinh dang co the doi chieu voi test sheet
+## Testing Round Summary
 
-## Prompt Format Chuan
+| Testing Round | Passed | Failed | Pending | N/A |
+|---|---:|---:|---:|---:|
+| Round 1 | 0 | 0 | 8 | 0 |
+| Round 2 | 0 | 0 | 8 | 0 |
+| Round 3 | 0 | 0 | 8 | 0 |
 
-Sao chep mau duoi day va thay gia tri trong dau nhon.
+## Test Cases
 
-```text
-[ROLE]
-You are a QA web automation bot testing SnakeAid Operator Portal.
-
-[TEST META]
-Test Case ID: <TC_ID>
-Flow: Operator Verification & Assignment
-Environment: <DEV/UAT/PROD-STAGING>
-Base URL: <WEB_PORTAL_URL>
-Language: vi-VN UI labels
-
-[GOAL]
-Execute Operator flow and verify status transition:
-<START_STATUS> -> <TARGET_STATUS>
-
-[PRE-CONDITIONS]
-1) Operator account exists: <OPERATOR_EMAIL>
-2) A snake catching request exists with status: <PENDING/CONFIRMED>
-3) Request reference id: <REQUEST_ID or SEARCH_KEY>
-4) At least one eligible rescuer exists for assignment: <YES/NO>
-
-[STRICT UI ACTIONS]
-1) Login to Operator Portal with provided account.
-2) Open menu/page: <REQUEST_LIST_PAGE_LABEL>.
-3) Search request by <REQUEST_ID or customer phone/name>.
-4) Open request detail.
-5) Click action button: <BUTTON_LABEL_1>.
-6) If confirmation modal appears, click: <CONFIRM_BUTTON_LABEL>.
-7) For assignment case: choose rescuer <RESCUER_NAME_OR_CODE>.
-8) Click assignment button: <BUTTON_LABEL_2>.
-
-[ASSERTIONS - MUST VERIFY]
-A) UI status badge changes from <START_STATUS_LABEL> to <TARGET_STATUS_LABEL>.
-B) Timeline/history log contains an entry for operator action.
-C) Assigned rescuer info is displayed (name/phone/code) for Assigned case.
-D) No blocking error toast/snackbar appears.
-
-[NEGATIVE CHECKS]
-1) If missing required field, verify validation message text.
-2) If no eligible rescuer, verify expected warning and status remains unchanged.
-
-[EVIDENCE OUTPUT FORMAT]
-Return exactly in this structure:
-- Result: PASS or FAIL
-- Executed steps: numbered list of actual clicks
-- Assertions:
-	- A: PASS/FAIL + observed text
-	- B: PASS/FAIL + observed text
-	- C: PASS/FAIL + observed text
-	- D: PASS/FAIL + observed text
-- Final status: <STATUS_TEXT>
-- Evidence:
-	- Screenshot_1: <what screen proves transition>
-	- Screenshot_2: <what screen proves assignment/log>
-- Defects:
-	- <NONE or defect summary>
-```
-
-## Prompt Mau 1 - Confirm Request (Pending -> Confirmed)
-
-```text
-You are a QA web automation bot testing SnakeAid Operator Portal.
-
-Test Case ID: TC801
-Flow: Operator Verification & Assignment
-Environment: UAT
-Base URL: https://<operator-portal-url>
-Language: vi-VN UI labels
-
-Goal:
-Execute operator confirmation and verify Pending -> Confirmed.
-
-Pre-conditions:
-1) Operator account exists: operator01@snakeaid.vn
-2) Snake catching request exists with status Pending
-3) Request ID: SC-REQ-000801
-
-Strict UI actions:
-1) Login to portal.
-2) Open page Don bat ran.
-3) Search SC-REQ-000801.
-4) Open detail.
-5) Click Xac nhan voi khach.
-6) In modal, click Xac nhan.
-
-Assertions:
-A) Status badge changes to Confirmed.
-B) Timeline has log entry that operator confirmed request.
-C) No blocking error toast appears.
-
-Evidence output format:
-- Result: PASS/FAIL
-- Executed steps
-- Assertions A/B/C with observed text
-- Final status
-- Evidence screenshots
-- Defects
-```
-
-## Prompt Mau 2 - Assign Rescuer (Confirmed -> Assigned)
-
-```text
-You are a QA web automation bot testing SnakeAid Operator Portal.
-
-Test Case ID: TC802
-Flow: Operator Verification & Assignment
-Environment: UAT
-Base URL: https://<operator-portal-url>
-Language: vi-VN UI labels
-
-Goal:
-Execute assignment and verify Confirmed -> Assigned.
-
-Pre-conditions:
-1) Operator account exists: operator01@snakeaid.vn
-2) Request is already Confirmed
-3) Request ID: SC-REQ-000802
-4) Eligible rescuer exists: RESCUER-021
-
-Strict UI actions:
-1) Login and open Don bat ran.
-2) Search SC-REQ-000802 and open detail.
-3) Click Phan cong cuu ho vien.
-4) Select rescuer RESCUER-021.
-5) Click Xac nhan phan cong.
-
-Assertions:
-A) Status changes to Assigned.
-B) Rescuer information is visible in request detail.
-C) Timeline has assignment log entry.
-D) No blocking error toast appears.
-
-Evidence output format:
-- Result: PASS/FAIL
-- Executed steps
-- Assertions A/B/C/D with observed text
-- Final status
-- Evidence screenshots
-- Defects
-```
-
-## Prompt Mau 3 - Negative (No Eligible Rescuer)
-
-```text
-You are a QA web automation bot testing SnakeAid Operator Portal.
-
-Test Case ID: TC803
-Flow: Operator Verification & Assignment
-Environment: UAT
-Base URL: https://<operator-portal-url>
-Language: vi-VN UI labels
-
-Goal:
-Verify system behavior when no rescuer is available.
-
-Pre-conditions:
-1) Request is Confirmed
-2) No eligible rescuer exists in assignment list
-3) Request ID: SC-REQ-000803
-
-Strict UI actions:
-1) Login and open request detail SC-REQ-000803.
-2) Click Phan cong cuu ho vien.
-3) Try to assign when list is empty or no selectable rescuer.
-
-Assertions:
-A) Warning/empty-state message is shown.
-B) Request status remains Confirmed.
-C) No fake success message appears.
-
-Evidence output format:
-- Result: PASS/FAIL
-- Executed steps
-- Assertions A/B/C with observed text
-- Final status
-- Evidence screenshots
-- Defects
-```
-
-## Checklist Khi Viet Prompt
-
-1. Luon co Request ID cu the.
-2. Luon khai bao start status va target status.
-3. Dung dung label nut theo UI that (khong viet mo ho).
-4. Tach ro action va assertion.
-5. Bat buoc yeu cau bot tra ve bang chung (screenshots + observed text).
-6. Neu test negative, phai assert status khong thay doi.
-
+| Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions | Round 1 | Test date | Tester | Round 2 | Test date | Tester | Round 3 | Test date | Tester | Note |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| TC801 | Confirm snake-catching request successfully (Pending -> Confirmed) | 1) Login with Operator account<br>2) Open Operator Dashboard<br>3) In tab "Bắt rắn", select a request with status "Chờ xác minh"<br>4) Open request detail modal<br>5) Click "Xác nhận yêu cầu" | Request is confirmed; status badge in detail becomes "Đã xác nhận"; success toast "Yêu cầu đã được xác nhận." is shown | Operator account exists; at least one active request in Pending state | Pending |  |  | Pending |  |  | Pending |  |  |  |
+| TC802 | Assign rescuer successfully (Confirmed -> Assigned) | 1) Open a request already in status "Đã xác nhận"<br>2) Click "Điều phối rescuer"<br>3) In dispatch modal, select one available rescuer<br>4) Click "Xác nhận điều phối" | Dispatch completes; success toast "Điều phối đội cứu hộ thành công." is shown; request detail displays assigned rescuer id in "Rescuer được phân công" | Request is Confirmed; at least one rescuer is online and available | Pending |  |  | Pending |  |  | Pending |  |  |  |
+| TC803 | Cannot dispatch when no rescuer is selected | 1) Open request detail in Confirmed state<br>2) Click "Điều phối rescuer"<br>3) Do not select any rescuer in list<br>4) Observe action button | Button "Xác nhận điều phối" remains disabled until a rescuer is selected | Request is Confirmed; dispatch modal can be opened | Pending |  |  | Pending |  |  | Pending |  |  |  |
+| TC804 | Show empty-state when no eligible rescuer exists | 1) Open dispatch modal for a Confirmed request<br>2) Keep filters "Chỉ trong ca" and "Chỉ online" enabled<br>3) Ensure no rescuer satisfies current filters | Empty-state message "Không có đội cứu hộ phù hợp bộ lọc." is shown; no dispatch success toast appears | Request is Confirmed; test data has no matching rescuer by shift/online filters | Pending |  |  | Pending |  |  | Pending |  |  |  |
+| TC805 | Refresh rescuer list in dispatch modal | 1) Open dispatch modal<br>2) Click retry action "Thử lại" when error appears, or close and reopen modal<br>3) Verify rescuer list reload behavior | Rescuer list reloads successfully; no stale loading state; error banner disappears when API call succeeds | Operator can open dispatch modal; backend on-duty API reachable | Pending |  |  | Pending |  |  | Pending |  |  |  |
+| TC806 | Cancel request from Confirmed state | 1) Open detail of a request in Confirmed state<br>2) Click "Hủy yêu cầu"<br>3) Wait for dashboard refresh | Success toast "Yêu cầu đã được hủy." is shown; request is removed from active request list | Request is Confirmed and cancellable by operator | Pending |  |  | Pending |  |  | Pending |  |  |  |
+| TC807 | Cancel request from Assigned state | 1) Open detail of a request already assigned<br>2) Click "Hủy yêu cầu"<br>3) Confirm dashboard list after action | Success toast "Yêu cầu đã được hủy." is shown; active list no longer contains cancelled request | Request is Assigned and appears in active request list | Pending |  |  | Pending |  |  | Pending |  |  |  |
+| TC808 | Verify list-detail consistency for snake-catching request | 1) In dashboard tab "Bắt rắn", click any request row (format CAR-xxxxxx)<br>2) Observe detail modal data (status, address, user, media/species)<br>3) Close and reopen same request from list | Detail modal maps to selected request id; status and address are consistent between row and modal; no mismatch after reopen | At least one request exists in list | Pending |  |  | Pending |  |  | Pending |  |  |  |
