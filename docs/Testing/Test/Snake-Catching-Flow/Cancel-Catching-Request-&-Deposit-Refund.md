@@ -1,11 +1,11 @@
-# Cancel Catching Request & Deposit Refund
+# Cancel Catching Request
 
 ## Summary
 
 | Field | Value |
 |---|---|
-| Feature | Cancel Catching Request & Deposit Refund |
-| Test requirement | Member can cancel eligible snake catching requests from Activity detail with a required reason, request status changes to Cancelled, and deposit refund is recorded when applicable |
+| Feature | Cancel Catching Request |
+| Test requirement | Member can cancel eligible snake catching requests from Activity detail with a required reason, and request status changes to Cancelled |
 | Number of TCs | 10 |
 
 ## Testing Round Summary
@@ -29,4 +29,4 @@
 | TC1207 | Cancel request successfully with predefined reason | 1) Open cancel sheet<br>2) Select one predefined reason (for example "Không cần hỗ trợ nữa")<br>3) Tap "XÁC NHẬN HỦY ĐƠN" | Success dialog appears with title "Đơn đã được hủy" and message "Yêu cầu của bạn đã được hủy thành công." | Booking is in cancellable state and API is available | Pending |  |  | Pending |  |  | Pending |  |  |  |
 | TC1208 | Return to list after cancellation confirmation | 1) Complete cancellation successfully<br>2) In success dialog, tap "Về Danh Sách" | App navigates to Member home/list screen and cancelled booking is no longer active | Cancellation was successful and dialog is shown | Pending |  |  | Pending |  |  | Pending |  |  |  |
 | TC1209 | Cancelled status is reflected in request detail | 1) Reopen the cancelled booking detail from history/list<br>2) Observe status and timeline area | Status text becomes "Đã Hủy" and timeline message shows cancelled state (for example "Yêu cầu đã bị hủy") | Booking was cancelled successfully | Pending |  |  | Pending |  |  | Pending |  |  |  |
-| TC1210 | Deposit refund transaction is recorded after cancellation | 1) Cancel a booking that already had round-1 deposit paid<br>2) Open "Lịch Sử Thanh Toán"<br>3) Search related transaction entries for this booking/time | A refund transaction for snake catching is present (transaction type CatchingRefund / label "Hoàn tiền bắt rắn") with successful status | Booking had a paid deposit before cancellation; backend refund flow is enabled | Pending |  |  | Pending |  |  | Pending |  |  |  |
+| TC1210 | Cancellation flow does not include refund confirmation step | 1) Cancel an eligible booking from Activity detail<br>2) Observe post-cancel screens and booking detail<br>3) Verify there is no UI step requiring refund confirmation in this flow | Cancellation completes with status "Đã Hủy" and the flow ends at cancel confirmation/list; no refund confirmation step is shown in snake catching cancellation flow | Booking is eligible for cancellation | Pending |  |  | Pending |  |  | Pending |  |  |  |
