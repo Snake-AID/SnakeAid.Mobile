@@ -640,17 +640,17 @@ flowchart LR
 **Function trigger:** Member reads articles and community updates. Navigation path: Member Home -> Blog List -> Blog Detail.
 **Function description:**
 - **Actor:** Member.
-- **Purpose:** Provide members with ongoing news, tips, and long-form articles related to snake safety and ecosystem awareness.
-- **Interface:** Long-form markdown blog readers, categorized lists of articles.
-- **Data processing:** Fetch and parse markdown payloads safely.
+- **Purpose:** Provide members with ongoing news, tips, and long-form articles related to snake safety and ecosystem awareness, while allowing community interaction via likes.
+- **Interface:** Long-form markdown blog readers, categorized lists of articles, and interactive interaction buttons (Like/Unlike).
+- **Data processing:** Fetch and parse markdown payloads safely, mutate and sync like states on the backend.
 - **Screen layout:** 
 
 **Function details:**
-- **Data:** Raw markdown blog payloads, author details, publication dates.
-- **Validation:** N/A (Mostly Read-only queries).
-- **Business rules:** Blogs that mention specific snakes should visually link back to the Snake Library.
-- **Normal cases:** Member opens Blog List -> Selects a recent article -> Reads the content.
-- **Abnormal cases:** Network failure prevents fetching new articles -> Shows offline cache.
+- **Data:** Raw markdown blog payloads, author details, publication dates, like counts, current user's like status.
+- **Validation:** User must be authenticated to toggle the like status.
+- **Business rules:** Blogs that mention specific snakes should visually link back to the Snake Library; Liking a blog updates the local UI optimistically while syncing to the server in the background.
+- **Normal cases:** Member opens Blog List -> Selects a recent article -> Reads the content -> Taps 'Like' button -> Like counter increments immediately.
+- **Abnormal cases:** Network failure prevents fetching new articles -> Shows offline cache; Backend fails to register Like -> UI reverts like toggle state and shows an error toast.
 
 ---
 
