@@ -39,7 +39,7 @@ Tài liệu này định nghĩa danh sách các Module Code (Cụm Test Case) ch
 | 23 | Cancellation & Escrow Refund (Expert-only cancel rule)  | 0 | 0 | 0 | 0 | 0 |
 | **E** | **Community, Blog & Knowledge Base (Luồng Phụ)** | | | | | |
 | 24 | Read Community Blog & Safety Alerts  | 0 | 0 | 0 | 0 | 0 |
-| 25 | Manage Blog Posts (Admin/Operator)  | 0 | 0 | 0 | 0 | 0 |
+| 25 | Confirm AI Snake Detection Image (Expert)  | 0 | 0 | 0 | 0 | 0 |
 | 26 | Search & View Snake Library (Encyclopedia)  | 0 | 0 | 0 | 0 | 0 |
 | 27 | Search & View First Aid Protocol Guides  | 0 | 0 | 0 | 0 | 0 |
 | 28 | Access Rescuer Training Lessons  | 0 | 0 | 0 | 0 | 0 |
