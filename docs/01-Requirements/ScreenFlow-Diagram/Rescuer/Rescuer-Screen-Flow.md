@@ -129,10 +129,10 @@ flowchart LR
 | 22 | Activity & History | Mission History | Chronological log displaying completed past rescue and catching operations. |
 | 23 | Activity & History | History Detail | In-depth breakdown validating operational and financial specifics of a past mission. |
 | 24 | Notification Tab | Notification Tab | Centralized paginated inbox handling system alerts and read/unread tracking. |
-| 25 | Rescuer Profile | Profile Tab | Rescuer profile summary detailing performance metrics and ratings. |
-| 26 | Rescuer Profile | Edit Profile | Form interface for modifying personal rescuer details and avatars. |
+| 25 | Profile & Rating | Profile Tab | Rescuer profile summary detailing performance metrics and ratings. |
+| 26 | Profile & Rating | Edit Profile | Form interface for modifying personal rescuer details and avatars. |
 | 27 | Rescuer Profile | Settings | Application configuration interface for work modes and notification toggles. |
-| 28 | Rescuer Reputation | Feedback | Interface for reviewing customer ratings and textual feedback. |
+| 28 | Profile & Rating | Feedback | Interface for reviewing customer ratings and textual feedback. |
 | 29 | Knowledge Base | Lessons | Educational hub providing modular training and procedural guides. |
 | 30 | Knowledge Base | Lesson Detail | Content viewer screen for accessing specific training multimedia. |
 | 31 | Knowledge Base | Snake Library | Encyclopedic database outlining snake species for field reference. |
@@ -262,19 +262,19 @@ flowchart LR
 
 ---
 
-### 3.4.5 Profile
-**Function trigger:** Navigation via global menubar. Navigation path: Rescuer Home -> Profile Tab -> Edit Profile.
+### 3.4.5 Profile & Rating
+**Function trigger:** Navigation via global menubar. Navigation path: Rescuer Home -> Profile Tab -> Edit Profile / Feedback.
 **Function description:**
 - **Actor:** Rescuer.
-- **Purpose:** Manage personal identity through profile editing.
-- **Interface:** Profile summaries and editable form fields.
-- **Data processing:** Retrieve and mutate profile records.
+- **Purpose:** Manage personal identity and view/update rating feedback.
+- **Interface:** Profile summaries, editable form fields, and rating feedback views.
+- **Data processing:** Retrieve and mutate profile records, aggregate rating data.
 - **Screen layout:** 
 
 **Function details:**
-- **Data:** Rescuer biographical data.
+- **Data:** Rescuer biographical data, review/rating payloads.
 - **Validation:** Input constraints on profile updates (e.g., valid phone regex).
-- **Business rules:** Profile updates must preserve account identity and contact integrity.
+- **Business rules:** Profile updates must preserve account identity and contact integrity; rating feedback is read-only history.
 - **Normal cases:** Rescuer updates profile avatar successfully.
 - **Abnormal cases:** Avatar media upload fails returning standard server error.
 
