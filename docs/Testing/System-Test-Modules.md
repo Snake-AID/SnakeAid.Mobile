@@ -15,7 +15,7 @@ Tài liệu này định nghĩa danh sách các Module Code (Cụm Test Case) ch
 | 2 | Sign In With Password (All Roles)  | 0 | 0 | 0 | 0 | 0 |
 | 3 | Forgot & Reset Password Flow  | 0 | 0 | 0 | 0 | 0 |
 | 4 | Manage User Profile, Avatar & Settings  | 0 | 0 | 0 | 0 | 0 |
-| 5 | Identity Document Verification (Rescuer/Expert)  | 0 | 0 | 0 | 0 | 0 |
+| 5 | Identity Document Verdification (Rescuer/Expert)  | 0 | 0 | 0 | 0 | 0 |
 | **B** | **Snake Catching Flow (Luồng Bắt Rắn)** | | | | | |
 | 6 | Create Snake Catching Request (Images, GPS, Species)  | 0 | 0 | 0 | 0 | 0 |
 | 7 | Process Catching Deposit (Round 1)  | 0 | 0 | 0 | 0 | 0 |
@@ -38,12 +38,12 @@ Tài liệu này định nghĩa danh sách các Module Code (Cụm Test Case) ch
 | 22 | WebRTC Video Room & Waiting Room Logic  | 0 | 0 | 0 | 0 | 0 |
 | 23 | Cancellation & Escrow Refund (Expert-only cancel rule)  | 0 | 0 | 0 | 0 | 0 |
 | **E** | **Community, Blog & Knowledge Base (Luồng Phụ)** | | | | | |
-| 24 | Read Community Report   | 0 | 0 | 0 | 0 | 10 |
-| 25 | Read Blog  | 0 | 0 | 0 | 0 | 0 |
+| 24 | View Community Alerts & Reports   | 0 | 0 | 0 | 0 | 0 |
+| 25 | View Blog  | 0 | 0 | 0 | 0 | 8 |
 | 26 | Confirm AI Snake Detection Image (Expert)  | 0 | 0 | 0 | 0 | 0 |
 | 27 | Search & View Snake Library (Encyclopedia)  | 0 | 0 | 0 | 0 | 0 |
 | 28 | Search & View First Aid Protocol Guides  | 0 | 0 | 0 | 0 | 0 |
-| 29 | Access Rescuer Training Lessons  | 0 | 0 | 0 | 0 | 0 |
+Verd| 29 | Access Rescuer Training Lessons  | 0 | 0 | 0 | 0 | 0 |
 | **F** | **System, Wallet & Utilities** | | | | | |
 | 30 | Manage SnakeAidPay Wallet (Top-up, History, Withdraw)  | 0 | 0 | 0 | 0 | 0 |
 | 31 | External Payment Interface (PayOS Callback)  | 0 | 0 | 0 | 0 | 0 |
