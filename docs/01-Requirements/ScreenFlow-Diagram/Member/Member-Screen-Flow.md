@@ -507,19 +507,19 @@ flowchart LR
 - **Actor:** Member (receiving telemetry from Rescuer).
 - **Purpose:** Provide psychological relief and operational visibility by tracking the inbound emergency responder in real-time, and settle the financial invoice once the threat is resolved.
 - **Interface:** Live map rendering dynamic polylines, ETA countdowns, responder profile snippets, final incident resolution summaries, and billing checkout interface.
-- **Data processing:** Consume incoming WebSocket/SignalR geolocation points, calculate route recalculations, sync final state closure, and interface with Wallet/Payment gateway for bill settlement.
+- **Data processing:** Consume incoming WebSocket/SignalR geolocation points, calculate route recalculations, sync final state closure, and interface with SnakeAidPay Wallet or PayOS gateway for bill settlement.
 - **Screen layout:** 
 
 **Function details:**
 - **Data:** Rescuer live coordinates, updated ETA metrics, discrete mission states (Assigned, En Route, Arrived, Resolved), billing invoice totals.
-- **Validation:** Ensures rescuer maintains an active transmit heartbeat. Payment requires sufficient wallet balance.
+- **Validation:** Ensures rescuer maintains an active transmit heartbeat. Payment requires sufficient wallet balance or successful transaction verification from PayOS.
 - **Business rules:** 
   - Member cannot abort the mission once the rescuer transitions to "Arrived" state.
   - **Execute-First, Pay-Later Priority:** SOS operations bypass upfront payments to prioritize life-safety. Payment is mandated only after the rescuer marks the incident as "Resolved" (Hoàn thành cứu hộ).
-- **Normal cases:** Rescuer dot approaches on map -> State flips to Arrived -> Operation concludes -> System generates billing summary -> Member pays via Wallet.
+- **Normal cases:** Rescuer dot approaches on map -> State flips to Arrived -> Operation concludes -> System generates billing summary -> Member pays via SnakeAidPay Wallet or directly via PayOS.
 - **Abnormal cases:** 
   - Rescuer goes offline -> UI shows "Signal Lost" while system attempts re-routing or re-assignment in background.
-  - Insufficient Wallet Balance -> Incident cannot be closed until Member tops up their wallet via integrated payment gateway.
+  - Payment Failed/Canceled -> Incident cannot be closed until Member successfully completes the payment.
 
 ---
 
