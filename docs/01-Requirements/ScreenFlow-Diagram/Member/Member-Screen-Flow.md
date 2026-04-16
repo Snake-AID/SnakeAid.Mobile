@@ -676,17 +676,17 @@ flowchart LR
 **Function trigger:** Member wishes to extract funds from their wallet. Navigation path: Profile Tab -> History Wallet -> Withdrawal.
 **Function description:**
 - **Actor:** Member.
-- **Purpose:** Allow members to transfer available balance from their SnakeAidPay wallet to a linked bank account.
-- **Interface:** Bank account selection, withdrawal amount input, and confirmation dialogs.
-- **Data processing:** Mutate digital ledger states, log withdrawal request for admin processing/automated payout.
+- **Purpose:** Allow members to submit a withdrawal request to transfer available balance from their SnakeAidPay wallet to a linked bank account, pending manual admin approval.
+- **Interface:** Bank account selection/input, withdrawal amount input, and confirmation dialogs indicating pending status.
+- **Data processing:** Mutate digital ledger states (lock funds), log withdrawal request for admin manual review and processing.
 - **Screen layout:** 
 
 **Function details:**
-- **Data:** Withdrawal amount, linked bank account details.
+- **Data:** Withdrawal amount, linked bank account details, request status (Pending/Approved/Rejected).
 - **Validation:** Withdrawal requests must exceed minimum systemic thresholds and cannot exceed available unheld balance.
-- **Business rules:** Funds are immediately locked/deducted from available balance upon request.
-- **Normal cases:** Member requests withdrawal of 200,000 VND -> Request approved -> Funds arrive in bank account.
-- **Abnormal cases:** Member tries to withdraw more than available -> UI blocks action with an error message.
+- **Business rules:** Funds are immediately locked from the available balance upon request, and the transaction is marked as "Pending Review". The actual fiat transfer is handled manually by an Admin. Once transferred, the Admin updates the request to "Completed". If rejected, the locked funds are returned to the member's wallet.
+- **Normal cases:** Member requests withdrawal of 200,000 VND -> System locks funds and shows "Pending" -> Admin reviews and transfers money manually -> Status updates to "Completed".
+- **Abnormal cases:** Member tries to withdraw more than available -> UI blocks action; Admin rejects the withdrawal due to invalid bank details -> Funds are unlocked and returned to the member's balance.
 
 ---
 
