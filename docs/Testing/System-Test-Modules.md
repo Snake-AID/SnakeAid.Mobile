@@ -46,7 +46,7 @@ Tài liệu này định nghĩa danh sách các Module Code (Cụm Test Case) ch
 Verd| 29 | Access Rescuer Training Lessons  | 0 | 0 | 0 | 0 | 8 |
 | **F** | **System, Wallet & Utilities** | | | | | |
 | 30 | Manage SnakeAidPay Wallet (Top-up, History, Withdraw)  | 0 | 0 | 0 | 0 | 10 |
-| 31 | External Payment Interface (PayOS Callback)  | 0 | 0 | 0 | 0 | 0 |
+| 31 | External Payment Interface (PayOS Callback)  | 0 | 0 | 0 | 0 | 9 |
 | 32 | Notification Tab & SignalR Broadcasts  | 0 | 0 | 0 | 0 | 0 |
 | 33 | Submit Ratings & Read Feedback  | 0 | 0 | 0 | 0 | 0 |
 | 34 | View Mission & Consultation History (Filtering, Detail)  | 0 | 0 | 0 | 0 | 0 |
