@@ -13,9 +13,9 @@ This document defines the list of Module Codes (Test Case clusters) for the enti
 | **A** | **Authentication & Identity Management** | | | | | | | |
 | 1 | Sign Up & Role Registration (Member, Rescuer)  | 0 | 0 | 0 | 0 | 0 | Create a new account and select the correct role. | No existing account uses the same email/phone number. |
 | 2 | Sign In With Password (All Roles)  | 0 | 0 | 0 | 0 | 0 | Sign in with valid credentials for the selected role. | The account is active and the password is correct. |
-| 3 | Forgot & Reset Password Flow  | 0 | 0 | 0 | 0 | 0 | Request a password reset and complete the new password setup. | The account is active and can receive OTP/email verification. |
+| 3 | Forgot & Reset Password Flow  | 0 | 0 | 0 | 0 | 8 | Request a password reset and complete the new password setup. | The account is active and can receive OTP/email verification. |
 | 4 | Manage User Profile, Avatar & Settings  | 0 | 0 | 0 | 0 | 0 | Update personal information, avatar, and account settings. | The user is logged in. |
-| 5 | Identity Document Verdification (Rescuer/Expert)  | 0 | 0 | 0 | 0 | 0 | Submit, view, and update identity verification documents. | The user is logged in as Rescuer or Expert. |
+| 5 | Identity Document Verdification (Rescuer/Expert)  | 0 | 0 | 0 | 0 | 8 | Submit, view, and update identity verification documents. | The user is logged in as Rescuer or Expert. |
 | **B** | **Snake Catching Flow (Snake Catching Flow)** | | | | | | | |
 | 6 | Create Snake Catching Request (Images, GPS, Species)  | 0 | 0 | 0 | 0 | 0 | Create a snake catching request with photos, location, and species details. | The user is a Member, GPS is enabled, and image upload is available. |
 | 7 | Process Catching Deposit (Round 1)  | 0 | 0 | 0 | 0 | 0 | Pay the initial deposit for the snake catching request. | The snake catching request has been created and is ready for payment. |
@@ -66,7 +66,7 @@ This document defines the list of Module Codes (Test Case clusters) for the enti
 | 47 | Learning: Lessons Database Management | 0 | 0 | 0 | 0 | 0 | Manage learning lesson content in the training database. | The user has learning content management permission. |
 | 48 | Content: Blogs Database Management | 0 | 0 | 0 | 0 | 0 | Manage blog posts and publishing states. | The admin/editor account has blog management permission. |
 
-| | **TOTAL** | **0** | **0** | **0** | **0** | **93** | | |
+| | **TOTAL** | **0** | **0** | **0** | **0** | **109** | | |
 
 ---
 
