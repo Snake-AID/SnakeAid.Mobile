@@ -1746,7 +1746,7 @@ class _EmergencyTrackingScreenState
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => const ChatScreen(
+              builder: (_) => ChatScreen(
                 recipientName: 'Đội cứu hộ',
                 recipientAvatar: '🚑',
                 isExpert: false,
@@ -2018,29 +2018,9 @@ class _EmergencyTrackingScreenState
           ],
         ),
         const SizedBox(height: 12),
-        // Row 3: Chat Expert + Incident Detail
+        // Row 3: Incident Detail
         Row(
           children: [
-            Expanded(
-              child: _buildQuickActionCard(
-                icon: Icons.chat_bubble_outline,
-                label: 'Tư vấn',
-                subtitle: 'Chat Expert',
-                color: const Color(0xFF2196F3),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ChatScreen(
-                        recipientName: 'Chuyên gia',
-                        isExpert: true,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
             Expanded(
               child: _buildQuickActionCard(
                 icon: Icons.description,

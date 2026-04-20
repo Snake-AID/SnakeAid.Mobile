@@ -4627,6 +4627,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         return 'Cần Thanh Toán';
       case 'paid':
         return 'Đã Thanh Toán';
+      case 'confirmed':
+        return 'Đã Duyệt';
       case 'completed':
         return 'Hoàn Thành';
       case 'dispute':
