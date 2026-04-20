@@ -218,18 +218,8 @@ class _EmergencyRequestWaitingDialogState
           }
         });
 
-        if (canonicalStatus == 'AcceptedByExpert' &&
-            event.consultationId != null &&
-            event.consultationId!.isNotEmpty) {
-          if (mounted) Navigator.of(context).pop();
-          context.go(
-            '/video-waiting/${event.consultationId}',
-            extra: {
-              'expertName': widget.expertName,
-              'expertSpecialty': 'Tư vấn ngay',
-            },
-          );
-        }
+        // Keep the user on waiting modal when accepted so they can confirm
+        // and manually enter via "Vào Phòng Chờ Ngay".
       });
 
       await _signalR!.connectAndJoinRequestRoom(widget.requestId);
@@ -286,18 +276,8 @@ class _EmergencyRequestWaitingDialogState
           }
         });
 
-        if (canonicalStatus == 'AcceptedByExpert' &&
-            request.consultationId != null &&
-            request.consultationId!.isNotEmpty) {
-          if (mounted) Navigator.of(context).pop();
-          context.go(
-            '/video-waiting/${request.consultationId}',
-            extra: {
-              'expertName': widget.expertName,
-              'expertSpecialty': 'Tư vấn ngay',
-            },
-          );
-        }
+        // Keep the user on waiting modal when accepted so they can confirm
+        // and manually enter via "Vào Phòng Chờ Ngay".
       } finally {
         _isPollingStatus = false;
       }
@@ -311,7 +291,7 @@ class _EmergencyRequestWaitingDialogState
       case 'PendingExpertResponse':
         return 'Đã thanh toán. Đang chờ chuyên gia phản hồi...';
       case 'AcceptedByExpert':
-        return 'Chuyên gia đã chấp nhận! Đang chuyển vào phòng tư vấn...';
+        return 'Chuyên gia đã chấp nhận! Nhấn "Vào Phòng Chờ Ngay" để tiếp tục.';
       case 'DeclinedByExpert':
         return 'Chuyên gia đã từ chối yêu cầu. Tiền sẽ được hoàn về ví của bạn. Vui lòng chọn chuyên gia khác.';
       case 'Expired':

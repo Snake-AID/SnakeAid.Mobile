@@ -429,33 +429,6 @@ class _ExpertConsultationCompletionScreenState
                     ),
                   ),
 
-                  // ── Rating placeholder ────────────────────────────────────
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: Column(
-                      children: [
-                        const Text(
-                          'Bệnh nhân sẽ được yêu cầu đánh giá bạn',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              fontSize: 13, color: Color(0xFF888888)),
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(
-                            5,
-                            (_) => const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 3),
-                              child: Icon(Icons.star,
-                                  color: Color(0xFFFFC107), size: 32),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
                   // ── Checklist ─────────────────────────────────────────────
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
