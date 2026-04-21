@@ -2919,23 +2919,61 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
             ),
           ],
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 38,
-            child: OutlinedButton(
-              onPressed: () => _openDetail(context, item),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFF6C47C2), width: 1.2),
-                foregroundColor: _purple,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 38,
+                  child: OutlinedButton(
+                    onPressed: () => _openDetail(context, item),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF6C47C2), width: 1.2),
+                      foregroundColor: _purple,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text(
+                      'Xem Chi Tiết',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                  ),
                 ),
               ),
-              child: const Text(
-                'Xem Chi Tiết',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SizedBox(
+                  height: 38,
+                  child: ElevatedButton.icon(
+                    onPressed: item.consultationId == null || item.consultationId!.isEmpty
+                        ? null
+                        : () {
+                            context.push(
+                              '/consultation-message-history/${item.consultationId}',
+                              extra: {
+                                'title': item.patientName,
+                                'isExpertMode': true,
+                              },
+                            );
+                          },
+                    icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                    label: const Text(
+                      'Tin Nhắn',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _purple,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: const Color(0xFFE8E8E8),
+                      disabledForegroundColor: const Color(0xFF999999),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),

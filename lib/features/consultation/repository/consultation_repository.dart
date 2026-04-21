@@ -14,6 +14,7 @@ import '../models/my_consultation_response.dart';
 import '../models/consultation_review_response.dart';
 import '../models/emergency_consultation_request.dart';
 import '../models/consultation_payment_response.dart';
+import '../models/consultation_message_history_response.dart';
 
 /// Provider for ConsultationRepository
 final consultationRepositoryProvider = Provider<ConsultationRepository>((ref) {
@@ -948,6 +949,62 @@ class ConsultationRepository {
     }
 
     throw Exception(body['message'] ?? 'Không thể lấy đánh giá buổi tư vấn');
+  }
+
+  /// Report expert absence for a scheduled consultation.
+  ///
+  /// API: `POST /api/consultations/{consultationId}/expert-absent-report`
+  Future<MyConsultationResponse> reportExpertAbsent({
+    required String consultationId,
+    required String customerReport,
+  }) async {
+    final report = customerReport.trim();
+    if (report.isEmpty) {
+      throw Exception('Nội dung báo cáo không được để trống');
+    }
+    if (report.length > 2000) {
+      throw Exception('Nội dung báo cáo tối đa 2000 ký tự');
+    }
+
+    final response = await httpService.post(
+      '/api/consultations/$consultationId/expert-absent-report',
+      data: {'customerReport': report},
+    );
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] == true && body['data'] is Map<String, dynamic>) {
+      return MyConsultationResponse.fromJson(
+        body['data'] as Map<String, dynamic>,
+      );
+    }
+
+    throw Exception(body['message'] ?? 'Không thể gửi báo cáo chuyên gia vắng mặt');
+  }
+
+  /// Get persisted chat history for a terminal consultation.
+  ///
+  /// API: `GET /api/consultations/{consultationId}/messages-history`
+  Future<ConsultationMessageHistoryResponse> getConsultationMessageHistory({
+    required String consultationId,
+    int pageNumber = 1,
+    int pageSize = 10,
+  }) async {
+    final response = await httpService.get(
+      '/api/consultations/$consultationId/messages-history',
+      queryParameters: {
+        'pageNumber': pageNumber,
+        'pageSize': pageSize,
+      },
+    );
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] == true && body['data'] is Map<String, dynamic>) {
+      return ConsultationMessageHistoryResponse.fromJson(
+        body['data'] as Map<String, dynamic>,
+      );
+    }
+
+    throw Exception(body['message'] ?? 'Không thể tải lịch sử tin nhắn');
   }
 
   // ---------------------------------------------------------------------------

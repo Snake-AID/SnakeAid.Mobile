@@ -32,6 +32,9 @@ class _ConsultationItem {
   final int feeCost;
   final double? rating;
   final String? problemDescription;
+  final String? customerReport;
+  final DateTime? customerReportSubmittedAt;
+  final bool canReportExpertAbsent;
 
   const _ConsultationItem({
     required this.id,
@@ -46,6 +49,9 @@ class _ConsultationItem {
     required this.feeCost,
     this.rating,
     this.problemDescription,
+    this.customerReport,
+    this.customerReportSubmittedAt,
+    this.canReportExpertAbsent = false,
   });
 
   /// Map from API my-consultation response to UI model
@@ -56,6 +62,11 @@ class _ConsultationItem {
     final ConsultationStatus uiStatus;
     if (c.status == MyConsultationStatus.completed) {
       uiStatus = ConsultationStatus.completed;
+    } else if (c.status == MyConsultationStatus.cancelled ||
+        c.status == MyConsultationStatus.userAbsent ||
+        c.status == MyConsultationStatus.expertAbsent ||
+        c.status == MyConsultationStatus.allAbsent) {
+      uiStatus = ConsultationStatus.cancelled;
     } else if (c.status == MyConsultationStatus.scheduled) {
       uiStatus = scheduledAt.isAfter(now)
           ? ConsultationStatus.upcoming
@@ -86,6 +97,9 @@ class _ConsultationItem {
       feeCost: fee,
       rating: null,
       problemDescription: c.problemDescription,
+      customerReport: c.customerReport,
+      customerReportSubmittedAt: c.customerReportSubmittedAt,
+      canReportExpertAbsent: c.type == MyConsultationType.scheduled,
     );
   }
 }
@@ -150,6 +164,9 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
         feeCost: item.feeCost,
         rating: rating,
         problemDescription: item.problemDescription,
+        customerReport: item.customerReport,
+        customerReportSubmittedAt: item.customerReportSubmittedAt,
+        canReportExpertAbsent: item.canReportExpertAbsent,
       );
     }).toList();
   }
@@ -227,6 +244,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
             feeCost: b.feeCost,
             rating: b.rating,
             problemDescription: b.problemDescription,
+            canReportExpertAbsent: b.consultationType == 'Scheduled',
           ),
         )
         .toList();
@@ -1146,6 +1164,28 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                   ),
               ],
             ),
+              if (item.consultationId != null && item.consultationId!.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 36,
+                  child: TextButton.icon(
+                    onPressed: () => _openMessageHistory(context, item),
+                    icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                    label: const Text(
+                      'Xem Lịch Sử Tin Nhắn',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF228B22),
+                      backgroundColor: const Color(0xFFE8F5E9),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
           ],
         ),
       ),
@@ -1374,6 +1414,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => MemberConsultationDetailScreen(
+          consultationId: item.consultationId,
           expertName: item.expertName,
           expertSpecialty: item.expertSpecialty,
           serviceType: item.serviceType,
@@ -1383,6 +1424,8 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
           statusColor: statusColor,
           rating: item.rating,
           problemDescription: item.problemDescription,
+          customerReport: item.customerReport,
+          customerReportSubmittedAt: item.customerReportSubmittedAt,
         ),
       ),
     );
@@ -1395,6 +1438,26 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
       extra: {
         'expertName': item.expertName,
         'expertSpecialty': item.expertSpecialty,
+        'canReportExpertAbsent': item.canReportExpertAbsent,
+        'scheduledStartAtMs': item.scheduledTime.millisecondsSinceEpoch,
+      },
+    );
+  }
+
+  void _openMessageHistory(BuildContext context, _ConsultationItem item) {
+    final consultationId = item.consultationId;
+    if (consultationId == null || consultationId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Phiên tư vấn này chưa có lịch sử tin nhắn.')),
+      );
+      return;
+    }
+
+    context.push(
+      '/consultation-message-history/$consultationId',
+      extra: {
+        'title': item.expertName,
+        'isExpertMode': false,
       },
     );
   }

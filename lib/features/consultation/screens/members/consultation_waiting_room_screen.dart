@@ -9,6 +9,10 @@ class ConsultationWaitingRoomScreen extends ConsumerStatefulWidget {
   final String consultationId;
   final String expertName;
   final String expertSpecialty;
+  /// Enable report-expert-absent action for scheduled consultations.
+  final bool canReportExpertAbsent;
+  /// Scheduled start time (epoch ms) used for StartTime business rule.
+  final int? scheduledStartAtMs;
   /// true khi quay lại từ cuộc gọi đã kết thúc → hiện nút "Xác nhận hoàn thành"
   final bool showCompleteButton;
   final int durationSeconds;
@@ -22,6 +26,8 @@ class ConsultationWaitingRoomScreen extends ConsumerStatefulWidget {
     required this.consultationId,
     required this.expertName,
     required this.expertSpecialty,
+    this.canReportExpertAbsent = false,
+    this.scheduledStartAtMs,
     this.showCompleteButton = false,
     this.durationSeconds = 0,
     this.initialMicOn = true,
@@ -43,6 +49,7 @@ class _ConsultationWaitingRoomScreenState
   bool _isMicOn = true;
   bool _isCameraOn = true;
   bool _isJoining = false;
+  bool _isReportingAbsent = false;
 
   late Timer _clockTimer;
   DateTime _now = DateTime.now();
@@ -209,6 +216,103 @@ class _ConsultationWaitingRoomScreenState
 
   void _cancelCall() {
     context.go('/consultation-home');
+  }
+
+  bool get _canSubmitAbsentByTime {
+    final startMs = widget.scheduledStartAtMs;
+    if (startMs == null) return true;
+    final start = DateTime.fromMillisecondsSinceEpoch(startMs);
+    return DateTime.now().isAfter(start) || DateTime.now().isAtSameMomentAs(start);
+  }
+
+  Future<void> _showReportExpertAbsentDialog() async {
+    if (_isReportingAbsent) return;
+
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text(
+            'Báo Cáo Chuyên Gia Vắng Mặt',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Vui lòng mô tả ngắn gọn để hệ thống xác minh và xử lý.',
+                style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                minLines: 3,
+                maxLines: 6,
+                maxLength: 2000,
+                decoration: InputDecoration(
+                  hintText: 'Ví dụ: Đã đến giờ hẹn nhưng chuyên gia chưa vào phòng tư vấn.',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, controller.text),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Gửi báo cáo'),
+            ),
+          ],
+        );
+      },
+    );
+
+    final report = (result ?? '').trim();
+    if (report.isEmpty || !mounted) return;
+
+    setState(() => _isReportingAbsent = true);
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      await repo.reportExpertAbsent(
+        consultationId: widget.consultationId,
+        customerReport: report,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã gửi báo cáo chuyên gia vắng mặt.'),
+          backgroundColor: Color(0xFF228B22),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      context.go('/consultation-home', extra: {'initialTab': 1});
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isReportingAbsent = false);
+      }
+    }
   }
 
   @override
@@ -623,6 +727,42 @@ class _ConsultationWaitingRoomScreenState
                   'Hoàn Thành Tư Vấn',
                   style: TextStyle(
                       fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
+
+          if (widget.canReportExpertAbsent && !widget.showCompleteButton) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: OutlinedButton.icon(
+                onPressed: (!_canSubmitAbsentByTime || _isReportingAbsent)
+                    ? null
+                    : _showReportExpertAbsentDialog,
+                icon: _isReportingAbsent
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.report_problem_outlined),
+                label: Text(
+                  _canSubmitAbsentByTime
+                      ? 'Báo Chuyên Gia Vắng Mặt'
+                      : 'Chưa đến giờ để báo cáo',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red,
+                  side: const BorderSide(color: Colors.red),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
