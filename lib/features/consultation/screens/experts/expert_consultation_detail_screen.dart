@@ -605,6 +605,38 @@ class _ExpertConsultationDetailScreenState
                 ),
               ),
             ),
+          if (!_isActionable && consultationId.isNotEmpty)
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+              child: SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    context.push(
+                      '/consultation-message-history/$consultationId',
+                      extra: {
+                        'title': patientName,
+                        'isExpertMode': true,
+                      },
+                    );
+                  },
+                  icon: const Icon(Icons.chat_bubble_outline, size: 20),
+                  label: const Text(
+                    'Xem Lịch Sử Tin Nhắn',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: _purple, width: 1.3),
+                    foregroundColor: _purple,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

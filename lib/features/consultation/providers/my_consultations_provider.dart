@@ -63,13 +63,43 @@ class MyConsultationsNotifier extends StateNotifier<MyConsultationsState> {
           pageNumber: 1,
           pageSize: 10,
         ),
+        _repository.getMyConsultations(
+          status: 'Cancelled',
+          pageNumber: 1,
+          pageSize: 10,
+        ),
+        _repository.getMyConsultations(
+          status: 'UserAbsent',
+          pageNumber: 1,
+          pageSize: 10,
+        ),
+        _repository.getMyConsultations(
+          status: 'ExpertAbsent',
+          pageNumber: 1,
+          pageSize: 10,
+        ),
+        _repository.getMyConsultations(
+          status: 'AllAbsent',
+          pageNumber: 1,
+          pageSize: 10,
+        ),
       ]);
 
       final ongoingAndScheduled = [...results[0], ...results[1]];
       final ongoingById = <String, MyConsultationResponse>{
         for (final c in ongoingAndScheduled) c.consultationId: c,
       };
-      final completed = results[2];
+      final completedById = <String, MyConsultationResponse>{
+        for (final c in [
+          ...results[2],
+          ...results[3],
+          ...results[4],
+          ...results[5],
+          ...results[6],
+        ])
+          c.consultationId: c,
+      };
+      final completed = completedById.values.toList();
       final reviewPairs = await Future.wait(
         completed.map((c) async {
           final consultationId = c.consultationId;

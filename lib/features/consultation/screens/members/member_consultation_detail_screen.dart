@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class MemberConsultationDetailScreen extends StatelessWidget {
+  final String? consultationId;
   final String expertName;
   final String expertSpecialty;
   final String serviceType;
@@ -10,9 +12,12 @@ class MemberConsultationDetailScreen extends StatelessWidget {
   final Color statusColor;
   final double? rating;
   final String? problemDescription;
+  final String? customerReport;
+  final DateTime? customerReportSubmittedAt;
 
   const MemberConsultationDetailScreen({
     super.key,
+    this.consultationId,
     required this.expertName,
     required this.expertSpecialty,
     required this.serviceType,
@@ -22,6 +27,8 @@ class MemberConsultationDetailScreen extends StatelessWidget {
     required this.statusColor,
     this.rating,
     this.problemDescription,
+    this.customerReport,
+    this.customerReportSubmittedAt,
   });
 
   static const Color _bg = Color(0xFFF8F6F8);
@@ -159,6 +166,36 @@ class MemberConsultationDetailScreen extends StatelessWidget {
               ),
             ),
           ],
+          if (customerReport != null && customerReport!.trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _SectionCard(
+              label: 'Báo Cáo Vắng Mặt',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    customerReport!.trim(),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      height: 1.5,
+                      color: Color(0xFF374151),
+                    ),
+                  ),
+                  if (customerReportSubmittedAt != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Đã gửi lúc ${_formatDateTime(customerReportSubmittedAt!)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF6B7280),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
           if (rating != null) ...[
             const SizedBox(height: 12),
             _SectionCard(
@@ -179,12 +216,46 @@ class MemberConsultationDetailScreen extends StatelessWidget {
               ),
             ),
           ],
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: consultationId == null || consultationId!.isEmpty
+                  ? null
+                  : () {
+                      context.push(
+                        '/consultation-message-history/$consultationId',
+                        extra: {
+                          'title': expertName,
+                          'isExpertMode': false,
+                        },
+                      );
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              icon: const Icon(Icons.chat_bubble_outline),
+              label: const Text(
+                'Xem Lịch Sử Tin Nhắn',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
   String _pad(int value) => value.toString().padLeft(2, '0');
+
+  String _formatDateTime(DateTime dt) {
+    return '${_pad(dt.day)}/${_pad(dt.month)}/${dt.year} ${_pad(dt.hour)}:${_pad(dt.minute)}';
+  }
 
   String _formatFee(int fee) {
     final formatted = fee

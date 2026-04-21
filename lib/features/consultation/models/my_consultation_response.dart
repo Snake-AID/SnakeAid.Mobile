@@ -7,6 +7,10 @@ enum MyConsultationStatus {
   scheduled,
   ongoing,
   completed,
+  cancelled,
+  userAbsent,
+  expertAbsent,
+  allAbsent,
 }
 
 class MyConsultationResponse {
@@ -20,6 +24,8 @@ class MyConsultationResponse {
   final DateTime? endTime;
   final double? price;
   final String? problemDescription;
+  final String? customerReport;
+  final DateTime? customerReportSubmittedAt;
   final String? bookingId;
   final DateTime? slotStartTime;
   final DateTime? slotEndTime;
@@ -36,6 +42,8 @@ class MyConsultationResponse {
     this.endTime,
     this.price,
     this.problemDescription,
+    this.customerReport,
+    this.customerReportSubmittedAt,
     this.bookingId,
     this.slotStartTime,
     this.slotEndTime,
@@ -57,6 +65,15 @@ class MyConsultationResponse {
       switch ((value ?? '').toLowerCase()) {
         case 'scheduled':
           return MyConsultationStatus.scheduled;
+        case 'cancelled':
+        case 'canceled':
+          return MyConsultationStatus.cancelled;
+        case 'userabsent':
+          return MyConsultationStatus.userAbsent;
+        case 'expertabsent':
+          return MyConsultationStatus.expertAbsent;
+        case 'allabsent':
+          return MyConsultationStatus.allAbsent;
         case 'completed':
           return MyConsultationStatus.completed;
         case 'ongoing':
@@ -116,6 +133,11 @@ class MyConsultationResponse {
       ),
       price: (json['price'] as num?)?.toDouble(),
       problemDescription: json['problemDescription']?.toString(),
+      customerReport: json['customerReport']?.toString(),
+      customerReportSubmittedAt: parseDate(
+        json['customerReportSubmittedAt'],
+        treatUtcAsWallClock: treatUtcAsWallClock,
+      ),
       bookingId: json['bookingId']?.toString(),
       slotStartTime: parseDate(
         json['slotStartTime'],

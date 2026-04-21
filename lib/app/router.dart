@@ -84,6 +84,7 @@ import 'package:snakeaid_mobile/features/consultation/screens/members/video_cons
 import 'package:snakeaid_mobile/features/consultation/screens/members/consultation_waiting_room_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/members/consultation_completion_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/members/emergency_request_waiting_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/shared/consultation_message_history_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/experts/expert_waiting_room_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/experts/expert_consultation_detail_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/experts/expert_consultation_completion_screen.dart';
@@ -430,6 +431,9 @@ final router = GoRouter(
           consultationId: id,
           expertName: extra?['expertName'] as String? ?? 'Chuyên Gia',
           expertSpecialty: extra?['expertSpecialty'] as String? ?? '',
+          canReportExpertAbsent:
+              extra?['canReportExpertAbsent'] as bool? ?? false,
+          scheduledStartAtMs: extra?['scheduledStartAtMs'] as int?,
           showCompleteButton: extra?['showCompleteButton'] as bool? ?? false,
           durationSeconds: extra?['durationSeconds'] as int? ?? 0,
           initialMicOn: extra?['initialMicOn'] as bool? ?? true,
@@ -535,6 +539,20 @@ final router = GoRouter(
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>? ?? {};
         return ExpertConsultationDetailScreen(data: extra);
+      },
+    ),
+
+    GoRoute(
+      path: '/consultation-message-history/:consultationId',
+      name: 'consultation_message_history',
+      builder: (context, state) {
+        final consultationId = state.pathParameters['consultationId']!;
+        final extra = state.extra as Map<String, dynamic>?;
+        return ConsultationMessageHistoryScreen(
+          consultationId: consultationId,
+          title: extra?['title'] as String? ?? 'Phiên tư vấn',
+          isExpertMode: extra?['isExpertMode'] as bool? ?? false,
+        );
       },
     ),
 
