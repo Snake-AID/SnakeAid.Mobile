@@ -47,7 +47,6 @@ final _rescuerShiftScheduleProvider =
       final startDate = DateFormat('yyyy-MM-dd').format(today);
       final endDate = DateFormat('yyyy-MM-dd').format(today);
       return repo.getAssignmentsByRescuerRange(
-        rescuerId: rescuerId,
         startDate: startDate,
         endDate: endDate,
       );

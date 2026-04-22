@@ -71,12 +71,10 @@ class RescuerShiftRepository {
 
   RescuerShiftRepository(this._httpService);
 
-  Future<List<ShiftAssignment>> getAssignmentsToday({
-    required String rescuerId,
-  }) async {
+  Future<List<ShiftAssignment>> getAssignmentsToday() async {
     try {
       final response = await _httpService.get(
-        '/api/shifts/rescuer/$rescuerId/my-assignments-today',
+        '/api/shifts/rescuer/my-assignments-today',
       );
       final raw = response.data;
       if (raw is! Map) return <ShiftAssignment>[];
@@ -95,13 +93,12 @@ class RescuerShiftRepository {
   }
 
   Future<List<ShiftAssignment>> getAssignmentsByRescuerRange({
-    required String rescuerId,
     required String startDate,
     required String endDate,
   }) async {
     try {
       final response = await _httpService.get(
-        '/api/shifts/rescuer/$rescuerId/assignments',
+        '/api/shifts/rescuer/assignments',
         queryParameters: {'startDate': startDate, 'endDate': endDate},
       );
       final raw = response.data;

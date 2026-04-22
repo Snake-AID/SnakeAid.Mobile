@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:snakeaid_mobile/features/emergency/models/detailed_incident_response.dart';
 import '../../../core/services/http_service.dart';
 import '../../../core/providers/http_provider.dart';
 import '../models/snake_catching_request.dart';
@@ -9,7 +10,9 @@ import '../../emergency/models/media_upload_response.dart';
 import '../../emergency/models/snake_detection_response.dart';
 
 /// Provider for SnakeCatchingRepository
-final snakeCatchingRepositoryProvider = Provider<SnakeCatchingRepository>((ref) {
+final snakeCatchingRepositoryProvider = Provider<SnakeCatchingRepository>((
+  ref,
+) {
   final httpService = ref.watch(httpServiceProvider);
   return SnakeCatchingRepository(httpService);
 });
@@ -21,7 +24,9 @@ class SnakeCatchingRepository {
 
   /// Create a new snake catching request
   /// POST /api/snakecatching/requests
-  Future<SnakeCatchingResponse> createRequest(SnakeCatchingRequest request) async {
+  Future<SnakeCatchingResponse> createRequest(
+    SnakeCatchingRequest request,
+  ) async {
     try {
       final body = request.toJson();
       final response = await _httpService.post(
@@ -34,8 +39,11 @@ class SnakeCatchingRepository {
       throw Exception('Phản hồi không hợp lệ từ server');
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) {
-        throw Exception('API endpoint chưa sẵn sàng. Vui lòng liên hệ admin để kích hoạt tính năng này.');
-      } else if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
+        throw Exception(
+          'API endpoint chưa sẵn sàng. Vui lòng liên hệ admin để kích hoạt tính năng này.',
+        );
+      } else if (e.response?.statusCode == 401 ||
+          e.response?.statusCode == 403) {
         throw Exception('Bạn cần đăng nhập để tạo yêu cầu bắt rắn.');
       } else if (e.response?.statusCode == 400) {
         final message = e.response?.data['message'] ?? 'Dữ liệu không hợp lệ';
@@ -67,7 +75,8 @@ class SnakeCatchingRepository {
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) {
         throw Exception('API endpoint chưa sẵn sàng.');
-      } else if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
+      } else if (e.response?.statusCode == 401 ||
+          e.response?.statusCode == 403) {
         throw Exception('Bạn cần đăng nhập để xem danh sách yêu cầu.');
       }
       throw Exception('Không thể tải danh sách yêu cầu. Vui lòng thử lại sau.');
@@ -80,12 +89,15 @@ class SnakeCatchingRepository {
   /// GET /api/snakecatching/requests/{requestId}
   Future<SnakeCatchingResponse> getRequestById(String requestId) async {
     try {
-      final response = await _httpService.get('/api/snakecatching/requests/$requestId');
+      final response = await _httpService.get(
+        '/api/snakecatching/requests/$requestId',
+      );
       return SnakeCatchingResponse.fromJson(response.data);
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) {
         throw Exception('Không tìm thấy yêu cầu này.');
-      } else if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
+      } else if (e.response?.statusCode == 401 ||
+          e.response?.statusCode == 403) {
         throw Exception('Bạn không có quyền xem yêu cầu này.');
       }
       throw Exception('Không thể tải chi tiết yêu cầu. Vui lòng thử lại sau.');
@@ -103,21 +115,30 @@ class SnakeCatchingRepository {
       final fileName = imageFile.path.split('/').last.split('\\').last;
       debugPrint('📸 Uploading report image: $fileName');
       final formData = FormData.fromMap({
-        'File': await MultipartFile.fromFile(imageFile.path, filename: fileName),
-        'Type': 'SnakeCatchingRequest',
-        'Purpose': 'SnakeIdentification',
+        'File': await MultipartFile.fromFile(
+          imageFile.path,
+          filename: fileName,
+        ),
       });
 
       final response = await _httpService.post(
         '/api/media/report',
         data: formData,
+        queryParameters: {
+          'type': MediaReferenceType.snakeCatchingRequest.value,
+          'purpose': MediaPurpose.snakeIdentification.value,
+        },
         options: Options(headers: {'Content-Type': 'multipart/form-data'}),
       );
       final result = MediaUploadResponse.fromJson(response.data);
-      debugPrint('📸 Upload result — isSuccess: ${result.isSuccess}, mediaId: ${result.data?.id}');
+      debugPrint(
+        '📸 Upload result — isSuccess: ${result.isSuccess}, mediaId: ${result.data?.id}',
+      );
       return result;
     } on DioException catch (e) {
-      debugPrint('❌ uploadSnakeReportImage failed [${e.response?.statusCode}]: ${e.response?.data}');
+      debugPrint(
+        '❌ uploadSnakeReportImage failed [${e.response?.statusCode}]: ${e.response?.data}',
+      );
       throw Exception('Không thể tải ảnh lên. Vui lòng thử lại.');
     } catch (e) {
       throw Exception('Lỗi không xác định: $e');
@@ -134,10 +155,14 @@ class SnakeCatchingRepository {
         '/api/detection/detect/$mediaId',
       );
       final result = SnakeDetectionResponse.fromJson(response.data);
-      debugPrint('🤖 Detection result — isSuccess: ${result.isSuccess}, results count: ${result.data?.results.length}, first species: ${result.data?.results.firstOrNull?.snake.commonName} (id: ${result.data?.results.firstOrNull?.snake.id})');
+      debugPrint(
+        '🤖 Detection result — isSuccess: ${result.isSuccess}, results count: ${result.data?.results.length}, first species: ${result.data?.results.firstOrNull?.snake.commonName} (id: ${result.data?.results.firstOrNull?.snake.id})',
+      );
       return result;
     } on DioException catch (e) {
-      debugPrint('❌ detectSnakeFromMedia failed [${e.response?.statusCode}]: ${e.response?.data}');
+      debugPrint(
+        '❌ detectSnakeFromMedia failed [${e.response?.statusCode}]: ${e.response?.data}',
+      );
       throw Exception('Nhận diện rắn thất bại. Vui lòng thử lại.');
     } catch (e) {
       throw Exception('Lỗi không xác định: $e');
@@ -150,7 +175,10 @@ class SnakeCatchingRepository {
     try {
       final fileName = imageFile.path.split('/').last;
       final formData = FormData.fromMap({
-        'File': await MultipartFile.fromFile(imageFile.path, filename: fileName),
+        'File': await MultipartFile.fromFile(
+          imageFile.path,
+          filename: fileName,
+        ),
         'ReferenceId': missionId,
       });
 
@@ -158,8 +186,8 @@ class SnakeCatchingRepository {
         '/api/media/report',
         data: formData,
         queryParameters: {
-          'type': 'SnakeCatchingMission',
-          'purpose': 'Evidence',
+          'type': MediaReferenceType.snakeCatchingMission.value,
+          'purpose': MediaPurpose.evidence.value,
         },
         options: Options(headers: {'Content-Type': 'multipart/form-data'}),
       );
@@ -182,7 +210,8 @@ class SnakeCatchingRepository {
       if (e.response?.statusCode == 404) {
         throw Exception('Không tìm thấy nhiệm vụ này.');
       } else if (e.response?.statusCode == 400) {
-        final message = e.response?.data['message'] ?? 'Không thể cập nhật trạng thái';
+        final message =
+            e.response?.data['message'] ?? 'Không thể cập nhật trạng thái';
         throw Exception(message);
       }
       throw Exception('Không thể cập nhật trạng thái. Vui lòng thử lại.');
@@ -203,7 +232,8 @@ class SnakeCatchingRepository {
       if (e.response?.statusCode == 404) {
         throw Exception('Không tìm thấy nhiệm vụ này.');
       } else if (e.response?.statusCode == 400) {
-        final message = e.response?.data['message'] ?? 'Không thể bắt đầu nhiệm vụ';
+        final message =
+            e.response?.data['message'] ?? 'Không thể bắt đầu nhiệm vụ';
         throw Exception(message);
       }
       throw Exception('Không thể bắt đầu nhiệm vụ. Vui lòng thử lại.');
@@ -215,7 +245,11 @@ class SnakeCatchingRepository {
   /// Add a snake detail to a mission (immediately after rescuer confirms a snake)
   /// POST /api/catchingmission/details
   /// Returns the created mission detail ID.
-  Future<String> addMissionDetail(String missionId, int snakeSpeciesId, int quantity) async {
+  Future<String> addMissionDetail(
+    String missionId,
+    int snakeSpeciesId,
+    int quantity,
+  ) async {
     try {
       final response = await _httpService.post(
         '/api/catchingmission/details',
@@ -258,7 +292,10 @@ class SnakeCatchingRepository {
 
   /// Complete a mission — rescuer sends result to customer
   /// PATCH /api/snakecatching/missions/{missionId}/complete
-  Future<void> completeMission(String missionId, {required String catchingEnvironmentId}) async {
+  Future<void> completeMission(
+    String missionId, {
+    required String catchingEnvironmentId,
+  }) async {
     try {
       final response = await _httpService.patch(
         '/api/snakecatching/missions/$missionId/complete',
@@ -268,7 +305,8 @@ class SnakeCatchingRepository {
       if (e.response?.statusCode == 404) {
         throw Exception('Không tìm thấy nhiệm vụ này.');
       } else if (e.response?.statusCode == 400) {
-        final message = e.response?.data['message'] ?? 'Không thể hoàn thành nhiệm vụ';
+        final message =
+            e.response?.data['message'] ?? 'Không thể hoàn thành nhiệm vụ';
         throw Exception(message);
       }
       throw Exception('Không thể hoàn thành nhiệm vụ. Vui lòng thử lại.');
@@ -291,7 +329,9 @@ class SnakeCatchingRepository {
       } else if (e.response?.statusCode == 400) {
         final errorCode = e.response?.data['error']?['errorCode'] as String?;
         if (errorCode == 'INTERNAL_SERVER_ERROR') {
-          throw Exception('Máy chủ gặp lỗi nội bộ khi hủy đơn. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.');
+          throw Exception(
+            'Máy chủ gặp lỗi nội bộ khi hủy đơn. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.',
+          );
         }
         final message = e.response?.data['message'] ?? 'Không thể hủy nhiệm vụ';
         throw Exception(message);
@@ -318,7 +358,9 @@ class SnakeCatchingRepository {
       } else if (e.response?.statusCode == 400) {
         final errorCode = e.response?.data['error']?['errorCode'] as String?;
         if (errorCode == 'INTERNAL_SERVER_ERROR') {
-          throw Exception('Máy chủ gặp lỗi nội bộ khi hủy đơn. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.');
+          throw Exception(
+            'Máy chủ gặp lỗi nội bộ khi hủy đơn. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.',
+          );
         }
         final message = e.response?.data['message'] ?? 'Không thể hủy yêu cầu';
         throw Exception(message);
@@ -333,7 +375,11 @@ class SnakeCatchingRepository {
 
   /// Accept a snake catching request
   /// POST /api/snakecatching/requests/accept/{requestId}
-  Future<SnakeCatchingResponse> acceptRequest(String requestId, double lat, double lng) async {
+  Future<SnakeCatchingResponse> acceptRequest(
+    String requestId,
+    double lat,
+    double lng,
+  ) async {
     try {
       final response = await _httpService.post(
         '/api/snakecatching/requests/accept/$requestId',
@@ -343,10 +389,12 @@ class SnakeCatchingRepository {
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) {
         throw Exception('Không tìm thấy yêu cầu này.');
-      } else if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
+      } else if (e.response?.statusCode == 401 ||
+          e.response?.statusCode == 403) {
         throw Exception('Bạn không có quyền chấp nhận yêu cầu này.');
       } else if (e.response?.statusCode == 400) {
-        final message = e.response?.data['message'] ?? 'Không thể chấp nhận yêu cầu';
+        final message =
+            e.response?.data['message'] ?? 'Không thể chấp nhận yêu cầu';
         throw Exception(message);
       }
       throw Exception('Không thể chấp nhận yêu cầu. Vui lòng thử lại sau.');

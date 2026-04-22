@@ -30,7 +30,6 @@ final rescuerWeeklyScheduleProvider =
       final endDateStr = DateFormat('yyyy-MM-dd').format(endOfWeek);
 
       return await repo.getAssignmentsByRescuerRange(
-        rescuerId: rescuerId,
         startDate: startDateStr,
         endDate: endDateStr,
       );
