@@ -13,7 +13,9 @@ RescueRequest _$RescueRequestFromJson(Map<String, dynamic> json) =>
       incidentId: json['incidentId'] as String,
       radiusKm: (json['radiusKm'] as num).toDouble(),
       requestSentAt: DateTime.parse(json['requestSentAt'] as String),
-      expiredAt: DateTime.parse(json['expiredAt'] as String),
+      expiredAt: json['expiredAt'] == null
+          ? null
+          : DateTime.parse(json['expiredAt'] as String),
     );
 
 Map<String, dynamic> _$RescueRequestToJson(RescueRequest instance) =>
@@ -23,7 +25,7 @@ Map<String, dynamic> _$RescueRequestToJson(RescueRequest instance) =>
       'incidentId': instance.incidentId,
       'radiusKm': instance.radiusKm,
       'requestSentAt': instance.requestSentAt.toIso8601String(),
-      'expiredAt': instance.expiredAt.toIso8601String(),
+      'expiredAt': instance.expiredAt?.toIso8601String(),
     };
 
 AcceptRequestResponse _$AcceptRequestResponseFromJson(

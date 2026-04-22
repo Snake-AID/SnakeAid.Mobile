@@ -27,24 +27,31 @@ import '../models/rescuer_daily_stats.dart';
 // ── Rescuer daily statistics provider ────────────────────────────────────────
 final _rescuerDailyStatsProvider =
     FutureProvider.autoDispose<RescuerDailyStats>((ref) async {
-  final repo = ref.watch(rescuerAnalyticsRepositoryProvider);
-  return repo.getStatistics(period: 'day');
-});
+      final repo = ref.watch(rescuerAnalyticsRepositoryProvider);
+      return repo.getStatistics(period: 'day');
+    });
 
 // ── Active snake catching job provider ──────────────────────────────────
 final _activeCatchingJobProvider =
     FutureProvider.autoDispose<SnakeCatchingRequestData?>((ref) async {
-  final currentUser = ref.watch(currentUserProvider);
-  if (currentUser == null) return null;
-  final repo = ref.watch(snakeCatchingRepositoryProvider);
-  final response = await repo.getRequests(assignedRescuerId: currentUser.id);
-  const terminalStatuses = {
-    'completed', 'cancelled', 'expired', 'rejected', 'failed', 'finished',
-  };
-  return response.data
-      .where((r) => !terminalStatuses.contains(r.status.toLowerCase()))
-      .firstOrNull;
-});
+      final currentUser = ref.watch(currentUserProvider);
+      if (currentUser == null) return null;
+      final repo = ref.watch(snakeCatchingRepositoryProvider);
+      final response = await repo.getRequests(
+        assignedRescuerId: currentUser.id,
+      );
+      const terminalStatuses = {
+        'completed',
+        'cancelled',
+        'expired',
+        'rejected',
+        'failed',
+        'finished',
+      };
+      return response.data
+          .where((r) => !terminalStatuses.contains(r.status.toLowerCase()))
+          .firstOrNull;
+    });
 
 /// Rescuer Home Screen - Dashboard for rescue team members
 class RescuerHomeScreen extends ConsumerStatefulWidget {
@@ -110,9 +117,9 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
         if (activeRequest?.requestId == requestId) {
           ref.read(activeRescueRequestProvider.notifier).clearRequest();
 
-          // Dismiss modal if open
-          if (Navigator.of(context).canPop()) {
-            Navigator.of(context).pop();
+          // Dismiss modal if open via root navigator, matching how the dialog was shown.
+          if (Navigator.of(context, rootNavigator: true).canPop()) {
+            Navigator.of(context, rootNavigator: true).pop();
           }
 
           ScaffoldMessenger.of(context).showSnackBar(
@@ -137,9 +144,9 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
         if (activeRequest?.requestId == requestId) {
           ref.read(activeRescueRequestProvider.notifier).clearRequest();
 
-          // Dismiss modal if open
-          if (Navigator.of(context).canPop()) {
-            Navigator.of(context).pop();
+          // Dismiss modal if open via root navigator, matching how the dialog was shown.
+          if (Navigator.of(context, rootNavigator: true).canPop()) {
+            Navigator.of(context, rootNavigator: true).pop();
           }
         }
       });
@@ -159,27 +166,25 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
     );
 
     // Listen for request cancelled
-    ref.listen<AsyncValue<dynamic>>(requestCancelledStreamProvider, (
-      previous,
-      next,
-    ) {
-      next.whenData((requestId) {
-        debugPrint('❌ [GLOBAL] Request cancelled: $requestId');
+    ref.listen<
+      AsyncValue<Map<String, dynamic>>
+    >(requestCancelledStreamProvider, (previous, next) {
+      next.whenData((data) {
+        final requestId = data['requestId']?.toString();
+        final message = data['message']?.toString() ?? 'Yêu cầu đã bị hủy';
+        debugPrint('❌ [GLOBAL] Request cancelled: $requestId | $message');
 
         final activeRequest = ref.read(activeRescueRequestProvider).request;
         if (activeRequest?.requestId == requestId) {
           ref.read(activeRescueRequestProvider.notifier).clearRequest();
 
-          // Dismiss modal if open
-          if (Navigator.of(context).canPop()) {
-            Navigator.of(context).pop();
+          // Dismiss modal if open via root navigator, matching how the dialog was shown.
+          if (Navigator.of(context, rootNavigator: true).canPop()) {
+            Navigator.of(context, rootNavigator: true).pop();
           }
 
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Yêu cầu đã bị hủy'),
-              backgroundColor: Colors.grey,
-            ),
+            SnackBar(content: Text(message), backgroundColor: Colors.grey),
           );
         }
       });
@@ -531,9 +536,7 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
       await _sosAudioPlayer.stop();
       await _sosAudioPlayer.setVolume(1.0);
       await _sosAudioPlayer.setReleaseMode(ReleaseMode.loop);
-      await _sosAudioPlayer.play(
-        AssetSource('sounds/sos_alert.mp3'),
-      );
+      await _sosAudioPlayer.play(AssetSource('sounds/sos_alert.mp3'));
     } catch (e) {
       debugPrint('⚠️ Could not play SOS alert sound: $e');
     }
@@ -628,7 +631,12 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
     ).then((_) => _stopSnakebiteIncidentAlert());
   }
 
-  Widget _buildNavItem(int index, IconData icon, String label, {int unreadCount = 0}) {
+  Widget _buildNavItem(
+    int index,
+    IconData icon,
+    String label, {
+    int unreadCount = 0,
+  }) {
     final isSelected = _selectedIndex == index;
     final color = isSelected
         ? const Color(0xFFFF6B35)
@@ -648,7 +656,12 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Icon(icon, color: color, size: 28, weight: isSelected ? 700 : 400),
+                Icon(
+                  icon,
+                  color: color,
+                  size: 28,
+                  weight: isSelected ? 700 : 400,
+                ),
                 if (unreadCount > 0)
                   Positioned(
                     top: -2,
@@ -952,7 +965,9 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                     const Spacer(),
                     Builder(
                       builder: (context) {
-                        final unread = ref.watch(notificationInboxProvider).unreadCount;
+                        final unread = ref
+                            .watch(notificationInboxProvider)
+                            .unreadCount;
                         return Stack(
                           children: [
                             IconButton(
@@ -1429,11 +1444,17 @@ class _HomeTabState extends ConsumerState<_HomeTab>
       ),
       error: (_, __) => Row(
         children: [
-          Expanded(child: _buildStatCard('--', 'Yêu cầu', const Color(0xFF333333))),
+          Expanded(
+            child: _buildStatCard('--', 'Yêu cầu', const Color(0xFF333333)),
+          ),
           const SizedBox(width: 12),
-          Expanded(child: _buildStatCard('--', 'Hoàn thành', const Color(0xFF10B981))),
+          Expanded(
+            child: _buildStatCard('--', 'Hoàn thành', const Color(0xFF10B981)),
+          ),
           const SizedBox(width: 12),
-          Expanded(child: _buildStatCard('--', 'Rắn cắn', const Color(0xFFE53935))),
+          Expanded(
+            child: _buildStatCard('--', 'Rắn cắn', const Color(0xFFE53935)),
+          ),
         ],
       ),
       data: (stats) {
@@ -1579,8 +1600,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: typeLabelColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(4),
@@ -1596,8 +1616,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
               ),
               const SizedBox(width: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: const Color(0xFFDC3545).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(4),
@@ -1867,8 +1886,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                 title: 'Hướng Dẫn\nSơ Cứu',
                 subtitle: 'Xử lý khi bị cắn',
                 color: accentColor,
-                onTap: () =>
-                    context.pushNamed('rescuer_snake_first_aid_guide'),
+                onTap: () => context.pushNamed('rescuer_snake_first_aid_guide'),
               ),
             ),
           ],
@@ -2074,8 +2092,11 @@ class _RescuerSnakeLibraryCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.arrow_forward_ios,
-                  size: 13, color: color.withOpacity(0.6)),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 13,
+                color: color.withOpacity(0.6),
+              ),
             ],
           ),
         ),

@@ -49,8 +49,8 @@ class _RescuerAvailableJobsScreenState
   void initState() {
     super.initState();
     _initialize();
-    // Auto-refresh every 10 seconds
-    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    // Auto-refresh every 15 seconds
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       _silentRefresh();
     });
   }
@@ -388,13 +388,11 @@ class _RescuerAvailableJobsScreenState
       // (which can appear via mission-cache status on still-Assigned requests)
       const activeStatuses = {'Assigned', 'Dispute'};
       const hideStatuses = {'Paid', 'Completed', 'Finished'};
-      filtered = filtered
-          .where((request) {
-            if (!activeStatuses.contains(request.status)) return false;
-            final resolved = _resolveDisplayStatus(request);
-            return !hideStatuses.contains(resolved);
-          })
-          .toList();
+      filtered = filtered.where((request) {
+        if (!activeStatuses.contains(request.status)) return false;
+        final resolved = _resolveDisplayStatus(request);
+        return !hideStatuses.contains(resolved);
+      }).toList();
       filtered.sort((a, b) => b.requestDate.compareTo(a.requestDate));
     } else if (statusFilter == 'History') {
       // Terminal requests assigned to this rescuer
@@ -451,9 +449,7 @@ class _RescuerAvailableJobsScreenState
     );
   }
 
-  Widget _buildAvailableJobsContent({
-    required String statusFilter,
-  }) {
+  Widget _buildAvailableJobsContent({required String statusFilter}) {
     if (_isLoading) {
       return const Center(
         child: CircularProgressIndicator(color: Color(0xFFFF6B35)),
@@ -1766,11 +1762,17 @@ class _RescuerAvailableJobsScreenState
             Builder(
               builder: (_) {
                 const paidStatuses = {
-                  'deposited', 'en_route', 'enroute', 'arrived',
-                  'finished', 'paid', 'completed',
+                  'deposited',
+                  'en_route',
+                  'enroute',
+                  'arrived',
+                  'finished',
+                  'paid',
+                  'completed',
                 };
-                final depositPaid =
-                    paidStatuses.contains(request.status.toLowerCase());
+                final depositPaid = paidStatuses.contains(
+                  request.status.toLowerCase(),
+                );
                 if (!depositPaid) return const SizedBox.shrink();
                 return Container(
                   margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
@@ -1878,13 +1880,13 @@ class _RescuerAvailableJobsScreenState
                       ),
                     );
                   } else if (missionStatus == 'Arrived' && mission != null) {
-                    final hasEvidence =
-                        mission.media.any((m) => m.purpose == 'Evidence');
+                    final hasEvidence = mission.media.any(
+                      (m) => m.purpose == 'Evidence',
+                    );
                     if (hasEvidence) {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (context) =>
-                              RescuerResultConfirmationScreen(
+                          builder: (context) => RescuerResultConfirmationScreen(
                             requestData: request,
                             missionId: mission.id,
                             capturedPhotos: const [],
@@ -1919,9 +1921,8 @@ class _RescuerAvailableJobsScreenState
                     // For Assigned and other statuses, navigate to accept/detail screen
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (context) => RescuerAcceptRequestScreen(
-                          requestData: request,
-                        ),
+                        builder: (context) =>
+                            RescuerAcceptRequestScreen(requestData: request),
                       ),
                     );
                   }

@@ -189,31 +189,33 @@ final requestExpiredStreamProvider = StreamProvider<String>((ref) {
 });
 
 /// Stream provider for request cancelled events
-final requestCancelledStreamProvider = StreamProvider<String>((ref) {
+final requestCancelledStreamProvider = StreamProvider<Map<String, dynamic>>((
+  ref,
+) {
   final signalRService = ref.watch(rescuerSignalRServiceProvider);
   debugPrint('🔗 requestCancelledStreamProvider: Watching stream...');
 
-  return signalRService.requestCancelledStream.map((requestId) {
-    debugPrint('🎯 Stream Provider: Request cancelled! $requestId');
-    return requestId;
+  return signalRService.requestCancelledStream.map((data) {
+    debugPrint('🎯 Stream Provider: Request cancelled! $data');
+    return data;
   });
 });
 
 /// Stream provider for SnakeCatchingRequestAssigned events
 final snakeCatchingRequestAssignedStreamProvider =
     StreamProvider<Map<String, dynamic>>((ref) {
-  final signalRService = ref.watch(rescuerSignalRServiceProvider);
-  debugPrint(
-    '🔗 snakeCatchingRequestAssignedStreamProvider: Watching stream...',
-  );
+      final signalRService = ref.watch(rescuerSignalRServiceProvider);
+      debugPrint(
+        '🔗 snakeCatchingRequestAssignedStreamProvider: Watching stream...',
+      );
 
-  return signalRService.snakeCatchingRequestAssignedStream.map((data) {
-    debugPrint(
-      '🎯 Stream Provider: SnakeCatchingRequestAssigned! id=${data['id']}',
-    );
-    return data;
-  });
-});
+      return signalRService.snakeCatchingRequestAssignedStream.map((data) {
+        debugPrint(
+          '🎯 Stream Provider: SnakeCatchingRequestAssigned! id=${data['id']}',
+        );
+        return data;
+      });
+    });
 
 /// Current active rescue request state
 class ActiveRescueRequestState {
