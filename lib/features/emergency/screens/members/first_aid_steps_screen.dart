@@ -177,7 +177,7 @@ class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
       StepData(
         stepNumber: 1,
         title: 'Băng ép vết cắn',
-        subtitle: _snake?.primaryVenomType ?? 'Nọc rắn',
+        subtitle: 'Hướng dẫn sơ cứu chung',
         illustrationUrl: null,
         illustrationIcon: Icons.healing,
         instructions: [
@@ -192,7 +192,7 @@ class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
       StepData(
         stepNumber: 2,
         title: 'Giữ nạn nhân bất động',
-        subtitle: _snake?.primaryVenomType ?? 'Nọc rắn',
+        subtitle: 'Hướng dẫn sơ cứu chung',
         illustrationUrl: null,
         illustrationIcon: Icons.airline_seat_flat,
         instructions: [
@@ -207,7 +207,7 @@ class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
       StepData(
         stepNumber: 3,
         title: 'Gọi cấp cứu ngay',
-        subtitle: _snake?.primaryVenomType ?? 'Nọc rắn',
+        subtitle: 'Hướng dẫn sơ cứu chung',
         illustrationUrl: null,
         illustrationIcon: Icons.phone_in_talk,
         instructions: [
@@ -477,6 +477,78 @@ class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
   }
 
   Widget _buildSnakeIdCard() {
+    final isCommonGuide = _snake == null;
+
+    if (isCommonGuide) {
+      // Common first aid guide layout - simplified with clear title
+      return Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE5E5E5)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                // Icon
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF228B22).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.healing,
+                    size: 32,
+                    color: Color(0xFF228B22),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Text
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Hướng dẫn sơ cứu chung',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF191910),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Hướng dẫn an toàn cho mọi vết cắn rắn độc',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF6B7280),
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Species-specific first aid guide layout
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(12),
@@ -546,7 +618,7 @@ class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _snake?.commonName ?? 'Rắn độc',
+                  _snake?.commonName ?? 'Rắn',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -562,30 +634,8 @@ class _FirstAidStepsScreenState extends ConsumerState<FirstAidStepsScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEE2E2),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFFECACA)),
-                  ),
-                  child: Text(
-                    _snake?.primaryVenomType ?? 'Nọc rắn',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFFB91C1C),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
                 Text(
-                  _snake != null
-                      ? 'Hướng dẫn sơ cứu chuyên biệt cho loài này'
-                      : 'Hướng dẫn sơ cứu chung cho mọi rắn',
+                  'Hướng dẫn sơ cứu chuyên biệt cho loài này',
                   style: const TextStyle(
                     fontSize: 12,
                     color: Color(0xFF6B7280),

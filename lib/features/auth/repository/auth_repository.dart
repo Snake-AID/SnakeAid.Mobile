@@ -450,6 +450,9 @@ class AuthRepository {
   /// Handle API errors
   Exception _handleError(DioException e) {
     String errorMessage = 'Đã có lỗi xảy ra';
+    final requestPath = e.requestOptions.path.toLowerCase();
+    final isLoginEndpoint = requestPath.contains('/api/auth/login');
+    final isVerifyOtpEndpoint = requestPath.contains('/api/auth/verify-account');
 
     if (e.response != null) {
       final data = e.response?.data;
@@ -489,8 +492,16 @@ class AuthRepository {
       switch (e.response?.statusCode) {
         case 400:
           // Lỗi dữ liệu không hợp lệ
-          if (errorMessage.toLowerCase().contains('invalid') ||
-              errorMessage.toLowerCase().contains('incorrect')) {
+          if (isVerifyOtpEndpoint) {
+            if (errorMessage == 'Đã có lỗi xảy ra' ||
+                errorMessage.toLowerCase().contains('invalid') ||
+                errorMessage.toLowerCase().contains('incorrect')) {
+              errorMessage =
+                  'Mã OTP không hợp lệ hoặc đã hết hạn. Vui lòng kiểm tra lại';
+            }
+          } else if (isLoginEndpoint &&
+              (errorMessage.toLowerCase().contains('invalid') ||
+                  errorMessage.toLowerCase().contains('incorrect'))) {
             errorMessage = 'Email hoặc mật khẩu không chính xác';
           } else if (errorMessage == 'Đã có lỗi xảy ra') {
             errorMessage = 'Thông tin đăng nhập không hợp lệ';
@@ -498,8 +509,13 @@ class AuthRepository {
           break;
         case 401:
           // Unauthorized - thường là sai mật khẩu hoặc tài khoản
-          errorMessage =
-              'Email hoặc mật khẩu không đúng. Vui lòng kiểm tra lại';
+          if (isVerifyOtpEndpoint) {
+            errorMessage =
+                'Mã OTP không chính xác hoặc đã hết hạn. Vui lòng thử lại';
+          } else if (isLoginEndpoint) {
+            errorMessage =
+                'Email hoặc mật khẩu không đúng. Vui lòng kiểm tra lại';
+          }
           break;
         case 404:
           errorMessage = 'Tài khoản không tồn tại hoặc email chưa được đăng ký';

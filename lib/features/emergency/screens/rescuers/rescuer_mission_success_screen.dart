@@ -14,8 +14,6 @@ class RescuerMissionSuccessScreen extends ConsumerStatefulWidget {
 
 class _RescuerMissionSuccessScreenState
     extends ConsumerState<RescuerMissionSuccessScreen> {
-  bool _isAvailable = true;
-
   String _formatCurrency(double? value) {
     if (value == null) return '-';
     final formatted = value
@@ -25,6 +23,20 @@ class _RescuerMissionSuccessScreenState
           (Match m) => '${m[1]}.',
         );
     return '$formattedđ';
+  }
+
+  String _formatVietnamTime(DateTime? value) {
+    if (value == null) return '-';
+
+    // Backend timestamps are UTC; display them in Vietnam time (UTC+7).
+    final vietnamTime = value.toUtc().add(const Duration(hours: 7));
+    final day = vietnamTime.day.toString().padLeft(2, '0');
+    final month = vietnamTime.month.toString().padLeft(2, '0');
+    final year = vietnamTime.year;
+    final hour = vietnamTime.hour.toString().padLeft(2, '0');
+    final minute = vietnamTime.minute.toString().padLeft(2, '0');
+
+    return '$day/$month/$year - $hour:$minute';
   }
 
   @override
@@ -203,9 +215,9 @@ class _RescuerMissionSuccessScreenState
                                           : Colors.grey[600],
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
+                                   const SizedBox(height: 4),
                                   Text(
-                                    'Thu nhập',
+                                    'Khách hàng thanh toán',
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: Colors.grey[600],
@@ -257,9 +269,7 @@ class _RescuerMissionSuccessScreenState
                         const SizedBox(height: 12),
                         _buildDetailRow(
                           'Thời gian:',
-                          missionState.mission?.completedAt != null
-                              ? '${missionState.mission!.completedAt!.day.toString().padLeft(2, '0')}/${missionState.mission!.completedAt!.month.toString().padLeft(2, '0')}/${missionState.mission!.completedAt!.year} - ${missionState.mission!.completedAt!.hour.toString().padLeft(2, '0')}:${missionState.mission!.completedAt!.minute.toString().padLeft(2, '0')}'
-                              : '-',
+                          _formatVietnamTime(missionState.mission?.completedAt),
                           false,
                         ),
                         const SizedBox(height: 12),
@@ -267,13 +277,6 @@ class _RescuerMissionSuccessScreenState
                           'Thời lượng:',
                           missionState.mission?.formattedElapsedTime ?? '-',
                           false,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildDetailRow(
-                          'Thu nhập:',
-                          missionState.mission?.formattedPrice ?? '-',
-                          false,
-                          isHighlighted: true,
                         ),
                         const SizedBox(height: 16),
                         Container(
@@ -318,211 +321,6 @@ class _RescuerMissionSuccessScreenState
                               ),
                             ],
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Payment Progress Card
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.06),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Tiến Trình Thanh Toán',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1C100D),
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        _buildProgressStep(
-                          'Hoàn thành nhiệm vụ',
-                          isCompleted: true,
-                          isLast: false,
-                        ),
-                        _buildProgressStep(
-                          'Bệnh nhân xác nhận',
-                          isCompleted: false,
-                          isLast: false,
-                        ),
-                        _buildProgressStep(
-                          'Thanh toán',
-                          isCompleted: false,
-                          isLast: false,
-                        ),
-                        _buildProgressStep(
-                          'Nhận tiền (~24h)',
-                          isCompleted: false,
-                          isLast: true,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Rating Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.06),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFC107).withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.star,
-                            size: 32,
-                            color: Color(0xFFFFC107),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Bệnh nhân sẽ đánh giá bạn',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1C100D),
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                'Đánh giá tốt giúp bạn nhận nhiều yêu cầu hơn',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF666666),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  '4.9',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF1C100D),
-                                  ),
-                                ),
-                                SizedBox(width: 4),
-                                Text('⭐', style: TextStyle(fontSize: 20)),
-                              ],
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              '(128 đánh giá)',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF999999),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Availability Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE3F2FD),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: const Color(0xFF90CAF9).withOpacity(0.5),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Tiếp tục nhận yêu cầu?',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF0D47A1),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFFFF8800),
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    _isAvailable
-                                        ? 'Bạn đang ONLINE'
-                                        : 'Bạn đang OFFLINE',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Color(0xFF1565C0),
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        Switch(
-                          value: _isAvailable,
-                          onChanged: (value) =>
-                              setState(() => _isAvailable = value),
-                          activeThumbColor: const Color(0xFFFF8800),
-                          activeTrackColor: const Color(
-                            0xFFFF8800,
-                          ).withOpacity(0.5),
                         ),
                       ],
                     ),
@@ -668,30 +466,6 @@ class _RescuerMissionSuccessScreenState
                     ),
                   ),
                   const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: OutlinedButton(
-                      onPressed: () {},
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFFFC107),
-                        side: const BorderSide(
-                          color: Color(0xFFFFC107),
-                          width: 2,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Xem Chi Tiết Thu Nhập',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -730,65 +504,4 @@ class _RescuerMissionSuccessScreenState
     );
   }
 
-  Widget _buildProgressStep(
-    String label, {
-    required bool isCompleted,
-    required bool isLast,
-  }) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
-      child: Row(
-        children: [
-          SizedBox(
-            height: isLast ? 32 : 48,
-            child: Column(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: isCompleted ? const Color(0xFFFF8800) : Colors.white,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isCompleted
-                          ? const Color(0xFFFF8800)
-                          : Colors.grey[300]!,
-                      width: 2,
-                    ),
-                  ),
-                  child: isCompleted
-                      ? const Icon(Icons.check, size: 18, color: Colors.white)
-                      : Center(
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[400],
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                ),
-                if (!isLast)
-                  Expanded(child: Container(width: 2, color: Colors.grey[300])),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: isCompleted ? FontWeight.w600 : FontWeight.normal,
-                color: isCompleted
-                    ? const Color(0xFF1C100D)
-                    : const Color(0xFF999999),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

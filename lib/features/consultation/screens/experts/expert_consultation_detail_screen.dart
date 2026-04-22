@@ -78,15 +78,6 @@ class _ExpertConsultationDetailScreenState
     return '$d/$m/${dt.year}  $h:$min';
   }
 
-  String _formatDateTimePlus7(int ms) {
-    final dt = DateTime.fromMillisecondsSinceEpoch(ms);
-    final d = dt.day.toString().padLeft(2, '0');
-    final m = dt.month.toString().padLeft(2, '0');
-    final h = dt.hour.toString().padLeft(2, '0');
-    final min = dt.minute.toString().padLeft(2, '0');
-    return '$d/$m/${dt.year}  $h:$min';
-  }
-
   String _formatCurrency(num amount) {
     final intVal = amount.toInt();
     final formatted = intVal.toString().replaceAllMapped(
@@ -146,7 +137,6 @@ class _ExpertConsultationDetailScreenState
     final patientPhone = data['patientPhone'] as String? ?? '';
     final consultationType = data['consultationType'] as String? ?? '';
     final scheduledMs = (data['scheduledTime'] as int?) ?? 0;
-    final bookedAtMs = data['bookedAt'] as int?;
     final paymentDeadlineMs = data['paymentDeadline'] as int?;
     final slotStartMs = data['slotStartTime'] as int?;
     final slotEndMs = data['slotEndTime'] as int?;
@@ -286,7 +276,7 @@ class _ExpertConsultationDetailScreenState
                         label: 'Ngày & Giờ',
                         value: scheduledMs > 0
                             ? _formatDateTime(scheduledMs)
-                            : 'Chưa xác định',
+                            : '--',
                       ),
                       const _Divider(),
                       _DetailRow(
@@ -352,22 +342,11 @@ class _ExpertConsultationDetailScreenState
                   label: 'Thông Tin Phiên Tư Vấn',
                   child: Column(
                     children: [
-                      if (bookedAtMs != null)
-                        _DetailRow(
-                          icon: Icons.event_available_outlined,
-                          label: 'Đặt lúc',
-                          value: _formatDateTimePlus7(bookedAtMs),
-                        ),
-                      if (bookedAtMs != null &&
-                          (paymentDeadlineMs != null ||
-                              slotStartMs != null ||
-                              slotEndMs != null))
-                        const _Divider(),
                       if (paymentDeadlineMs != null) ...[
                         _DetailRow(
                           icon: Icons.timer_outlined,
                           label: 'Hạn thanh toán',
-                          value: _formatDateTimePlus7(paymentDeadlineMs),
+                          value: _formatDateTime(paymentDeadlineMs),
                         ),
                         if (slotStartMs != null || slotEndMs != null)
                           const _Divider(),
@@ -387,6 +366,10 @@ class _ExpertConsultationDetailScreenState
                           value: _formatDateTime(slotEndMs),
                         ),
                       ],
+                      if (paymentDeadlineMs != null ||
+                          slotStartMs != null ||
+                          slotEndMs != null)
+                        const _Divider(),
                     ],
                   ),
                 ),
@@ -615,6 +598,38 @@ class _ExpertConsultationDetailScreenState
                     backgroundColor: _isWaiting ? _red : _purple,
                     foregroundColor: Colors.white,
                     elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (!_isActionable && consultationId.isNotEmpty)
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+              child: SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    context.push(
+                      '/consultation-message-history/$consultationId',
+                      extra: {
+                        'title': patientName,
+                        'isExpertMode': true,
+                      },
+                    );
+                  },
+                  icon: const Icon(Icons.chat_bubble_outline, size: 20),
+                  label: const Text(
+                    'Xem Lịch Sử Tin Nhắn',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: _purple, width: 1.3),
+                    foregroundColor: _purple,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),

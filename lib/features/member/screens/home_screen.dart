@@ -116,7 +116,9 @@ class _MemberHomeScreenState extends ConsumerState<MemberHomeScreen>
                     ),
                   Builder(
                     builder: (context) {
-                      final unread = ref.watch(notificationInboxProvider).unreadCount;
+                      final unread = ref
+                          .watch(notificationInboxProvider)
+                          .unreadCount;
                       return Stack(
                         children: [
                           IconButton(
@@ -181,11 +183,8 @@ class _MemberHomeScreenState extends ConsumerState<MemberHomeScreen>
                       onCameraPressed: () {
                         context.push('/snake-quantity-selection');
                       },
-                      onCall115Pressed: () async {
-                        final uri = Uri(scheme: 'tel', path: '115');
-                        if (await canLaunchUrl(uri)) {
-                          await launchUrl(uri);
-                        }
+                      onConsultationPressed: () {
+                        context.push('/consultation-home');
                       },
                     ),
                   ),
@@ -292,15 +291,28 @@ Future<void> _navigateToActiveIncident(
     } else {
       if (context.mounted) {
         _showErrorDialog(context, response.message);
+        if (response.message.toLowerCase().contains('not found')) {
+          ref.read(activeIncidentProvider.notifier).clearActiveIncident();
+        }
       }
     }
   } catch (e) {
     if (context.mounted) {
       context.pop(); // Close loading dialog
-      _showErrorDialog(
-        context,
-        'Không thể tải thông tin SOS. ${e.toString().replaceAll('Exception: ', '')}',
-      );
+
+      final errorMsg = e.toString().replaceAll('Exception: ', '');
+
+      // If it's a 404 or not found, clear the stale data
+      if (errorMsg.toLowerCase().contains('not found') ||
+          errorMsg.contains('404')) {
+        ref.read(activeIncidentProvider.notifier).clearActiveIncident();
+        _showErrorDialog(
+          context,
+          'Sự cố SOS đã bị xóa hoặc không tồn tại. Đã đặt lại trạng thái.',
+        );
+      } else {
+        _showErrorDialog(context, 'Không thể tải thông tin SOS. $errorMsg');
+      }
     }
   }
 }

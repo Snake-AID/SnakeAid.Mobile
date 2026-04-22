@@ -14,6 +14,7 @@ import '../models/my_consultation_response.dart';
 import '../models/consultation_review_response.dart';
 import '../models/emergency_consultation_request.dart';
 import '../models/consultation_payment_response.dart';
+import '../models/consultation_message_history_response.dart';
 
 /// Provider for ConsultationRepository
 final consultationRepositoryProvider = Provider<ConsultationRepository>((ref) {
@@ -274,6 +275,81 @@ class ConsultationRepository {
     } catch (e) {
       debugPrint('❌ Unexpected error fetching reviews: $e');
       return [];
+    }
+  }
+
+  /// Get paged reviews for an expert including metadata.
+  ///
+  /// API: `GET /api/experts/{expertId}/reviews`
+  Future<({
+    List<ReviewModel> items,
+    int totalPages,
+    int totalItems,
+    int currentPage,
+    int pageSize,
+  })> getExpertReviewsPaged(
+    String expertId, {
+    int pageNumber = 1,
+    int pageSize = 10,
+  }) async {
+    try {
+      debugPrint('📋 Fetching paged reviews for expert: $expertId');
+
+      final response = await httpService.get(
+        '/api/experts/$expertId/reviews',
+        queryParameters: {'pageNumber': pageNumber, 'pageSize': pageSize},
+      );
+
+      final body = response.data as Map<String, dynamic>;
+      if (body['is_success'] == true && body['data'] != null) {
+        final data = body['data'] as Map<String, dynamic>;
+        final itemsRaw = (data['items'] ?? data['data'] ?? []) as List<dynamic>;
+        final meta = data['meta'] as Map<String, dynamic>? ?? <String, dynamic>{};
+
+        final items = itemsRaw
+            .map((e) => ReviewModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+
+        int parseInt(dynamic value, int fallback) {
+          if (value is int) return value;
+          if (value is num) return value.toInt();
+          return int.tryParse(value?.toString() ?? '') ?? fallback;
+        }
+
+        return (
+          items: items,
+          totalPages: parseInt(meta['total_pages'], 1),
+          totalItems: parseInt(meta['total_items'], items.length),
+          currentPage: parseInt(meta['current_page'], pageNumber),
+          pageSize: parseInt(meta['page_size'], pageSize),
+        );
+      }
+
+      return (
+        items: const <ReviewModel>[],
+        totalPages: 1,
+        totalItems: 0,
+        currentPage: pageNumber,
+        pageSize: pageSize,
+      );
+    } on DioException catch (e) {
+      debugPrint('❌ Failed to fetch paged reviews: ${e.message}');
+      return (
+        items: const <ReviewModel>[],
+        totalPages: 1,
+        totalItems: 0,
+        currentPage: pageNumber,
+        pageSize: pageSize,
+      );
+    } catch (e) {
+      debugPrint('❌ Unexpected error fetching paged reviews: $e');
+      return (
+        items: const <ReviewModel>[],
+        totalPages: 1,
+        totalItems: 0,
+        currentPage: pageNumber,
+        pageSize: pageSize,
+      );
     }
   }
 
@@ -567,6 +643,38 @@ class ConsultationRepository {
     throw Exception(body['message'] ?? 'Không thể từ chối yêu cầu tư vấn ngay');
   }
 
+  /// Get current status of an emergency consultation request.
+  ///
+  /// Preferred API: `GET /api/consultations/instant/{requestId}`
+  /// Fallback API: `GET /api/consultations/instant/{requestId}/status`
+  ///
+  /// Returns null when endpoint is unavailable to keep UI resilient.
+  Future<EmergencyConsultationRequest?> getEmergencyRequestStatus(
+    String requestId,
+  ) async {
+    final candidates = <String>[
+      '/api/consultations/instant/$requestId',
+      '/api/consultations/instant/$requestId/status',
+    ];
+
+    for (final path in candidates) {
+      try {
+        final response = await httpService.get(path);
+        final body = response.data;
+        if (body is! Map<String, dynamic>) continue;
+        if (body['is_success'] == true && body['data'] is Map<String, dynamic>) {
+          return EmergencyConsultationRequest.fromJson(
+            body['data'] as Map<String, dynamic>,
+          );
+        }
+      } catch (_) {
+        // Ignore and try next candidate.
+      }
+    }
+
+    return null;
+  }
+
   // ---------------------------------------------------------------------------
   // In-room chat utility methods
   // ---------------------------------------------------------------------------
@@ -843,6 +951,62 @@ class ConsultationRepository {
     throw Exception(body['message'] ?? 'Không thể lấy đánh giá buổi tư vấn');
   }
 
+  /// Report expert absence for a scheduled consultation.
+  ///
+  /// API: `POST /api/consultations/{consultationId}/expert-absent-report`
+  Future<MyConsultationResponse> reportExpertAbsent({
+    required String consultationId,
+    required String customerReport,
+  }) async {
+    final report = customerReport.trim();
+    if (report.isEmpty) {
+      throw Exception('Nội dung báo cáo không được để trống');
+    }
+    if (report.length > 2000) {
+      throw Exception('Nội dung báo cáo tối đa 2000 ký tự');
+    }
+
+    final response = await httpService.post(
+      '/api/consultations/$consultationId/expert-absent-report',
+      data: {'customerReport': report},
+    );
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] == true && body['data'] is Map<String, dynamic>) {
+      return MyConsultationResponse.fromJson(
+        body['data'] as Map<String, dynamic>,
+      );
+    }
+
+    throw Exception(body['message'] ?? 'Không thể gửi báo cáo chuyên gia vắng mặt');
+  }
+
+  /// Get persisted chat history for a terminal consultation.
+  ///
+  /// API: `GET /api/consultations/{consultationId}/messages-history`
+  Future<ConsultationMessageHistoryResponse> getConsultationMessageHistory({
+    required String consultationId,
+    int pageNumber = 1,
+    int pageSize = 10,
+  }) async {
+    final response = await httpService.get(
+      '/api/consultations/$consultationId/messages-history',
+      queryParameters: {
+        'pageNumber': pageNumber,
+        'pageSize': pageSize,
+      },
+    );
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] == true && body['data'] is Map<String, dynamic>) {
+      return ConsultationMessageHistoryResponse.fromJson(
+        body['data'] as Map<String, dynamic>,
+      );
+    }
+
+    throw Exception(body['message'] ?? 'Không thể tải lịch sử tin nhắn');
+  }
+
   // ---------------------------------------------------------------------------
   // Expert profile settings
   // ---------------------------------------------------------------------------
@@ -851,17 +1015,26 @@ class ConsultationRepository {
   ///
   /// API: `PUT /api/experts/me/settings`
   ///
-  /// Provide at least one of [consultationFee], [biography], [specializations].
+  /// Provide at least one of [scheduledConsultationFee],
+  /// [emergencyConsultationFee], [biography], [specializations].
   /// Null values are omitted from the request body.
   ///
   /// Throws on 400/422 (invalid payload), 401/403 (unauthenticated / wrong role).
   Future<void> updateExpertSettings({
+    double? scheduledConsultationFee,
+    double? emergencyConsultationFee,
+    // Backward-compatible alias for scheduled fee.
     double? consultationFee,
     String? biography,
     List<String>? specializations,
   }) async {
+    final resolvedScheduledFee = scheduledConsultationFee ?? consultationFee;
+
     final body = <String, dynamic>{
-      if (consultationFee != null) 'consultationFee': consultationFee,
+      if (resolvedScheduledFee != null)
+        'scheduledConsultationFee': resolvedScheduledFee,
+      if (emergencyConsultationFee != null)
+        'emergencyConsultationFee': emergencyConsultationFee,
       if (biography != null) 'biography': biography,
       if (specializations != null) 'specializations': specializations,
     };
@@ -1120,7 +1293,10 @@ class ConsultationRepository {
 
   /// Get all bookings for the current logged-in expert.
   ///
-  /// API: `GET /api/experts/me/consultations`
+  /// API priority:
+  /// 1) `GET /api/experts/me/consultations`
+  /// 2) `GET /api/experts/me/consultations/scheduled`
+  /// 3) `GET /api/experts/me/consultation-bookings` (legacy fallback)
   Future<List<ConsultationBookingResponse>> getExpertBookings({
     String? status,
     String? type,
@@ -1144,6 +1320,7 @@ class ConsultationRepository {
 
       Response<dynamic> response;
       try {
+        // Prefer aggregate endpoint to include both scheduled and emergency consultations.
         response = await httpService.get(
           '/api/experts/me/consultations',
           queryParameters: query,
@@ -1184,6 +1361,39 @@ class ConsultationRepository {
         }
 
         return items.map((e) {
+          int? parseAmount(dynamic value) {
+          if (value is num) return value.toInt();
+          if (value == null) return null;
+          final raw = value.toString().trim();
+          if (raw.isEmpty) return null;
+          return int.tryParse(raw);
+          }
+
+          final payment = e['payment'] is Map
+            ? Map<String, dynamic>.from(e['payment'] as Map)
+            : <String, dynamic>{};
+          final paymentInfo = e['paymentInfo'] is Map
+            ? Map<String, dynamic>.from(e['paymentInfo'] as Map)
+            : <String, dynamic>{};
+          final consultationPayment = e['consultationPayment'] is Map
+            ? Map<String, dynamic>.from(e['consultationPayment'] as Map)
+            : <String, dynamic>{};
+
+          final resolvedFee =
+            parseAmount(e['price']) ??
+            parseAmount(e['feeCost']) ??
+            parseAmount(e['fee']) ??
+            parseAmount(e['amount']) ??
+            parseAmount(e['scheduledConsultationFee']) ??
+            parseAmount(e['emergencyConsultationFee']) ??
+            parseAmount(payment['amount']) ??
+            parseAmount(payment['feeCost']) ??
+            parseAmount(paymentInfo['amount']) ??
+            parseAmount(paymentInfo['feeCost']) ??
+            parseAmount(consultationPayment['amount']) ??
+            parseAmount(consultationPayment['feeCost']) ??
+            0;
+
           final endpointType = (e['type'] ?? '').toString().toLowerCase();
           final endpointStatus = (e['status'] ?? '').toString().toLowerCase();
 
@@ -1221,10 +1431,9 @@ class ConsultationRepository {
             'slotStartTime': e['slotStartTime'] ?? e['startTime'],
             'slotEndTime': e['slotEndTime'] ?? e['endTime'],
             'status': normalizedStatus,
-            'feeCost': e['price'],
-            'price': e['price'],
+            'feeCost': resolvedFee,
+            'price': resolvedFee,
             'bookedAt': e['startTime'],
-            'problemDescription': e['problemDescription'],
           };
 
           return ConsultationBookingResponse.fromJson(normalized);

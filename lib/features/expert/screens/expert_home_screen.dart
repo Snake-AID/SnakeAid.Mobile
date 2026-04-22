@@ -45,15 +45,30 @@ final _expertBookingsFutureProvider =
 _ExpertConsultation _bookingToExpertConsultation(
   ConsultationBookingResponse b,
 ) {
-  // now dùng UTC+7 để khớp với giờ VN wall-clock của backend
-  final now = DateTime.now().toUtc().add(const Duration(hours: 7));
-  final scheduled = b.slotStartTime ?? b.scheduledTime;
-  // Chuẩn hoá scheduled về cùng kiểu UTC (Đây là VN wall-clock được tag +00)
-  final scheduledVn = scheduled.toUtc();
+  final isScheduled = b.consultationType != 'Instant';
+
+  DateTime normalizeForExpertUi(DateTime value) {
+    // Scheduled bookings are currently over-shifted on expert screens.
+    // Keep instant flow unchanged and only offset scheduled times back.
+    return isScheduled ? value : value.add(const Duration(hours: 7));
+  }
+
+  final now = DateTime.now();
+  final scheduled = normalizeForExpertUi(b.slotStartTime ?? b.scheduledTime);
+  final slotStartTime =
+      b.slotStartTime != null ? normalizeForExpertUi(b.slotStartTime!) : null;
+  final slotEndTime =
+      b.slotEndTime != null ? normalizeForExpertUi(b.slotEndTime!) : null;
+  final bookedAt = b.bookedAt != null ? normalizeForExpertUi(b.bookedAt!) : null;
+  final paymentDeadline =
+      b.paymentDeadline != null
+          ? normalizeForExpertUi(b.paymentDeadline!)
+          : null;
+
   final _ExpertConsultationStatus status;
   switch (b.status) {
     case ConsultationBookingStatus.confirmed:
-      final diff = scheduledVn.difference(now);
+      final diff = scheduled.difference(now);
       // Chỉ hiện "Đến giờ" khi trong vòng 15 phút trước giờ hẹn
       status = diff.inMinutes <= 15
           ? _ExpertConsultationStatus.waiting
@@ -75,21 +90,21 @@ _ExpertConsultation _bookingToExpertConsultation(
     patientName: b.userName ?? 'Bệnh nhân',
     patientPhone: '',
     consultationType: b.consultationType == 'Instant' ? 'Khẩn Cấp' : 'Đặt Lịch',
-    snakeSuspect: 'Chưa xác định',
+    snakeSuspect: '',
     hasSnakeImage: false,
     scheduledTime: scheduled,
-    bookedAt: b.bookedAt,
-    paymentDeadline: b.paymentDeadline,
-    slotStartTime: b.slotStartTime,
-    slotEndTime: b.slotEndTime,
+    bookedAt: bookedAt,
+    paymentDeadline: paymentDeadline,
+    slotStartTime: slotStartTime,
+    slotEndTime: slotEndTime,
     status: status,
     feeCost: b.feeCost,
     rating: b.rating,
-    durationSeconds: b.slotEndTime != null && b.slotStartTime != null
-        ? b.slotEndTime!.difference(b.slotStartTime!).inSeconds
+    durationSeconds: slotEndTime != null && slotStartTime != null
+      ? slotEndTime.difference(slotStartTime).inSeconds
         : null,
-    durationMinutes: b.slotEndTime != null && b.slotStartTime != null
-        ? b.slotEndTime!.difference(b.slotStartTime!).inMinutes
+    durationMinutes: slotEndTime != null && slotStartTime != null
+      ? slotEndTime.difference(slotStartTime).inMinutes
         : 45,
     consultationMethod: 'video',
     problemDescription: b.problemDescription,
@@ -100,7 +115,13 @@ _ExpertConsultation _bookingToExpertConsultation(
 /// Expert Home Screen - Dashboard for snake experts
 class ExpertHomeScreen extends StatefulWidget {
   final int initialTab;
-  const ExpertHomeScreen({super.key, this.initialTab = 0});
+  final int initialConsultationsTab;
+
+  const ExpertHomeScreen({
+    super.key,
+    this.initialTab = 0,
+    this.initialConsultationsTab = 0,
+  });
 
   @override
   State<ExpertHomeScreen> createState() => _ExpertHomeScreenState();
@@ -123,7 +144,10 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
         key: _homeKey,
         onSeeAll: () => setState(() => _selectedIndex = 1),
       ),
-      _ConsultationsTab(key: _consultationsKey),
+      _ConsultationsTab(
+        key: _consultationsKey,
+        initialTab: widget.initialConsultationsTab,
+      ),
       const _IncomeTab(),
       _ProfileTab(onGoToHistory: _goToConsultationHistory),
     ];
@@ -224,7 +248,6 @@ class _HomeTab extends ConsumerStatefulWidget {
 
 class _HomeTabState extends ConsumerState<_HomeTab>
     with SingleTickerProviderStateMixin {
-  bool _isAvailable = true;
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnimation;
 
@@ -540,15 +563,6 @@ class _HomeTabState extends ConsumerState<_HomeTab>
     super.dispose();
   }
 
-  void _showUrgentRequestBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => const _UrgentRequestSheet(),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -632,10 +646,6 @@ class _HomeTabState extends ConsumerState<_HomeTab>
               padding: const EdgeInsets.all(20),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-                  // Availability Toggle Card
-                  _buildAvailabilityCard(),
-                  const SizedBox(height: 20),
-
                   // Hero Earnings Card
                   _buildEarningsCard(),
                   const SizedBox(height: 20),
@@ -679,8 +689,6 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                         name: c.patientName,
                         type: c.consultationType,
                         date: dateStr,
-                        snake: c.snakeSuspect,
-                        hasImage: c.hasSnakeImage,
                         onDetailTap: () => _openDetailFromHome(context, c),
                       ),
                       const SizedBox(height: 12),
@@ -1158,201 +1166,12 @@ class _HomeTabState extends ConsumerState<_HomeTab>
               ),
             ),
           ),
-
-        // Floating SOS Alert Button (rendered before popups so popups can cover it)
-        Positioned(
-          right: 16,
-          bottom: 100,
-          child: AnimatedBuilder(
-            animation: _pulseAnimation,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: _pulseAnimation.value,
-                child: GestureDetector(
-                  onTap: () => _showUrgentRequestBottomSheet(context),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFDC3545).withOpacity(0.4),
-                          blurRadius: 20,
-                          spreadRadius: 3,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFDC3545), Color(0xFFC82333)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.sos,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Người Cứu Hộ',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.white70,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                'Cần Hỗ Trợ',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
       ],
     );
   }
 
-  Widget _buildAvailabilityCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFF6C47C2).withOpacity(0.2),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: _isAvailable
-                          ? const Color(0xFF28A745)
-                          : Colors.grey,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color:
-                              (_isAvailable
-                                      ? const Color(0xFF28A745)
-                                      : Colors.grey)
-                                  .withOpacity(0.5),
-                          blurRadius: 8,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'TRẠNG THÁI',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Color(0xFF999999),
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _isAvailable
-                            ? 'Sẵn Sàng Nhận Tư Vấn'
-                            : 'Không Khả Dụng',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Color(0xFF6C47C2),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              Switch(
-                value: _isAvailable,
-                onChanged: (value) {
-                  setState(() {
-                    _isAvailable = value;
-                  });
-                },
-                activeThumbColor: const Color(0xFF6C47C2),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.only(left: 12),
-            decoration: const BoxDecoration(
-              border: Border(
-                left: BorderSide(color: Color(0xFFF0F0F0), width: 2),
-              ),
-            ),
-            child: const Text(
-              'Bạn sẽ nhận thông báo khi có yêu cầu khẩn cấp từ Rescuer',
-              style: TextStyle(fontSize: 13, color: Color(0xFF666666)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   List<_ExpertConsultation> get _upcomingConsultations {
-    final now = DateTime.now().toUtc().add(const Duration(hours: 7));
+    final now = DateTime.now();
     final consultations =
         ref
             .watch(_expertBookingsFutureProvider)
@@ -1661,8 +1480,6 @@ class _HomeTabState extends ConsumerState<_HomeTab>
     required String name,
     required String type,
     required String date,
-    required String snake,
-    required bool hasImage,
     VoidCallback? onDetailTap,
   }) {
     return Container(
@@ -1750,65 +1567,6 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                 constraints: const BoxConstraints(),
               ),
             ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8F6F8),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: hasImage ? Colors.grey[200] : Colors.grey[300],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: hasImage
-                      ? const Icon(
-                          Icons.dangerous,
-                          color: Color(0xFFDC3545),
-                          size: 24,
-                        )
-                      : const Icon(
-                          Icons.image_not_supported,
-                          color: Color(0xFF999999),
-                          size: 20,
-                        ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'NGHI VẤN',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF999999),
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        snake,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF2D2D2D),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
           ),
           const SizedBox(height: 12),
           SizedBox(
@@ -2236,7 +1994,9 @@ class _ExpertConsultation {
 }
 
 class _ConsultationsTab extends ConsumerStatefulWidget {
-  const _ConsultationsTab({super.key});
+  final int initialTab;
+
+  const _ConsultationsTab({super.key, this.initialTab = 0});
 
   @override
   ConsumerState<_ConsultationsTab> createState() => _ConsultationsTabState();
@@ -2281,7 +2041,9 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    final initialTab =
+        widget.initialTab < 0 ? 0 : (widget.initialTab > 1 ? 1 : widget.initialTab);
+    _tabController = TabController(length: 2, vsync: this, initialIndex: initialTab);
     final today = DateTime.now();
     _selectedDay = DateTime(today.year, today.month, today.day);
     // Week starts from today (not Monday), showing today + next 6 days
@@ -2790,24 +2552,25 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.pest_control,
-                                    size: 14,
-                                    color: Color(0xFF999999),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    c.snakeSuspect,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Color(0xFF555555),
-                                      fontWeight: FontWeight.w500,
+                              if (c.snakeSuspect.trim().isNotEmpty)
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.pest_control,
+                                      size: 14,
+                                      color: Color(0xFF999999),
                                     ),
-                                  ),
-                                ],
-                              ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      c.snakeSuspect,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF555555),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                             ],
                           ),
                         ),
@@ -3127,12 +2890,6 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                 label: 'Khung giờ',
                 value: _formatSlotRange(item),
               ),
-              if (item.bookedAt != null)
-                _buildHistoryMetaChip(
-                  icon: Icons.event_available_outlined,
-                  label: 'Đặt lúc',
-                  value: _formatFullDateTimePlus7(item.bookedAt!),
-                ),
             ],
           ),
           if (isDone && item.rating != null) ...[
@@ -3162,23 +2919,61 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
             ),
           ],
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 38,
-            child: OutlinedButton(
-              onPressed: () => _openDetail(context, item),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFF6C47C2), width: 1.2),
-                foregroundColor: _purple,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 38,
+                  child: OutlinedButton(
+                    onPressed: () => _openDetail(context, item),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF6C47C2), width: 1.2),
+                      foregroundColor: _purple,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text(
+                      'Xem Chi Tiết',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                  ),
                 ),
               ),
-              child: const Text(
-                'Xem Chi Tiết',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SizedBox(
+                  height: 38,
+                  child: ElevatedButton.icon(
+                    onPressed: item.consultationId == null || item.consultationId!.isEmpty
+                        ? null
+                        : () {
+                            context.push(
+                              '/consultation-message-history/${item.consultationId}',
+                              extra: {
+                                'title': item.patientName,
+                                'isExpertMode': true,
+                              },
+                            );
+                          },
+                    icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                    label: const Text(
+                      'Tin Nhắn',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _purple,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: const Color(0xFFE8E8E8),
+                      disabledForegroundColor: const Color(0xFF999999),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),

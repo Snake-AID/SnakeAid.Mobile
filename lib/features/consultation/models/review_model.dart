@@ -25,27 +25,32 @@ class ReviewModel {
   factory ReviewModel.fromJson(Map<String, dynamic> json) {
     return ReviewModel(
       id: json['id'] as String? ?? '',
-      expertId: json['expertId'] as String? ?? '',
-      // backend uses userId for the reviewer
+      expertId:
+          (json['expertId'] ?? json['targetUserId'] ?? json['expert_id'] ?? '')
+              as String,
+      // Backend variants: patientId/userId/raterId.
       patientId:
-          (json['patientId'] ?? json['userId'] ?? '') as String,
-      // backend uses userName or fullName
+        (json['patientId'] ?? json['userId'] ?? json['raterId'] ?? '') as String,
+      // Backend variants: patientName/userName/fullName/raterName.
       patientName: (json['patientName'] ??
               json['userName'] ??
               json['fullName'] ??
+          json['raterName'] ??
               'Người dùng') as String,
-      // backend uses userAvatarUrl or avatarUrl
+      // Backend variants: patientAvatarUrl/userAvatarUrl/avatarUrl/raterAvatarUrl.
       patientAvatarUrl: (json['patientAvatarUrl'] ??
           json['userAvatarUrl'] ??
-          json['avatarUrl']) as String?,
-      rating: ((json['rating'] ?? 0) as num).toDouble(),
-      // backend may use feedback, content, or comment
+        json['avatarUrl'] ??
+        json['raterAvatarUrl']) as String?,
+      rating: ((json['rating'] ?? json['stars'] ?? 0) as num).toDouble(),
+      // Backend variants: comment/comments/feedback/content.
       comment: (json['comment'] ??
+          json['comments'] ??
               json['feedback'] ??
               json['content'] ??
               '') as String,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
+      createdAt: (json['createdAt'] ?? json['reviewedAt']) != null
+        ? DateTime.parse((json['createdAt'] ?? json['reviewedAt']) as String)
           : DateTime.now(),
     );
   }

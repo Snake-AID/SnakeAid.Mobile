@@ -37,9 +37,9 @@ class _SnakeLibraryScreenState
       appBar: AppBar(
         backgroundColor: widget.themeColor,
         foregroundColor: Colors.white,
-        title: const Text(
-          'Thư viện loài rắn',
-          style: TextStyle(
+        title: Text(
+          widget.firstAidMode ? 'Hướng dẫn sơ cứu' : 'Thư viện loài rắn',
+          style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,
           ),

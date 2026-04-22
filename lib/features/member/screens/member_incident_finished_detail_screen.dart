@@ -1488,7 +1488,7 @@ class _MemberIncidentFinishedDetailScreenState
                     isCompleted
                         ? 'Hoàn tất'
                         : isFinished
-                        ? 'Chờ TT'
+                        ? 'Chờ Thanh toán'
                         : isCancelled
                         ? 'Đã đóng'
                         : 'Đang xử lý',

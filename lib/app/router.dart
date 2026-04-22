@@ -75,6 +75,7 @@ import 'package:snakeaid_mobile/features/emergency/models/route_navigation_data.
 import 'package:snakeaid_mobile/features/consultation/screens/members/consultation_home_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/members/expert_list_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/members/expert_profile_detail_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/members/expert_reviews_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/members/service_selection_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/members/consultation_documents_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/members/consultation_time_selection_screen.dart';
@@ -83,6 +84,7 @@ import 'package:snakeaid_mobile/features/consultation/screens/members/video_cons
 import 'package:snakeaid_mobile/features/consultation/screens/members/consultation_waiting_room_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/members/consultation_completion_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/members/emergency_request_waiting_screen.dart';
+import 'package:snakeaid_mobile/features/consultation/screens/shared/consultation_message_history_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/experts/expert_waiting_room_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/experts/expert_consultation_detail_screen.dart';
 import 'package:snakeaid_mobile/features/consultation/screens/experts/expert_consultation_completion_screen.dart';
@@ -170,7 +172,12 @@ final router = GoRouter(
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>?;
         final initialTab = (extra?['initialTab'] as int?) ?? 0;
-        return ExpertHomeScreen(initialTab: initialTab);
+        final initialConsultationsTab =
+            (extra?['initialConsultationsTab'] as int?) ?? 0;
+        return ExpertHomeScreen(
+          initialTab: initialTab,
+          initialConsultationsTab: initialConsultationsTab,
+        );
       },
     ),
 
@@ -424,6 +431,9 @@ final router = GoRouter(
           consultationId: id,
           expertName: extra?['expertName'] as String? ?? 'Chuyên Gia',
           expertSpecialty: extra?['expertSpecialty'] as String? ?? '',
+          canReportExpertAbsent:
+              extra?['canReportExpertAbsent'] as bool? ?? false,
+          scheduledStartAtMs: extra?['scheduledStartAtMs'] as int?,
           showCompleteButton: extra?['showCompleteButton'] as bool? ?? false,
           durationSeconds: extra?['durationSeconds'] as int? ?? 0,
           initialMicOn: extra?['initialMicOn'] as bool? ?? true,
@@ -532,6 +542,20 @@ final router = GoRouter(
       },
     ),
 
+    GoRoute(
+      path: '/consultation-message-history/:consultationId',
+      name: 'consultation_message_history',
+      builder: (context, state) {
+        final consultationId = state.pathParameters['consultationId']!;
+        final extra = state.extra as Map<String, dynamic>?;
+        return ConsultationMessageHistoryScreen(
+          consultationId: consultationId,
+          title: extra?['title'] as String? ?? 'Phiên tư vấn',
+          isExpertMode: extra?['isExpertMode'] as bool? ?? false,
+        );
+      },
+    ),
+
     // Consultation Completion & Rating
     GoRoute(
       path: '/consultation-complete',
@@ -562,6 +586,22 @@ final router = GoRouter(
       builder: (context, state) {
         final expertId = state.pathParameters['expertId']!;
         return ExpertProfileDetailScreen(expertId: expertId);
+      },
+    ),
+
+    // Expert Reviews (all)
+    GoRoute(
+      path: '/expert-reviews/:expertId',
+      name: 'expert_reviews',
+      builder: (context, state) {
+        final expertId = state.pathParameters['expertId']!;
+        final extra = state.extra as Map<String, dynamic>?;
+        return ExpertReviewsScreen(
+          expertId: expertId,
+          expertName: extra?['expertName'] as String? ?? 'Chuyên gia',
+          initialRating: (extra?['rating'] as num?)?.toDouble() ?? 0,
+          initialReviewCount: (extra?['reviewCount'] as num?)?.toInt() ?? 0,
+        );
       },
     ),
 
@@ -748,9 +788,11 @@ final router = GoRouter(
 
     // Rescuer Feedback
     GoRoute(
-      path: '/rescuer-feedback',
+      path: '/rescuer-feedback/:targetUserId',
       name: 'rescuer_feedback',
-      builder: (context, state) => const RescuerFeedbackScreen(),
+      builder: (context, state) => RescuerFeedbackScreen(
+        targetUserId: state.pathParameters['targetUserId'] ?? '',
+      ),
     ),
 
     // Rescuer ID Documents

@@ -7,6 +7,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:vibration/vibration.dart';
 import 'rescuer_profile_screen.dart';
 import 'rescuer_income_management_screen.dart';
+import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_schedule_screen.dart';
 import 'package:snakeaid_mobile/features/lesson/providers/lesson_read_provider.dart';
 import '../../emergency/providers/rescuer_emergency_provider.dart';
 import '../../emergency/providers/mission_hub_provider.dart';
@@ -16,19 +17,33 @@ import '../managers/location_manager.dart';
 import '../providers/tracking_provider.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_accept_request_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_available_jobs_screen.dart';
+import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_tracking_screen.dart';
+import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer_en_route_screen.dart';
 import 'package:snakeaid_mobile/features/snake_catching/repository/snake_catching_repository.dart';
 import 'package:snakeaid_mobile/features/snake_catching/models/snake_catching_request.dart';
 import '../../notifications/providers/notification_inbox_provider.dart';
 import '../../notifications/screens/notification_inbox_screen.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../repository/rescuer_analytics_repository.dart';
+import '../repository/rescuer_shift_repository.dart';
 import '../models/rescuer_daily_stats.dart';
+import 'package:intl/intl.dart';
 
 // ── Rescuer daily statistics provider ────────────────────────────────────────
 final _rescuerDailyStatsProvider =
     FutureProvider.autoDispose<RescuerDailyStats>((ref) async {
       final repo = ref.watch(rescuerAnalyticsRepositoryProvider);
       return repo.getStatistics(period: 'day');
+    });
+
+// ── Rescuer working schedule provider ─────────────────────────────────────
+final _rescuerShiftScheduleProvider =
+    FutureProvider.autoDispose<List<ShiftAssignment>>((ref) async {
+      final repo = ref.watch(rescuerShiftRepositoryProvider);
+      final now = DateTime.now();
+      final startDate = DateFormat('yyyy-MM-dd').format(now);
+      final endDate = DateFormat('yyyy-MM-dd').format(now);
+      return repo.getAssignments(startDate: startDate, endDate: endDate);
     });
 
 // ── Active snake catching job provider ──────────────────────────────────
@@ -48,9 +63,17 @@ final _activeCatchingJobProvider =
         'failed',
         'finished',
       };
-      return response.data
-          .where((r) => !terminalStatuses.contains(r.status.toLowerCase()))
-          .firstOrNull;
+      return response.data.where((r) {
+        if (terminalStatuses.contains(r.status.toLowerCase())) return false;
+
+        // Also check mission status if it exists.
+        if (r.mission != null) {
+          final mStatus = r.mission!.status.toLowerCase();
+          if (terminalStatuses.contains(mStatus)) return false;
+        }
+
+        return true;
+      }).firstOrNull;
     });
 
 /// Rescuer Home Screen - Dashboard for rescue team members
@@ -69,7 +92,7 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
   final List<Widget> _screens = [
     const _HomeTab(),
     const RescuerAvailableJobsScreen(),
-    const NotificationInboxScreen(),
+    const RescuerScheduleScreen(),
     const _ProfileTab(),
   ];
 
@@ -213,9 +236,8 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
                 _buildNavItem(1, Icons.task_alt, 'Nhiệm Vụ'),
                 _buildNavItem(
                   2,
-                  Icons.notifications_outlined,
-                  'Thông Báo',
-                  unreadCount: ref.watch(notificationInboxProvider).unreadCount,
+                  Icons.calendar_month_outlined,
+                  'Lịch Làm Việc',
                 ),
                 _buildNavItem(3, Icons.person, 'Cá Nhân'),
               ],
@@ -819,6 +841,18 @@ class _HomeTabState extends ConsumerState<_HomeTab>
 
       // ── GPS OK, bật chế độ cứu hộ ────────────────────────────────────
       try {
+        if (_rescuerId == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Không tìm thấy thông tin cứu hộ viên'),
+                backgroundColor: Color(0xFFDC3545),
+              ),
+            );
+          }
+          return;
+        }
+
         await ref
             .read(rescueModeProvider.notifier)
             .startRescueMode(_rescuerId!);
@@ -1034,6 +1068,19 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                       ),
                       const SizedBox(height: 16),
                       _buildStatsGrid(),
+                      const SizedBox(height: 24),
+
+                      // Schedule
+                      const Text(
+                        'Lịch Làm Việc Hôm Nay',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF333333),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTodaySchedule(),
                       const SizedBox(height: 24),
 
                       // Current Mission
@@ -1367,7 +1414,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      rescueModeState.error!,
+                      rescueModeState.error ?? "",
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFFD32F2F),
@@ -1410,6 +1457,252 @@ class _HomeTabState extends ConsumerState<_HomeTab>
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTodaySchedule() {
+    final scheduleAsync = ref.watch(_rescuerShiftScheduleProvider);
+    return scheduleAsync.when(
+      data: (shifts) {
+        if (shifts.isEmpty) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.event_available, size: 40, color: Color(0xFFDDDDDD)),
+                SizedBox(height: 12),
+                Text(
+                  'Không có lịch làm việc nào hôm nay',
+                  style: TextStyle(
+                    color: Color(0xFF888888),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: shifts.length,
+          itemBuilder: (context, index) {
+            final item = shifts[index];
+            final shiftName = item.shift?.name ?? 'Ca tùy chỉnh';
+
+            DateTime? startDt;
+            if (item.shiftStartLocal.isNotEmpty) {
+              startDt = DateTime.tryParse(item.shiftStartLocal);
+            }
+            final timeStr = startDt != null
+                ? "${startDt.hour.toString().padLeft(2, '0')}:${startDt.minute.toString().padLeft(2, '0')}"
+                : '';
+
+            DateTime? endDt;
+            if (item.shiftEndLocal.isNotEmpty) {
+              endDt = DateTime.tryParse(item.shiftEndLocal);
+            }
+            final endTimeStr = endDt != null
+                ? "${endDt.hour.toString().padLeft(2, '0')}:${endDt.minute.toString().padLeft(2, '0')}"
+                : '';
+
+            String statusVi = item.status;
+            Color statusColor = const Color(0xFFDDDDDD);
+            Color statusBg = const Color(0xFFF9F9F9);
+
+            switch (item.status.toLowerCase()) {
+              case 'scheduled':
+                statusVi = 'Đã lên lịch';
+                statusColor = const Color(0xFFFF6B35); // Green
+                statusBg = const Color(0xFFFFF3E0);
+                break;
+              case 'inprogress':
+              case 'in_progress':
+              case 'active':
+                statusVi = 'Đang làm việc';
+                statusColor = const Color(0xFFFF9800); // Orange
+                statusBg = const Color(0xFFFFF3E0);
+                break;
+              case 'completed':
+              case 'done':
+                statusVi = 'Đã hoàn thành';
+                statusColor = const Color(0xFF1976D2); // Blue
+                statusBg = const Color(0xFFE3F2FD);
+                break;
+              case 'cancelled':
+                statusVi = 'Đã hủy';
+                statusColor = const Color(0xFFD32F2F); // Red
+                statusBg = const Color(0xFFFFEBEE);
+                break;
+            }
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Cột Timeline bên trái
+                    Container(
+                      width: 85,
+                      constraints: const BoxConstraints(minHeight: 108),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: statusBg,
+                        border: Border(
+                          right: BorderSide(color: statusColor, width: 2),
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            timeStr,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: statusColor,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'đến',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: statusColor.withOpacity(0.8),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            endTimeStr,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: statusColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Cột Content bên phải
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    shiftName,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF333333),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: statusBg,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    statusVi,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: statusColor,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            const Row(
+                              children: [
+                                Icon(
+                                  Icons.today,
+                                  size: 14,
+                                  color: Color(0xFF555555),
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Hôm nay',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF555555),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+      loading: () => const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24.0),
+          child: CircularProgressIndicator(color: Color(0xFFFF6B35)),
+        ),
+      ),
+      error: (err, _) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFEBEE),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          'Lỗi tải lịch làm việc: $err',
+          style: const TextStyle(color: Color(0xFFD32F2F), fontSize: 13),
+          textAlign: TextAlign.center,
+        ),
       ),
     );
   }
@@ -1532,7 +1825,8 @@ class _HomeTabState extends ConsumerState<_HomeTab>
     // Priority 1: active snakebite rescue mission
     final activeMissionState = ref.watch(activeMissionProvider);
     if (activeMissionState.hasActiveMission) {
-      final mission = activeMissionState.mission!;
+      final mission = activeMissionState.mission;
+      if (mission == null) return const SizedBox.shrink();
       return _buildMissionCard(
         typeLabel: 'CỨU HỘ',
         typeLabelColor: const Color(0xFFDC3545),
@@ -1540,8 +1834,16 @@ class _HomeTabState extends ConsumerState<_HomeTab>
         title: 'Nhiệm vụ cứu hộ rắn cắn',
         subtitle:
             'Đang xử lý • Mã: ...${mission.missionId.length >= 6 ? mission.missionId.substring(mission.missionId.length - 6) : mission.missionId}',
-        onContinue: () =>
-            context.push('/rescuer/mission-detail/${mission.missionId}'),
+        onContinue: () {
+          if (mission.status.toLowerCase() == 'en route' ||
+              mission.status.toLowerCase() == 'arrived') {
+            context.push(
+              '/rescuer/navigation/${mission.incidentId}?missionId=${mission.missionId}',
+            );
+          } else {
+            context.push('/rescuer/mission-detail/${mission.missionId}');
+          }
+        },
       );
     }
 
@@ -1557,17 +1859,45 @@ class _HomeTabState extends ConsumerState<_HomeTab>
       error: (_, __) => _buildNoActiveMissionCard(),
       data: (job) {
         if (job == null) return _buildNoActiveMissionCard();
+
+        final mStatus =
+            job.mission?.status.toLowerCase() ?? job.status.toLowerCase();
+
         return _buildMissionCard(
           typeLabel: 'BẮT RẮN',
-          typeLabelColor: const Color(0xFF228B22),
+          typeLabelColor: const Color(0xFFFF6B35),
           icon: Icons.catching_pokemon,
           title: 'Yêu cầu bắt rắn',
           subtitle: job.address.isNotEmpty ? job.address : 'Địa chỉ không có',
-          onContinue: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => RescuerAcceptRequestScreen(requestData: job),
-            ),
-          ),
+          onContinue: () {
+            if (mStatus == 'arrived' || mStatus == 'catching') {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => RescuerTrackingScreen(
+                    requestData: job,
+                    missionId: job.mission?.id ?? '',
+                  ),
+                ),
+              );
+            } else if (mStatus == 'en_route' ||
+                mStatus == 'en route' ||
+                mStatus == 'enroute') {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => RescuerEnRouteScreen(
+                    requestData: job,
+                    missionId: job.mission?.id ?? '',
+                  ),
+                ),
+              );
+            } else {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => RescuerAcceptRequestScreen(requestData: job),
+                ),
+              );
+            }
+          },
         );
       },
     );

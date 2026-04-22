@@ -84,7 +84,6 @@ class ExpertListNotifier extends StateNotifier<ExpertListState> {
 
   ExpertListNotifier(this._repository) : super(const ExpertListState()) {
     loadExperts();
-    loadSpecialties();
   }
 
   /// Load list of experts
@@ -198,10 +197,16 @@ class ExpertListNotifier extends StateNotifier<ExpertListState> {
     await loadExperts();
   }
 
-  /// Apply local keyword search by expert name/specialty.
+  /// Apply local keyword search by expert name (realtime per typed character).
+  /// Empty query => show full list (with current sort/filter state).
   void setSearchQuery(String query) {
+    final normalizedQuery = query.trim();
     state = state.copyWith(
-      searchQuery: query.trim(),
+      searchQuery: normalizedQuery,
+    );
+
+    // Recompute after state.searchQuery is updated so filtering uses latest text.
+    state = state.copyWith(
       filteredExperts: _applyFiltersAndSort(state.experts),
     );
   }
@@ -243,9 +248,7 @@ class ExpertListNotifier extends StateNotifier<ExpertListState> {
       final q = state.searchQuery.toLowerCase();
       filtered = filtered.where((expert) {
         final name = expert.displayName.toLowerCase();
-        final primary = expert.primarySpecialty.toLowerCase();
-        final allSpecs = expert.specialties.join(' ').toLowerCase();
-        return name.contains(q) || primary.contains(q) || allSpecs.contains(q);
+        return name.contains(q);
       }).toList();
     }
 
@@ -275,6 +278,18 @@ class ExpertListNotifier extends StateNotifier<ExpertListState> {
 
   /// Refresh expert list
   Future<void> refresh() async {
+    await loadExperts();
+  }
+
+  /// Reset filters/sort for the simplified member expert-list UI.
+  Future<void> resetForMemberListUi() async {
+    state = state.copyWith(
+      clearSpecialty: true,
+      clearIsOnlineFilter: true,
+      sortBy: 'online',
+      searchQuery: '',
+      filteredExperts: _applyFiltersAndSort(state.experts),
+    );
     await loadExperts();
   }
 

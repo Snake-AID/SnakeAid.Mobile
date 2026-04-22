@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'edit_profile_screen.dart';
 import '../models/member_profile.dart';
 import '../repository/member_profile_repository.dart';
@@ -10,7 +11,7 @@ import 'id_documents_screen.dart';
 import 'deposit_money_screen.dart';
 import 'withdraw_money_screen.dart';
 import 'wallet_history_screen.dart';
-import 'settings_screen.dart';
+import '../../auth/repository/auth_repository.dart';
 import '../../wallet/repository/wallet_repository.dart';
 
 /// Member Profile Screen
@@ -112,36 +113,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           color: Colors.white,
           child: SafeArea(
             bottom: false,
-            child: SizedBox(
+            child: const SizedBox(
               height: 56,
               child: Stack(
                 children: [
                   Center(
-                    child: const Text(
+                    child: Text(
                       'Hồ Sơ Cá Nhân',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF1F1F1F),
                       ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    bottom: 0,
-                    child: IconButton(
-                      icon: const Icon(
-                        Icons.settings,
-                        color: Color(0xFF1F1F1F),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const SettingsScreen(),
-                          ),
-                        );
-                      },
                     ),
                   ),
                 ],
@@ -625,20 +608,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       );
                     },
                   ),
-                  const SizedBox(height: 8),
-                  _MenuItem(
-                    icon: Icons.badge,
-                    title: 'Chứng Chỉ & Giấy Tờ',
-                    subtitle: 'CMND, BHYT',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const IdDocumentsScreen(),
+                  const SizedBox(height: 24),
+                  
+                  // Logout Button
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: _showLogoutDialog,
+                      icon: Icon(Icons.logout, size: 18, color: Colors.grey[600]),
+                      label: Text(
+                        'Đăng xuất',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[600],
                         ),
-                      );
-                    },
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 16), // Space for bottom nav
+                  const SizedBox(height: 24), // Space for bottom nav
                   ],
                 ),
               ),
@@ -646,6 +636,85 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Đăng xuất',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1F1F1F),
+          ),
+        ),
+        content: const Text(
+          'Bạn có chắc muốn đăng xuất khỏi tài khoản?',
+          style: TextStyle(
+            fontSize: 14,
+            color: Color(0xFF666666),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text(
+              'Hủy',
+              style: TextStyle(color: Color(0xFF888888)),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final navigator = Navigator.of(context);
+              final router = GoRouter.of(context);
+              navigator.pop();
+              
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (dialogContext) => WillPopScope(
+                  onWillPop: () async => false,
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF228B22),
+                    ),
+                  ),
+                ),
+              );
+              
+              try {
+                final authRepository = ref.read(authRepositoryProvider);
+                await authRepository.logout();
+                router.go('/role-selection');
+              } catch (e) {
+                if (mounted) {
+                  navigator.pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(e.toString().replaceAll('Exception: ', '')),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE53935),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Đăng xuất'),
+          ),
+        ],
+      ),
     );
   }
 }

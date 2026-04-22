@@ -20,6 +20,8 @@ class FeedbackData {
   final int rating;
   final String? comments;
   final DateTime? createdAt;
+  final String? raterName;
+  final String? targetUserName;
 
   const FeedbackData({
     required this.id,
@@ -31,6 +33,8 @@ class FeedbackData {
     required this.rating,
     this.comments,
     this.createdAt,
+    this.raterName,
+    this.targetUserName,
   });
 
   factory FeedbackData.fromJson(Map<String, dynamic> json) {
@@ -46,6 +50,8 @@ class FeedbackData {
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'] as String)
           : null,
+      raterName: json['raterName'] as String?,
+      targetUserName: json['targetUserName'] as String?,
     );
   }
 }
@@ -111,10 +117,10 @@ class FeedbackRepository {
     }
   }
 
-  /// GET /api/feedback/reference/{referenceId}
-  Future<List<FeedbackData>> getFeedbacksByReference(String referenceId) async {
+  /// GET /api/feedback/user/{targetUserId}
+  Future<List<FeedbackData>> getFeedbacksByUser(String targetUserId) async {
     try {
-      final response = await _http.get('/api/feedback/reference/$referenceId');
+      final response = await _http.get('/api/feedback/user/$targetUserId');
       if (response.statusCode == 200 && response.data != null) {
         final list = (response.data['data'] ?? response.data) as List<dynamic>?;
         return list
@@ -123,7 +129,8 @@ class FeedbackRepository {
             [];
       }
       return [];
-    } catch (_) {
+    } catch (e) {
+      debugPrint('❌ [FeedbackRepo] Error fetching user feedback: $e');
       return [];
     }
   }

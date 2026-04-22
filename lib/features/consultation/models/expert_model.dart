@@ -180,7 +180,9 @@ class ExpertModel {
 
   /// Get formatted consultation fee
   String get formattedFee {
-    final fee = consultationFee.toInt();
+     final fee = (scheduledConsultationFee > 0 
+      ? scheduledConsultationFee 
+      : consultationFee).round();
     return '${fee.toString().replaceAllMapped(
           RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
           (Match m) => '${m[1]},',

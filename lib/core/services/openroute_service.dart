@@ -234,8 +234,8 @@ class RouteData {
           .map((point) => LatLng(point.latitude, point.longitude))
           .toList();
 
-      final distanceMeters = (summary['distance'] as num);
-      final durationSeconds = (summary['duration'] as num);
+      final distanceMeters = (summary['distance'] as num?) ?? 0.0;
+      final durationSeconds = (summary['duration'] as num?) ?? 0.0;
 
       debugPrint('✅ Decoded ${points.length} points from polyline');
 
