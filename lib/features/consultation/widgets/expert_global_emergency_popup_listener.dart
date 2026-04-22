@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/router.dart';
-import '../../../core/providers/http_provider.dart';
 import '../../../core/services/emergency_consultation_signalr_service.dart';
 import '../repository/consultation_repository.dart';
+import '../../expert/providers/expert_availability_provider.dart';
 
 class ExpertGlobalEmergencyPopupListener extends ConsumerStatefulWidget {
   const ExpertGlobalEmergencyPopupListener({super.key});
@@ -20,6 +20,7 @@ class _ExpertGlobalEmergencyPopupListenerState
     extends ConsumerState<ExpertGlobalEmergencyPopupListener> {
   EmergencyConsultationSignalRService? _service;
   StreamSubscription<EmergencyConsultationRequestEvent>? _requestSub;
+  ProviderSubscription<ExpertAvailabilityState>? _availabilitySub;
   Timer? _countdownTimer;
 
   EmergencyConsultationRequestEvent? _activeRequest;
@@ -41,45 +42,50 @@ class _ExpertGlobalEmergencyPopupListenerState
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _connectRealtime();
-    });
-  }
+    _service = ref.read(expertAvailabilitySignalRServiceProvider);
+    _requestSub = _service!.requestStream.listen((event) {
+      if (!mounted) return;
 
-  Future<void> _connectRealtime() async {
-    try {
-      final baseUrl = ref.read(httpServiceProvider).baseUrl;
-      _service = EmergencyConsultationSignalRService(baseUrl: baseUrl);
+      final availability = ref.read(expertAvailabilityProvider);
+      if (!availability.isOnline) {
+        return;
+      }
 
-      _requestSub = _service!.requestStream.listen((event) {
-        if (!mounted) return;
+      if (!_shouldShowForStatus(event.status)) {
+        debugPrint(
+          'Ignore emergency popup because status is not actionable: ${event.status}',
+        );
+        return;
+      }
 
-        if (!_shouldShowForStatus(event.status)) {
-          debugPrint(
-            'Ignore emergency popup because status is not actionable: ${event.status}',
-          );
-          return;
-        }
+      final expiresAtUtc = event.expiresAt?.toUtc();
+      if (expiresAtUtc == null) return;
 
-        final expiresAtUtc = event.expiresAt?.toUtc();
-        if (expiresAtUtc == null) return;
+      final remain = expiresAtUtc.difference(DateTime.now().toUtc()).inSeconds;
+      if (remain <= 0) return;
 
-        final remain = expiresAtUtc.difference(DateTime.now().toUtc()).inSeconds;
-        if (remain <= 0) return;
-
-        setState(() {
-          _activeRequest = event;
-          _expiresAtUtc = expiresAtUtc;
-          _countdownSeconds = remain;
-          _isVisible = true;
-        });
-        _startCountdown();
+      setState(() {
+        _activeRequest = event;
+        _expiresAtUtc = expiresAtUtc;
+        _countdownSeconds = remain;
+        _isVisible = true;
       });
+      _startCountdown();
+    });
 
-      await _service!.connectAsExpert();
-    } catch (e) {
-      debugPrint('Expert global popup listener connect failed: $e');
-    }
+    _availabilitySub = ref.listenManual<ExpertAvailabilityState>(
+      expertAvailabilityProvider,
+      (previous, next) {
+        if (!next.isOnline && mounted && _isVisible) {
+          setState(() {
+            _isVisible = false;
+            _activeRequest = null;
+            _expiresAtUtc = null;
+            _countdownSeconds = 0;
+          });
+        }
+      },
+    );
   }
 
   bool _syncCountdown() {
@@ -199,7 +205,7 @@ class _ExpertGlobalEmergencyPopupListenerState
   void dispose() {
     _countdownTimer?.cancel();
     _requestSub?.cancel();
-    _service?.dispose();
+    _availabilitySub?.close();
     super.dispose();
   }
 

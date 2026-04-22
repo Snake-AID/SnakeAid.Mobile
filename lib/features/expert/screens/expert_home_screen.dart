@@ -16,6 +16,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../../notifications/providers/notification_inbox_provider.dart';
 import '../../wallet/repository/transaction_repository.dart';
 import '../providers/ai_recognition_review_provider.dart';
+import '../providers/expert_availability_provider.dart';
 
 /// FutureProvider for today's expert statistics (used in stats grid).
 /// Not autoDispose so data is cached for the session (avoids re-spinner on tab switch).
@@ -326,6 +327,31 @@ class _HomeTabState extends ConsumerState<_HomeTab>
     }
   }
 
+  Future<void> _toggleExpertAvailability(bool nextOnline) async {
+    final notifier = ref.read(expertAvailabilityProvider.notifier);
+    await notifier.setOnline(nextOnline);
+
+    if (!mounted) return;
+    final state = ref.read(expertAvailabilityProvider);
+    if (state.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(state.error!)),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          nextOnline
+              ? 'Bạn đã chuyển sang trạng thái online'
+              : 'Bạn đã chuyển sang trạng thái offline',
+        ),
+        backgroundColor: nextOnline ? Colors.green : Colors.grey,
+      ),
+    );
+  }
+
   // Public method to reload data when tab is selected
   void reload() {
     if (mounted) {
@@ -565,6 +591,8 @@ class _HomeTabState extends ConsumerState<_HomeTab>
 
   @override
   Widget build(BuildContext context) {
+    final availabilityState = ref.watch(expertAvailabilityProvider);
+
     return Stack(
       children: [
         CustomScrollView(
@@ -648,6 +676,10 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                 delegate: SliverChildListDelegate([
                   // Hero Earnings Card
                   _buildEarningsCard(),
+                  const SizedBox(height: 20),
+
+                  // Expert availability
+                  _buildAvailabilityCard(availabilityState),
                   const SizedBox(height: 20),
 
                   // Quick Stats Grid
@@ -1337,6 +1369,163 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                           ),
                         ],
                       ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvailabilityCard(ExpertAvailabilityState availabilityState) {
+    final isOnline = availabilityState.isOnline;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: isOnline
+                          ? const Color(0xFF10B981)
+                          : const Color(0xFF999999),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  if (isOnline)
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withOpacity(0.3),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      availabilityState.isLoading
+                          ? 'ĐANG KẾT NỐI...'
+                          : (isOnline ? 'ĐANG ONLINE' : 'OFFLINE'),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: availabilityState.isLoading
+                            ? const Color(0xFFFFA726)
+                            : (isOnline
+                                  ? const Color(0xFF10B981)
+                                  : const Color(0xFF999999)),
+                      ),
+                    ),
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.video_call,
+                          size: 14,
+                          color: Color(0xFF999999),
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          'Bật để nhận tư vấn khẩn cấp',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF999999),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: isOnline,
+                activeColor: const Color(0xFF6C47C2),
+                onChanged: availabilityState.isLoading
+                    ? null
+                    : _toggleExpertAvailability,
+              ),
+            ],
+          ),
+          if (availabilityState.error != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFEBEE),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    size: 16,
+                    color: Color(0xFFD32F2F),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      availabilityState.error!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFFD32F2F),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          const Divider(),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Trạng thái kết nối',
+                style: TextStyle(fontSize: 12, color: Color(0xFFAAAAAA)),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: availabilityState.isConnected
+                      ? const Color(0xFFE8F5E9)
+                      : const Color(0xFFEEEEEE),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  availabilityState.isConnected ? 'Đã kết nối' : 'Chưa kết nối',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: availabilityState.isConnected
+                        ? const Color(0xFF2E7D32)
+                        : const Color(0xFF757575),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
