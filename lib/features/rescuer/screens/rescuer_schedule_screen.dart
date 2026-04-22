@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../repository/rescuer_shift_repository.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 final scheduleSelectedDateProvider = StateProvider<DateTime>((ref) {
   return DateTime.now();
@@ -9,21 +10,27 @@ final scheduleSelectedDateProvider = StateProvider<DateTime>((ref) {
 
 final scheduleWeekStartProvider = StateProvider<DateTime>((ref) {
   final now = DateTime.now();
-  return DateTime(now.year, now.month, now.day).subtract(
-    Duration(days: now.weekday - 1),
-  );
+  return DateTime(
+    now.year,
+    now.month,
+    now.day,
+  ).subtract(Duration(days: now.weekday - 1));
 });
 
 final rescuerWeeklyScheduleProvider =
     FutureProvider.autoDispose<List<ShiftAssignment>>((ref) async {
       final repo = ref.watch(rescuerShiftRepositoryProvider);
+      final prefs = await SharedPreferences.getInstance();
+      final rescuerId = prefs.getString('user_id');
+      if (rescuerId == null || rescuerId.isEmpty) return <ShiftAssignment>[];
+
       final startOfWeek = ref.watch(scheduleWeekStartProvider);
       final endOfWeek = startOfWeek.add(const Duration(days: 6));
-
       final startDateStr = DateFormat('yyyy-MM-dd').format(startOfWeek);
       final endDateStr = DateFormat('yyyy-MM-dd').format(endOfWeek);
 
-      return await repo.getAssignments(
+      return await repo.getAssignmentsByRescuerRange(
+        rescuerId: rescuerId,
         startDate: startDateStr,
         endDate: endDateStr,
       );
@@ -51,7 +58,11 @@ class RescuerScheduleScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text(
           'Lịch làm việc',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.white),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            color: Colors.white,
+          ),
         ),
         backgroundColor: const Color(0xFFFF6B35),
         centerTitle: true,
@@ -64,8 +75,8 @@ class RescuerScheduleScreen extends ConsumerWidget {
               final normalizedNow = DateTime(now.year, now.month, now.day);
               ref.read(scheduleSelectedDateProvider.notifier).state =
                   normalizedNow;
-              ref.read(scheduleWeekStartProvider.notifier).state =
-                  normalizedNow.subtract(Duration(days: normalizedNow.weekday - 1));
+              ref.read(scheduleWeekStartProvider.notifier).state = normalizedNow
+                  .subtract(Duration(days: normalizedNow.weekday - 1));
             },
             tooltip: 'Hôm nay',
           ),
@@ -86,8 +97,8 @@ class RescuerScheduleScreen extends ConsumerWidget {
                     final prev = startOfWeek.subtract(const Duration(days: 7));
                     final weekdayOffset = selectedDate.weekday - 1;
                     ref.read(scheduleWeekStartProvider.notifier).state = prev;
-                    ref.read(scheduleSelectedDateProvider.notifier).state =
-                        prev.add(Duration(days: weekdayOffset));
+                    ref.read(scheduleSelectedDateProvider.notifier).state = prev
+                        .add(Duration(days: weekdayOffset));
                   },
                 ),
                 Text(
@@ -104,8 +115,8 @@ class RescuerScheduleScreen extends ConsumerWidget {
                     final next = startOfWeek.add(const Duration(days: 7));
                     final weekdayOffset = selectedDate.weekday - 1;
                     ref.read(scheduleWeekStartProvider.notifier).state = next;
-                    ref.read(scheduleSelectedDateProvider.notifier).state =
-                        next.add(Duration(days: weekdayOffset));
+                    ref.read(scheduleSelectedDateProvider.notifier).state = next
+                        .add(Duration(days: weekdayOffset));
                   },
                 ),
               ],
@@ -433,24 +444,24 @@ class RescuerScheduleScreen extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: statusBg,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            statusVi,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: statusColor,
-                            ),
-                          ),
-                        ),
+                        // Container(
+                        //   padding: const EdgeInsets.symmetric(
+                        //     horizontal: 8,
+                        //     vertical: 4,
+                        //   ),
+                        //   decoration: BoxDecoration(
+                        //     color: statusBg,
+                        //     borderRadius: BorderRadius.circular(6),
+                        //   ),
+                        //   child: Text(
+                        //     statusVi,
+                        //     style: TextStyle(
+                        //       fontSize: 11,
+                        //       fontWeight: FontWeight.w600,
+                        //       color: statusColor,
+                        //     ),
+                        //   ),
+                        // ),
                       ],
                     ),
                     const SizedBox(height: 12),

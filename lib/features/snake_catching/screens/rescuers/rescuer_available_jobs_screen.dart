@@ -626,7 +626,7 @@ class _RescuerAvailableJobsScreenState
             label: const Text(
               'Lịch sử',
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF666666),
               ),
@@ -660,7 +660,7 @@ class _RescuerAvailableJobsScreenState
                     shape: BoxShape.circle,
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 3),
                 Text(
                   _isOnline ? 'Trực tuyến' : 'Ngoại tuyến',
                   style: TextStyle(
