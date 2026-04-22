@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/snake_catching_request.dart';
 import '../../models/snake_species.dart';
 import '../../repository/snake_catching_repository.dart';
@@ -78,7 +79,8 @@ class _RescuerAcceptRequestScreenState
       if (data != null) {
         setState(() => _fullRequest = data);
         if (!_paymentConfirmed) _checkPayment(silent: true);
-        if (data.status == 'Cancelled' && !_cancelledByCustomerHandled) {
+        final status = data.status.toLowerCase();
+        if ((status == 'cancelled' || status == 'canceled') && !_cancelledByCustomerHandled) {
           _cancelledByCustomerHandled = true;
           _pollingTimer?.cancel();
           _showCancelledByCustomerDialog(data.cancellationReason);
@@ -262,7 +264,6 @@ class _RescuerAcceptRequestScreenState
           _isCheckingPayment = false;
           _pollCount++;
         });
-        _pollingTimer?.cancel();
         return;
       }
       // Query transaction list by referenceId=requestId, filtered to CatchingDeposit + isPaid.
@@ -278,7 +279,7 @@ class _RescuerAcceptRequestScreenState
         _isCheckingPayment = false;
         _pollCount++;
       });
-      if (confirmed) _pollingTimer?.cancel();
+      if (confirmed) return;
     } catch (_) {
       if (mounted) setState(() => _isCheckingPayment = false);
     }
@@ -305,7 +306,7 @@ class _RescuerAcceptRequestScreenState
     }
 
     return GestureDetector(
-      onLongPress: species != null ? () => _showSnakeDetail(species!, detail) : null,
+      onLongPress: species != null ? () => _showSnakeDetail(species, detail) : null,
       child: Container(
       decoration: BoxDecoration(
         color: const Color(0xFFFAFAFA),
@@ -1078,13 +1079,15 @@ class _RescuerAcceptRequestScreenState
   }
 
   Widget _buildCustomerInformationCard(RequestUserInfo? user) {
-    final name = user?.account?.fullName?.isNotEmpty == true
+    final name = user?.account?.fullName.isNotEmpty == true
         ? user!.account!.fullName
         : (user?.userName.isNotEmpty == true
             ? user!.userName
             : (_fullRequest == null ? 'Đang tải...' : 'Khách hàng'));
     final phone = user?.phoneNumber.isNotEmpty == true ? user!.phoneNumber : null;
     final email = user?.email.isNotEmpty == true ? user!.email : null;
+    final avatarUrl = user?.account?.avatarUrl?.trim();
+    final hasAvatar = avatarUrl?.isNotEmpty == true;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -1133,11 +1136,13 @@ class _RescuerAcceptRequestScreenState
 
           Row(
             children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: const BoxDecoration(color: Color(0xFFE0E0E0), shape: BoxShape.circle),
-                child: const Icon(Icons.person, color: Color(0xFF999999), size: 28),
+              CircleAvatar(
+                radius: 23,
+                backgroundColor: const Color(0xFFE0E0E0),
+                backgroundImage: hasAvatar ? NetworkImage(avatarUrl!) : null,
+                child: hasAvatar
+                    ? null
+                    : const Icon(Icons.person, color: Color(0xFF999999), size: 28),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1161,13 +1166,11 @@ class _RescuerAcceptRequestScreenState
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  // TODO: url_launcher tel:$phone
-                },
+                onPressed: () => _launchPhoneCall(phone),
                 icon: const Icon(Icons.call, size: 18),
-                label: Text(
+                label: const Text(
                   'GỌI KHÁCH HÀNG',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFF6B35),
@@ -1221,6 +1224,20 @@ class _RescuerAcceptRequestScreenState
         ],
       ),
     );
+  }
+
+  Future<void> _launchPhoneCall(String phone) async {
+    final Uri uri = Uri(scheme: 'tel', path: phone);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không thể mở ứng dụng gọi điện. Vui lòng kiểm tra thiết bị.'),
+          backgroundColor: Color(0xFFDC3545),
+        ),
+      );
+    }
   }
 
   Widget _buildEquipmentChecklistCard() {

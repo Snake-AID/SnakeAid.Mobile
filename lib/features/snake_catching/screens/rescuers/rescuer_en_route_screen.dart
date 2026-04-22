@@ -45,12 +45,15 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
   bool _hasLocationError = false;
   bool _routeLoading = false;
   bool _isArriving = false;
+  bool _isCancelling = false;
 
   final Map<int, SnakeSpecies> _speciesCache = {};
   bool _speciesLoading = false;
 
   StreamSubscription<Position>? _positionSub;
   Timer? _routeRefreshTimer;
+  Timer? _statusRefreshTimer;
+  bool _hasHandledCancellation = false;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnim;
 
@@ -81,6 +84,7 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
     _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
     _pulseAnim = Tween<double>(begin: 0.3, end: 1.0).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut));
     _initLocation();
+    _startStatusRefresh();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadSpecies());
   }
 
@@ -88,6 +92,7 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
   void dispose() {
     _positionSub?.cancel();
     _routeRefreshTimer?.cancel();
+    _statusRefreshTimer?.cancel();
     _pulseController.dispose();
     _dio.close(force: true);
     super.dispose();
@@ -199,6 +204,118 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
       final uri = Uri.parse('tel:$phone');
       if (await canLaunchUrl(uri)) await launchUrl(uri);
     }
+  }
+
+  void _startStatusRefresh() {
+    _statusRefreshTimer?.cancel();
+    _refreshRequestStatus();
+    _statusRefreshTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      _refreshRequestStatus();
+    });
+  }
+
+  Future<void> _refreshRequestStatus() async {
+    if (_hasHandledCancellation) return;
+    try {
+      final repo = ref.read(snakeCatchingRepositoryProvider);
+      final response = await repo.getRequestById(widget.requestData.id);
+      if (!mounted || response.data == null) return;
+
+      final status = response.data!.status.toLowerCase();
+      if ((status == 'cancelled' || status == 'canceled') && !_hasHandledCancellation) {
+        _hasHandledCancellation = true;
+        _positionSub?.cancel();
+        _routeRefreshTimer?.cancel();
+        _statusRefreshTimer?.cancel();
+        _showRequestCancelledDialog(response.data!.cancellationReason);
+      }
+    } catch (_) {}
+  }
+
+  void _showRequestCancelledDialog(String? reason) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 68,
+              height: 68,
+              decoration: BoxDecoration(
+                color: const Color(0xFFDC3545).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.cancel, color: Color(0xFFDC3545), size: 38),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Đơn đã bị hủy',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF1F1F1F)),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Khách hàng đã hủy đơn này. Bạn sẽ được đưa về danh sách công việc.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Color(0xFF666666), height: 1.4),
+            ),
+            if (reason != null && reason.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F8F8),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFEEEEEE)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Lý do hủy:',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF999999)),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      reason,
+                      style: const TextStyle(fontSize: 13, color: Color(0xFF444444), fontStyle: FontStyle.italic),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF6B35),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+              ),
+              child: const Text(
+                'Về Danh Sách Công Việc',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _confirmArrived() {
@@ -533,6 +650,272 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
         ),
       ),
     );
+  }
+
+  void _showCancelDialog() {
+    String? _selectedReason;
+    final _otherController = TextEditingController();
+    bool _showOtherField = false;
+
+    const reasons = [
+      'Khách hàng không phản hồi / không liên lạc được',
+      'Phương tiện hoặc thiết bị gặp sự cố',
+      'Không thể đến địa điểm (tắc đường, sự cố đường)',
+      'Địa chỉ không rõ ràng hoặc không chính xác',
+      'Có việc khẩn cấp cá nhân',
+      'Lý do khác',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDC3545).withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.cancel_outlined, color: Color(0xFFDC3545), size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Hủy đơn',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF333333),
+                              ),
+                            ),
+                            Text(
+                              'Vui lòng chọn lý do hủy đơn',
+                              style: TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    margin: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF8E1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFFE082)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded, color: Color(0xFFFF8F00), size: 16),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Hủy đơn nhiều lần có thể ảnh hưởng đến điểm uy tín của bạn.',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF7B5800)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ...reasons.map((reason) {
+                    final isOther = reason == 'Lý do khác';
+                    return InkWell(
+                      onTap: () {
+                        setSheetState(() {
+                          _selectedReason = reason;
+                          _showOtherField = isOther;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _selectedReason == reason
+                              ? const Color(0xFFDC3545).withOpacity(0.07)
+                              : const Color(0xFFF8F8F8),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: _selectedReason == reason
+                                ? const Color(0xFFDC3545)
+                                : Colors.grey[200]!,
+                            width: _selectedReason == reason ? 1.5 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _selectedReason == reason
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_off,
+                              color: _selectedReason == reason
+                                  ? const Color(0xFFDC3545)
+                                  : Colors.grey[400],
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                reason,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: _selectedReason == reason
+                                      ? const Color(0xFFDC3545)
+                                      : const Color(0xFF444444),
+                                  fontWeight: _selectedReason == reason
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                  if (_showOtherField) ...[
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: _otherController,
+                      autofocus: true,
+                      maxLines: 2,
+                      maxLength: 200,
+                      decoration: InputDecoration(
+                        hintText: 'Nhập lý do cụ thể...',
+                        hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+                        filled: true,
+                        fillColor: const Color(0xFFF8F8F8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFFDC3545)),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        counterStyle: TextStyle(color: Colors.grey[400], fontSize: 11),
+                      ),
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(sheetContext),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF666666),
+                            side: BorderSide(color: Colors.grey[300]!),
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: const Text('Giữ đơn', style: TextStyle(fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: (_selectedReason == null || _isCancelling)
+                              ? null
+                              : () async {
+                                  final reason = _selectedReason == 'Lý do khác'
+                                      ? (_otherController.text.trim().isNotEmpty
+                                          ? _otherController.text.trim()
+                                          : 'Lý do khác')
+                                      : _selectedReason!;
+
+                                  Navigator.pop(sheetContext);
+                                  await _cancelMission(reason);
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFDC3545),
+                            disabledBackgroundColor: Colors.grey[300],
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: const Text('Xác nhận hủy', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _cancelMission(String reason) async {
+    setState(() => _isCancelling = true);
+    try {
+      final repo = ref.read(snakeCatchingRepositoryProvider);
+      await repo.abortMission(widget.missionId, reason);
+      _positionSub?.cancel();
+      _routeRefreshTimer?.cancel();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã hủy đơn thành công'),
+          backgroundColor: Color(0xFF28A745),
+        ),
+      );
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: const Color(0xFFDC3545),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isCancelling = false);
+    }
   }
 
   ({String badge, Color color}) _dangerInfo(SnakeSpecies? species) {
@@ -1105,37 +1488,31 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
             const SizedBox(height: 12),
             _buildSnakeSection(),
           ],
-          const SizedBox(height: 14),
-          Row(children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _callCustomer,
-                icon: const Icon(Icons.phone_in_talk, size: 15),
-                label: const Text('Gọi khách', style: TextStyle(fontSize: 13)),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFFF6B35),
-                  side: const BorderSide(color: Color(0xFFFF6B35)),
-                  padding: const EdgeInsets.symmetric(vertical: 11),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
+         
+          const SizedBox(height: 100),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _isCancelling ? null : _showCancelDialog,
+              icon: _isCancelling
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFDC3545)),
+                    )
+                  : const Icon(Icons.close, size: 16),
+              label: Text(
+                _isCancelling ? 'Đang hủy đơn...' : 'Hủy đơn',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFDC3545),
+                side: const BorderSide(color: Color(0xFFDC3545)),
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _openExternalNav,
-                icon: const Icon(Icons.navigation, size: 15),
-                label: const Text('Chỉ đường', style: TextStyle(fontSize: 13)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2196F3),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 11),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            ),
-          ]),
+          ),
         ],
       ),
     );
