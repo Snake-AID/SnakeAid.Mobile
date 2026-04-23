@@ -603,7 +603,7 @@ void _showSosActivatedDialog(
           ],
           actions: [
             DialogAction(
-              label: 'HỦY SOS',
+              label: 'ĐÓNG',
               onPressed: () {
                 if (Navigator.of(dialogContext).canPop()) {
                   Navigator.of(dialogContext).pop();

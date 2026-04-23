@@ -20,8 +20,7 @@ import '../providers/expert_availability_provider.dart';
 
 /// FutureProvider for today's expert statistics (used in stats grid).
 /// Not autoDispose so data is cached for the session (avoids re-spinner on tab switch).
-final _expertDailyStatsProvider =
-    FutureProvider<ExpertStats>((ref) {
+final _expertDailyStatsProvider = FutureProvider<ExpertStats>((ref) {
   return ref
       .watch(expertAnalyticsRepositoryProvider)
       .getStatistics(period: 'day');
@@ -29,8 +28,7 @@ final _expertDailyStatsProvider =
 
 /// FutureProvider for this month's expert statistics (used in earnings card).
 /// Not autoDispose so data is cached for the session (avoids re-spinner on tab switch).
-final _expertMonthlyStatsProvider =
-    FutureProvider<ExpertStats>((ref) {
+final _expertMonthlyStatsProvider = FutureProvider<ExpertStats>((ref) {
   return ref
       .watch(expertAnalyticsRepositoryProvider)
       .getStatistics(period: 'month');
@@ -56,15 +54,18 @@ _ExpertConsultation _bookingToExpertConsultation(
 
   final now = DateTime.now();
   final scheduled = normalizeForExpertUi(b.slotStartTime ?? b.scheduledTime);
-  final slotStartTime =
-      b.slotStartTime != null ? normalizeForExpertUi(b.slotStartTime!) : null;
-  final slotEndTime =
-      b.slotEndTime != null ? normalizeForExpertUi(b.slotEndTime!) : null;
-  final bookedAt = b.bookedAt != null ? normalizeForExpertUi(b.bookedAt!) : null;
-  final paymentDeadline =
-      b.paymentDeadline != null
-          ? normalizeForExpertUi(b.paymentDeadline!)
-          : null;
+  final slotStartTime = b.slotStartTime != null
+      ? normalizeForExpertUi(b.slotStartTime!)
+      : null;
+  final slotEndTime = b.slotEndTime != null
+      ? normalizeForExpertUi(b.slotEndTime!)
+      : null;
+  final bookedAt = b.bookedAt != null
+      ? normalizeForExpertUi(b.bookedAt!)
+      : null;
+  final paymentDeadline = b.paymentDeadline != null
+      ? normalizeForExpertUi(b.paymentDeadline!)
+      : null;
 
   final _ExpertConsultationStatus status;
   switch (b.status) {
@@ -102,10 +103,10 @@ _ExpertConsultation _bookingToExpertConsultation(
     feeCost: b.feeCost,
     rating: b.rating,
     durationSeconds: slotEndTime != null && slotStartTime != null
-      ? slotEndTime.difference(slotStartTime).inSeconds
+        ? slotEndTime.difference(slotStartTime).inSeconds
         : null,
     durationMinutes: slotEndTime != null && slotStartTime != null
-      ? slotEndTime.difference(slotStartTime).inMinutes
+        ? slotEndTime.difference(slotStartTime).inMinutes
         : 45,
     consultationMethod: 'video',
     problemDescription: b.problemDescription,
@@ -336,9 +337,9 @@ class _HomeTabState extends ConsumerState<_HomeTab>
     if (!mounted) return;
     final state = ref.read(expertAvailabilityProvider);
     if (state.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(state.error!)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(state.error!)));
       return;
     }
 
@@ -1315,70 +1316,84 @@ class _HomeTabState extends ConsumerState<_HomeTab>
             child: _statsLoading
                 ? const Row(
                     children: [
-                      Icon(Icons.check_circle_outline,
-                          color: Colors.white38, size: 18),
-                      SizedBox(width: 6),
-                      Text('— Tư Vấn Hoàn Thành',
-                          style:
-                              TextStyle(fontSize: 14, color: Colors.white38)),
+                      Icon(
+                        Icons.check_circle_outline,
+                        color: Colors.white38,
+                        size: 18,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        '— Tư Vấn Hoàn Thành',
+                        style: TextStyle(fontSize: 14, color: Colors.white38),
+                      ),
                       SizedBox(width: 16),
                       SizedBox(
                         width: 14,
                         height: 14,
                         child: CircularProgressIndicator(
-                            strokeWidth: 1.5, color: Colors.white38),
+                          strokeWidth: 1.5,
+                          color: Colors.white38,
+                        ),
                       ),
                     ],
                   )
                 : stats == null
-                    ? GestureDetector(
-                        onTap: _loadStats,
-                        child: const Row(
-                          children: [
-                            Icon(Icons.refresh,
-                                color: Colors.white54, size: 16),
-                            SizedBox(width: 6),
-                            Text('Nhấn để thử lại',
-                                style: TextStyle(
-                                    fontSize: 13, color: Colors.white54)),
-                          ],
+                ? GestureDetector(
+                    onTap: _loadStats,
+                    child: const Row(
+                      children: [
+                        Icon(Icons.refresh, color: Colors.white54, size: 16),
+                        SizedBox(width: 6),
+                        Text(
+                          'Nhấn để thử lại',
+                          style: TextStyle(fontSize: 13, color: Colors.white54),
                         ),
-                      )
-                    : Row(
-                        children: [
-                          const Icon(Icons.check_circle_outline,
-                              color: Colors.white, size: 18),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              '${stats.completedConsultations} Tư Vấn Hoàn Thành',
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Container(width: 1, height: 16, color: Colors.white30),
-                          const SizedBox(width: 12),
-                          const Icon(Icons.inbox_outlined,
-                              color: Colors.white70, size: 18),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              '${stats.consultationRequests} Yêu Cầu',
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Colors.white70,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
+                      ],
+                    ),
+                  )
+                : Row(
+                    children: [
+                      const Icon(
+                        Icons.check_circle_outline,
+                        color: Colors.white,
+                        size: 18,
                       ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          '${stats.completedConsultations} Tư Vấn Hoàn Thành',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: false,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 1),
+                      Container(width: 1, height: 16, color: Colors.white30),
+                      const SizedBox(width: 12),
+                      const Icon(
+                        Icons.inbox_outlined,
+                        color: Colors.white70,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${stats.consultationRequests} Yêu Cầu',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: false,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ],
       ),
@@ -1582,21 +1597,11 @@ class _HomeTabState extends ConsumerState<_HomeTab>
       error: (_, __) => Row(
         children: [
           Expanded(
-            child: _buildStatCard(
-              'Yêu Cầu',
-              '--',
-              Icons.inbox_outlined,
-              const Color(0xFF6C47C2),
-            ),
+            child: _buildStatCard('Yêu Cầu', '--', const Color(0xFF6C47C2)),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: _buildStatCard(
-              'Hoàn Thành',
-              '--',
-              Icons.check_circle_outline,
-              const Color(0xFF28A745),
-            ),
+            child: _buildStatCard('Hoàn Thành', '--', const Color(0xFF28A745)),
           ),
         ],
       ),
@@ -1622,12 +1627,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
     );
   }
 
-  Widget _buildStatCard(
-    String label,
-    String value,
-    IconData icon,
-    Color iconColor,
-  ) {
+  Widget _buildStatCard(String label, String value, Color iconColor) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1650,19 +1650,22 @@ class _HomeTabState extends ConsumerState<_HomeTab>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Flexible(
-                child: Text(
-                  label,
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 2,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF999999),
-                    fontWeight: FontWeight.w500,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF999999),
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ),
               const SizedBox(width: 4),
-              Icon(icon, color: iconColor, size: 20),
             ],
           ),
           const SizedBox(height: 8),
@@ -1829,8 +1832,11 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                   color: primaryColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.manage_search,
-                    color: primaryColor, size: 20),
+                child: const Icon(
+                  Icons.manage_search,
+                  color: primaryColor,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 10),
               const Expanded(
@@ -1847,8 +1853,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                     ),
                     Text(
                       'Tra cứu & kiểm duyệt nhận diện AI',
-                      style: TextStyle(
-                          fontSize: 12, color: Color(0xFF9CA3AF)),
+                      style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
                     ),
                   ],
                 ),
@@ -1897,7 +1902,9 @@ class _HomeTabState extends ConsumerState<_HomeTab>
               borderRadius: BorderRadius.circular(12),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 12),
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 child: Row(
                   children: [
                     Container(
@@ -1907,8 +1914,11 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                         color: aiColor.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.document_scanner,
-                          color: aiColor, size: 20),
+                      child: const Icon(
+                        Icons.document_scanner,
+                        color: aiColor,
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     const Expanded(
@@ -1926,7 +1936,9 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                           Text(
                             'Kiểm duyệt ảnh độ tin cậy thấp',
                             style: TextStyle(
-                                fontSize: 11, color: Color(0xFF6B7280)),
+                              fontSize: 11,
+                              color: Color(0xFF6B7280),
+                            ),
                           ),
                         ],
                       ),
@@ -1934,7 +1946,9 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                     if (pendingCount > 0)
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: aiColor,
                           borderRadius: BorderRadius.circular(10),
@@ -1949,8 +1963,11 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                         ),
                       ),
                     const SizedBox(width: 6),
-                    Icon(Icons.arrow_forward_ios,
-                        size: 13, color: aiColor.withOpacity(0.7)),
+                    Icon(
+                      Icons.arrow_forward_ios,
+                      size: 13,
+                      color: aiColor.withOpacity(0.7),
+                    ),
                   ],
                 ),
               ),
@@ -1994,7 +2011,9 @@ class _HomeTabState extends ConsumerState<_HomeTab>
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
               child: CircularProgressIndicator(
-                  color: Color(0xFF6C47C2), strokeWidth: 2),
+                color: Color(0xFF6C47C2),
+                strokeWidth: 2,
+              ),
             ),
           )
         else if (recentBlogs.isEmpty)
@@ -2004,13 +2023,16 @@ class _HomeTabState extends ConsumerState<_HomeTab>
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                  color: const Color(0xFF6C47C2).withOpacity(0.2)),
+                color: const Color(0xFF6C47C2).withOpacity(0.2),
+              ),
             ),
             child: Row(
               children: [
-                Icon(Icons.article_outlined,
-                    color: const Color(0xFF6C47C2).withOpacity(0.5),
-                    size: 32),
+                Icon(
+                  Icons.article_outlined,
+                  color: const Color(0xFF6C47C2).withOpacity(0.5),
+                  size: 32,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -2019,20 +2041,22 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                       const Text(
                         'Bạn chưa có bài viết nào',
                         style: TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 14),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       GestureDetector(
                         onTap: () async {
                           await context.push('/expert/blogs/new');
-                          ref
-                              .read(expertBlogListProvider.notifier)
-                              .refresh();
+                          ref.read(expertBlogListProvider.notifier).refresh();
                         },
                         child: const Text(
                           'Viết bài đầu tiên ngay →',
                           style: TextStyle(
-                              color: Color(0xFF6C47C2), fontSize: 13),
+                            color: Color(0xFF6C47C2),
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ],
@@ -2042,10 +2066,12 @@ class _HomeTabState extends ConsumerState<_HomeTab>
             ),
           )
         else
-          ...recentBlogs.map((blog) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _buildBlogCard(context, blog),
-              )),
+          ...recentBlogs.map(
+            (blog) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _buildBlogCard(context, blog),
+            ),
+          ),
       ],
     );
   }
@@ -2108,14 +2134,18 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                   Text(
                     blog.title,
                     style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.bold),
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: statusColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(6),
@@ -2123,9 +2153,10 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                     child: Text(
                       blogStatusLabel(blog.status),
                       style: TextStyle(
-                          fontSize: 11,
-                          color: statusColor,
-                          fontWeight: FontWeight.bold),
+                        fontSize: 11,
+                        color: statusColor,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -2138,7 +2169,6 @@ class _HomeTabState extends ConsumerState<_HomeTab>
     );
   }
 }
-
 
 enum _ExpertConsultationStatus { waiting, upcoming, completed, cancelled }
 
@@ -2249,9 +2279,14 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
   @override
   void initState() {
     super.initState();
-    final initialTab =
-        widget.initialTab < 0 ? 0 : (widget.initialTab > 1 ? 1 : widget.initialTab);
-    _tabController = TabController(length: 2, vsync: this, initialIndex: initialTab);
+    final initialTab = widget.initialTab < 0
+        ? 0
+        : (widget.initialTab > 1 ? 1 : widget.initialTab);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: initialTab,
+    );
     final today = DateTime.now();
     _selectedDay = DateTime(today.year, today.month, today.day);
     // Week starts from today (not Monday), showing today + next 6 days
@@ -3022,10 +3057,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                                     color: Color(0xFF9CA3AF),
                                   ),
                                 )
-                              : const Icon(
-                                  Icons.event_busy_outlined,
-                                  size: 14,
-                                ),
+                              : const Icon(Icons.event_busy_outlined, size: 14),
                           label: const Text(
                             'Hủy lịch tư vấn',
                             style: TextStyle(
@@ -3242,7 +3274,10 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                   child: OutlinedButton(
                     onPressed: () => _openDetail(context, item),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF6C47C2), width: 1.2),
+                      side: const BorderSide(
+                        color: Color(0xFF6C47C2),
+                        width: 1.2,
+                      ),
                       foregroundColor: _purple,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -3250,7 +3285,10 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                     ),
                     child: const Text(
                       'Xem Chi Tiết',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -3260,7 +3298,9 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                 child: SizedBox(
                   height: 38,
                   child: ElevatedButton.icon(
-                    onPressed: item.consultationId == null || item.consultationId!.isEmpty
+                    onPressed:
+                        item.consultationId == null ||
+                            item.consultationId!.isEmpty
                         ? null
                         : () {
                             context.push(
@@ -3274,7 +3314,10 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                     icon: const Icon(Icons.chat_bubble_outline, size: 16),
                     label: const Text(
                       'Tin Nhắn',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _purple,
@@ -3468,7 +3511,9 @@ class _IncomeTabState extends ConsumerState<_IncomeTab> {
         });
         return;
       }
-      final results = await ref.read(transactionRepositoryProvider).getTransactions(
+      final results = await ref
+          .read(transactionRepositoryProvider)
+          .getTransactions(
             userId: userId,
             transType: 'consultation',
             pageNumber: page,
@@ -3495,17 +3540,20 @@ class _IncomeTabState extends ConsumerState<_IncomeTab> {
   }
 
   List<TransactionInfo> get _filtered => _allTransactions
-      .where((t) => t.createdAt.month == _selectedMonth && t.createdAt.year == _selectedYear)
+      .where(
+        (t) =>
+            t.createdAt.month == _selectedMonth &&
+            t.createdAt.year == _selectedYear,
+      )
       .toList();
 
-  double get _filteredTotal =>
-      _filtered.fold(0.0, (sum, t) => sum + t.amount);
+  double get _filteredTotal => _filtered.fold(0.0, (sum, t) => sum + t.amount);
 
   String _formatAmount(double amount) {
     return amount.toInt().toString().replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (m) => '${m[1]}.',
-        );
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
   }
 
   String _formatDate(DateTime dt) =>
@@ -3513,9 +3561,18 @@ class _IncomeTabState extends ConsumerState<_IncomeTab> {
       '${dt.month.toString().padLeft(2, '0')}/${dt.year}';
 
   static const _months = [
-    'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4',
-    'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8',
-    'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12',
+    'Tháng 1',
+    'Tháng 2',
+    'Tháng 3',
+    'Tháng 4',
+    'Tháng 5',
+    'Tháng 6',
+    'Tháng 7',
+    'Tháng 8',
+    'Tháng 9',
+    'Tháng 10',
+    'Tháng 11',
+    'Tháng 12',
   ];
 
   @override
@@ -3551,316 +3608,318 @@ class _IncomeTabState extends ConsumerState<_IncomeTab> {
           Expanded(
             child: _isLoading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF6C47C2),
-                    ),
+                    child: CircularProgressIndicator(color: Color(0xFF6C47C2)),
                   )
                 : _error != null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(32),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.cloud_off_outlined,
-                                size: 56,
-                                color: Color(0xFFCCCCCC),
-                              ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'Không thể tải dữ liệu',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF555555),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _error!,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF999999),
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              TextButton.icon(
-                                onPressed: _initialLoad,
-                                icon: const Icon(Icons.refresh),
-                                label: const Text('Thử lại'),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: const Color(0xFF6C47C2),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    : ListView(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(16),
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          // ── Summary Card ───────────────────────────────────
-                          Container(
-                            padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF6C47C2), Color(0xFF9F7AEA)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF6C47C2).withOpacity(0.3),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 8),
+                          const Icon(
+                            Icons.cloud_off_outlined,
+                            size: 56,
+                            color: Color(0xFFCCCCCC),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Không thể tải dữ liệu',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF555555),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF999999),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          TextButton.icon(
+                            onPressed: _initialLoad,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Thử lại'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: const Color(0xFF6C47C2),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : ListView(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      // ── Summary Card ───────────────────────────────────
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF6C47C2), Color(0xFF9F7AEA)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF6C47C2).withOpacity(0.3),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.wallet,
+                                  color: Colors.white70,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Thu Nhập — ${_months[_selectedMonth - 1]} $_selectedYear',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white70,
+                                  ),
                                 ),
                               ],
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            const SizedBox(height: 8),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.wallet,
-                                      color: Colors.white70,
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Thu Nhập — ${_months[_selectedMonth - 1]} $_selectedYear',
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.white70,
-                                      ),
-                                    ),
-                                  ],
+                                Text(
+                                  _formatAmount(_filteredTotal),
+                                  style: const TextStyle(
+                                    fontSize: 40,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    height: 1.1,
+                                  ),
                                 ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      _formatAmount(_filteredTotal),
-                                      style: const TextStyle(
-                                        fontSize: 40,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                        height: 1.1,
-                                      ),
+                                const Padding(
+                                  padding: EdgeInsets.only(bottom: 6, left: 8),
+                                  child: Text(
+                                    'VNĐ',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.white70,
                                     ),
-                                    const Padding(
-                                      padding: EdgeInsets.only(bottom: 6, left: 8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.only(top: 14),
+                              decoration: const BoxDecoration(
+                                border: Border(
+                                  top: BorderSide(color: Colors.white24),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.receipt_long,
+                                    color: Colors.white70,
+                                    size: 15,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '${filtered.length} giao dịch',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  if (_allTransactions.length > filtered.length)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
                                       child: Text(
-                                        'VNĐ',
-                                        style: TextStyle(
-                                          fontSize: 16,
+                                        'Tổng: ${_allTransactions.length} giao dịch',
+                                        style: const TextStyle(
+                                          fontSize: 11,
                                           color: Colors.white70,
                                         ),
                                       ),
                                     ),
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
-                                Container(
-                                  padding: const EdgeInsets.only(top: 14),
-                                  decoration: const BoxDecoration(
-                                    border: Border(
-                                      top: BorderSide(color: Colors.white24),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.receipt_long,
-                                        color: Colors.white70,
-                                        size: 15,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        '${filtered.length} giao dịch',
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                      const Spacer(),
-                                      if (_allTransactions.length > filtered.length)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                            vertical: 4,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white.withOpacity(0.15),
-                                            borderRadius: BorderRadius.circular(20),
-                                          ),
-                                          child: Text(
-                                            'Tổng: ${_allTransactions.length} giao dịch',
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.white70,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // ── Month / Year Filter ────────────────────────────
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFEEEEEE)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.calendar_month,
-                                  size: 18,
-                                  color: Color(0xFF6C47C2),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'Lọc theo tháng:',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFF666666),
-                                  ),
-                                ),
-                                const Spacer(),
-                                DropdownButton<int>(
-                                  value: _selectedMonth,
-                                  underline: const SizedBox(),
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF6C47C2),
-                                  ),
-                                  items: List.generate(
-                                    12,
-                                    (i) => DropdownMenuItem(
-                                      value: i + 1,
-                                      child: Text(_months[i]),
-                                    ),
-                                  ),
-                                  onChanged: (v) =>
-                                      setState(() => _selectedMonth = v!),
-                                ),
-                                const SizedBox(width: 8),
-                                DropdownButton<int>(
-                                  value: _selectedYear,
-                                  underline: const SizedBox(),
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF6C47C2),
-                                  ),
-                                  items: [2024, 2025, 2026]
-                                      .map((y) => DropdownMenuItem(
-                                            value: y,
-                                            child: Text('$y'),
-                                          ))
-                                      .toList(),
-                                  onChanged: (v) =>
-                                      setState(() => _selectedYear = v!),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // ── Transaction List ───────────────────────────────
-                          Row(
-                            children: [
-                              const Text(
-                                'Lịch Sử Giao Dịch',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF2D2D2D),
-                                ),
-                              ),
-                              const Spacer(),
-                              if (filtered.isNotEmpty)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF6C47C2).withOpacity(0.08),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    '${filtered.length}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFF6C47C2),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-
-                          if (filtered.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 40),
-                              child: Column(
-                                children: [
-                                  Icon(
-                                    Icons.inbox_outlined,
-                                    size: 52,
-                                    color: Colors.grey.shade300,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    'Không có giao dịch\ntrong ${_months[_selectedMonth - 1]} $_selectedYear',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Color(0xFF999999),
-                                    ),
-                                  ),
                                 ],
                               ),
-                            )
-                          else
-                            ...filtered.map(_buildTransactionItem),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
 
-                          if (_isLoadingMore)
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              child: Center(
-                                child: SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Color(0xFF6C47C2),
-                                  ),
+                      // ── Month / Year Filter ────────────────────────────
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFEEEEEE)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.calendar_month,
+                              size: 18,
+                              color: Color(0xFF6C47C2),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Lọc theo tháng:',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF666666),
+                              ),
+                            ),
+                            const Spacer(),
+                            DropdownButton<int>(
+                              value: _selectedMonth,
+                              underline: const SizedBox(),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF6C47C2),
+                              ),
+                              items: List.generate(
+                                12,
+                                (i) => DropdownMenuItem(
+                                  value: i + 1,
+                                  child: Text(_months[i]),
+                                ),
+                              ),
+                              onChanged: (v) =>
+                                  setState(() => _selectedMonth = v!),
+                            ),
+                            const SizedBox(width: 8),
+                            DropdownButton<int>(
+                              value: _selectedYear,
+                              underline: const SizedBox(),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF6C47C2),
+                              ),
+                              items: [2024, 2025, 2026]
+                                  .map(
+                                    (y) => DropdownMenuItem(
+                                      value: y,
+                                      child: Text('$y'),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) =>
+                                  setState(() => _selectedYear = v!),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // ── Transaction List ───────────────────────────────
+                      Row(
+                        children: [
+                          const Text(
+                            'Lịch Sử Giao Dịch',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2D2D2D),
+                            ),
+                          ),
+                          const Spacer(),
+                          if (filtered.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(
+                                  0xFF6C47C2,
+                                ).withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                '${filtered.length}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF6C47C2),
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
-
-                          const SizedBox(height: 80),
                         ],
                       ),
+                      const SizedBox(height: 10),
+
+                      if (filtered.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 40),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.inbox_outlined,
+                                size: 52,
+                                color: Colors.grey.shade300,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Không có giao dịch\ntrong ${_months[_selectedMonth - 1]} $_selectedYear',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF999999),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        ...filtered.map(_buildTransactionItem),
+
+                      if (_isLoadingMore)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(
+                            child: SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFF6C47C2),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      const SizedBox(height: 80),
+                    ],
+                  ),
           ),
         ],
       ),
@@ -3902,8 +3961,8 @@ class _IncomeTabState extends ConsumerState<_IncomeTab> {
                   t.fullName.isNotEmpty
                       ? t.fullName
                       : (t.description.isNotEmpty
-                          ? t.description
-                          : 'Giao dịch'),
+                            ? t.description
+                            : 'Giao dịch'),
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -4676,7 +4735,11 @@ class _SnakeLibraryCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.arrow_forward_ios, size: 13, color: color.withOpacity(0.6)),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 13,
+                color: color.withOpacity(0.6),
+              ),
             ],
           ),
         ),
