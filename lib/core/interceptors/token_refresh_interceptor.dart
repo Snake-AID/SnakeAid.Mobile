@@ -29,6 +29,8 @@ class TokenRefreshInterceptor extends Interceptor {
     '/api/auth/verify-account',
     '/api/email/send-otp',
     '/api/email/verify',
+    '/api/otp/validate',
+    '/api/auth/forgot-password',
   ];
 
   // Prevent concurrent refresh calls

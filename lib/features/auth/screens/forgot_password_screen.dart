@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../repository/auth_repository.dart';
 
 /// Forgot Password Screen - Enter Email
 /// Màn hình quên mật khẩu - nhập email
-class ForgotPasswordScreen extends StatefulWidget {
+class ForgotPasswordScreen extends ConsumerStatefulWidget {
   final Color themeColor;
   final String roleRoute; // For back navigation
 
@@ -14,18 +16,23 @@ class ForgotPasswordScreen extends StatefulWidget {
   });
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() =>
+      _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailOrPhoneController = TextEditingController();
+  final _emailController = TextEditingController();
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _emailOrPhoneController.dispose();
+    _emailController.dispose();
     super.dispose();
+  }
+
+  String _normalizeException(Object error) {
+    return error.toString().replaceAll('Exception: ', '').trim();
   }
 
   void _handleSendOTP() async {
@@ -37,23 +44,47 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _isLoading = true;
     });
 
-    // TODO: Send OTP API call
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final email = _emailController.text.trim();
+      final authRepository = ref.read(authRepositoryProvider);
+      await authRepository.sendOtp(email);
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
+      if (!mounted) {
+        return;
+      }
 
-      // Navigate to OTP verification screen
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Mã OTP đã được gửi tới email của bạn'),
+          backgroundColor: widget.themeColor,
+        ),
+      );
+
       context.goNamed(
         'forgot_password_otp',
         extra: {
-          'email': _emailOrPhoneController.text,
+          'email': email,
           'themeColor': widget.themeColor,
           'roleRoute': widget.roleRoute,
         },
       );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_normalizeException(error)),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -97,11 +128,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      Icon(
-                        Icons.lock,
-                        size: 100,
-                        color: widget.themeColor,
-                      ),
+                      Icon(Icons.lock, size: 100, color: widget.themeColor),
                       Positioned(
                         right: 20,
                         top: 0,
@@ -134,7 +161,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'Nhập email hoặc số điện thoại đã đăng ký. Chúng tôi sẽ gửi mã xác thực để bạn đặt lại mật khẩu mới.',
+                  'Nhập email đã đăng ký. Chúng tôi sẽ gửi mã xác thực để bạn đặt lại mật khẩu mới.',
                   style: TextStyle(
                     fontSize: 14,
                     color: Color(0xFF666666),
@@ -144,12 +171,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                // Email/Phone Field
+                // Email Field
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Email hoặc Số điện thoại',
+                      'Email',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -158,10 +185,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
-                      controller: _emailOrPhoneController,
+                      controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       decoration: InputDecoration(
-                        hintText: 'Nhập email hoặc số điện thoại',
+                        hintText: 'Nhập email',
                         hintStyle: const TextStyle(
                           color: Color(0xFFBDBDBD),
                           fontSize: 14,
@@ -209,8 +236,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         ),
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Vui lòng nhập email hoặc số điện thoại';
+                        final email = value?.trim() ?? '';
+                        if (email.isEmpty) {
+                          return 'Vui lòng nhập email';
+                        }
+                        final isValidEmail = RegExp(
+                          r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
+                        ).hasMatch(email);
+                        if (!isValidEmail) {
+                          return 'Email không đúng định dạng';
                         }
                         return null;
                       },
@@ -239,8 +273,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             height: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           )
                         : const Text(
