@@ -1606,7 +1606,6 @@ class _HomeTabState extends ConsumerState<_HomeTab>
             child: _buildStatCard(
               'Yêu Cầu Hôm Nay',
               '${stats.consultationRequests}',
-              Icons.inbox_outlined,
               const Color(0xFF6C47C2),
             ),
           ),
@@ -1615,7 +1614,6 @@ class _HomeTabState extends ConsumerState<_HomeTab>
             child: _buildStatCard(
               'Hoàn Thành Hôm Nay',
               '${stats.completedConsultations}',
-              Icons.check_circle_outline,
               const Color(0xFF28A745),
             ),
           ),
