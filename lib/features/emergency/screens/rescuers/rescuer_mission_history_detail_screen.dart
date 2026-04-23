@@ -1,24 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:snakeaid_mobile/features/emergency/models/detailed_incident_response.dart';
 import 'package:snakeaid_mobile/features/emergency/models/rescue_mission_response.dart';
 import 'package:snakeaid_mobile/features/emergency/models/snake_identification_response.dart';
-import 'package:snakeaid_mobile/features/emergency/providers/mission_detail_provider.dart';
-import 'package:snakeaid_mobile/features/emergency/widgets/snake_risk_badges.dart';
+import '../../models/detailed_incident_response.dart';
+import '../../providers/mission_detail_provider.dart';
+import '../../widgets/snake_risk_badges.dart';
 
-class RescuerHistoryDetailScreen extends ConsumerStatefulWidget {
+class RescuerMissionHistoryDetailScreen extends ConsumerStatefulWidget {
   final String missionId;
-  const RescuerHistoryDetailScreen({super.key, required this.missionId});
+  const RescuerMissionHistoryDetailScreen({super.key, required this.missionId});
 
   @override
-  ConsumerState<RescuerHistoryDetailScreen> createState() =>
-      _RescuerHistoryDetailScreenState();
+  ConsumerState<RescuerMissionHistoryDetailScreen> createState() =>
+      _RescuerMissionHistoryDetailScreenState();
 }
 
-class _RescuerHistoryDetailScreenState
-    extends ConsumerState<RescuerHistoryDetailScreen> {
-  // Design tokens – identical to the active screen for visual consistency
+class _RescuerMissionHistoryDetailScreenState
+    extends ConsumerState<RescuerMissionHistoryDetailScreen> {
+  bool _isInitializing = true;
+
+  // ── Design tokens (giống hệt RescuerMissionDetailScreen) ──────────────────
   static const _accent = Color(0xFFE65100);
   static const _surface = Color(0xFFF5F5F5);
   static const _cardBg = Colors.white;
@@ -31,18 +33,21 @@ class _RescuerHistoryDetailScreenState
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref
-          .read(missionDetailProvider.notifier)
-          .loadMissionDetail(missionId: widget.missionId);
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    await ref
+        .read(missionDetailProvider.notifier)
+        .loadMissionDetail(missionId: widget.missionId);
+    if (mounted) setState(() => _isInitializing = false);
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(missionDetailProvider);
 
-    if (state.isLoading) {
+    if (state.isLoading || _isInitializing) {
       return const Scaffold(
         backgroundColor: _surface,
         body: Center(child: CircularProgressIndicator(color: _accent)),
@@ -52,7 +57,7 @@ class _RescuerHistoryDetailScreenState
     if (state.error != null && state.error!.isNotEmpty) {
       return Scaffold(
         backgroundColor: _surface,
-        appBar: _buildAppBar(),
+        appBar: _simpleAppBar('Chi tiết lịch sử'),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(32),
@@ -68,8 +73,7 @@ class _RescuerHistoryDetailScreenState
                 ),
                 const SizedBox(height: 24),
                 FilledButton(
-                  onPressed: () =>
-                      ref.read(missionDetailProvider.notifier).refresh(),
+                  onPressed: _load,
                   style: FilledButton.styleFrom(backgroundColor: _accent),
                   child: const Text('Thử lại'),
                 ),
@@ -84,7 +88,7 @@ class _RescuerHistoryDetailScreenState
     if (mission == null) {
       return Scaffold(
         backgroundColor: _surface,
-        appBar: _buildAppBar(),
+        appBar: _simpleAppBar('Chi tiết lịch sử'),
         body: const Center(
           child: Padding(
             padding: EdgeInsets.all(32),
@@ -95,15 +99,11 @@ class _RescuerHistoryDetailScreenState
                 SizedBox(height: 16),
                 Text(
                   'Không tìm thấy nhiệm vụ',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: _textPrimary,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Nhiệm vụ có thể đã bị xóa hoặc không tồn tại',
+                  'Nhiệm vụ có thể đã bị hủy hoặc không còn tồn tại',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 14, color: _textSecondary),
                 ),
@@ -125,7 +125,7 @@ class _RescuerHistoryDetailScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildStatusSummaryCard(mission),
+                  _buildSummaryCard(mission),
                   const SizedBox(height: 12),
                   _buildPriceCard(mission),
                   const SizedBox(height: 12),
@@ -147,6 +147,15 @@ class _RescuerHistoryDetailScreenState
                   _buildMediaCard(mission),
                   const SizedBox(height: 12),
                   _buildIncidentTimeCard(mission),
+                  if (mission.notes != null && mission.notes!.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _buildNotesCard(mission.notes!),
+                  ],
+                  if (mission.cancellationReason != null &&
+                      mission.cancellationReason!.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _buildCancellationCard(mission.cancellationReason!),
+                  ],
                 ],
               ),
             ),
@@ -156,8 +165,8 @@ class _RescuerHistoryDetailScreenState
     );
   }
 
-  // ── App Bar ────────────────────────────────────────────────────────────────
-  AppBar _buildAppBar() => AppBar(
+  // ── App Bar (fallback khi không có mission) ────────────────────────────────
+  AppBar _simpleAppBar(String title) => AppBar(
     backgroundColor: _cardBg,
     elevation: 0,
     surfaceTintColor: Colors.transparent,
@@ -165,9 +174,9 @@ class _RescuerHistoryDetailScreenState
       icon: const Icon(Icons.arrow_back, color: _textPrimary),
       onPressed: () => context.pop(),
     ),
-    title: const Text(
-      'Chi tiết lịch sử',
-      style: TextStyle(
+    title: Text(
+      title,
+      style: const TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.w600,
         color: _textPrimary,
@@ -181,8 +190,7 @@ class _RescuerHistoryDetailScreenState
 
   // ── Header ─────────────────────────────────────────────────────────────────
   Widget _buildHeader(DetailRescueMissionResponse mission) {
-    final status = mission.missionStatus;
-    final (statusLabel, statusColor) = _statusInfo(status);
+    final (statusLabel, statusColor) = _statusInfo(mission.missionStatus);
 
     return SafeArea(
       bottom: false,
@@ -216,6 +224,7 @@ class _RescuerHistoryDetailScreenState
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
                 children: [
+                  // Status badge
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -289,48 +298,72 @@ class _RescuerHistoryDetailScreenState
     );
   }
 
-  // ── Status Summary Card ────────────────────────────────────────────────────
-  Widget _buildStatusSummaryCard(DetailRescueMissionResponse mission) {
-    final status = mission.missionStatus;
-    final (_, statusColor) = _statusInfo(status);
+  // ── Summary Card ───────────────────────────────────────────────────────────
+  Widget _buildSummaryCard(DetailRescueMissionResponse mission) {
+    final rows =
+        <({IconData icon, Color iconColor, String label, String value})>[];
 
-    final rows = <_SummaryRow>[];
+    rows.add((
+      icon: Icons.tag_rounded,
+      iconColor: _textSecondary,
+      label: 'Mã nhiệm vụ',
+      value: mission.formattedMissionId,
+    ));
+
+    if (mission.createdAt != null) {
+      rows.add((
+        icon: Icons.add_circle_outline_rounded,
+        iconColor: _textSecondary,
+        label: 'Tạo lúc',
+        value: _formatDateTime(mission.createdAt!),
+      ));
+    }
 
     if (mission.startedAt != null) {
-      rows.add(
-        _SummaryRow(
-          icon: Icons.play_circle_outline_rounded,
-          label: 'Bắt đầu',
-          value: _formatDateTime(mission.startedAt!),
-          iconColor: _green,
-        ),
-      );
+      rows.add((
+        icon: Icons.play_circle_outline_rounded,
+        iconColor: _green,
+        label: 'Bắt đầu',
+        value: _formatDateTime(mission.startedAt!),
+      ));
+    }
+
+    if (mission.arrivedAt != null) {
+      rows.add((
+        icon: Icons.location_on_outlined,
+        iconColor: const Color(0xFF1565C0),
+        label: 'Đến nơi',
+        value: _formatDateTime(mission.arrivedAt!),
+      ));
     }
 
     if (mission.completedAt != null) {
-      rows.add(
-        _SummaryRow(
-          icon: Icons.check_circle_outline_rounded,
-          label: 'Kết thúc',
-          value: _formatDateTime(mission.completedAt!),
-          iconColor: statusColor,
-        ),
-      );
+      rows.add((
+        icon: Icons.check_circle_outline_rounded,
+        iconColor: _green,
+        label: 'Kết thúc',
+        value: _formatDateTime(mission.completedAt!),
+      ));
     }
 
     if (mission.startedAt != null && mission.completedAt != null) {
       final duration = mission.completedAt!.difference(mission.startedAt!);
-      rows.add(
-        _SummaryRow(
-          icon: Icons.timer_outlined,
-          label: 'Thời lượng',
-          value: _formatDuration(duration),
-          iconColor: const Color(0xFF1565C0),
-        ),
-      );
+      rows.add((
+        icon: Icons.timer_outlined,
+        iconColor: const Color(0xFF1565C0),
+        label: 'Thời lượng',
+        value: _formatDuration(duration),
+      ));
     }
 
-    if (rows.isEmpty) return const SizedBox.shrink();
+    if (mission.distanceFromCenterKm != null) {
+      rows.add((
+        icon: Icons.straighten_rounded,
+        iconColor: _textSecondary,
+        label: 'Khoảng cách',
+        value: '${mission.distanceFromCenterKm!.toStringAsFixed(1)} km',
+      ));
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -358,31 +391,11 @@ class _RescuerHistoryDetailScreenState
                     padding: EdgeInsets.symmetric(vertical: 8),
                     child: Divider(height: 1, color: _divider),
                   ),
-                Row(
-                  children: [
-                    Icon(row.icon, size: 17, color: row.iconColor),
-                    const SizedBox(width: 10),
-                    SizedBox(
-                      width: 80,
-                      child: Text(
-                        row.label,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: _textSecondary,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        row.value,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: _textPrimary,
-                        ),
-                      ),
-                    ),
-                  ],
+                _infoRow(
+                  row.icon,
+                  row.label,
+                  row.value,
+                  iconColorOverride: row.iconColor,
                 ),
               ],
             );
@@ -401,38 +414,88 @@ class _RescuerHistoryDetailScreenState
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _divider),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: _green.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
+          _sectionLabelWithIcon(Icons.payments_outlined, _green, 'Chi phí'),
+          const SizedBox(height: 16),
+
+          // Dòng 1 – Thực tế (to nhất)
+          if (mission.formattedActualCost.isNotEmpty) ...[
+            const Text(
+              'Thực tế',
+              style: TextStyle(fontSize: 12, color: _textSecondary),
             ),
-            child: const Icon(Icons.payments_outlined, color: _green, size: 22),
-          ),
-          const SizedBox(width: 14),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Phí dịch vụ',
-                style: TextStyle(fontSize: 12, color: _textSecondary),
+            const SizedBox(height: 4),
+            Text(
+              mission.formattedActualCost,
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                color: _green,
               ),
-              const SizedBox(height: 2),
-              Text(
-                mission.formattedPrice,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: _green,
-                ),
-              ),
-            ],
+            ),
+            const SizedBox(height: 14),
+            const Divider(color: _divider),
+            const SizedBox(height: 14),
+          ],
+
+          // Dòng 2 – Phí dịch vụ (dự kiến)
+          _priceRow(
+            icon: Icons.payments_outlined,
+            iconColor: _green,
+            label: 'Phí dịch vụ',
+            value: mission.formattedPrice,
+            valueFontSize: 15,
+            valueColor: _textPrimary,
           ),
+
+          // Dòng 3 – Phí từ trung tâm
+          if (mission.costFromCenter != null) ...[
+            const SizedBox(height: 12),
+            const Divider(color: _divider),
+            const SizedBox(height: 12),
+            _priceRow(
+              icon: Icons.business_outlined,
+              iconColor: _textSecondary,
+              label: 'Phí di chuyển từ trung tâm',
+              value: mission.formattedCostFromCenter,
+              valueFontSize: 15,
+              valueColor: _textPrimary,
+            ),
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _priceRow({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String value,
+    required double valueFontSize,
+    required Color valueColor,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: iconColor),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 13, color: _textSecondary),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: valueFontSize,
+            fontWeight: FontWeight.w600,
+            color: valueColor,
+          ),
+        ),
+      ],
     );
   }
 
@@ -528,6 +591,16 @@ class _RescuerHistoryDetailScreenState
                     ),
                   ],
                 ),
+                if (ctx?.aiConfidence != null) ...[
+                  const SizedBox(height: 10),
+                  const Divider(color: _divider),
+                  const SizedBox(height: 8),
+                  _infoRow(
+                    Icons.analytics_outlined,
+                    'Độ tin cậy',
+                    '${(ctx!.aiConfidence! * 100).toStringAsFixed(0)}%',
+                  ),
+                ],
                 if (species.identificationSummary != null &&
                     species.identificationSummary!.isNotEmpty) ...[
                   const SizedBox(height: 10),
@@ -595,7 +668,7 @@ class _RescuerHistoryDetailScreenState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      account?.fullName ?? 'Không rõ',
+                      account?.fullName ?? user.userName ?? 'Không rõ',
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -1125,16 +1198,71 @@ class _RescuerHistoryDetailScreenState
     );
   }
 
+  // ── Notes Card ─────────────────────────────────────────────────────────────
+  Widget _buildNotesCard(String notes) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionLabelWithIcon(
+            Icons.notes_rounded,
+            const Color(0xFF1565C0),
+            'Ghi chú của cứu hộ viên',
+          ),
+          const SizedBox(height: 10),
+          Text(
+            notes,
+            style: const TextStyle(
+              fontSize: 13,
+              color: _textPrimary,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Cancellation Card ──────────────────────────────────────────────────────
+  Widget _buildCancellationCard(String reason) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _danger.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _danger.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionLabelWithIcon(Icons.cancel_outlined, _danger, 'Lý do hủy'),
+          const SizedBox(height: 10),
+          Text(
+            reason,
+            style: const TextStyle(
+              fontSize: 13,
+              color: _textPrimary,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────────────
   (String, Color) _statusInfo(MissionStatus status) => switch (status) {
     MissionStatus.preparing => ('Đang chuẩn bị', const Color(0xFFE65100)),
     MissionStatus.enRoute => ('Đang di chuyển', const Color(0xFF1565C0)),
     MissionStatus.rescuerArrived => ('Đã đến nơi', _green),
     MissionStatus.missionCompleted => ('Hoàn thành', _green),
-    MissionStatus.missionUncompleted => (
-      'Chưa hoàn thành',
-      const Color(0xFFE65100),
-    ),
+    MissionStatus.missionUncompleted => ('Chưa hoàn thành', _accent),
     MissionStatus.missionAborted => ('Đã hủy bỏ', _danger),
     MissionStatus.cancelled => ('Đã hủy', _textSecondary),
   };
@@ -1170,21 +1298,32 @@ class _RescuerHistoryDetailScreenState
     );
   }
 
-  Widget _infoRow(IconData icon, String label, String value) {
-    Color iconColor(IconData i) {
+  Widget _infoRow(
+    IconData icon,
+    String label,
+    String value, {
+    Color? iconColorOverride,
+  }) {
+    Color defaultIconColor(IconData i) {
       if (i == Icons.my_location_outlined) return const Color(0xFF4CAF50);
       if (i == Icons.place_outlined) return const Color(0xFF4CAF50);
       if (i == Icons.monitor_heart_outlined) return const Color(0xFFE65100);
+      if (i == Icons.business_outlined) return _textSecondary;
+      if (i == Icons.analytics_outlined) return const Color(0xFF1565C0);
       return _textSecondary;
     }
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: iconColor(icon)),
+        Icon(
+          icon,
+          size: 16,
+          color: iconColorOverride ?? defaultIconColor(icon),
+        ),
         const SizedBox(width: 8),
         SizedBox(
-          width: 72,
+          width: 90,
           child: Text(
             label,
             style: const TextStyle(fontSize: 13, color: _textSecondary),
@@ -1203,20 +1342,6 @@ class _RescuerHistoryDetailScreenState
       ],
     );
   }
-}
-
-// ── Data class ────────────────────────────────────────────────────────────
-class _SummaryRow {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color iconColor;
-  const _SummaryRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.iconColor,
-  });
 }
 
 // ── Method Badge ───────────────────────────────────────────────────────────
