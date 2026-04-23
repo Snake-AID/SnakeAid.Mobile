@@ -4873,32 +4873,41 @@ class _PaymentMethodSheetState extends State<_PaymentMethodSheet> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Text.rich(
                     TextSpan(
                       text: 'Tôi đã hiểu và đồng ý với ',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF424242), height: 1.4),
+                      style: const TextStyle(fontSize: 13, color: Color(0xFF424242), height: 1.4),
                       children: [
-                        TextSpan(
+                        const TextSpan(
                           text: 'Chính sách thanh toán',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Color(0xFFFF8F00),
                           ),
                         ),
-                        TextSpan(
+                        const TextSpan(
                           text: '. Xin lưu ý: Mọi khoản thanh toán (bao gồm phí di chuyển và phí dịch vụ) ',
                         ),
-                        TextSpan(
+                        const TextSpan(
                           text: 'sẽ KHÔNG được hoàn lại',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Color(0xFFD32F2F),
                           ),
                         ),
-                        TextSpan(
-                          text: ' dưới bất kỳ hình thức nào.',
+                        const TextSpan(
+                          text: ' dưới bất kỳ hình thức nào. Đây là chính sách nhằm bảo vệ quyền lợi cho đội ngũ cứu hộ của hệ thống.',
                         ),
+                        if (!widget.isFinalPayment)
+                          const TextSpan(
+                            text: '\n\n*Đặc quyền bảo vệ:* Nếu chuyên viên đến hiện trường nhưng không phát hiện hoặc không bắt được rắn, quý khách sẽ KHÔNG phải thanh toán chi phí dịch vụ cho Đợt 2.',
+                            style: TextStyle(
+                              fontStyle: FontStyle.italic,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFFE65100),
+                            ),
+                          ),
                       ],
                     ),
                   ),
