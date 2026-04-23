@@ -2032,10 +2032,11 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         _isPayingWithWallet ||
         _isPayingFinalWithWallet;
 
-    // Cancel is allowed: Pending (any time) or Assigned only when mission is still Preparing
+    // Cancel is allowed: Pending (any time), Confirmed, or Assigned only when mission is still Preparing
     final bool canCancel =
         !_isCancelling &&
         (request.status == 'Pending' ||
+            request.status == 'Confirmed' ||
             (request.status == 'Assigned' &&
                 (request.mission == null ||
                     request.mission!.status == 'Preparing')));
