@@ -1365,13 +1365,13 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                           const SizedBox(width: 12),
                           const Icon(Icons.inbox_outlined,
                               color: Colors.white70, size: 18),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 4),
                           Flexible(
                             child: Text(
                               '${stats.consultationRequests} Yêu Cầu',
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                fontSize: 14,
+                                fontSize: 10,
                                 color: Colors.white70,
                                 fontWeight: FontWeight.w500,
                               ),

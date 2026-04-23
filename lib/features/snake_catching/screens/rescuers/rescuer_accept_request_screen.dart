@@ -377,8 +377,10 @@ class _RescuerAcceptRequestScreenState
                         ),
                       ),
                       const SizedBox(height: 6),
-                      // Badges row
-                      Row(
+                      // Badges — use Wrap so they flow to next line on narrow screens
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
                         children: [
                           if (species != null)
                             Container(
@@ -405,7 +407,6 @@ class _RescuerAcceptRequestScreenState
                                 ],
                               ),
                             ),
-                          const SizedBox(width: 6),
                           if (species != null)
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),

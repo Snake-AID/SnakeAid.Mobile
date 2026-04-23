@@ -1086,7 +1086,7 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                 // Label
                 const Text('Số lượng:',
                     style: TextStyle(fontSize: 13, color: Color(0xFF666666))),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 // Quantity stepper
                 Container(
                   decoration: BoxDecoration(
@@ -1098,7 +1098,7 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       SizedBox(
-                        width: 32, height: 36,
+                        width: 28, height: 36,
                         child: IconButton(
                           icon: const Icon(Icons.remove, size: 14),
                           padding: EdgeInsets.zero,
@@ -1108,7 +1108,7 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                         ),
                       ),
                       Container(
-                        width: 34,
+                        width: 30,
                         alignment: Alignment.center,
                         child: Text('$_pendingQuantity',
                             style: const TextStyle(
@@ -1117,7 +1117,7 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                             )),
                       ),
                       SizedBox(
-                        width: 32, height: 36,
+                        width: 28, height: 36,
                         child: IconButton(
                           icon: const Icon(Icons.add, size: 14),
                           padding: EdgeInsets.zero,
@@ -1127,7 +1127,7 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                     ],
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 // Confirm button
                 Expanded(
                   child: SizedBox(
@@ -1144,6 +1144,7 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
                       ),
                       child: _isConfirmingSnake
                           ? const SizedBox(
@@ -1152,14 +1153,18 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                                   strokeWidth: 2, color: Colors.white))
                           : const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(Icons.add_circle_outline, size: 16),
-                                SizedBox(width: 6),
-                                Text('THÊM RẮN',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                    )),
+                                SizedBox(width: 4),
+                                Flexible(
+                                  child: Text('THÊM RẮN',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                      )),
+                                ),
                               ],
                             ),
                     ),
