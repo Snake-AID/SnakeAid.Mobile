@@ -77,7 +77,7 @@ class _ConsultationItem {
           : ConsultationStatus.active;
     }
 
-    final fee = c.price?.toInt() ?? 0;
+    final fee = c.grossPrice?.toInt() ?? 0;
     final serviceType = c.type == MyConsultationType.emergency
         ? 'Tư vấn khẩn cấp'
         : 'Tư vấn đặt lịch';

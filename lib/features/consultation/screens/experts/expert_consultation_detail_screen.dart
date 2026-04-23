@@ -92,7 +92,7 @@ class _ExpertConsultationDetailScreenState
   @override
   void initState() {
     super.initState();
-    if (_isCompleted) {
+    if (_isCompleted && data['netPrice'] == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadSettlement());
     }
   }
@@ -217,6 +217,14 @@ class _ExpertConsultationDetailScreenState
     final durationMinutes = (data['durationMinutes'] as int?) ?? 45;
     final consultationMethod = data['consultationMethod'] as String? ?? 'video';
     final questions = data['questions'] as String?;
+    final int? grossPrice = (data['grossPrice'] as num?)?.toInt();
+    final int? netPrice = (data['netPrice'] as num?)?.toInt();
+
+    final int displayGross = grossPrice ?? feeCost;
+    final int? displayNet = netPrice ?? (_expertPayout?.toInt());
+    final int? displayPlatformFee = (netPrice != null) 
+        ? (displayGross - netPrice) 
+        : (_platformFee?.toInt());
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F6F8),
@@ -400,7 +408,7 @@ class _ExpertConsultationDetailScreenState
                       _DetailRow(
                         icon: Icons.payments_outlined,
                         label: 'Phí Tư Vấn',
-                        value: _formatCurrency(feeCost),
+                        value: _formatCurrency(displayGross),
                         valueColor: _isCompleted ? _green : _darkPurple,
                         valueBold: true,
                       ),
@@ -485,14 +493,14 @@ class _ExpertConsultationDetailScreenState
                               _DetailRow(
                                 icon: Icons.receipt_long_outlined,
                                 label: 'Chi phí tư vấn',
-                                value: _formatCurrency(feeCost),
+                                value: _formatCurrency(displayGross),
                               ),
-                              if (_platformFee != null) ...[
+                              if (displayPlatformFee != null) ...[
                                 const _Divider(),
                                 _DetailRow(
                                   icon: Icons.account_balance_outlined,
                                   label: 'Phí nền tảng',
-                                  value: '- ${_formatCurrency(_platformFee!)}',
+                                  value: '- ${_formatCurrency(displayPlatformFee)}',
                                   valueColor: _red,
                                 ),
                               ],
@@ -528,11 +536,9 @@ class _ExpertConsultationDetailScreenState
                                     Expanded(
                                       flex: 3,
                                       child: Text(
-                                        _expertPayout != null
-                                            ? '+${_formatCurrency(_expertPayout!)}'
-                                            : (_platformFee != null
-                                                ? '+${_formatCurrency(feeCost - _platformFee!.toInt())}'
-                                                : '--'),
+                                        displayNet != null
+                                            ? '+${_formatCurrency(displayNet)}'
+                                            : '--',
                                         textAlign: TextAlign.right,
                                         style: const TextStyle(
                                           fontSize: 15,

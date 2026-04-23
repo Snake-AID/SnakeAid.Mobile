@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -110,6 +110,8 @@ _ExpertConsultation _bookingToExpertConsultation(
     consultationMethod: 'video',
     problemDescription: b.problemDescription,
     questions: null,
+    grossPrice: b.grossPrice,
+    netPrice: b.netPrice,
   );
 }
 
@@ -576,6 +578,8 @@ class _HomeTabState extends ConsumerState<_HomeTab>
         'consultationMethod': c.consultationMethod,
         'problemDescription': c.problemDescription,
         'questions': c.questions,
+        'grossPrice': c.grossPrice,
+        'netPrice': c.netPrice,
       },
     );
   }
@@ -2147,6 +2151,8 @@ class _ExpertConsultation {
   final DateTime? slotEndTime;
   final _ExpertConsultationStatus status;
   final int feeCost;
+  final int? grossPrice;
+  final int? netPrice;
   final double? rating;
   final int? durationSeconds;
   final int durationMinutes;
@@ -2179,6 +2185,8 @@ class _ExpertConsultation {
     this.consultationMethod = 'video',
     this.problemDescription,
     this.questions,
+    this.grossPrice,
+    this.netPrice,
   });
 }
 
@@ -2307,6 +2315,8 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
         'consultationMethod': c.consultationMethod,
         'problemDescription': c.problemDescription,
         'questions': c.questions,
+        'grossPrice': c.grossPrice,
+        'netPrice': c.netPrice,
       },
     );
 
@@ -3156,7 +3166,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '+${_formatFee(item.feeCost)}',
+                      '+${_formatFee(item.netPrice ?? item.feeCost)}',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,

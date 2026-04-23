@@ -22,7 +22,8 @@ class MyConsultationResponse {
   final String? roomId;
   final DateTime? startTime;
   final DateTime? endTime;
-  final double? price;
+  final double? grossPrice;
+  final double? netPrice;
   final String? problemDescription;
   final String? customerReport;
   final DateTime? customerReportSubmittedAt;
@@ -40,7 +41,8 @@ class MyConsultationResponse {
     this.roomId,
     this.startTime,
     this.endTime,
-    this.price,
+    this.grossPrice,
+    this.netPrice,
     this.problemDescription,
     this.customerReport,
     this.customerReportSubmittedAt,
@@ -131,7 +133,8 @@ class MyConsultationResponse {
         json['endTime'],
         treatUtcAsWallClock: treatUtcAsWallClock,
       ),
-      price: (json['price'] as num?)?.toDouble(),
+      grossPrice: (json['grossPrice'] as num?)?.toDouble() ?? (json['price'] as num?)?.toDouble(),
+      netPrice: (json['netPrice'] as num?)?.toDouble(),
       problemDescription: json['problemDescription']?.toString(),
       customerReport: json['customerReport']?.toString(),
       customerReportSubmittedAt: parseDate(
