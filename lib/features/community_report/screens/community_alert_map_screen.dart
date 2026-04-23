@@ -39,14 +39,14 @@ class _CommunityAlertMapScreenState
     if (_riskFilter == 'All') return _reports;
     if (_riskFilter == 'Danger') {
       return _reports
-          .where((r) =>
-              r.resolvedRiskLevel == 'Critical' ||
-              r.resolvedRiskLevel == 'Extreme')
+          .where(
+            (r) =>
+                r.resolvedRiskLevel == 'Critical' ||
+                r.resolvedRiskLevel == 'Extreme',
+          )
           .toList();
     }
-    return _reports
-        .where((r) => r.resolvedRiskLevel == _riskFilter)
-        .toList();
+    return _reports.where((r) => r.resolvedRiskLevel == _riskFilter).toList();
   }
 
   @override
@@ -61,10 +61,7 @@ class _CommunityAlertMapScreenState
       _error = null;
     });
     // Fetch location and reports concurrently
-    final results = await Future.wait([
-      _tryGetLocation(),
-      _fetchReports(),
-    ]);
+    final results = await Future.wait([_tryGetLocation(), _fetchReports()]);
     final position = results[0] as Position?;
     if (position != null && mounted) {
       setState(() => _center = LatLng(position.latitude, position.longitude));
@@ -81,7 +78,8 @@ class _CommunityAlertMapScreenState
         perm = await Geolocator.requestPermission();
       }
       if (perm == LocationPermission.denied ||
-          perm == LocationPermission.deniedForever) return null;
+          perm == LocationPermission.deniedForever)
+        return null;
       return await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.medium,
@@ -96,7 +94,7 @@ class _CommunityAlertMapScreenState
   Future<Null> _fetchReports() async {
     try {
       final repo = ref.read(communityReportRepositoryProvider);
-      final list = await repo.getReports();
+      final list = await repo.getAllReports();
       if (!mounted) return;
       setState(() {
         _reports = list;
@@ -122,15 +120,17 @@ class _CommunityAlertMapScreenState
   }
 
   Future<void> _openCreateReport() async {
-    await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => CreateReportScreen(onReportCreated: _fetchReports),
-    ));
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CreateReportScreen(onReportCreated: _fetchReports),
+      ),
+    );
   }
 
   void _openHistory() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ReportHistoryScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const ReportHistoryScreen()));
   }
 
   @override
@@ -185,8 +185,9 @@ class _CommunityAlertMapScreenState
                   child: Text(
                     '© OpenStreetMap contributors',
                     style: TextStyle(
-                        fontSize: 8,
-                        color: Colors.black.withOpacity(0.45)),
+                      fontSize: 8,
+                      color: Colors.black.withOpacity(0.45),
+                    ),
                   ),
                 ),
               ),
@@ -214,8 +215,11 @@ class _CommunityAlertMapScreenState
                   child: Row(
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.arrow_back_ios_new,
-                            color: Colors.white, size: 20),
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                         onPressed: () => context.pop(),
                       ),
                       Expanded(
@@ -226,64 +230,78 @@ class _CommunityAlertMapScreenState
                             const Text(
                               'Cảnh báo khu vực',
                               style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.bold),
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             if (!_isLoading && _error == null)
-                              Row(children: [
-                                Container(
-                                  margin: const EdgeInsets.only(top: 2),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 7, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: _reports.isEmpty
-                                        ? Colors.white24
-                                        : const Color(0xFFDC3545),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Text(
-                                    _riskFilter == 'All'
-                                        ? '${_reports.length} điểm cảnh báo'
-                                        : '${_filteredReports.length}/${_reports.length} điểm hiển thị',
-                                    style: const TextStyle(
+                              Row(
+                                children: [
+                                  Container(
+                                    margin: const EdgeInsets.only(top: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _reports.isEmpty
+                                          ? Colors.white24
+                                          : const Color(0xFFDC3545),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      _riskFilter == 'All'
+                                          ? '${_reports.length} điểm cảnh báo'
+                                          : '${_filteredReports.length}/${_reports.length} điểm hiển thị',
+                                      style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 10,
-                                        fontWeight: FontWeight.w600),
-                                  ),
-                                ),
-                                if (_riskFilter != 'All') ...[
-                                  const SizedBox(width: 5),
-                                  GestureDetector(
-                                    onTap: () =>
-                                        setState(() => _riskFilter = 'All'),
-                                    child: Container(
-                                      margin: const EdgeInsets.only(top: 2),
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 7, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.22),
-                                        borderRadius:
-                                            BorderRadius.circular(10),
-                                      ),
-                                      child: const Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.filter_list_off_rounded,
-                                              color: Colors.white, size: 10),
-                                          SizedBox(width: 3),
-                                          Text('Xóa lọc',
-                                              style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 10,
-                                                  fontWeight:
-                                                      FontWeight.w600)),
-                                        ],
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ),
+                                  if (_riskFilter != 'All') ...[
+                                    const SizedBox(width: 5),
+                                    GestureDetector(
+                                      onTap: () =>
+                                          setState(() => _riskFilter = 'All'),
+                                      child: Container(
+                                        margin: const EdgeInsets.only(top: 2),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 7,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.22),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.filter_list_off_rounded,
+                                              color: Colors.white,
+                                              size: 10,
+                                            ),
+                                            SizedBox(width: 3),
+                                            Text(
+                                              'Xóa lọc',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ],
-                              ]),
+                              ),
                           ],
                         ),
                       ),
@@ -320,10 +338,7 @@ class _CommunityAlertMapScreenState
               top: topPad + 70,
               left: 16,
               right: 16,
-              child: _ErrorBanner(
-                message: _error!,
-                onRetry: _loadData,
-              ),
+              child: _ErrorBanner(message: _error!, onRetry: _loadData),
             ),
 
           // ── Province selected chip ─────────────────────────────────────
@@ -339,7 +354,9 @@ class _CommunityAlertMapScreenState
                     onTap: _showProvincePicker,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 7),
+                        horizontal: 14,
+                        vertical: 7,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF1B5E20),
                         borderRadius: BorderRadius.circular(20),
@@ -354,22 +371,28 @@ class _CommunityAlertMapScreenState
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.location_city_rounded,
-                              color: Colors.white, size: 14),
+                          const Icon(
+                            Icons.location_city_rounded,
+                            color: Colors.white,
+                            size: 14,
+                          ),
                           const SizedBox(width: 6),
                           Text(
                             _selectedProvince!.name,
                             style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold),
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(width: 8),
                           GestureDetector(
                             onTap: () {
                               setState(() => _selectedProvince = null);
                               _mapController.move(
-                                  const LatLng(16.5, 106.0), 5.5);
+                                const LatLng(16.5, 106.0),
+                                5.5,
+                              );
                             },
                             child: Container(
                               padding: const EdgeInsets.all(2),
@@ -377,8 +400,11 @@ class _CommunityAlertMapScreenState
                                 color: Colors.white.withOpacity(0.2),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.close,
-                                  color: Colors.white, size: 12),
+                              child: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 12,
+                              ),
                             ),
                           ),
                         ],
@@ -436,7 +462,9 @@ class _CommunityAlertMapScreenState
                     final pos = await _tryGetLocation();
                     if (pos != null) {
                       _mapController.move(
-                          LatLng(pos.latitude, pos.longitude), 15);
+                        LatLng(pos.latitude, pos.longitude),
+                        15,
+                      );
                     }
                   },
                 ),
@@ -468,16 +496,15 @@ class _CommunityAlertMapScreenState
                     backgroundColor: const Color(0xFFDC3545),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                     elevation: 6,
                     shadowColor: const Color(0xFFDC3545).withOpacity(0.4),
                   ),
-                  icon: const Icon(Icons.add_location_alt,
-                      size: 20),
+                  icon: const Icon(Icons.add_location_alt, size: 20),
                   label: const Text(
                     'Báo cáo phát hiện rắn',
-                    style: TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -498,8 +525,7 @@ class _CommunityAlertMapScreenState
         onSelected: (province) {
           setState(() => _selectedProvince = province);
           if (province != null) {
-            _mapController.move(
-                LatLng(province.lat, province.lng), 11.0);
+            _mapController.move(LatLng(province.lat, province.lng), 11.0);
           } else {
             _mapController.move(const LatLng(16.5, 106.0), 5.5);
           }
@@ -558,8 +584,9 @@ class _ReportDetailSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final level = report.resolvedRiskLevel;
     final color = riskColor(level);
-    final dateStr =
-        DateFormat('dd/MM/yyyy • HH:mm').format(report.createdAt.toLocal());
+    final dateStr = DateFormat(
+      'dd/MM/yyyy • HH:mm',
+    ).format(report.createdAt.toLocal());
     final species = report.snakeSpecies;
 
     return DraggableScrollableSheet(
@@ -654,7 +681,9 @@ class _ReportDetailSheet extends StatelessWidget {
                   // Risk badge
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: color.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(20),
@@ -663,8 +692,11 @@ class _ReportDetailSheet extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.warning_amber_rounded,
-                            color: color, size: 15),
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          color: color,
+                          size: 15,
+                        ),
                         const SizedBox(width: 5),
                         Text(
                           riskLabel(level),
@@ -682,18 +714,24 @@ class _ReportDetailSheet extends StatelessWidget {
                   if (report.isVenomous)
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFDC3545).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                            color: const Color(0xFFDC3545).withOpacity(0.5)),
+                          color: const Color(0xFFDC3545).withOpacity(0.5),
+                        ),
                       ),
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.dangerous,
-                              color: Color(0xFFDC3545), size: 14),
+                          Icon(
+                            Icons.dangerous,
+                            color: Color(0xFFDC3545),
+                            size: 14,
+                          ),
                           SizedBox(width: 4),
                           Text(
                             'Có nọc độc',
@@ -717,9 +755,10 @@ class _ReportDetailSheet extends StatelessWidget {
                 child: Text(
                   report.snakeDisplayName,
                   style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A1A1A)),
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A1A),
+                  ),
                 ),
               ),
 
@@ -736,25 +775,30 @@ class _ReportDetailSheet extends StatelessWidget {
               child: Column(
                 children: [
                   _InfoRow(
-                      icon: Icons.person_outline,
-                      label: 'Người báo cáo',
-                      value: report.reporterName ?? 'Ẩn danh'),
+                    icon: Icons.person_outline,
+                    label: 'Người báo cáo',
+                    value: report.reporterName ?? 'Ẩn danh',
+                  ),
                   _InfoRow(
-                      icon: Icons.notes_outlined,
-                      label: 'Ghi chú',
-                      value: report.notes.isNotEmpty
-                          ? report.notes
-                          : 'Không có ghi chú'),
+                    icon: Icons.notes_outlined,
+                    label: 'Ghi chú',
+                    value: report.notes.isNotEmpty
+                        ? report.notes
+                        : 'Không có ghi chú',
+                  ),
                   _InfoRow(
-                      icon: Icons.access_time_outlined,
-                      label: 'Thời gian',
-                      value: dateStr),
+                    icon: Icons.access_time_outlined,
+                    label: 'Thời gian',
+                    value: dateStr,
+                  ),
                   _InfoRow(
-                      icon: Icons.location_on_outlined,
-                      label: 'Tọa độ',
-                      value: '${report.latitude.toStringAsFixed(4)}°N, '
-                          '${report.longitude.toStringAsFixed(4)}°E',
-                      isLast: true),
+                    icon: Icons.location_on_outlined,
+                    label: 'Tọa độ',
+                    value:
+                        '${report.latitude.toStringAsFixed(4)}°N, '
+                        '${report.longitude.toStringAsFixed(4)}°E',
+                    isLast: true,
+                  ),
                 ],
               ),
             ),
@@ -774,8 +818,7 @@ class _ReportDetailSheet extends StatelessWidget {
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content:
-                                Text('Tọa độ đã sao chép: $coords'),
+                            content: Text('Tọa độ đã sao chép: $coords'),
                             duration: const Duration(seconds: 2),
                             behavior: SnackBarBehavior.floating,
                           ),
@@ -786,11 +829,13 @@ class _ReportDetailSheet extends StatelessWidget {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF1B5E20),
                         side: const BorderSide(
-                            color: Color(0xFF1B5E20), width: 1.5),
+                          color: Color(0xFF1B5E20),
+                          width: 1.5,
+                        ),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 11),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
                       ),
                     ),
                   ),
@@ -804,10 +849,10 @@ class _ReportDetailSheet extends StatelessWidget {
                         backgroundColor: const Color(0xFF1B5E20),
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         elevation: 0,
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 11),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
                       ),
                     ),
                   ),
@@ -856,15 +901,22 @@ class _InfoRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label,
-                        style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF999999),
-                            fontWeight: FontWeight.w500)),
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF999999),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text(value,
-                        style: const TextStyle(
-                            fontSize: 14, color: Color(0xFF1A1A1A))),
+                    Text(
+                      value,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -908,13 +960,16 @@ class _TopBarBtn extends StatelessWidget {
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2),
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
                   )
                 : Icon(icon, color: Colors.white, size: 20),
             const SizedBox(height: 2),
-            Text(label,
-                style: const TextStyle(
-                    color: Colors.white70, fontSize: 9.5)),
+            Text(
+              label,
+              style: const TextStyle(color: Colors.white70, fontSize: 9.5),
+            ),
           ],
         ),
       ),
@@ -995,19 +1050,23 @@ class _ErrorBanner extends StatelessWidget {
               onTap: onRetry,
               borderRadius: BorderRadius.circular(8),
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(8),
-                  border:
-                      Border.all(color: Colors.white.withOpacity(0.4)),
+                  border: Border.all(color: Colors.white.withOpacity(0.4)),
                 ),
-                child: const Text('Thử lại',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold)),
+                child: const Text(
+                  'Thử lại',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
           ],
@@ -1059,13 +1118,17 @@ class _LegendSheet extends StatelessWidget {
                   color: const Color(0xFF1B5E20).withOpacity(0.10),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.map_outlined,
-                    color: Color(0xFF1B5E20), size: 18),
+                child: const Icon(
+                  Icons.map_outlined,
+                  color: Color(0xFF1B5E20),
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 10),
-              const Text('Âm hiu bản đồ',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold)),
+              const Text(
+                'Âm hiu bản đồ',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -1078,21 +1141,25 @@ class _LegendSheet extends StatelessWidget {
             childAspectRatio: 2.6,
             children: const [
               _LegendCard(
-                  color: Color(0xFFB71C1C),
-                  label: 'Cực kỳ nguy hiểm',
-                  icon: Icons.crisis_alert_rounded),
+                color: Color(0xFFB71C1C),
+                label: 'Cực kỳ nguy hiểm',
+                icon: Icons.crisis_alert_rounded,
+              ),
               _LegendCard(
-                  color: Color(0xFFE53935),
-                  label: 'Nguy hiểm cao',
-                  icon: Icons.warning_amber_rounded),
+                color: Color(0xFFE53935),
+                label: 'Nguy hiểm cao',
+                icon: Icons.warning_amber_rounded,
+              ),
               _LegendCard(
-                  color: Color(0xFFF5A623),
-                  label: 'Trung bình',
-                  icon: Icons.report_outlined),
+                color: Color(0xFFF5A623),
+                label: 'Trung bình',
+                icon: Icons.report_outlined,
+              ),
               _LegendCard(
-                  color: Color(0xFF28A745),
-                  label: 'Nguy hiểm thấp',
-                  icon: Icons.info_outline_rounded),
+                color: Color(0xFF28A745),
+                label: 'Nguy hiểm thấp',
+                icon: Icons.info_outline_rounded,
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -1104,14 +1171,16 @@ class _LegendSheet extends StatelessWidget {
             ),
             child: const Row(
               children: [
-                Icon(Icons.touch_app_outlined,
-                    color: Color(0xFF1B5E20), size: 16),
+                Icon(
+                  Icons.touch_app_outlined,
+                  color: Color(0xFF1B5E20),
+                  size: 16,
+                ),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Nhấn vào điểm đánh dấu trên bản đồ để xem chi tiết báo cáo',
-                    style:
-                        TextStyle(fontSize: 12, color: Color(0xFF444444)),
+                    style: TextStyle(fontSize: 12, color: Color(0xFF444444)),
                   ),
                 ),
               ],
@@ -1143,71 +1212,386 @@ class _VietnamProvince {
 
 const _vnProvinces = <_VietnamProvince>[
   // ── Miền Bắc ──────────────────────────────────────────────────────────────
-  _VietnamProvince(name: 'Hà Nội', lat: 21.028, lng: 105.854, region: _VnRegion.north),
-  _VietnamProvince(name: 'Hải Phòng', lat: 20.844, lng: 106.688, region: _VnRegion.north),
-  _VietnamProvince(name: 'Quảng Ninh', lat: 21.006, lng: 107.292, region: _VnRegion.north),
-  _VietnamProvince(name: 'Hà Giang', lat: 22.823, lng: 104.983, region: _VnRegion.north),
-  _VietnamProvince(name: 'Cao Bằng', lat: 22.672, lng: 106.254, region: _VnRegion.north),
-  _VietnamProvince(name: 'Lào Cai', lat: 22.485, lng: 103.976, region: _VnRegion.north),
-  _VietnamProvince(name: 'Bắc Kạn', lat: 22.147, lng: 105.834, region: _VnRegion.north),
-  _VietnamProvince(name: 'Lạng Sơn', lat: 21.853, lng: 106.761, region: _VnRegion.north),
-  _VietnamProvince(name: 'Tuyên Quang', lat: 21.823, lng: 105.214, region: _VnRegion.north),
-  _VietnamProvince(name: 'Yên Bái', lat: 21.720, lng: 104.911, region: _VnRegion.north),
-  _VietnamProvince(name: 'Thái Nguyên', lat: 21.594, lng: 105.848, region: _VnRegion.north),
-  _VietnamProvince(name: 'Phú Thọ', lat: 21.322, lng: 105.201, region: _VnRegion.north),
-  _VietnamProvince(name: 'Vĩnh Phúc', lat: 21.360, lng: 105.597, region: _VnRegion.north),
-  _VietnamProvince(name: 'Bắc Giang', lat: 21.282, lng: 106.197, region: _VnRegion.north),
-  _VietnamProvince(name: 'Bắc Ninh', lat: 21.186, lng: 106.076, region: _VnRegion.north),
-  _VietnamProvince(name: 'Hưng Yên', lat: 20.645, lng: 106.051, region: _VnRegion.north),
-  _VietnamProvince(name: 'Hải Dương', lat: 20.940, lng: 106.331, region: _VnRegion.north),
-  _VietnamProvince(name: 'Hà Nam', lat: 20.545, lng: 105.922, region: _VnRegion.north),
-  _VietnamProvince(name: 'Nam Định', lat: 20.420, lng: 106.168, region: _VnRegion.north),
-  _VietnamProvince(name: 'Thái Bình', lat: 20.446, lng: 106.342, region: _VnRegion.north),
-  _VietnamProvince(name: 'Ninh Bình', lat: 20.254, lng: 105.975, region: _VnRegion.north),
-  _VietnamProvince(name: 'Hòa Bình', lat: 20.813, lng: 105.338, region: _VnRegion.north),
-  _VietnamProvince(name: 'Sơn La', lat: 21.326, lng: 103.919, region: _VnRegion.north),
-  _VietnamProvince(name: 'Điện Biên', lat: 21.386, lng: 103.013, region: _VnRegion.north),
-  _VietnamProvince(name: 'Lai Châu', lat: 22.386, lng: 103.472, region: _VnRegion.north),
+  _VietnamProvince(
+    name: 'Hà Nội',
+    lat: 21.028,
+    lng: 105.854,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Hải Phòng',
+    lat: 20.844,
+    lng: 106.688,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Quảng Ninh',
+    lat: 21.006,
+    lng: 107.292,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Hà Giang',
+    lat: 22.823,
+    lng: 104.983,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Cao Bằng',
+    lat: 22.672,
+    lng: 106.254,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Lào Cai',
+    lat: 22.485,
+    lng: 103.976,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Bắc Kạn',
+    lat: 22.147,
+    lng: 105.834,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Lạng Sơn',
+    lat: 21.853,
+    lng: 106.761,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Tuyên Quang',
+    lat: 21.823,
+    lng: 105.214,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Yên Bái',
+    lat: 21.720,
+    lng: 104.911,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Thái Nguyên',
+    lat: 21.594,
+    lng: 105.848,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Phú Thọ',
+    lat: 21.322,
+    lng: 105.201,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Vĩnh Phúc',
+    lat: 21.360,
+    lng: 105.597,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Bắc Giang',
+    lat: 21.282,
+    lng: 106.197,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Bắc Ninh',
+    lat: 21.186,
+    lng: 106.076,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Hưng Yên',
+    lat: 20.645,
+    lng: 106.051,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Hải Dương',
+    lat: 20.940,
+    lng: 106.331,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Hà Nam',
+    lat: 20.545,
+    lng: 105.922,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Nam Định',
+    lat: 20.420,
+    lng: 106.168,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Thái Bình',
+    lat: 20.446,
+    lng: 106.342,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Ninh Bình',
+    lat: 20.254,
+    lng: 105.975,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Hòa Bình',
+    lat: 20.813,
+    lng: 105.338,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Sơn La',
+    lat: 21.326,
+    lng: 103.919,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Điện Biên',
+    lat: 21.386,
+    lng: 103.013,
+    region: _VnRegion.north,
+  ),
+  _VietnamProvince(
+    name: 'Lai Châu',
+    lat: 22.386,
+    lng: 103.472,
+    region: _VnRegion.north,
+  ),
   // ── Miền Trung ────────────────────────────────────────────────────────────
-  _VietnamProvince(name: 'Thanh Hóa', lat: 19.807, lng: 105.776, region: _VnRegion.central),
-  _VietnamProvince(name: 'Nghệ An', lat: 18.666, lng: 105.681, region: _VnRegion.central),
-  _VietnamProvince(name: 'Hà Tĩnh', lat: 18.355, lng: 105.887, region: _VnRegion.central),
-  _VietnamProvince(name: 'Quảng Bình', lat: 17.467, lng: 106.622, region: _VnRegion.central),
-  _VietnamProvince(name: 'Quảng Trị', lat: 16.746, lng: 107.185, region: _VnRegion.central),
-  _VietnamProvince(name: 'Thừa Thiên Huế', lat: 16.462, lng: 107.590, region: _VnRegion.central),
-  _VietnamProvince(name: 'Đà Nẵng', lat: 16.047, lng: 108.206, region: _VnRegion.central),
-  _VietnamProvince(name: 'Quảng Nam', lat: 15.540, lng: 108.019, region: _VnRegion.central),
-  _VietnamProvince(name: 'Quảng Ngãi', lat: 15.120, lng: 108.792, region: _VnRegion.central),
-  _VietnamProvince(name: 'Bình Định', lat: 13.782, lng: 109.219, region: _VnRegion.central),
-  _VietnamProvince(name: 'Phú Yên', lat: 13.088, lng: 109.093, region: _VnRegion.central),
-  _VietnamProvince(name: 'Khánh Hòa', lat: 12.238, lng: 109.090, region: _VnRegion.central),
-  _VietnamProvince(name: 'Ninh Thuận', lat: 11.565, lng: 108.988, region: _VnRegion.central),
-  _VietnamProvince(name: 'Bình Thuận', lat: 11.090, lng: 108.072, region: _VnRegion.central),
-  _VietnamProvince(name: 'Kon Tum', lat: 14.349, lng: 107.969, region: _VnRegion.central),
-  _VietnamProvince(name: 'Gia Lai', lat: 13.983, lng: 108.237, region: _VnRegion.central),
-  _VietnamProvince(name: 'Đắk Lắk', lat: 12.710, lng: 108.237, region: _VnRegion.central),
-  _VietnamProvince(name: 'Đắk Nông', lat: 12.264, lng: 107.609, region: _VnRegion.central),
-  _VietnamProvince(name: 'Lâm Đồng', lat: 11.575, lng: 108.145, region: _VnRegion.central),
+  _VietnamProvince(
+    name: 'Thanh Hóa',
+    lat: 19.807,
+    lng: 105.776,
+    region: _VnRegion.central,
+  ),
+  _VietnamProvince(
+    name: 'Nghệ An',
+    lat: 18.666,
+    lng: 105.681,
+    region: _VnRegion.central,
+  ),
+  _VietnamProvince(
+    name: 'Hà Tĩnh',
+    lat: 18.355,
+    lng: 105.887,
+    region: _VnRegion.central,
+  ),
+  _VietnamProvince(
+    name: 'Quảng Bình',
+    lat: 17.467,
+    lng: 106.622,
+    region: _VnRegion.central,
+  ),
+  _VietnamProvince(
+    name: 'Quảng Trị',
+    lat: 16.746,
+    lng: 107.185,
+    region: _VnRegion.central,
+  ),
+  _VietnamProvince(
+    name: 'Thừa Thiên Huế',
+    lat: 16.462,
+    lng: 107.590,
+    region: _VnRegion.central,
+  ),
+  _VietnamProvince(
+    name: 'Đà Nẵng',
+    lat: 16.047,
+    lng: 108.206,
+    region: _VnRegion.central,
+  ),
+  _VietnamProvince(
+    name: 'Quảng Nam',
+    lat: 15.540,
+    lng: 108.019,
+    region: _VnRegion.central,
+  ),
+  _VietnamProvince(
+    name: 'Quảng Ngãi',
+    lat: 15.120,
+    lng: 108.792,
+    region: _VnRegion.central,
+  ),
+  _VietnamProvince(
+    name: 'Bình Định',
+    lat: 13.782,
+    lng: 109.219,
+    region: _VnRegion.central,
+  ),
+  _VietnamProvince(
+    name: 'Phú Yên',
+    lat: 13.088,
+    lng: 109.093,
+    region: _VnRegion.central,
+  ),
+  _VietnamProvince(
+    name: 'Khánh Hòa',
+    lat: 12.238,
+    lng: 109.090,
+    region: _VnRegion.central,
+  ),
+  _VietnamProvince(
+    name: 'Ninh Thuận',
+    lat: 11.565,
+    lng: 108.988,
+    region: _VnRegion.central,
+  ),
+  _VietnamProvince(
+    name: 'Bình Thuận',
+    lat: 11.090,
+    lng: 108.072,
+    region: _VnRegion.central,
+  ),
+  _VietnamProvince(
+    name: 'Kon Tum',
+    lat: 14.349,
+    lng: 107.969,
+    region: _VnRegion.central,
+  ),
+  _VietnamProvince(
+    name: 'Gia Lai',
+    lat: 13.983,
+    lng: 108.237,
+    region: _VnRegion.central,
+  ),
+  _VietnamProvince(
+    name: 'Đắk Lắk',
+    lat: 12.710,
+    lng: 108.237,
+    region: _VnRegion.central,
+  ),
+  _VietnamProvince(
+    name: 'Đắk Nông',
+    lat: 12.264,
+    lng: 107.609,
+    region: _VnRegion.central,
+  ),
+  _VietnamProvince(
+    name: 'Lâm Đồng',
+    lat: 11.575,
+    lng: 108.145,
+    region: _VnRegion.central,
+  ),
   // ── Miền Nam ──────────────────────────────────────────────────────────────
-  _VietnamProvince(name: 'TP. Hồ Chí Minh', lat: 10.762, lng: 106.660, region: _VnRegion.south),
-  _VietnamProvince(name: 'Bình Phước', lat: 11.752, lng: 106.723, region: _VnRegion.south),
-  _VietnamProvince(name: 'Tây Ninh', lat: 11.310, lng: 106.098, region: _VnRegion.south),
-  _VietnamProvince(name: 'Bình Dương', lat: 10.980, lng: 106.652, region: _VnRegion.south),
-  _VietnamProvince(name: 'Đồng Nai', lat: 10.945, lng: 107.241, region: _VnRegion.south),
-  _VietnamProvince(name: 'Bà Rịa - Vũng Tàu', lat: 10.582, lng: 107.241, region: _VnRegion.south),
-  _VietnamProvince(name: 'Long An', lat: 10.694, lng: 106.241, region: _VnRegion.south),
-  _VietnamProvince(name: 'Tiền Giang', lat: 10.449, lng: 106.342, region: _VnRegion.south),
-  _VietnamProvince(name: 'Bến Tre', lat: 10.241, lng: 106.376, region: _VnRegion.south),
-  _VietnamProvince(name: 'Trà Vinh', lat: 9.934, lng: 106.345, region: _VnRegion.south),
-  _VietnamProvince(name: 'Vĩnh Long', lat: 10.240, lng: 105.972, region: _VnRegion.south),
-  _VietnamProvince(name: 'Đồng Tháp', lat: 10.493, lng: 105.688, region: _VnRegion.south),
-  _VietnamProvince(name: 'An Giang', lat: 10.380, lng: 105.435, region: _VnRegion.south),
-  _VietnamProvince(name: 'Kiên Giang', lat: 10.012, lng: 105.080, region: _VnRegion.south),
-  _VietnamProvince(name: 'Cần Thơ', lat: 10.046, lng: 105.748, region: _VnRegion.south),
-  _VietnamProvince(name: 'Hậu Giang', lat: 9.757, lng: 105.641, region: _VnRegion.south),
-  _VietnamProvince(name: 'Sóc Trăng', lat: 9.602, lng: 105.974, region: _VnRegion.south),
-  _VietnamProvince(name: 'Bạc Liêu', lat: 9.294, lng: 105.727, region: _VnRegion.south),
-  _VietnamProvince(name: 'Cà Mau', lat: 9.177, lng: 105.150, region: _VnRegion.south),
+  _VietnamProvince(
+    name: 'TP. Hồ Chí Minh',
+    lat: 10.762,
+    lng: 106.660,
+    region: _VnRegion.south,
+  ),
+  _VietnamProvince(
+    name: 'Bình Phước',
+    lat: 11.752,
+    lng: 106.723,
+    region: _VnRegion.south,
+  ),
+  _VietnamProvince(
+    name: 'Tây Ninh',
+    lat: 11.310,
+    lng: 106.098,
+    region: _VnRegion.south,
+  ),
+  _VietnamProvince(
+    name: 'Bình Dương',
+    lat: 10.980,
+    lng: 106.652,
+    region: _VnRegion.south,
+  ),
+  _VietnamProvince(
+    name: 'Đồng Nai',
+    lat: 10.945,
+    lng: 107.241,
+    region: _VnRegion.south,
+  ),
+  _VietnamProvince(
+    name: 'Bà Rịa - Vũng Tàu',
+    lat: 10.582,
+    lng: 107.241,
+    region: _VnRegion.south,
+  ),
+  _VietnamProvince(
+    name: 'Long An',
+    lat: 10.694,
+    lng: 106.241,
+    region: _VnRegion.south,
+  ),
+  _VietnamProvince(
+    name: 'Tiền Giang',
+    lat: 10.449,
+    lng: 106.342,
+    region: _VnRegion.south,
+  ),
+  _VietnamProvince(
+    name: 'Bến Tre',
+    lat: 10.241,
+    lng: 106.376,
+    region: _VnRegion.south,
+  ),
+  _VietnamProvince(
+    name: 'Trà Vinh',
+    lat: 9.934,
+    lng: 106.345,
+    region: _VnRegion.south,
+  ),
+  _VietnamProvince(
+    name: 'Vĩnh Long',
+    lat: 10.240,
+    lng: 105.972,
+    region: _VnRegion.south,
+  ),
+  _VietnamProvince(
+    name: 'Đồng Tháp',
+    lat: 10.493,
+    lng: 105.688,
+    region: _VnRegion.south,
+  ),
+  _VietnamProvince(
+    name: 'An Giang',
+    lat: 10.380,
+    lng: 105.435,
+    region: _VnRegion.south,
+  ),
+  _VietnamProvince(
+    name: 'Kiên Giang',
+    lat: 10.012,
+    lng: 105.080,
+    region: _VnRegion.south,
+  ),
+  _VietnamProvince(
+    name: 'Cần Thơ',
+    lat: 10.046,
+    lng: 105.748,
+    region: _VnRegion.south,
+  ),
+  _VietnamProvince(
+    name: 'Hậu Giang',
+    lat: 9.757,
+    lng: 105.641,
+    region: _VnRegion.south,
+  ),
+  _VietnamProvince(
+    name: 'Sóc Trăng',
+    lat: 9.602,
+    lng: 105.974,
+    region: _VnRegion.south,
+  ),
+  _VietnamProvince(
+    name: 'Bạc Liêu',
+    lat: 9.294,
+    lng: 105.727,
+    region: _VnRegion.south,
+  ),
+  _VietnamProvince(
+    name: 'Cà Mau',
+    lat: 9.177,
+    lng: 105.150,
+    region: _VnRegion.south,
+  ),
 ];
 
 // ── Province picker sheet ────────────────────────────────────────────────────
@@ -1244,12 +1628,11 @@ class _ProvincePickerSheetState extends State<_ProvincePickerSheet> {
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
-    final north =
-        filtered.where((p) => p.region == _VnRegion.north).toList();
-    final central =
-        filtered.where((p) => p.region == _VnRegion.central).toList();
-    final south =
-        filtered.where((p) => p.region == _VnRegion.south).toList();
+    final north = filtered.where((p) => p.region == _VnRegion.north).toList();
+    final central = filtered
+        .where((p) => p.region == _VnRegion.central)
+        .toList();
+    final south = filtered.where((p) => p.region == _VnRegion.south).toList();
 
     return DraggableScrollableSheet(
       initialChildSize: 0.72,
@@ -1258,8 +1641,7 @@ class _ProvincePickerSheetState extends State<_ProvincePickerSheet> {
       expand: false,
       builder: (_, scroll) => Material(
         color: Colors.white,
-        borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         clipBehavior: Clip.antiAlias,
         child: Column(
           children: [
@@ -1284,8 +1666,11 @@ class _ProvincePickerSheetState extends State<_ProvincePickerSheet> {
                       color: const Color(0xFF1B5E20).withOpacity(0.10),
                       borderRadius: BorderRadius.circular(11),
                     ),
-                    child: const Icon(Icons.explore_outlined,
-                        color: Color(0xFF1B5E20), size: 20),
+                    child: const Icon(
+                      Icons.explore_outlined,
+                      color: Color(0xFF1B5E20),
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   const Column(
@@ -1294,12 +1679,16 @@ class _ProvincePickerSheetState extends State<_ProvincePickerSheet> {
                       Text(
                         'Chọn tỉnh / thành phố',
                         style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       Text(
                         'Di chuyển bản đồ đến khu vực bạn muốn xem',
                         style: TextStyle(
-                            fontSize: 11, color: Color(0xFF888888)),
+                          fontSize: 11,
+                          color: Color(0xFF888888),
+                        ),
                       ),
                     ],
                   ),
@@ -1314,8 +1703,11 @@ class _ProvincePickerSheetState extends State<_ProvincePickerSheet> {
                 onChanged: (v) => setState(() => _query = v),
                 decoration: InputDecoration(
                   hintText: 'Tìm tỉnh, thành phố...',
-                  prefixIcon: const Icon(Icons.search,
-                      color: Color(0xFF1B5E20), size: 20),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: Color(0xFF1B5E20),
+                    size: 20,
+                  ),
                   suffixIcon: _query.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear, size: 18),
@@ -1327,8 +1719,7 @@ class _ProvincePickerSheetState extends State<_ProvincePickerSheet> {
                       : null,
                   filled: true,
                   fillColor: const Color(0xFFF5F5F5),
-                  contentPadding:
-                      const EdgeInsets.symmetric(vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
@@ -1357,45 +1748,51 @@ class _ProvincePickerSheetState extends State<_ProvincePickerSheet> {
                   const Divider(height: 1, indent: 16),
                   if (north.isNotEmpty) ...[
                     _RegionHeader(
-                        label: 'Miền Bắc',
-                        color: const Color(0xFF1565C0)),
-                    ...north.map((p) => _ProvinceItem(
-                          name: p.name,
-                          isSelected:
-                              widget.selected?.name == p.name,
-                          onTap: () {
-                            widget.onSelected(p);
-                            Navigator.pop(context);
-                          },
-                        )),
+                      label: 'Miền Bắc',
+                      color: const Color(0xFF1565C0),
+                    ),
+                    ...north.map(
+                      (p) => _ProvinceItem(
+                        name: p.name,
+                        isSelected: widget.selected?.name == p.name,
+                        onTap: () {
+                          widget.onSelected(p);
+                          Navigator.pop(context);
+                        },
+                      ),
+                    ),
                   ],
                   if (central.isNotEmpty) ...[
                     _RegionHeader(
-                        label: 'Miền Trung',
-                        color: const Color(0xFF2E7D32)),
-                    ...central.map((p) => _ProvinceItem(
-                          name: p.name,
-                          isSelected:
-                              widget.selected?.name == p.name,
-                          onTap: () {
-                            widget.onSelected(p);
-                            Navigator.pop(context);
-                          },
-                        )),
+                      label: 'Miền Trung',
+                      color: const Color(0xFF2E7D32),
+                    ),
+                    ...central.map(
+                      (p) => _ProvinceItem(
+                        name: p.name,
+                        isSelected: widget.selected?.name == p.name,
+                        onTap: () {
+                          widget.onSelected(p);
+                          Navigator.pop(context);
+                        },
+                      ),
+                    ),
                   ],
                   if (south.isNotEmpty) ...[
                     _RegionHeader(
-                        label: 'Miền Nam',
-                        color: const Color(0xFFE65100)),
-                    ...south.map((p) => _ProvinceItem(
-                          name: p.name,
-                          isSelected:
-                              widget.selected?.name == p.name,
-                          onTap: () {
-                            widget.onSelected(p);
-                            Navigator.pop(context);
-                          },
-                        )),
+                      label: 'Miền Nam',
+                      color: const Color(0xFFE65100),
+                    ),
+                    ...south.map(
+                      (p) => _ProvinceItem(
+                        name: p.name,
+                        isSelected: widget.selected?.name == p.name,
+                        onTap: () {
+                          widget.onSelected(p);
+                          Navigator.pop(context);
+                        },
+                      ),
+                    ),
                   ],
                   const SizedBox(height: 24),
                 ],
@@ -1471,8 +1868,7 @@ class _ProvinceItem extends StatelessWidget {
         color: isSelected
             ? const Color(0xFF1B5E20).withOpacity(0.07)
             : Colors.transparent,
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
         child: Row(
           children: [
             if (icon != null) ...[
@@ -1484,8 +1880,7 @@ class _ProvinceItem extends StatelessWidget {
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child:
-                    Icon(icon!, size: 18, color: const Color(0xFF1B5E20)),
+                child: Icon(icon!, size: 18, color: const Color(0xFF1B5E20)),
               ),
               const SizedBox(width: 12),
             ] else ...[
@@ -1522,15 +1917,20 @@ class _ProvinceItem extends StatelessWidget {
                     Text(
                       subtitle!,
                       style: const TextStyle(
-                          fontSize: 11, color: Color(0xFF888888)),
+                        fontSize: 11,
+                        color: Color(0xFF888888),
+                      ),
                     ),
                   ],
                 ],
               ),
             ),
             if (isSelected)
-              const Icon(Icons.check_circle_rounded,
-                  color: Color(0xFF1B5E20), size: 20),
+              const Icon(
+                Icons.check_circle_rounded,
+                color: Color(0xFF1B5E20),
+                size: 20,
+              ),
           ],
         ),
       ),
@@ -1596,16 +1996,19 @@ class _RiskFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dangerCount = reports
-        .where((r) =>
-            r.resolvedRiskLevel == 'Critical' ||
-            r.resolvedRiskLevel == 'Extreme')
+        .where(
+          (r) =>
+              r.resolvedRiskLevel == 'Critical' ||
+              r.resolvedRiskLevel == 'Extreme',
+        )
         .length;
-    final highCount =
-        reports.where((r) => r.resolvedRiskLevel == 'High').length;
-    final medCount =
-        reports.where((r) => r.resolvedRiskLevel == 'Medium').length;
-    final lowCount =
-        reports.where((r) => r.resolvedRiskLevel == 'Low').length;
+    final highCount = reports
+        .where((r) => r.resolvedRiskLevel == 'High')
+        .length;
+    final medCount = reports
+        .where((r) => r.resolvedRiskLevel == 'Medium')
+        .length;
+    final lowCount = reports.where((r) => r.resolvedRiskLevel == 'Low').length;
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -1703,8 +2106,7 @@ class _FilterChipBtn extends StatelessWidget {
             ),
             const SizedBox(width: 5),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
               decoration: BoxDecoration(
                 color: active
                     ? Colors.white.withOpacity(0.25)
@@ -1737,16 +2139,18 @@ class _MapStatsBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final danger = reports
-        .where((r) =>
-            r.resolvedRiskLevel == 'Critical' ||
-            r.resolvedRiskLevel == 'Extreme')
+        .where(
+          (r) =>
+              r.resolvedRiskLevel == 'Critical' ||
+              r.resolvedRiskLevel == 'Extreme',
+        )
         .length;
-    final high =
-        reports.where((r) => r.resolvedRiskLevel == 'High').length;
+    final high = reports.where((r) => r.resolvedRiskLevel == 'High').length;
     final safe = reports
-        .where((r) =>
-            r.resolvedRiskLevel == 'Medium' ||
-            r.resolvedRiskLevel == 'Low')
+        .where(
+          (r) =>
+              r.resolvedRiskLevel == 'Medium' || r.resolvedRiskLevel == 'Low',
+        )
         .length;
 
     return ClipRRect(
@@ -1754,8 +2158,7 @@ class _MapStatsBar extends StatelessWidget {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.88),
             borderRadius: BorderRadius.circular(14),
@@ -1771,19 +2174,22 @@ class _MapStatsBar extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               _StatPill(
-                  color: const Color(0xFFDC3545),
-                  count: danger,
-                  label: 'Cực kỳ'),
+                color: const Color(0xFFDC3545),
+                count: danger,
+                label: 'Cực kỳ',
+              ),
               const SizedBox(width: 10),
               _StatPill(
-                  color: const Color(0xFFF5A623),
-                  count: high,
-                  label: 'Cao'),
+                color: const Color(0xFFF5A623),
+                count: high,
+                label: 'Cao',
+              ),
               const SizedBox(width: 10),
               _StatPill(
-                  color: const Color(0xFF28A745),
-                  count: safe,
-                  label: 'Thấp'),
+                color: const Color(0xFF28A745),
+                count: safe,
+                label: 'Thấp',
+              ),
             ],
           ),
         ),
@@ -1811,16 +2217,16 @@ class _StatPill extends StatelessWidget {
         Container(
           width: 8,
           height: 8,
-          decoration:
-              BoxDecoration(color: color, shape: BoxShape.circle),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 4),
         Text(
           '$count $label',
           style: const TextStyle(
-              fontSize: 11,
-              color: Color(0xFF333333),
-              fontWeight: FontWeight.w600),
+            fontSize: 11,
+            color: Color(0xFF333333),
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );

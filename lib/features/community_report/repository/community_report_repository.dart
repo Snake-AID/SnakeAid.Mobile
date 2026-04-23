@@ -12,7 +12,10 @@ class CommunityReportRepository {
 
   List<CommunityReport> _parseReportList(dynamic data) {
     if (data is List) {
-      return data.whereType<Map<String, dynamic>>().map(CommunityReport.fromJson).toList();
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map(CommunityReport.fromJson)
+          .toList();
     }
     if (data is Map<String, dynamic>) {
       // Try common paginated-response wrapper keys
@@ -40,10 +43,16 @@ class CommunityReportRepository {
 
   List<SnakeSpecies> _parseSpeciesList(dynamic data) {
     if (data is List) {
-      return data.whereType<Map<String, dynamic>>().map(SnakeSpecies.fromJson).toList();
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map(SnakeSpecies.fromJson)
+          .toList();
     }
     if (data is Map<String, dynamic> && data['data'] is List) {
-      return (data['data'] as List).whereType<Map<String, dynamic>>().map(SnakeSpecies.fromJson).toList();
+      return (data['data'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map(SnakeSpecies.fromJson)
+          .toList();
     }
     return [];
   }
@@ -57,11 +66,20 @@ class CommunityReportRepository {
     try {
       final res = await _http.get(
         '/api/community-reports',
-        queryParameters: {
-          'pageSize': pageSize,
-          'page': page,
-        },
+        queryParameters: {'pageSize': pageSize, 'page': page},
       );
+      return _parseReportList(res.data);
+    } catch (e) {
+      throw Exception('Không thể tải danh sách cảnh báo: $e');
+    }
+  }
+
+  Future<List<CommunityReport>> getAllReports({
+    int pageSize = 1000,
+    int page = 1,
+  }) async {
+    try {
+      final res = await _http.get('/api/community-reports/all');
       return _parseReportList(res.data);
     } catch (e) {
       throw Exception('Không thể tải danh sách cảnh báo: $e');
@@ -137,7 +155,8 @@ class CommunityReportRepository {
   }
 }
 
-final communityReportRepositoryProvider =
-    Provider<CommunityReportRepository>((ref) {
+final communityReportRepositoryProvider = Provider<CommunityReportRepository>((
+  ref,
+) {
   return CommunityReportRepository(ref.watch(httpServiceProvider));
 });

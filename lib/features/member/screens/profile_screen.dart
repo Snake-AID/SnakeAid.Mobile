@@ -691,7 +691,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     _MenuItem(
                       icon: Icons.health_and_safety_outlined,
                       title: 'Hướng dẫn sơ cứu',
-                      subtitle: 'Kỹ năng xử lý ban đầu khi bị rắn cắn',
+                      subtitle: '',
                       onTap: () {
                         context.push('/snake-first-aid-guide');
                       },
@@ -700,7 +700,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     _MenuItem(
                       icon: Icons.menu_book_outlined,
                       title: 'Thư viện loài rắn',
-                      subtitle: 'Tra cứu thông tin các loài rắn phổ biến',
+                      subtitle: '',
                       onTap: () {
                         context.push('/snake-species');
                       },
@@ -709,7 +709,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     _MenuItem(
                       icon: Icons.warning_amber_rounded,
                       title: 'Cảnh báo khu vực',
-                      subtitle: 'Bản đồ cảnh báo rắn xuất hiện gần đây',
+                      subtitle: '',
                       onTap: () {
                         context.pushNamed('community_alert_map');
                       },
