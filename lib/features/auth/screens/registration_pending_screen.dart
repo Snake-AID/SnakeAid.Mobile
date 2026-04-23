@@ -1,15 +1,86 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../expert/repository/expert_certificate_repository.dart';
+import '../providers/auth_provider.dart';
 
 /// Registration Pending Screen
-/// Màn hình chờ phê duyệt sau khi đăng ký rescuer
-class RegistrationPendingScreen extends StatelessWidget {
+/// Màn hình chờ phê duyệt sau khi đăng ký expert/rescuer
+class RegistrationPendingScreen extends ConsumerStatefulWidget {
   final String email;
 
-  const RegistrationPendingScreen({
-    super.key,
-    required this.email,
-  });
+  const RegistrationPendingScreen({super.key, required this.email});
+
+  @override
+  ConsumerState<RegistrationPendingScreen> createState() =>
+      _RegistrationPendingScreenState();
+}
+
+class _RegistrationPendingScreenState
+    extends ConsumerState<RegistrationPendingScreen> {
+  bool _isChecking = false;
+
+  Future<void> _checkStatus() async {
+    setState(() {
+      _isChecking = true;
+    });
+
+    try {
+      final repo = ref.read(expertCertificateRepositoryProvider);
+      final certs = await repo.getMyCertificates();
+
+      final hasVerified = certs.any((c) => c.isVerified);
+
+      if (!mounted) return;
+
+      if (hasVerified) {
+        // Cập nhật state isVerified = true để vượt qua router guard
+        await ref.read(authProvider.notifier).markUserAsVerified();
+        
+        if (!mounted) return;
+        // Nếu đã được duyệt -> Vào thẳng Home
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tài khoản của bạn đã được phê duyệt!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        context.go('/expert-home');
+      } else {
+        // Vẫn chưa được duyệt
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Tài khoản của bạn vẫn đang trong quá trình chờ phê duyệt.',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi kiểm tra trạng thái: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isChecking = false;
+        });
+      }
+    }
+  }
+
+  void _logout() async {
+    await ref.read(authProvider.notifier).logout();
+    if (mounted) {
+      context.goNamed('role_selection');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +113,7 @@ class RegistrationPendingScreen extends StatelessWidget {
 
                     // Title
                     const Text(
-                      'Đăng Ký Thành Công!',
+                      'Đã Nộp Chứng Chỉ!',
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
@@ -65,7 +136,7 @@ class RegistrationPendingScreen extends StatelessWidget {
 
                     // Description
                     const Text(
-                      'Tài khoản của bạn đang được xem xét bởi quản trị viên. Chúng tôi sẽ gửi thông báo qua email khi tài khoản được phê duyệt.',
+                      'Chứng chỉ của bạn đang được xem xét bởi quản trị viên.',
                       style: TextStyle(
                         fontSize: 16,
                         color: Color(0xFF666666),
@@ -105,7 +176,7 @@ class RegistrationPendingScreen extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      email,
+                                      widget.email,
                                       style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600,
@@ -150,9 +221,7 @@ class RegistrationPendingScreen extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        border: Border.all(
-                          color: const Color(0xFFDDDDDD),
-                        ),
+                        border: Border.all(color: const Color(0xFFDDDDDD)),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
@@ -167,13 +236,20 @@ class RegistrationPendingScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          _buildStep('1', 'Chúng tôi xem xét thông tin đăng ký của bạn'),
+                          _buildStep(
+                            '1',
+                            'Chúng tôi xác thực giấy tờ và chứng chỉ',
+                          ),
                           const SizedBox(height: 8),
-                          _buildStep('2', 'Xác thực giấy tờ và chứng chỉ (nếu có)'),
+                          _buildStep(
+                            '2',
+                            'Nhấn "Kiểm tra trạng thái" để làm mới',
+                          ),
                           const SizedBox(height: 8),
-                          _buildStep('3', 'Gửi email thông báo kết quả phê duyệt'),
-                          const SizedBox(height: 8),
-                          _buildStep('4', 'Bạn có thể đăng nhập và bắt đầu sử dụng'),
+                          _buildStep(
+                            '3',
+                            'Bắt đầu sử dụng tài khoản Chuyên gia',
+                          ),
                         ],
                       ),
                     ),
@@ -184,15 +260,12 @@ class RegistrationPendingScreen extends StatelessWidget {
               // Bottom Buttons
               Column(
                 children: [
-                  // Back to Home Button
+                  // Check Status Button
                   SizedBox(
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: () {
-                        // Navigate back to role selection
-                        context.goNamed('role_selection');
-                      },
+                      onPressed: _isChecking ? null : _checkStatus,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF228B22),
                         foregroundColor: Colors.white,
@@ -201,43 +274,42 @@ class RegistrationPendingScreen extends StatelessWidget {
                         ),
                         elevation: 0,
                       ),
-                      child: const Text(
-                        'Về Trang Chủ',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      child: _isChecking
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text(
+                              'Kiểm tra trạng thái',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 12),
 
-                  // Contact Support Button
+                  // Logout Button
                   SizedBox(
                     width: double.infinity,
                     height: 48,
                     child: OutlinedButton.icon(
-                      onPressed: () {
-                        // TODO: Open contact support
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Tính năng liên hệ hỗ trợ đang phát triển'),
-                          ),
-                        );
-                      },
+                      onPressed: _logout,
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF228B22),
-                        side: const BorderSide(
-                          color: Color(0xFF228B22),
-                          width: 1,
-                        ),
+                        foregroundColor: Colors.red,
+                        side: const BorderSide(color: Colors.red, width: 1),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      icon: const Icon(Icons.support_agent, size: 20),
+                      icon: const Icon(Icons.logout, size: 20),
                       label: const Text(
-                        'Liên Hệ Hỗ Trợ',
+                        'Đăng xuất',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.normal,

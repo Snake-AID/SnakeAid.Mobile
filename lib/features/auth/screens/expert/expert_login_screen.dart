@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/user_role.dart';
 import '../../providers/auth_provider.dart';
+import '../../../expert/repository/expert_certificate_repository.dart';
 
 /// Expert Login Screen
 /// Màn hình đăng nhập cho chuyên gia
@@ -82,8 +83,34 @@ class _ExpertLoginScreenState extends ConsumerState<ExpertLoginScreen> {
           ),
         );
 
-        // Navigate to expert home screen
-        context.goNamed('expert_home');
+        // Luôn kiểm tra trạng thái chứng chỉ thực tế thay vì dựa vào isVerified (vì có thể isVerified chỉ là email)
+        try {
+          final repo = ref.read(expertCertificateRepositoryProvider);
+          final certs = await repo.getMyCertificates();
+          
+          final hasVerified = certs.any((c) => c.isVerified);
+          final hasPending = certs.any((c) => !c.isVerified && (c.rejectionReason == null || c.rejectionReason!.isEmpty));
+          
+          if (!mounted) return;
+          if (hasVerified) {
+            await ref.read(authProvider.notifier).markUserAsVerified();
+            if (mounted) context.goNamed('expert_home');
+          } else if (hasPending) {
+            context.goNamed('registration_pending', extra: user?.email ?? '');
+          } else {
+            // Chưa có chứng chỉ hoặc tất cả đều bị Reject -> Bắt nộp lại
+            context.goNamed('expert_credentials', extra: {
+              'email': user?.email ?? '',
+              'fullName': user?.fullName ?? '',
+              'phoneNumber': user?.phoneNumber ?? '',
+              'fromLogin': 'true',
+            });
+          }
+        } catch (e) {
+          if (!mounted) return;
+          // Lỗi khi fetch cert -> Fallback vào trang quản lý chứng chỉ
+          context.goNamed('expert_id_documents');
+        }
       } else {
         // Hiển thị lỗi từ provider state
         final error = ref.read(authProvider).error ?? 'Đăng nhập thất bại';

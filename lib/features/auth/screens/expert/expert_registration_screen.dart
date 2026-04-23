@@ -655,46 +655,31 @@ class _ExpertRegistrationScreenState
       final authRepository = ref.read(authRepositoryProvider);
       final response = await authRepository.register(registerRequest);
 
-      // Gửi OTP qua email sau khi register thành công
-      try {
-        await authRepository.sendOtp(_emailController.text.trim());
-      } catch (e) {
-        // Nếu send OTP thất bại, vẫn cho phép user tiếp tục
-        debugPrint('⚠️ Send OTP failed but continuing: $e');
-      }
-
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
 
-        // Hiển thị thông báo thành công
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Đăng ký thành công! Mã OTP đã được gửi đến email của bạn',
-            ),
-            backgroundColor: Color(0xFF6C47C2),
-          ),
-        );
-
-        // Navigate to OTP verification screen
-        context.goNamed(
+        // Go straight to OTP verification
+        final result = await context.pushNamed(
           'otp_verification',
           extra: {
             'email': _emailController.text.trim(),
             'roleRoute': 'expert_login',
-            'themeColor': const Color(0xFF6C47C2),
+            'themeColor': const Color(0xFF9333EA),
           },
         );
+
+        if (mounted && result == null) {
+           // OTP verified successfully, go to login
+           context.goNamed('expert_login');
+        }
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
-
-        // Hiển thị lỗi
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e.toString().replaceAll('Exception: ', '')),

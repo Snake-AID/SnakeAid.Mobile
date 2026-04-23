@@ -1,52 +1,146 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../models/expert_certificate.dart';
+import '../models/expert_profile.dart';
+import '../repository/expert_certificate_repository.dart';
+import '../repository/expert_profile_repository.dart';
+import '../../auth/providers/auth_provider.dart';
 
 /// Expert ID Documents Screen - Manage certificates and credentials for experts
 /// Màn hình chứng chỉ & bằng cấp của Chuyên gia
-class ExpertIdDocumentsScreen extends StatefulWidget {
+class ExpertIdDocumentsScreen extends ConsumerStatefulWidget {
   const ExpertIdDocumentsScreen({super.key});
 
   @override
-  State<ExpertIdDocumentsScreen> createState() =>
+  ConsumerState<ExpertIdDocumentsScreen> createState() =>
       _ExpertIdDocumentsScreenState();
 }
 
-class _ExpertIdDocumentsScreenState extends State<ExpertIdDocumentsScreen> {
+class _ExpertIdDocumentsScreenState
+    extends ConsumerState<ExpertIdDocumentsScreen> {
+  bool _isLoading = true;
+  String? _error;
+  ExpertProfile? _profile;
+  List<ExpertCertificate> _certificates = [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final certificateRepo = ref.read(expertCertificateRepositoryProvider);
+      final profileRepo = ref.read(expertProfileRepositoryProvider);
+      final profile = await profileRepo.getMyProfile();
+      final certificates = await certificateRepo.getMyCertificates();
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+        _certificates = certificates;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _error = e.toString();
+      });
+    }
+  }
+
+  Future<void> _openCreate() async {
+    final result = await context.pushNamed('expert_certificate_create');
+    if (result == true && mounted) {
+      await _loadData();
+    }
+  }
+
+  Future<void> _openDetail(String certificateId) async {
+    final result = await context.pushNamed(
+      'expert_certificate_detail',
+      pathParameters: {'certificateId': certificateId},
+    );
+    if (result == true && mounted) {
+      await _loadData();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasVerifiedCert = _certificates.any((c) => c.isVerified) || _profile?.isVerified == true;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF7F6F8),
       appBar: _buildAppBar(),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildStatusBanner(),
-            const SizedBox(height: 24),
-            _buildIdentitySection(),
-            const SizedBox(height: 24),
-            _buildMedicalDegreesSection(),
-            const SizedBox(height: 24),
-            _buildSpecializedCertificatesSection(),
-            const SizedBox(height: 24),
-            _buildInfoBox(),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? _buildErrorState()
+              : RefreshIndicator(
+                  onRefresh: _loadData,
+                  child: ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      _buildStatusBanner(),
+                      const SizedBox(height: 24),
+                      _buildCertificateSection(),
+                      const SizedBox(height: 24),
+                      _buildInfoBox(),
+                      const SizedBox(height: 24),
+                      if (hasVerifiedCert) ...[
+                          SizedBox(
+                            height: 56,
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                await ref.read(authProvider.notifier).markUserAsVerified();
+                                if (mounted) context.go('/expert-home');
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF6C47C2),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 2,
+                              ),
+                              child: const Text(
+                                'Vào Trang Chủ',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 24),
+                      ],
+                    ],
+                  ),
+                ),
     );
   }
 
   PreferredSizeWidget _buildAppBar() {
+    final verified = _profile?.isVerified == true;
     return AppBar(
       backgroundColor: const Color(0xFFF7F6F8),
       elevation: 0,
       centerTitle: true,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Color(0xFF131018)),
-        onPressed: () => context.pop(),
-      ),
+      leading: verified
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back, color: Color(0xFF131018)),
+              onPressed: () => context.pop(),
+            )
+          : null,
       title: const Text(
         'Chứng Chỉ & Bằng Cấp',
         style: TextStyle(
@@ -55,32 +149,79 @@ class _ExpertIdDocumentsScreenState extends State<ExpertIdDocumentsScreen> {
           color: Color(0xFF131018),
         ),
       ),
-      actions: [
-        Container(
-          margin: const EdgeInsets.only(right: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xFF6C47C2).withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.add, color: Color(0xFF6C47C2)),
-            onPressed: _addNewDocument,
-          ),
+      actions: verified
+          ? [
+              Container(
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6C47C2).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.add, color: Color(0xFF6C47C2)),
+                  onPressed: _openCreate,
+                ),
+              ),
+            ]
+          : null,
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            const SizedBox(height: 12),
+            Text(
+              _error ?? 'Không thể tải chứng chỉ',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Color(0xFF333333)),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadData,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6C47C2),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Thử lại'),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
   Widget _buildStatusBanner() {
+    final total = _certificates.length;
+    final verifiedCount = _certificates.where((c) => c.isVerified).length;
+    final rejectedCount = _certificates
+        .where((c) => !c.isVerified && (c.rejectionReason?.isNotEmpty ?? false))
+        .length;
+    final pendingCount = total - verifiedCount - rejectedCount;
+
+    final isFullyVerified = _profile?.isVerified == true;
+    final banner = _statusBannerConfig(
+      isFullyVerified: isFullyVerified,
+      total: total,
+      verifiedCount: verifiedCount,
+      rejectedCount: rejectedCount,
+      pendingCount: pendingCount,
+    );
+
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFD4EDDA),
+        color: banner.backgroundColor,
         borderRadius: const BorderRadius.only(
           topRight: Radius.circular(12),
           bottomRight: Radius.circular(12),
         ),
-        border: const Border(
-          left: BorderSide(color: Color(0xFF28A745), width: 4),
+        border: Border(
+          left: BorderSide(color: banner.accentColor, width: 4),
         ),
       ),
       padding: const EdgeInsets.all(16),
@@ -88,11 +229,11 @@ class _ExpertIdDocumentsScreenState extends State<ExpertIdDocumentsScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(4),
-            decoration: const BoxDecoration(
-              color: Color(0xFF28A745),
+            decoration: BoxDecoration(
+              color: banner.accentColor,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.check, color: Colors.white, size: 16),
+            child: Icon(banner.icon, color: Colors.white, size: 16),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -102,40 +243,41 @@ class _ExpertIdDocumentsScreenState extends State<ExpertIdDocumentsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Xác minh hồ sơ',
+                    Text(
+                      banner.title,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF155724),
+                        color: banner.textColor,
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.4),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text(
-                        '4/6 đã xác minh',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF155724),
+                    if (total > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.4),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '$verifiedCount/$total đã xác minh',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: banner.textColor,
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'Tất cả chứng chỉ quan trọng đã được hệ thống xác thực.',
+                Text(
+                  banner.subtitle,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Color(0xFF155724),
+                    color: banner.textColor,
                     height: 1.3,
                   ),
                 ),
@@ -147,71 +289,74 @@ class _ExpertIdDocumentsScreenState extends State<ExpertIdDocumentsScreen> {
     );
   }
 
-  Widget _buildIdentitySection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Giấy Tờ Tùy Thân',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF131018),
-              ),
-            ),
-            TextButton(
-              onPressed: () {},
-              child: const Text(
-                'Chi tiết',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF6C47C2),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _buildDocumentCard(
-          title: 'CCCD / Hộ Chiếu',
-          subtitle: 'Số: 0791****8821',
-          expiry: 'Hết hạn: 20/10/2025',
-          status: DocumentStatus.verified,
-          imageUrl: 'https://via.placeholder.com/80x100',
-        ),
-      ],
+  _StatusBannerConfig _statusBannerConfig({
+    required bool isFullyVerified,
+    required int total,
+    required int verifiedCount,
+    required int rejectedCount,
+    required int pendingCount,
+  }) {
+    if (isFullyVerified && total > 0) {
+      return const _StatusBannerConfig(
+        title: 'Hồ sơ đã xác minh',
+        subtitle: 'Tất cả chứng chỉ đã được hệ thống xác thực.',
+        backgroundColor: Color(0xFFD4EDDA),
+        accentColor: Color(0xFF28A745),
+        textColor: Color(0xFF155724),
+        icon: Icons.check,
+      );
+    }
+    if (rejectedCount > 0) {
+      return const _StatusBannerConfig(
+        title: 'Có chứng chỉ bị từ chối',
+        subtitle: 'Vui lòng cập nhật hoặc nộp lại chứng chỉ bị từ chối.',
+        backgroundColor: Color(0xFFF8D7DA),
+        accentColor: Color(0xFFDC3545),
+        textColor: Color(0xFF721C24),
+        icon: Icons.cancel,
+      );
+    }
+    if (pendingCount > 0) {
+      return const _StatusBannerConfig(
+        title: 'Đang chờ duyệt',
+        subtitle: 'Chứng chỉ sẽ được kiểm tra trong vòng 24 giờ làm việc.',
+        backgroundColor: Color(0xFFFFF3CD),
+        accentColor: Color(0xFFFFC107),
+        textColor: Color(0xFF856404),
+        icon: Icons.hourglass_top,
+      );
+    }
+    return const _StatusBannerConfig(
+      title: 'Chưa có chứng chỉ',
+      subtitle: 'Hãy thêm chứng chỉ để hoàn tất hồ sơ chuyên gia.',
+      backgroundColor: Color(0xFFE9ECEF),
+      accentColor: Color(0xFF6C757D),
+      textColor: Color(0xFF495057),
+      icon: Icons.info_outline,
     );
   }
 
-  Widget _buildMedicalDegreesSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Bằng Cấp Y Khoa',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF131018),
+  Widget _buildCertificateSection() {
+    if (_certificates.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Chứng Chỉ Chuyên Môn',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF131018),
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
-        _buildDocumentCard(
-          title: 'Bằng Bác Sĩ Đa Khoa',
-          subtitle: 'ĐH Y Dược TP.HCM',
-          status: DocumentStatus.verified,
-          imageUrl: 'https://via.placeholder.com/80x100',
-          isSecondary: true,
-        ),
-      ],
-    );
-  }
+          const SizedBox(height: 12),
+          _buildEmptyState(),
+          const SizedBox(height: 16),
+          _buildAddNewPlaceholder(),
+        ],
+      );
+    }
 
-  Widget _buildSpecializedCertificatesSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -224,36 +369,34 @@ class _ExpertIdDocumentsScreenState extends State<ExpertIdDocumentsScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        _buildDocumentCard(
-          title: 'Giấy Phép Xử Lý Rắn',
-          subtitle: 'Cục Kiểm Lâm',
-          status: DocumentStatus.pending,
-          icon: Icons.pets,
-          hasBorderHighlight: true,
+        ..._certificates.map(
+          (certificate) => Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: _buildDocumentCard(
+              certificate: certificate,
+            ),
+          ),
         ),
-        const SizedBox(height: 16),
         _buildAddNewPlaceholder(),
       ],
     );
   }
 
   Widget _buildDocumentCard({
-    required String title,
-    required String subtitle,
-    String? expiry,
-    required DocumentStatus status,
-    String? imageUrl,
-    IconData? icon,
-    bool isSecondary = false,
-    bool hasBorderHighlight = false,
+    required ExpertCertificate certificate,
   }) {
+    final status = _statusFromCertificate(certificate);
+    final subtitle = certificate.issuingOrganization.isNotEmpty
+        ? certificate.issuingOrganization
+        : 'Chưa cập nhật đơn vị cấp';
+    final expiry = certificate.expiryDateLabel != null
+        ? 'Hết hạn: ${certificate.expiryDateLabel}'
+        : null;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: hasBorderHighlight
-            ? const Border(left: BorderSide(color: Color(0xFF6C47C2), width: 4))
-            : Border.all(color: const Color(0xFFF0F0F0)),
+        border: Border.all(color: const Color(0xFFF0F0F0)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
@@ -266,37 +409,7 @@ class _ExpertIdDocumentsScreenState extends State<ExpertIdDocumentsScreen> {
       child: Row(
         children: [
           // Thumbnail or Icon
-          Container(
-            width: 80,
-            height: 96,
-            decoration: BoxDecoration(
-              color: icon != null
-                  ? const Color(0xFF6C47C2).withOpacity(0.05)
-                  : const Color(0xFFF5F5F5),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: icon != null
-                    ? const Color(0xFF6C47C2).withOpacity(0.1)
-                    : const Color(0xFFE0E0E0),
-              ),
-            ),
-            child: icon != null
-                ? Icon(icon, color: const Color(0xFF6C47C2), size: 40)
-                : imageUrl != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(
-                          child: Icon(Icons.image, color: Colors.grey),
-                        );
-                      },
-                    ),
-                  )
-                : null,
-          ),
+          _buildThumbnail(certificate.primaryMediaUrl),
           const SizedBox(width: 16),
           // Content
           Expanded(
@@ -304,7 +417,7 @@ class _ExpertIdDocumentsScreenState extends State<ExpertIdDocumentsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  certificate.certificateName,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -337,16 +450,12 @@ class _ExpertIdDocumentsScreenState extends State<ExpertIdDocumentsScreen> {
           const SizedBox(width: 12),
           // Action button
           ElevatedButton(
-            onPressed: () {},
+            onPressed: () => _openDetail(certificate.id),
             style: ElevatedButton.styleFrom(
-              backgroundColor: isSecondary
-                  ? const Color(0xFFF5F5F5)
-                  : const Color(0xFF6C47C2),
-              foregroundColor: isSecondary
-                  ? const Color(0xFF131018)
-                  : Colors.white,
+              backgroundColor: const Color(0xFF6C47C2),
+              foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              elevation: isSecondary ? 0 : 2,
+              elevation: 2,
               shadowColor: const Color(0xFF6C47C2).withOpacity(0.2),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -359,6 +468,32 @@ class _ExpertIdDocumentsScreenState extends State<ExpertIdDocumentsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildThumbnail(String? mediaUrl) {
+    return Container(
+      width: 80,
+      height: 96,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F5F5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+      ),
+      child: mediaUrl == null
+          ? const Icon(Icons.image_outlined, color: Colors.grey, size: 32)
+          : ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                mediaUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Center(
+                    child: Icon(Icons.image, color: Colors.grey),
+                  );
+                },
+              ),
+            ),
     );
   }
 
@@ -415,7 +550,7 @@ class _ExpertIdDocumentsScreenState extends State<ExpertIdDocumentsScreen> {
 
   Widget _buildAddNewPlaceholder() {
     return InkWell(
-      onTap: _addNewDocument,
+      onTap: _openCreate,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         width: double.infinity,
@@ -514,12 +649,52 @@ class _ExpertIdDocumentsScreenState extends State<ExpertIdDocumentsScreen> {
       ),
     );
   }
-
-  void _addNewDocument() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Thêm chứng chỉ mới - Đang phát triển')),
+  Widget _buildEmptyState() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF0F0F0)),
+      ),
+      child: Column(
+        children: const [
+          Icon(Icons.folder_open, size: 56, color: Color(0xFFB0B0B0)),
+          SizedBox(height: 12),
+          Text(
+            'Chưa có chứng chỉ nào',
+            style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
+          ),
+        ],
+      ),
     );
+  }
+
+  DocumentStatus _statusFromCertificate(ExpertCertificate certificate) {
+    if (certificate.isVerified) return DocumentStatus.verified;
+    if (certificate.rejectionReason?.isNotEmpty ?? false) {
+      return DocumentStatus.rejected;
+    }
+    return DocumentStatus.pending;
   }
 }
 
 enum DocumentStatus { verified, pending, rejected }
+
+class _StatusBannerConfig {
+  final String title;
+  final String subtitle;
+  final Color backgroundColor;
+  final Color accentColor;
+  final Color textColor;
+  final IconData icon;
+
+  const _StatusBannerConfig({
+    required this.title,
+    required this.subtitle,
+    required this.backgroundColor,
+    required this.accentColor,
+    required this.textColor,
+    required this.icon,
+  });
+}

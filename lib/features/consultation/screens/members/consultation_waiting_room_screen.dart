@@ -732,38 +732,44 @@ class _ConsultationWaitingRoomScreenState
             ),
           ],
 
-          if (widget.canReportExpertAbsent && !widget.showCompleteButton) ...[
+          // Chỉ hiện report sau khi member đã vào call và quay lại sảnh chờ.
+          if (widget.canReportExpertAbsent && widget.showCompleteButton) ...[
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
-              height: 52,
-              child: OutlinedButton.icon(
-                onPressed: (!_canSubmitAbsentByTime || _isReportingAbsent)
-                    ? null
-                    : _showReportExpertAbsentDialog,
-                icon: _isReportingAbsent
+              height: 44,
+              child: OutlinedButton(
+                onPressed: _isReportingAbsent ? null : _showReportExpertAbsentDialog,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF6B7280),
+                  side: const BorderSide(color: Color(0xFFD1D5DB)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _isReportingAbsent
                     ? const SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.report_problem_outlined),
-                label: Text(
-                  _canSubmitAbsentByTime
-                      ? 'Báo Chuyên Gia Vắng Mặt'
-                      : 'Chưa đến giờ để báo cáo',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red,
-                  side: const BorderSide(color: Colors.red),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.report_problem_outlined,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Báo chuyên gia vắng mặt',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
               ),
             ),
           ],

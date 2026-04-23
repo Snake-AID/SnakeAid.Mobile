@@ -17,7 +17,8 @@ class RegistrationSuccessScreen extends StatefulWidget {
   });
 
   @override
-  State<RegistrationSuccessScreen> createState() => _RegistrationSuccessScreenState();
+  State<RegistrationSuccessScreen> createState() =>
+      _RegistrationSuccessScreenState();
 }
 
 class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen>
@@ -60,7 +61,10 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen>
             // Main Content - Centered
             Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32.0,
+                  vertical: 40.0,
+                ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -109,7 +113,7 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen>
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 12),
-                    
+
                     // Subtitle
                     const Text(
                       'Đăng Ký Thành Công',
@@ -121,10 +125,10 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen>
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 24),
-                    
+
                     // Description
                     const Text(
-                      'Tài khoản của bạn đã được tạo thành công. Bây giờ bạn có thể sử dụng đầy đủ các tính năng của SnakeAid.',
+                      'Tài khoản của bạn đã được tạo thành công. Bây giờ bạn hãy đăng nhập và nộp chứng chỉ hành nghề để có thể sử dụng đầy đủ các tính năng của SnakeAid.',
                       style: TextStyle(
                         fontSize: 16,
                         color: Color(0xFF6B6B6B),
