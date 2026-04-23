@@ -778,8 +778,8 @@ final router = GoRouter(
       path: '/rescuer-history-detail',
       name: 'rescuer_history_detail',
       builder: (context, state) {
-        final mission = state.extra as Map<String, dynamic>;
-        return RescuerHistoryDetailScreen(mission: mission);
+        final missionId = state.pathParameters['missionId']!;
+        return RescuerMissionDetailScreen(missionId: missionId);
       },
     ),
 

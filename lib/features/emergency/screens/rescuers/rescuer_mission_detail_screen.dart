@@ -59,7 +59,9 @@ class _RescuerMissionDetailScreenState
   @override
   void initState() {
     super.initState();
-    _loadMissionAndStartTracking();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadMissionAndStartTracking();
+    });
   }
 
   @override
