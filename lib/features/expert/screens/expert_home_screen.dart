@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -1345,26 +1345,32 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                           const Icon(Icons.check_circle_outline,
                               color: Colors.white, size: 18),
                           const SizedBox(width: 6),
-                          Text(
-                            '${stats.completedConsultations} Tư Vấn Hoàn Thành',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
+                          Flexible(
+                            child: Text(
+                              '${stats.completedConsultations} Tư Vấn Hoàn Thành',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 12),
                           Container(width: 1, height: 16, color: Colors.white30),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 12),
                           const Icon(Icons.inbox_outlined,
                               color: Colors.white70, size: 18),
                           const SizedBox(width: 6),
-                          Text(
-                            '${stats.consultationRequests} Yêu Cầu',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.white70,
-                              fontWeight: FontWeight.w500,
+                          Flexible(
+                            child: Text(
+                              '${stats.consultationRequests} Yêu Cầu',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                         ],
@@ -1639,15 +1645,21 @@ class _HomeTabState extends ConsumerState<_HomeTab>
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF999999),
-                  fontWeight: FontWeight.w500,
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF999999),
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
+              const SizedBox(width: 4),
               Icon(icon, color: iconColor, size: 20),
             ],
           ),
