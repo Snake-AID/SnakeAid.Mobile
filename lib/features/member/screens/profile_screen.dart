@@ -46,7 +46,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Future<void> _loadUserInfo() async {
     try {
-      final profile = await ref.read(memberProfileRepositoryProvider).getMyProfile();
+      final profile = await ref
+          .read(memberProfileRepositoryProvider)
+          .getMyProfile();
       if (mounted) setState(() => _profile = profile);
     } catch (_) {}
   }
@@ -54,7 +56,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Future<void> _loadWallet() async {
     try {
       final wallet = await ref.read(walletRepositoryProvider).getWalletInfo();
-      if (mounted) setState(() { _walletInfo = wallet; _isLoadingWallet = false; });
+      if (mounted)
+        setState(() {
+          _walletInfo = wallet;
+          _isLoadingWallet = false;
+        });
     } catch (_) {
       if (mounted) setState(() => _isLoadingWallet = false);
     }
@@ -68,39 +74,46 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _refreshProfile() async {
-    await Future.wait([
-      _loadUserInfo(),
-      _loadWallet(),
-    ]);
+    await Future.wait([_loadUserInfo(), _loadWallet()]);
   }
 
   Color _reputationColor(String? status) {
     switch (status?.toLowerCase()) {
-      case 'excellent': return const Color(0xFFFFB300);
-      case 'good': return const Color(0xFF10B981);
-      case 'fair': return const Color(0xFFFF8800);
+      case 'excellent':
+        return const Color(0xFFFFB300);
+      case 'good':
+        return const Color(0xFF10B981);
+      case 'fair':
+        return const Color(0xFFFF8800);
       case 'poor':
-      case 'bad': return const Color(0xFFE53935);
-      default: return const Color(0xFF9E9E9E);
+      case 'bad':
+        return const Color(0xFFE53935);
+      default:
+        return const Color(0xFF9E9E9E);
     }
   }
 
   String _translateReputationStatus(String status) {
     switch (status.toLowerCase()) {
-      case 'excellent': return 'Xuất Sắc';
-      case 'good': return 'Tốt';
-      case 'fair': return 'Trung Bình';
-      case 'poor': return 'Kém';
-      case 'bad': return 'Xấu';
-      default: return status;
+      case 'excellent':
+        return 'Xuất Sắc';
+      case 'good':
+        return 'Tốt';
+      case 'fair':
+        return 'Trung Bình';
+      case 'poor':
+        return 'Kém';
+      case 'bad':
+        return 'Xấu';
+      default:
+        return status;
     }
   }
 
   String _formatBalance(double amount) {
-    final formatted = amount.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-      (m) => '${m[1]}.',
-    );
+    final formatted = amount
+        .toStringAsFixed(0)
+        .replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
     return '$formatted đ';
   }
 
@@ -144,242 +157,137 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                  // Profile Header Card
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        // Avatar
-                        Container(
-                          width: 96,
-                          height: 96,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.grey[300]!,
-                              width: 2,
-                            ),
-                            image: DecorationImage(
-                              image: NetworkImage(
-                                _profile?.avatarUrl?.isNotEmpty == true
-                                    ? _profile!.avatarUrl!
-                                    : 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_profile?.fullName ?? 'User')}&background=228B22&color=fff&size=200',
+                    // Profile Header Card
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          // Avatar
+                          Container(
+                            width: 96,
+                            height: 96,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.grey[300]!,
+                                width: 2,
                               ),
-                              fit: BoxFit.cover,
+                              image: DecorationImage(
+                                image: NetworkImage(
+                                  _profile?.avatarUrl?.isNotEmpty == true
+                                      ? _profile!.avatarUrl!
+                                      : 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_profile?.fullName ?? 'User')}&background=228B22&color=fff&size=200',
+                                ),
+                                fit: BoxFit.cover,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        // Name
-                        Text(
-                          _profile?.fullName ?? '---',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1F1F1F),
+                          const SizedBox(height: 16),
+                          // Name
+                          Text(
+                            _profile?.fullName ?? '---',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1F1F1F),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        // Active Badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: (_profile?.isActive ?? true)
-                                ? const Color(0xFF228B22).withOpacity(0.1)
-                                : Colors.grey.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                (_profile?.isActive ?? true)
-                                    ? Icons.verified
-                                    : Icons.cancel_outlined,
-                                size: 16,
-                                color: (_profile?.isActive ?? true)
-                                    ? const Color(0xFF228B22)
-                                    : Colors.grey,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                (_profile?.isActive ?? true)
-                                    ? 'Tài khoản đã xác minh'
-                                    : 'Tài khoản chưa xác minh',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
+                          const SizedBox(height: 12),
+                          // Active Badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: (_profile?.isActive ?? true)
+                                  ? const Color(0xFF228B22).withOpacity(0.1)
+                                  : Colors.grey.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  (_profile?.isActive ?? true)
+                                      ? Icons.verified
+                                      : Icons.cancel_outlined,
+                                  size: 16,
                                   color: (_profile?.isActive ?? true)
                                       ? const Color(0xFF228B22)
                                       : Colors.grey,
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        // Edit Button
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => const EditProfileScreen(),
+                                const SizedBox(width: 4),
+                                Text(
+                                  (_profile?.isActive ?? true)
+                                      ? 'Tài khoản đã xác minh'
+                                      : 'Tài khoản chưa xác minh',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: (_profile?.isActive ?? true)
+                                        ? const Color(0xFF228B22)
+                                        : Colors.grey,
+                                  ),
                                 ),
-                              ).then((_) => _refreshProfile());
-                            },
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(
-                                color: Color(0xFF228B22),
-                                width: 2,
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'Chỉnh Sửa Hồ Sơ',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF228B22),
-                              ),
+                              ],
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Info Card: phone, rating, reputation
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        // Rating + Reputation row
-                        IntrinsicHeight(
-                          child: Row(
-                            children: [
-                              // Rating
-                              Expanded(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        const Icon(Icons.star_rounded, size: 20, color: Color(0xFFFFA500)),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          (_profile?.rating ?? 0.0).toStringAsFixed(1),
-                                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1F1F1F)),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${_profile?.ratingCount ?? 0} đánh giá',
-                                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                                    ),
-                                  ],
+                          const SizedBox(height: 20),
+                          // Edit Button
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed: () {
+                                Navigator.of(context)
+                                    .push(
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const EditProfileScreen(),
+                                      ),
+                                    )
+                                    .then((_) => _refreshProfile());
+                              },
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(
+                                  color: Color(0xFF228B22),
+                                  width: 2,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              // Divider
-                              VerticalDivider(color: Colors.grey[200], thickness: 1, width: 1),
-                              // Reputation
-                              Expanded(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.workspace_premium_rounded, size: 20, color: _reputationColor(_profile?.reputationStatus)),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${_profile?.reputationPoints ?? 0}',
-                                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _reputationColor(_profile?.reputationStatus)),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    if (_profile?.reputationStatus != null)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: _reputationColor(_profile?.reputationStatus),
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        child: Text(
-                                          _translateReputationStatus(_profile!.reputationStatus!),
-                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-                                        ),
-                                      )
-                                    else
-                                      Text('Uy tín', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Has Underlying Disease
-                        if (_profile?.hasUnderlyingDisease == true) ...[
-                          const Divider(height: 24),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.medical_services,
-                                  size: 16, color: Color(0xFFD32F2F)),
-                              const SizedBox(width: 6),
-                              const Text(
-                                'Có bệnh nền',
+                              child: const Text(
+                                'Chỉnh Sửa Hồ Sơ',
                                 style: TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFFD32F2F),
-                                  fontWeight: FontWeight.w500,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF228B22),
                                 ),
                               ),
-                            ],
+                            ),
                           ),
                         ],
-                      ],
+                      ),
                     ),
-                  ),
 
-                  // Emergency Contacts Card
-                  if (_profile != null &&
-                      _profile!.emergencyContacts.isNotEmpty) ...[
                     const SizedBox(height: 16),
+
+                    // Info Card: phone, rating, reputation
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -394,241 +302,432 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ],
                       ),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Liên Lạc Khẩn Cấp',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1F1F1F),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          ..._profile!.emergencyContacts.map(
-                            (c) => Padding(
-                              padding: const EdgeInsets.only(bottom: 6),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.phone_in_talk,
-                                      size: 16, color: Color(0xFF228B22)),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    c,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Color(0xFF333333),
-                                    ),
+                          // Rating + Reputation row
+                          IntrinsicHeight(
+                            child: Row(
+                              children: [
+                                // Rating
+                                Expanded(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(
+                                            Icons.star_rounded,
+                                            size: 20,
+                                            color: Color(0xFFFFA500),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            (_profile?.rating ?? 0.0)
+                                                .toStringAsFixed(1),
+                                            style: const TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF1F1F1F),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${_profile?.ratingCount ?? 0} đánh giá',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[500],
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                                // Divider
+                                VerticalDivider(
+                                  color: Colors.grey[200],
+                                  thickness: 1,
+                                  width: 1,
+                                ),
+                                // Reputation
+                                Expanded(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.workspace_premium_rounded,
+                                            size: 20,
+                                            color: _reputationColor(
+                                              _profile?.reputationStatus,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${_profile?.reputationPoints ?? 0}',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                              color: _reputationColor(
+                                                _profile?.reputationStatus,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      if (_profile?.reputationStatus != null)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: _reputationColor(
+                                              _profile?.reputationStatus,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            _translateReputationStatus(
+                                              _profile!.reputationStatus!,
+                                            ),
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        )
+                                      else
+                                        Text(
+                                          'Uy tín',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey[500],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
+                          // Has Underlying Disease
+                          if (_profile?.hasUnderlyingDisease == true) ...[
+                            const Divider(height: 24),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.medical_services,
+                                  size: 16,
+                                  color: Color(0xFFD32F2F),
+                                ),
+                                const SizedBox(width: 6),
+                                const Text(
+                                  'Có bệnh nền',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFFD32F2F),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),
-                  ],
 
-                  // SnakeAidPay Wallet Card
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF228B22).withOpacity(0.3),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                    // Emergency Contacts Card
+                    if (_profile != null &&
+                        _profile!.emergencyContacts.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                Icons.account_balance_wallet,
-                                color: Colors.white,
-                                size: 24,
+                            const Text(
+                              'Liên Lạc Khẩn Cấp',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1F1F1F),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            const Text(
-                              'Ví SnakeAidPay',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                            const SizedBox(height: 10),
+                            ..._profile!.emergencyContacts.map(
+                              (c) => Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.phone_in_talk,
+                                      size: 16,
+                                      color: Color(0xFF228B22),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      c,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Color(0xFF333333),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Số dư',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.white70,
-                          ),
+                      ),
+                    ],
+
+                    // SnakeAidPay Wallet Card
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                        const SizedBox(height: 4),
-                        _isLoadingWallet
-                            ? const SizedBox(
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF228B22).withOpacity(0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 40,
                                 height: 40,
-                                child: Center(
-                                  child: SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white54,
-                                    ),
-                                  ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(10),
                                 ),
-                              )
-                            : Text(
-                                _formatBalance(_walletInfo?.balance ?? 0),
-                                style: const TextStyle(
-                                  fontSize: 32,
+                                child: const Icon(
+                                  Icons.account_balance_wallet,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              const Text(
+                                'Ví SnakeAidPay',
+                                style: TextStyle(
+                                  fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
                                 ),
                               ),
-                        const SizedBox(height: 20),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (context) => const DepositMoneyScreen(),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Số dư',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white70,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          _isLoadingWallet
+                              ? const SizedBox(
+                                  height: 40,
+                                  child: Center(
+                                    child: SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white54,
+                                      ),
                                     ),
-                                  );
-                                },
-                                icon: const Icon(Icons.add_circle_outline, size: 20),
-                                label: const Text('Nạp tiền'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  foregroundColor: const Color(0xFF228B22),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
                                   ),
-                                  elevation: 0,
+                                )
+                              : Text(
+                                  _formatBalance(_walletInfo?.balance ?? 0),
+                                  style: const TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                          const SizedBox(height: 20),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const DepositMoneyScreen(),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(
+                                    Icons.add_circle_outline,
+                                    size: 20,
+                                  ),
+                                  label: const Text('Nạp tiền'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: const Color(0xFF228B22),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    elevation: 0,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: OutlinedButton.icon(
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const WithdrawMoneyScreen(),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(
+                                    Icons.remove_circle_outline,
+                                    size: 20,
+                                  ),
+                                  label: const Text('Rút tiền'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    side: const BorderSide(
+                                      color: Colors.white,
+                                      width: 2,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              OutlinedButton(
                                 onPressed: () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
-                                      builder: (context) => const WithdrawMoneyScreen(),
+                                      builder: (context) =>
+                                          const WalletHistoryScreen(),
                                     ),
                                   );
                                 },
-                                icon: const Icon(Icons.remove_circle_outline, size: 20),
-                                label: const Text('Rút tiền'),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: Colors.white,
-                                  side: const BorderSide(color: Colors.white, width: 2),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  side: const BorderSide(
+                                    color: Colors.white70,
+                                    width: 1.5,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                    horizontal: 14,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
+                                child: const Icon(Icons.history, size: 20),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            OutlinedButton(
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const WalletHistoryScreen(),
-                                  ),
-                                );
-                              },
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.white,
-                                side: const BorderSide(
-                                    color: Colors.white70, width: 1.5),
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 12, horizontal: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              child: const Icon(Icons.history, size: 20),
-                            ),
-                          ],
-                        ),
-                      ],
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 16),
-                  _MenuItem(
-                    icon: Icons.wallet,
-                    title: 'Lịch Sử Thanh Toán',
-                    subtitle: '',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const PaymentHistoryScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  _MenuItem(
-                    icon: Icons.medical_information,
-                    title: 'Hồ Sơ Y Tế',
-                    subtitle: 'Nhóm máu, dị ứng, tiền sử bệnh',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const MedicalRecordsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Logout Button
-                  Center(
-                    child: TextButton.icon(
-                      onPressed: _showLogoutDialog,
-                      icon: Icon(Icons.logout, size: 18, color: Colors.grey[600]),
-                      label: Text(
-                        'Đăng xuất',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                    const SizedBox(height: 16),
+                    _MenuItem(
+                      icon: Icons.wallet,
+                      title: 'Lịch Sử Thanh Toán',
+                      subtitle: '',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const PaymentHistoryScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    // const SizedBox(height: 8),
+                    // _MenuItem(
+                    //   icon: Icons.medical_information,
+                    //   title: 'Hồ Sơ Y Tế',
+                    //   subtitle: 'Nhóm máu, dị ứng, tiền sử bệnh',
+                    //   onTap: () {
+                    //     Navigator.of(context).push(
+                    //       MaterialPageRoute(
+                    //         builder: (context) => const MedicalRecordsScreen(),
+                    //       ),
+                    //     );
+                    //   },
+                    // ),
+                    const SizedBox(height: 24),
+
+                    // Logout Button
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: _showLogoutDialog,
+                        icon: Icon(
+                          Icons.logout,
+                          size: 18,
                           color: Colors.grey[600],
                         ),
-                      ),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        label: Text(
+                          'Đăng xuất',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 24), // Space for bottom nav
+                    const SizedBox(height: 24), // Space for bottom nav
                   ],
                 ),
               ),
@@ -644,9 +743,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Đăng xuất',
           style: TextStyle(
@@ -656,10 +753,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
         content: const Text(
           'Bạn có chắc muốn đăng xuất khỏi tài khoản?',
-          style: TextStyle(
-            fontSize: 14,
-            color: Color(0xFF666666),
-          ),
+          style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
         ),
         actions: [
           TextButton(
@@ -674,20 +768,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               final navigator = Navigator.of(context);
               final router = GoRouter.of(context);
               navigator.pop();
-              
+
               showDialog(
                 context: context,
                 barrierDismissible: false,
                 builder: (dialogContext) => WillPopScope(
                   onWillPop: () async => false,
                   child: const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF228B22),
-                    ),
+                    child: CircularProgressIndicator(color: Color(0xFF228B22)),
                   ),
                 ),
               );
-              
+
               try {
                 final authRepository = ref.read(authRepositoryProvider);
                 await authRepository.logout();
@@ -776,10 +868,10 @@ class _MenuItem extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   if (subtitle.isNotEmpty)
-                  Text(
-                    subtitle,
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                  ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    ),
                 ],
               ),
             ),

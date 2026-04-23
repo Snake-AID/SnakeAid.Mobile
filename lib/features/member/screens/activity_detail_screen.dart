@@ -1982,7 +1982,11 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 children: const [
                   Row(
                     children: [
-                      Icon(Icons.support_agent, color: Color(0xFF228B22), size: 20),
+                      Icon(
+                        Icons.support_agent,
+                        color: Color(0xFF228B22),
+                        size: 20,
+                      ),
                       SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -3037,7 +3041,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _cardHeader(
-            'Đợt 1 — Phí Di Chuyển (Đã Thanh Toán)',
+            'Đợt 1 — Phí Di Chuyển',
             const Color(0xFF28A745),
             Icons.check_circle,
           ),
@@ -3111,7 +3115,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         children: [
           _cardHeader(
             round2Paid
-                ? 'Đợt 2 — Thanh Toán Dịch Vụ (Đã Thanh Toán)'
+                ? 'Đợt 2 — Thanh Toán Dịch Vụ'
                 : 'Đợt 2 — Thanh Toán Dịch Vụ',
             round2Paid ? const Color(0xFF28A745) : const Color(0xFFFF6B35),
             round2Paid ? Icons.check_circle : Icons.payments_outlined,
@@ -4740,7 +4744,8 @@ class _PaymentMethodSheetState extends State<_PaymentMethodSheet> {
   @override
   Widget build(BuildContext context) {
     final bool hasSufficientBalance =
-        widget.walletInfo != null && widget.walletInfo!.balance >= widget.amount;
+        widget.walletInfo != null &&
+        widget.walletInfo!.balance >= widget.amount;
     final double balance = widget.walletInfo?.balance ?? 0;
 
     return Container(
@@ -4851,7 +4856,9 @@ class _PaymentMethodSheetState extends State<_PaymentMethodSheet> {
             decoration: BoxDecoration(
               color: const Color(0xFFFFF8E1), // Light amber/warning background
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFFFB300).withOpacity(0.5)),
+              border: Border.all(
+                color: const Color(0xFFFFB300).withOpacity(0.5),
+              ),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -4877,7 +4884,11 @@ class _PaymentMethodSheetState extends State<_PaymentMethodSheet> {
                   child: Text.rich(
                     TextSpan(
                       text: 'Tôi đã hiểu và đồng ý với ',
-                      style: const TextStyle(fontSize: 13, color: Color(0xFF424242), height: 1.4),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF424242),
+                        height: 1.4,
+                      ),
                       children: [
                         const TextSpan(
                           text: 'Chính sách thanh toán',
@@ -4887,7 +4898,8 @@ class _PaymentMethodSheetState extends State<_PaymentMethodSheet> {
                           ),
                         ),
                         const TextSpan(
-                          text: '. Xin lưu ý: Mọi khoản thanh toán (bao gồm phí di chuyển và phí dịch vụ) ',
+                          text:
+                              '. Xin lưu ý: Mọi khoản thanh toán (bao gồm phí di chuyển và phí dịch vụ) ',
                         ),
                         const TextSpan(
                           text: 'sẽ KHÔNG được hoàn lại',
@@ -4897,11 +4909,13 @@ class _PaymentMethodSheetState extends State<_PaymentMethodSheet> {
                           ),
                         ),
                         const TextSpan(
-                          text: ' dưới bất kỳ hình thức nào. Đây là chính sách nhằm bảo vệ quyền lợi cho đội ngũ cứu hộ của hệ thống.',
+                          text:
+                              ' dưới bất kỳ hình thức nào. Đây là chính sách nhằm bảo vệ quyền lợi cho đội ngũ cứu hộ của hệ thống.',
                         ),
                         if (!widget.isFinalPayment)
                           const TextSpan(
-                            text: '\n\n*Đặc quyền bảo vệ:* Nếu chuyên viên đến hiện trường nhưng không phát hiện hoặc không bắt được rắn, quý khách sẽ KHÔNG phải thanh toán chi phí dịch vụ cho Đợt 2.',
+                            text:
+                                '\n\n*Đặc quyền bảo vệ:* Nếu chuyên viên đến hiện trường nhưng không phát hiện hoặc không bắt được rắn, quý khách sẽ KHÔNG phải thanh toán chi phí dịch vụ cho Đợt 2.',
                             style: TextStyle(
                               fontStyle: FontStyle.italic,
                               fontWeight: FontWeight.w500,
@@ -5028,7 +5042,8 @@ class _PaymentMethodSheetState extends State<_PaymentMethodSheet> {
                                 ),
                         ],
                       ),
-                      if (!hasSufficientBalance && widget.walletInfo != null) ...[
+                      if (!hasSufficientBalance &&
+                          widget.walletInfo != null) ...[
                         const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -5064,7 +5079,9 @@ class _PaymentMethodSheetState extends State<_PaymentMethodSheet> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: (hasSufficientBalance && _agreedToTerms) ? widget.onWallet : null,
+                          onPressed: (hasSufficientBalance && _agreedToTerms)
+                              ? widget.onWallet
+                              : null,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF228B22),
                             foregroundColor: Colors.white,
