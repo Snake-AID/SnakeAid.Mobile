@@ -1960,6 +1960,56 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
               request.status == 'Finished')
             _buildFeedbackCard(request),
 
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE6E8EC)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Row(
+                    children: [
+                      Icon(Icons.support_agent, color: Color(0xFF228B22), size: 20),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Hỗ trợ khách hàng',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1F2937),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    'Nếu bạn có bất cứ thắc mắc hoặc báo cáo về yêu cầu này hãy liên hệ tổng đài 0787171699 để được phản hồi sớm nhất.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.6,
+                      color: Color(0xFF475569),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
           const SizedBox(height: 32),
         ],
       ),
@@ -2576,7 +2626,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     color: Color(0xFF2196F3),
                   ),
                   label: Text(
-                    'Gọi $phone',
+                    'Gọi đội cứu hộ',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -2682,7 +2732,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     Padding(
                       padding: const EdgeInsets.only(left: 28, top: 2),
                       child: Text(
-                        'Khoảng cách: ${request.distanceKm!.toStringAsFixed(1)} km',
+                        'Khoảng cách từ trung tâm tới bạn: ${request.distanceKm!.toStringAsFixed(1)} km',
                         style: const TextStyle(
                           fontSize: 11,
                           color: Color(0xFF999999),

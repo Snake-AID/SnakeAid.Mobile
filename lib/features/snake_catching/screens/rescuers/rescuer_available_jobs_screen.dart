@@ -1025,8 +1025,12 @@ class _RescuerAvailableJobsScreenState
         return 'Đã đến nơi';
       case 'finished':
         return 'Đã hoàn thành';
+      case 'missionAborted':
+        return 'Đã hủy nhiệm vụ';
       case 'missioncompleted':
         return 'Đã hoàn thành';
+       case 'missionuncompleted':
+        return 'Chưa hoàn thành';  
       case 'paid':
         return 'Đã thanh toán';
       case 'completed':

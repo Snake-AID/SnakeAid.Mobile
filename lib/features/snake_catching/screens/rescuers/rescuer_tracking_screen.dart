@@ -31,6 +31,7 @@ class _RescuerTrackingScreenState extends ConsumerState<RescuerTrackingScreen> {
   final Map<int, _UploadState> _uploadStates = {};
   final TextEditingController _notesController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
+  bool _isSubmittingUncomplete = false;
 
   // At least one photo successfully uploaded
   bool get _hasUploadedPhoto => _uploadStates.values.any((s) => s == _UploadState.done);
@@ -68,6 +69,262 @@ class _RescuerTrackingScreenState extends ConsumerState<RescuerTrackingScreen> {
     super.dispose();
   }
 
+  void _showSuccessDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false, // Bắt buộc nhấn nút để đóng
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 10),
+          // Icon Checkmark với vòng tròn xanh
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: const Color(0xFF28A745).withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.check_circle_rounded,
+              color: Color(0xFF28A745),
+              size: 60,
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Gửi Báo Cáo Thành Công',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF333333),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Thông tin của bạn đã được hệ thống ghi nhận. Yêu cầu đã hoàn thành!',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF666666),
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.of(ctx).pop(); // Đóng pop-up thành công
+                // Quay về màn hình chính sau khi báo cáo xong
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF6B35), // Màu cam dự án
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Về trang chủ',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> _openUncompleteDialog() async {
+    final reasonController = TextEditingController(text: _notesController.text);
+
+    // 1. Chờ Dialog đóng và lấy kết quả trả về (là chuỗi lý do hoặc null)
+    final String? submitReason = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final uploadedCount = _uploadStates.values.where((s) => s == _UploadState.done).length;
+          bool canConfirm = reasonController.text.trim().isNotEmpty;
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Báo cáo chưa hoàn thành', style: TextStyle(fontWeight: FontWeight.bold)),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Bạn cần ít nhất 1 ảnh bằng chứng và lý do chưa hoàn thành nhiệm vụ.',
+                      style: TextStyle(fontSize: 14, color: Color(0xFF555555), height: 1.4),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        const Icon(Icons.photo_camera, color: Color(0xFFFF6B35), size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Đã tải lên $uploadedCount ảnh bằng chứng.',
+                            style: const TextStyle(fontSize: 13, color: Color(0xFF555555)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    if (_capturedPhotos.isNotEmpty) ...[
+                      SizedBox(
+                        height: 90,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: _capturedPhotos.asMap().entries.map((entry) {
+                              final index = entry.key;
+                              final state = _uploadStates[index] ?? _UploadState.uploading;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 10),
+                                child: Stack(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Image.file(_capturedPhotos[index], width: 90, height: 90, fit: BoxFit.cover),
+                                    ),
+                                    Positioned(
+                                      bottom: 4, right: 4,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
+                                        child: Text(
+                                          state == _UploadState.done ? 'OK' : (state == _UploadState.uploading ? 'Đang tải' : 'Lỗi'),
+                                          style: const TextStyle(fontSize: 10, color: Colors.white),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+
+                    TextButton.icon(
+                      onPressed: () async {
+                        await _capturePhoto();
+                        setDialogState(() {}); 
+                      },
+                      icon: const Icon(Icons.add_a_photo, color: Color(0xFFFF6B35)),
+                      label: const Text('Chụp thêm ảnh bằng chứng', 
+                        style: TextStyle(color: Color(0xFFFF6B35), fontWeight: FontWeight.bold)),
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFFFFF3EE),
+                        minimumSize: const Size(double.infinity, 45),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    
+                    TextField(
+                      controller: reasonController,
+                      maxLines: 4,
+                      onChanged: (value) => setDialogState(() {}),
+                      decoration: InputDecoration(
+                        hintText: 'Nhập lý do...',
+                        filled: true,
+                        fillColor: const Color(0xFFF7F7F7),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(), // Trả về null
+                child: const Text('Hủy', style: TextStyle(color: Color(0xFF666666))),
+              ),
+              ElevatedButton(
+                onPressed: canConfirm ? () {
+                  // Chỉ pop và trả về kết quả string, KHÔNG gọi logic submit ở đây
+                  Navigator.of(ctx).pop(reasonController.text.trim());
+                } : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF6B35),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Gửi báo cáo', 
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    // 2. Logic Submit nằm hoàn toàn ở ngoài, khi Dialog đã biến mất hẳn
+   if (submitReason != null && mounted) {
+  await Future.delayed(const Duration(milliseconds: 100));
+  
+  // Hiển thị loading hoặc thực hiện submit
+  try {
+    await _submitUncomplete(submitReason);
+    
+    // NẾU HÀM _submitUncomplete CHƯA CÓ POPUNTIL THÌ GỌI Ở ĐÂY:
+    if (mounted) {
+      _showSuccessDialog(); // <--- Gọi Pop-up đẹp ở đây
+    }
+  } catch (e) {
+    // Xử lý lỗi nếu cần
+  }
+    reasonController.dispose();
+  }
+}
+
+  Future<void> _submitUncomplete(String reason) async {
+    if (_isSubmittingUncomplete) return;
+    setState(() => _isSubmittingUncomplete = true);
+    try {
+      final repo = ref.read(snakeCatchingRepositoryProvider);
+      await repo.uncompleteMission(widget.missionId, reason);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã báo cáo chưa hoàn thành nhiệm vụ.'),
+          backgroundColor: Color(0xFF28A745),
+        ),
+      );
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: const Color(0xFFDC3545),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmittingUncomplete = false);
+    }
+  }
+
   Future<void> _capturePhoto() async {
     try {
       final XFile? photo = await _picker.pickImage(
@@ -85,7 +342,7 @@ class _RescuerTrackingScreenState extends ConsumerState<RescuerTrackingScreen> {
 
       try {
         final repo = ref.read(snakeCatchingRepositoryProvider);
-        await repo.uploadMissionEvidence(widget.missionId, file);
+        await repo.uploadRequestEvidence(widget.requestData.id, file);
         if (mounted) setState(() => _uploadStates[index] = _UploadState.done);
       } catch (e) {
         debugPrint('⚠️ Upload failed for photo $index: $e');
@@ -119,7 +376,7 @@ class _RescuerTrackingScreenState extends ConsumerState<RescuerTrackingScreen> {
     setState(() => _uploadStates[index] = _UploadState.uploading);
     try {
       final repo = ref.read(snakeCatchingRepositoryProvider);
-      await repo.uploadMissionEvidence(widget.missionId, _capturedPhotos[index]);
+      await repo.uploadRequestEvidence(widget.requestData.id, _capturedPhotos[index]);
       if (mounted) setState(() => _uploadStates[index] = _UploadState.done);
     } catch (e) {
       if (mounted) setState(() => _uploadStates[index] = _UploadState.failed);
@@ -695,6 +952,11 @@ class _RescuerTrackingScreenState extends ConsumerState<RescuerTrackingScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          const Text(
+            'Ghi chú này cũng sẽ được dùng làm lý do khi báo cáo chưa hoàn thành nhiệm vụ.',
+            style: TextStyle(fontSize: 12, color: Color(0xFF777777), height: 1.4),
+          ),
         ],
       ),
     );
@@ -706,9 +968,9 @@ class _RescuerTrackingScreenState extends ConsumerState<RescuerTrackingScreen> {
       left: 0,
       right: 0,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8F6F5).withOpacity(0.8),
+          color: const Color(0xFFF8F6F5).withOpacity(0.95),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
@@ -717,52 +979,80 @@ class _RescuerTrackingScreenState extends ConsumerState<RescuerTrackingScreen> {
             ),
           ],
         ),
-        child: SizedBox(
-          width: double.infinity,
-          height: 56,
-          child: ElevatedButton(
-            onPressed: _hasUploadedPhoto
-                ? () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => RescuerResultConfirmationScreen(
-                          requestData: widget.requestData,
-                          missionId: widget.missionId,
-                          capturedPhotos: _capturedPhotos,
-                          notes: _notesController.text,
-                        ),
-                      ),
-                    );
-                  }
-                : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _hasUploadedPhoto ? const Color(0xFFFF6B35) : const Color(0xFFDDDDDD),
-              foregroundColor: _hasUploadedPhoto ? Colors.white : const Color(0xFF999999),
-              elevation: 0,
-              disabledBackgroundColor: const Color(0xFFDDDDDD),
-              disabledForegroundColor: const Color(0xFF999999),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (!_hasUploadedPhoto)
-                  const Padding(
-                    padding: EdgeInsets.only(right: 8),
-                    child: Icon(Icons.lock, size: 20),
-                  ),
-                Text(
-                  _hasUploadedPhoto ? 'HOÀN THÀNH BẮT RẮN' : 'CẦN ÍT NHẤT 1 ẢNH',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: _hasUploadedPhoto
+                    ? () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => RescuerResultConfirmationScreen(
+                              requestData: widget.requestData,
+                              missionId: widget.missionId,
+                              capturedPhotos: _capturedPhotos,
+                              notes: _notesController.text,
+                            ),
+                          ),
+                        );
+                      }
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _hasUploadedPhoto ? const Color(0xFFFF6B35) : const Color(0xFFDDDDDD),
+                  foregroundColor: _hasUploadedPhoto ? Colors.white : const Color(0xFF999999),
+                  elevation: 0,
+                  disabledBackgroundColor: const Color(0xFFDDDDDD),
+                  disabledForegroundColor: const Color(0xFF999999),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-              ],
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (!_hasUploadedPhoto)
+                      const Padding(
+                        padding: EdgeInsets.only(right: 8),
+                        child: Icon(Icons.lock, size: 20),
+                      ),
+                    Text(
+                      _hasUploadedPhoto ? 'Hoàn thành bắt rắn' : 'Cần ít nhất 1 ảnh',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: OutlinedButton(
+                onPressed: _hasUploadedPhoto ? _openUncompleteDialog : null,
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: _hasUploadedPhoto ? Colors.white : const Color(0xFFF5F5F5),
+                  foregroundColor: _hasUploadedPhoto ? const Color(0xFFFF6B35) : const Color(0xFF999999),
+                  side: BorderSide(
+                    color: _hasUploadedPhoto ? const Color(0xFFFF6B35) : const Color(0xFFDDDDDD),
+                    width: 1.5,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Báo cáo',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

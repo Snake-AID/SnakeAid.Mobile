@@ -169,6 +169,32 @@ class SnakeCatchingRepository {
     }
   }
 
+  /// Upload evidence photo for a request
+  /// POST /api/media/report?type=SnakeCatchingRequest&purpose=Evidence
+  Future<void> uploadRequestEvidence(String requestId, File imageFile) async {
+    try {
+      final fileName = imageFile.path.split('/').last;
+      final formData = FormData.fromMap({
+        'File': await MultipartFile.fromFile(imageFile.path, filename: fileName),
+        'ReferenceId': requestId,
+      });
+
+      await _httpService.post(
+        '/api/media/report',
+        data: formData,
+        queryParameters: {
+          'type': 'SnakeCatchingRequest',
+          'purpose': 'Evidence',
+        },
+        options: Options(headers: {'Content-Type': 'multipart/form-data'}),
+      );
+    } on DioException catch (e) {
+      throw Exception('Không thể tải ảnh lên. Vui lòng thử lại.');
+    } catch (e) {
+      throw Exception('Lỗi không xác định: $e');
+    }
+  }
+
   /// Upload evidence photo for a mission
   /// POST /api/media/report
   Future<void> uploadMissionEvidence(String missionId, File imageFile) async {
@@ -193,6 +219,27 @@ class SnakeCatchingRepository {
       );
     } on DioException catch (e) {
       throw Exception('Không thể tải ảnh lên. Vui lòng thử lại.');
+    } catch (e) {
+      throw Exception('Lỗi không xác định: $e');
+    }
+  }
+
+  /// Uncomplete a mission after evidence is uploaded
+  /// PATCH /api/snakecatching/missions/{missionId}/uncomplete
+  Future<void> uncompleteMission(String missionId, String reason) async {
+    try {
+      await _httpService.patch(
+        '/api/snakecatching/missions/$missionId/uncomplete',
+        data: {'reason': reason},
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        throw Exception('Không tìm thấy nhiệm vụ này.');
+      } else if (e.response?.statusCode == 400) {
+        final message = e.response?.data['message'] ?? 'Không thể báo cáo chưa hoàn thành nhiệm vụ';
+        throw Exception(message);
+      }
+      throw Exception('Không thể báo cáo chưa hoàn thành nhiệm vụ. Vui lòng thử lại.');
     } catch (e) {
       throw Exception('Lỗi không xác định: $e');
     }

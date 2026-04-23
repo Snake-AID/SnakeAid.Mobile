@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io';
+import 'package:intl/intl.dart';
 import '../../models/snake_catching_request.dart';
 import '../../models/snake_species.dart';
 import '../../models/catching_environment.dart';
@@ -63,6 +64,12 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
   final TextEditingController _additionalNotesController = TextEditingController();
 
   bool get _isValid => _confirmedSnakes.isNotEmpty && _catchingEnvironmentId != null;
+
+ String formatDate(String rawDate) {
+  final dateTimeUtc = DateTime.parse(rawDate);
+  final dateTimeLocal = dateTimeUtc.toLocal();
+  return DateFormat('dd/MM/yyyy HH:mm').format(dateTimeLocal);
+}
 
   @override
   void initState() {
@@ -448,7 +455,7 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
         children: [
           _buildSummaryRow(Icons.location_on, widget.requestData.address),
           const SizedBox(height: 12),
-          _buildSummaryRow(Icons.calendar_today, '8/12/2025, 14:30'),
+          _buildSummaryRow(Icons.calendar_today, formatDate(widget.requestData.requestDate.toString())),
         ],
       ),
     );

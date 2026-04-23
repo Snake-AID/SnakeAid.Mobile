@@ -466,6 +466,22 @@ class EmergencyConsultationSignalRService {
     await _hubConnection!.invoke('JoinAsExpert');
   }
 
+  Future<void> leaveAsExpert() async {
+    if (_hubConnection == null) {
+      return;
+    }
+
+    try {
+      if (_hubConnection!.state == HubConnectionState.Connected) {
+        await _hubConnection!.invoke('LeaveAsExpert');
+      }
+    } catch (e) {
+      debugPrint('LeaveAsExpert failed: $e');
+    } finally {
+      await disconnect();
+    }
+  }
+
   Future<void> connectAsMember() async {
     if (_hubConnection != null) {
       await disconnect();
