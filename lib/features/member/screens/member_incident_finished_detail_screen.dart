@@ -12,6 +12,8 @@ import '../../../core/payments/payos_pending_context.dart';
 import '../../emergency/models/detailed_incident_response.dart';
 import '../../emergency/providers/detailed_incident_provider.dart';
 import '../../emergency/repository/incident_repository.dart';
+import '../../snake_catching/repository/feedback_repository.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../wallet/repository/wallet_repository.dart';
 
 class MemberIncidentFinishedDetailScreen extends ConsumerStatefulWidget {
@@ -32,6 +34,7 @@ class _MemberIncidentFinishedDetailScreenState
     with WidgetsBindingObserver {
   bool _isProcessingPayment = false;
   bool _isConfirmingPayOs = false;
+  bool _isSubmittingFeedback = false;
   bool _hasPaid = false;
   int? _pendingPayOsOrderCode;
   String? _pendingPayOsTransactionId;
@@ -282,6 +285,431 @@ class _MemberIncidentFinishedDetailScreenState
     _pendingPayOsOrderCode = null;
     _pendingPayOsTransactionId = null;
     _isAwaitingPayOsReturn = false;
+  }
+
+  void _showFeedbackSheet() {
+    final incident = ref.read(detailedIncidentProvider).incident;
+    if (incident == null) return;
+    final rescuer = incident.assignedRescuer;
+    if (rescuer == null) return;
+
+    int selectedRating = 0;
+    final commentController = TextEditingController();
+
+    final currentUser = ref.read(currentUserProvider);
+    final alreadyReviewed =
+        currentUser != null &&
+        incident.feedbacks.any(
+          (f) =>
+              f.raterId == currentUser.id &&
+              f.targetUserId == rescuer.accountId &&
+              f.referenceId == incident.id,
+        );
+    if (alreadyReviewed) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 26,
+                        backgroundImage: rescuer.account!.avatarUrl != null
+                            ? NetworkImage(rescuer.account!.avatarUrl!)
+                            : null,
+                        backgroundColor: const Color(
+                          0xFFFF6B35,
+                        ).withOpacity(0.15),
+                        child: rescuer.account!.avatarUrl == null
+                            ? const Icon(Icons.person, color: Color(0xFFFF6B35))
+                            : null,
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Đánh giá cứu hộ viên',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1F1F1F),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              rescuer.account?.fullName ?? 'Cứu hộ viên',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (i) {
+                      return GestureDetector(
+                        onTap: () => setSheet(() => selectedRating = i + 1),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Icon(
+                            i < selectedRating
+                                ? Icons.star_rounded
+                                : Icons.star_border_rounded,
+                            size: 40,
+                            color: i < selectedRating
+                                ? const Color(0xFFFFB300)
+                                : Colors.grey[300],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                  if (selectedRating > 0) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      [
+                        '',
+                        'Rất tệ',
+                        'Tệ',
+                        'Bình thường',
+                        'Tốt',
+                        'Tuyệt vời!',
+                      ][selectedRating],
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: selectedRating >= 4
+                            ? const Color(0xFF228B22)
+                            : selectedRating == 3
+                            ? Colors.orange
+                            : const Color(0xFFDC3545),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: commentController,
+                    maxLines: 3,
+                    maxLength: 300,
+                    decoration: InputDecoration(
+                      hintText:
+                          'Chia sẻ trải nghiệm của bạn (không bắt buộc)...',
+                      hintStyle: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[400],
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFFF6F8F6),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.all(14),
+                      counterStyle: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[400],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: Text(
+                            'Để sau',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton(
+                          onPressed:
+                              selectedRating == 0 || _isSubmittingFeedback
+                              ? null
+                              : () async {
+                                  Navigator.pop(ctx);
+                                  await _submitFeedback(
+                                    targetUserId: rescuer.accountId,
+                                    targetUserRole: 'Rescuer',
+                                    rating: selectedRating,
+                                    comments: commentController.text.trim(),
+                                  );
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF228B22),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            disabledBackgroundColor: Colors.grey[200],
+                          ),
+                          child: _isSubmittingFeedback
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text(
+                                  'Gửi đánh giá',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _submitFeedback({
+    required String targetUserId,
+    required String targetUserRole,
+    required int rating,
+    required String comments,
+  }) async {
+    final incident = ref.read(detailedIncidentProvider).incident;
+    if (incident == null) return;
+    setState(() => _isSubmittingFeedback = true);
+
+    try {
+      await ref
+          .read(feedbackRepositoryProvider)
+          .submitFeedback(
+            FeedbackRequest(
+              targetUserId: targetUserId,
+              referenceId: incident.id,
+              type: 'Emergency',
+              rating: rating,
+              comments: comments.isEmpty ? null : comments,
+              targetUserRole: targetUserRole,
+            ),
+          );
+      if (!mounted) return;
+      setState(() => _isSubmittingFeedback = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white, size: 18),
+              SizedBox(width: 8),
+              Text('Cảm ơn bạn đã đánh giá!'),
+            ],
+          ),
+          backgroundColor: const Color(0xFF228B22),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      await ref
+          .read(detailedIncidentProvider.notifier)
+          .refreshDetailedIncident();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmittingFeedback = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: const Color(0xFFDC3545),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildFeedbackCard(DetailedIncidentData incident) {
+    final currentUser = ref.read(currentUserProvider);
+    final rescuer = incident.assignedRescuer;
+    if (rescuer == null) return const SizedBox.shrink();
+
+    final existingReviews = currentUser != null
+        ? incident.feedbacks.where(
+            (f) =>
+                f.raterId == currentUser.id &&
+                f.targetUserId == rescuer.accountId &&
+                f.referenceId == incident.id,
+          )
+        : const <FeedbackItem>[];
+    final existing = existingReviews.isNotEmpty ? existingReviews.first : null;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFB300).withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.star_rounded,
+                    color: Color(0xFFFFB300),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Đánh giá dịch vụ',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1F1F1F),
+                        ),
+                      ),
+                      Text(
+                        rescuer.account?.fullName ?? 'Cứu hộ viên',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            if (existing != null) ...[
+              Row(
+                children: List.generate(
+                  5,
+                  (i) => Icon(
+                    i < existing.rating
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
+                    size: 22,
+                    color: i < existing.rating
+                        ? const Color(0xFFFFB300)
+                        : Colors.grey[300],
+                  ),
+                ),
+              ),
+              if (existing.comments != null &&
+                  existing.comments!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '"${existing.comments!}"',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    Icons.check_circle_outline,
+                    size: 14,
+                    color: const Color(0xFF228B22),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    'Đã gửi đánh giá',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: const Color(0xFF228B22),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ] else ...[
+              Text(
+                'Chia sẻ trải nghiệm của bạn với cứu hộ viên này.',
+                style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _showFeedbackSheet,
+                  icon: const Icon(Icons.rate_review_outlined, size: 18),
+                  label: const Text('Đánh giá ngay'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF228B22),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   String _formatCurrency(double value) {
@@ -813,6 +1241,8 @@ class _MemberIncidentFinishedDetailScreenState
                           _buildIncidentInfoCard(incident),
                           const SizedBox(height: 16),
                           _buildRescuerInfoCard(incident),
+                          const SizedBox(height: 16),
+                          _buildFeedbackCard(incident),
                           const SizedBox(height: 16),
                           _buildPaymentCard(incident),
                           const SizedBox(height: 16),

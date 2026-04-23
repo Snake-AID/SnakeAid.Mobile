@@ -34,6 +34,46 @@ class DetailedIncidentResponse {
       'DetailedIncidentResponse(isSuccess: $isSuccess, message: $message)';
 }
 
+class FeedbackItem {
+  final String id;
+  final String referenceId;
+  final String type;
+  final String raterId;
+  final String targetUserId;
+  final String? targetUserRole;
+  final int rating;
+  final String? comments;
+  final DateTime? createdAt;
+
+  const FeedbackItem({
+    required this.id,
+    required this.referenceId,
+    required this.type,
+    required this.raterId,
+    required this.targetUserId,
+    this.targetUserRole,
+    required this.rating,
+    this.comments,
+    this.createdAt,
+  });
+
+  factory FeedbackItem.fromJson(Map<String, dynamic> json) {
+    return FeedbackItem(
+      id: json['id'] as String? ?? '',
+      referenceId: json['referenceId'] as String? ?? '',
+      type: json['type'] as String? ?? '',
+      raterId: json['raterId'] as String? ?? '',
+      targetUserId: json['targetUserId'] as String? ?? '',
+      targetUserRole: json['targetUserRole'] as String?,
+      rating: json['rating'] as int? ?? 0,
+      comments: json['comments'] as String?,
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'] as String)
+          : null,
+    );
+  }
+}
+
 /// Main Incident Data with all related entities
 class DetailedIncidentData {
   final String id;
@@ -59,6 +99,7 @@ class DetailedIncidentData {
   final RescueMission? activeMission;
   final List<SnakeAIDetectMedia> media;
   final List<RescueMissionMediaGroup> rescueMissionMedia;
+  final List<FeedbackItem> feedbacks;
 
   // Identification results
   final DetectedSnakeSpecies? identifiedSnakeSpecies;
@@ -82,6 +123,7 @@ class DetailedIncidentData {
     this.activeMission,
     required this.media,
     required this.rescueMissionMedia,
+    required this.feedbacks,
     this.identifiedSnakeSpecies,
     this.identificationContext,
   });
@@ -133,6 +175,11 @@ class DetailedIncidentData {
       identificationContext: json['identificationContext'] != null
           ? SnakeIdentificationContext.fromJson(json['identificationContext'])
           : null,
+      feedbacks:
+          (json['feedbacks'] as List<dynamic>?)
+              ?.map((e) => FeedbackItem.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
     );
   }
 
