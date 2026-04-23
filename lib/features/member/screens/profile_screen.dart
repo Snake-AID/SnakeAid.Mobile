@@ -687,19 +687,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         );
                       },
                     ),
-                    // const SizedBox(height: 8),
-                    // _MenuItem(
-                    //   icon: Icons.medical_information,
-                    //   title: 'Hồ Sơ Y Tế',
-                    //   subtitle: 'Nhóm máu, dị ứng, tiền sử bệnh',
-                    //   onTap: () {
-                    //     Navigator.of(context).push(
-                    //       MaterialPageRoute(
-                    //         builder: (context) => const MedicalRecordsScreen(),
-                    //       ),
-                    //     );
-                    //   },
-                    // ),
+                    const SizedBox(height: 8),
+                    _MenuItem(
+                      icon: Icons.health_and_safety_outlined,
+                      title: 'Hướng dẫn sơ cứu',
+                      subtitle: 'Kỹ năng xử lý ban đầu khi bị rắn cắn',
+                      onTap: () {
+                        context.push('/snake-first-aid-guide');
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _MenuItem(
+                      icon: Icons.menu_book_outlined,
+                      title: 'Thư viện loài rắn',
+                      subtitle: 'Tra cứu thông tin các loài rắn phổ biến',
+                      onTap: () {
+                        context.push('/snake-species');
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _MenuItem(
+                      icon: Icons.warning_amber_rounded,
+                      title: 'Cảnh báo khu vực',
+                      subtitle: 'Bản đồ cảnh báo rắn xuất hiện gần đây',
+                      onTap: () {
+                        context.pushNamed('community_alert_map');
+                      },
+                    ),
                     const SizedBox(height: 24),
 
                     // Logout Button
