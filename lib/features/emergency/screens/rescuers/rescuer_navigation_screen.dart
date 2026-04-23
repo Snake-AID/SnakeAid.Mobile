@@ -1124,14 +1124,14 @@ class _RescuerNavigationScreenState
                                     ),
                                   ),
                                   const SizedBox(height: 2),
-                                  Text(
-                                    '${widget.mission.incident.getSeverityText()} • Rắn độc',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFFDC3545),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
+                                  // Text(
+                                  //   '${widget.mission.incident.getIsVenomousText()}',
+                                  //   style: const TextStyle(
+                                  //     fontSize: 12,
+                                  //     color: Color(0xFFDC3545),
+                                  //     fontWeight: FontWeight.w600,
+                                  //   ),
+                                  // ),
                                 ],
                               ),
                             ),

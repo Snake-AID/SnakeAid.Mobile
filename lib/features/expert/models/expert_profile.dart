@@ -11,6 +11,7 @@ class ExpertProfile {
   final String? reputationStatus;
   final String? biography;
   final bool isOnline;
+  final bool isVerified;
   final double? scheduledConsultationFee;
   final double? emergencyConsultationFee;
   final double? rating;
@@ -30,6 +31,7 @@ class ExpertProfile {
     this.reputationStatus,
     this.biography,
     required this.isOnline,
+    required this.isVerified,
     this.scheduledConsultationFee,
     this.emergencyConsultationFee,
     this.rating,
@@ -53,6 +55,7 @@ class ExpertProfile {
       reputationStatus: json['reputationStatus'] as String?,
       biography: json['biography'] as String?,
       isOnline: json['isOnline'] as bool? ?? false,
+      isVerified: json['isVerified'] as bool? ?? false,
       scheduledConsultationFee:
           (json['scheduledConsultationFee'] as num?)?.toDouble(),
       emergencyConsultationFee:

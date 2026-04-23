@@ -30,6 +30,8 @@ class ConsultationBookingResponse {
   final String? userName;             // Patient name (from expert's view)
   final String? problemDescription;  // Problem submitted by patient
   final DateTime? bookedAt;
+  final int? grossPrice;
+  final int? netPrice;
 
   const ConsultationBookingResponse({
     required this.id,
@@ -52,6 +54,8 @@ class ConsultationBookingResponse {
     this.userName,
     this.problemDescription,
     this.bookedAt,
+    this.grossPrice,
+    this.netPrice,
   });
 
   static DateTime? _parseBackendDate(dynamic value) {
@@ -94,7 +98,7 @@ class ConsultationBookingResponse {
           (_parseBackendDate(json['bookedAt']) ??
               (_parseBackendDate(json['scheduledTime']) ?? DateTime.now())),
       status: _parseStatus(json['status'] as String?),
-      feeCost: (json['price'] as num?)?.toInt() ??
+      feeCost: (json['grossPrice'] as num?)?.toInt() ??
           (json['feeCost'] as num?)?.toInt() ??
           (json['fee'] as num?)?.toInt() ??
           0,
@@ -108,6 +112,8 @@ class ConsultationBookingResponse {
       userName: json['userName'] as String?,
       problemDescription: json['problemDescription'] as String?,
       bookedAt: _parseBackendDate(json['bookedAt']),
+      grossPrice: (json['grossPrice'] as num?)?.toInt(),
+      netPrice: (json['netPrice'] as num?)?.toInt(),
     );
   }
 

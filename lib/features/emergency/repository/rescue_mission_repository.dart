@@ -79,6 +79,29 @@ class RescueMissionRepository {
     }
   }
 
+  /// Get rescuer mission list
+  ///
+  /// Gọi API GET /api/rescue-missions/rescuer/list
+  /// Query params: status (optional)
+  Future<RescueMissionListResponse> getRescuerMissionList({
+    String? status,
+  }) async {
+    try {
+      final response = await httpService.get(
+        '/api/rescue-missions/rescuer/list',
+        queryParameters: status != null ? {'status': status} : null,
+      );
+      return RescueMissionListResponse.fromJson(response.data);
+    } on DioException catch (e) {
+      debugPrint('❌ Get rescuer mission list failed: ${e.message}');
+      debugPrint('❌ Response: ${e.response?.data}');
+      throw _handleError(e);
+    } catch (e) {
+      debugPrint('❌ Unexpected error: $e');
+      throw Exception('Lỗi khi tải danh sách nhiệm vụ cứu hộ');
+    }
+  }
+
   /// Start mission (Preparing → EnRoute)
   ///
   /// Gọi API PATCH /api/rescue-missions/{missionId}/start

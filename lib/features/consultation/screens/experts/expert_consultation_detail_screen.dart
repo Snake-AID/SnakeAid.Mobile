@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../repository/consultation_repository.dart';
 import '../../../../features/wallet/repository/transaction_repository.dart';
 
 /// Chi tiết lịch tư vấn dành cho chuyên gia.
@@ -30,6 +31,7 @@ class _ExpertConsultationDetailScreenState
   bool _settlementLoading = false;
   double? _platformFee;
   double? _expertPayout;
+  bool _isCancellingBooking = false;
 
   // status index: 0=waiting, 1=upcoming, 2=completed, 3=cancelled
   int get _statusIndex => (data['statusIndex'] as int?) ?? 1;
@@ -90,7 +92,7 @@ class _ExpertConsultationDetailScreenState
   @override
   void initState() {
     super.initState();
-    if (_isCompleted) {
+    if (_isCompleted && data['netPrice'] == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadSettlement());
     }
   }
@@ -127,6 +129,75 @@ class _ExpertConsultationDetailScreenState
     }
   }
 
+  Future<void> _cancelBooking() async {
+    if (_isCancellingBooking) return;
+
+    final bookingId =
+        (data['bookingId'] as String?) ?? (data['id'] as String?) ?? '';
+    if (bookingId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không tìm thấy booking để hủy.')),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Xác Nhận Hủy Lịch',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'Bạn có chắc muốn hủy lịch tư vấn này? Member sẽ nhận thông báo từ hệ thống.',
+          style: TextStyle(fontSize: 14, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Không Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Hủy Lịch'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isCancellingBooking = true);
+    try {
+      await ref.read(consultationRepositoryProvider).cancelScheduledBooking(
+            bookingId,
+          );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã hủy lịch tư vấn thành công.'),
+          backgroundColor: Color(0xFF228B22),
+        ),
+      );
+      context.pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isCancellingBooking = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: _red,
+        ),
+      );
+    }
+  }
+
   // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
@@ -146,6 +217,14 @@ class _ExpertConsultationDetailScreenState
     final durationMinutes = (data['durationMinutes'] as int?) ?? 45;
     final consultationMethod = data['consultationMethod'] as String? ?? 'video';
     final questions = data['questions'] as String?;
+    final int? grossPrice = (data['grossPrice'] as num?)?.toInt();
+    final int? netPrice = (data['netPrice'] as num?)?.toInt();
+
+    final int displayGross = grossPrice ?? feeCost;
+    final int? displayNet = netPrice ?? (_expertPayout?.toInt());
+    final int? displayPlatformFee = (netPrice != null) 
+        ? (displayGross - netPrice) 
+        : (_platformFee?.toInt());
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F6F8),
@@ -329,7 +408,7 @@ class _ExpertConsultationDetailScreenState
                       _DetailRow(
                         icon: Icons.payments_outlined,
                         label: 'Phí Tư Vấn',
-                        value: _formatCurrency(feeCost),
+                        value: _formatCurrency(displayGross),
                         valueColor: _isCompleted ? _green : _darkPurple,
                         valueBold: true,
                       ),
@@ -414,14 +493,14 @@ class _ExpertConsultationDetailScreenState
                               _DetailRow(
                                 icon: Icons.receipt_long_outlined,
                                 label: 'Chi phí tư vấn',
-                                value: _formatCurrency(feeCost),
+                                value: _formatCurrency(displayGross),
                               ),
-                              if (_platformFee != null) ...[
+                              if (displayPlatformFee != null) ...[
                                 const _Divider(),
                                 _DetailRow(
                                   icon: Icons.account_balance_outlined,
                                   label: 'Phí nền tảng',
-                                  value: '- ${_formatCurrency(_platformFee!)}',
+                                  value: '- ${_formatCurrency(displayPlatformFee)}',
                                   valueColor: _red,
                                 ),
                               ],
@@ -457,11 +536,9 @@ class _ExpertConsultationDetailScreenState
                                     Expanded(
                                       flex: 3,
                                       child: Text(
-                                        _expertPayout != null
-                                            ? '+${_formatCurrency(_expertPayout!)}'
-                                            : (_platformFee != null
-                                                ? '+${_formatCurrency(feeCost - _platformFee!.toInt())}'
-                                                : '--'),
+                                        displayNet != null
+                                            ? '+${_formatCurrency(displayNet)}'
+                                            : '--',
                                         textAlign: TextAlign.right,
                                         style: const TextStyle(
                                           fontSize: 15,
@@ -574,35 +651,66 @@ class _ExpertConsultationDetailScreenState
             Container(
               color: Colors.white,
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-              child: SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    context.push(
-                      '/expert-video-waiting/$consultationId',
-                      extra: {
-                        'consultationId': consultationId,
-                        'patientName': patientName,
-                        'consultationType': consultationType,
-                        'feeCost': feeCost,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        context.push(
+                          '/expert-video-waiting/$consultationId',
+                          extra: {
+                            'consultationId': consultationId,
+                            'patientName': patientName,
+                            'consultationType': consultationType,
+                            'feeCost': feeCost,
+                          },
+                        );
                       },
-                    );
-                  },
-                  icon: const Icon(Icons.videocam, size: 22),
-                  label: const Text(
-                    'Bắt Đầu Tư Vấn',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isWaiting ? _red : _purple,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      icon: const Icon(Icons.videocam, size: 22),
+                      label: const Text(
+                        'Bắt Đầu Tư Vấn',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _isWaiting ? _red : _purple,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 40,
+                    child: OutlinedButton.icon(
+                      onPressed: _isCancellingBooking ? null : _cancelBooking,
+                      icon: _isCancellingBooking
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.event_busy_outlined, size: 18),
+                      label: const Text(
+                        'Hủy Lịch Tư Vấn',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.grey.withOpacity(0.4)),
+                        foregroundColor: const Color(0xFF6B7280),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           if (!_isActionable && consultationId.isNotEmpty)

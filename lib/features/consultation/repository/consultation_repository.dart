@@ -572,6 +572,28 @@ class ConsultationRepository {
     throw Exception(body['message'] ?? 'Không thể tạo lịch tư vấn');
   }
 
+  /// Cancel a future scheduled booking as member or expert.
+  ///
+  /// API: `POST /api/consultations/scheduled/{bookingId}/cancel`
+  Future<ConsultationBookingResponse> cancelScheduledBooking(
+    String bookingId,
+  ) async {
+    debugPrint('📋 Cancelling scheduled booking: $bookingId');
+
+    final response = await httpService.post(
+      '/api/consultations/scheduled/$bookingId/cancel',
+    );
+
+    final body = response.data as Map<String, dynamic>;
+    if (body['is_success'] == true && body['data'] != null) {
+      return ConsultationBookingResponse.fromJson(
+        body['data'] as Map<String, dynamic>,
+      );
+    }
+
+    throw Exception(body['message'] ?? 'Không thể hủy lịch tư vấn');
+  }
+
   // ---------------------------------------------------------------------------
   // Emergency consultation methods
   // ---------------------------------------------------------------------------
@@ -1380,7 +1402,7 @@ class ConsultationRepository {
             : <String, dynamic>{};
 
           final resolvedFee =
-            parseAmount(e['price']) ??
+            parseAmount(e['grossPrice']) ??
             parseAmount(e['feeCost']) ??
             parseAmount(e['fee']) ??
             parseAmount(e['amount']) ??
@@ -1432,8 +1454,9 @@ class ConsultationRepository {
             'slotEndTime': e['slotEndTime'] ?? e['endTime'],
             'status': normalizedStatus,
             'feeCost': resolvedFee,
-            'price': resolvedFee,
             'bookedAt': e['startTime'],
+            'grossPrice': e['grossPrice'] ?? resolvedFee,
+            'netPrice': e['netPrice'],
           };
 
           return ConsultationBookingResponse.fromJson(normalized);

@@ -253,6 +253,11 @@ class BriefIncidentForMission {
     if (severityLevel! >= 10) return 'FFC107';
     return '4CAF50';
   }
+
+  String getIsVenomousText() {
+    if (identifiedSnakeSpecies == null) return 'Chưa xác định';
+    return identifiedSnakeSpecies!.isVenomous ? 'Rắn độc' : 'Rắn không độc';
+  }
 }
 
 /// Update Mission Status Request
@@ -330,6 +335,109 @@ class BasicRescueMissionResponse {
       status: detailed.status,
       startedAt: detailed.startedAt,
       acceptedAt: detailed.createdAt,
+    );
+  }
+}
+
+/// API response wrapper for rescue mission list
+class RescueMissionListResponse {
+  final int statusCode;
+  final String message;
+  final bool isSuccess;
+  final List<RescueMissionListItem> data;
+  final String? error;
+
+  RescueMissionListResponse({
+    required this.statusCode,
+    required this.message,
+    required this.isSuccess,
+    required this.data,
+    this.error,
+  });
+
+  factory RescueMissionListResponse.fromJson(Map<String, dynamic> json) {
+    final rawData = json['data'] as List<dynamic>? ?? [];
+    return RescueMissionListResponse(
+      statusCode:
+          json['status_code'] as int? ?? json['statusCode'] as int? ?? 200,
+      message: json['message'] as String? ?? json['msg'] as String? ?? '',
+      isSuccess:
+          json['is_success'] as bool? ??
+          json['success'] as bool? ??
+          json['isSuccess'] as bool? ??
+          false,
+      data: rawData
+          .whereType<Map<String, dynamic>>()
+          .map(RescueMissionListItem.fromJson)
+          .toList(),
+      error: json['error'] as String?,
+    );
+  }
+}
+
+/// A single rescue mission list item returned by the rescuer list API.
+class RescueMissionListItem {
+  final String id;
+  final String incidentId;
+  final String rescuerId;
+  final String status;
+  final double? price;
+  final double? actualCost;
+  final double? costFromCenter;
+  final double? distanceFromCenterKm;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+  final DateTime? startedAt;
+  final DateTime? arrivedAt;
+  final DateTime? completedAt;
+  final String incidentStatus;
+  final String incidentAddress;
+  final String? notes;
+
+  RescueMissionListItem({
+    required this.id,
+    required this.incidentId,
+    required this.rescuerId,
+    required this.status,
+    this.price,
+    this.actualCost,
+    this.costFromCenter,
+    this.distanceFromCenterKm,
+    required this.createdAt,
+    this.updatedAt,
+    this.startedAt,
+    this.arrivedAt,
+    this.completedAt,
+    required this.incidentStatus,
+    required this.incidentAddress,
+    this.notes,
+  });
+
+  factory RescueMissionListItem.fromJson(Map<String, dynamic> json) {
+    DateTime? parseDate(Object? value) {
+      if (value is String && value.isNotEmpty) {
+        return DateTime.tryParse(value);
+      }
+      return null;
+    }
+
+    return RescueMissionListItem(
+      id: json['id'] as String? ?? '',
+      incidentId: json['incidentId'] as String? ?? '',
+      rescuerId: json['rescuerId'] as String? ?? '',
+      status: json['status'] as String? ?? '',
+      price: (json['price'] as num?)?.toDouble(),
+      actualCost: (json['actualCost'] as num?)?.toDouble(),
+      costFromCenter: (json['costFromCenter'] as num?)?.toDouble(),
+      distanceFromCenterKm: (json['distanceFromCenterKm'] as num?)?.toDouble(),
+      createdAt: parseDate(json['createdAt']) ?? DateTime.now(),
+      updatedAt: parseDate(json['updatedAt']),
+      startedAt: parseDate(json['startedAt']),
+      arrivedAt: parseDate(json['arrivedAt']),
+      completedAt: parseDate(json['completedAt']),
+      incidentStatus: json['incidentStatus'] as String? ?? '',
+      incidentAddress: json['incidentAddress'] as String? ?? '',
+      notes: json['notes'] as String?,
     );
   }
 }

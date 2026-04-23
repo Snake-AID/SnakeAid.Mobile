@@ -418,6 +418,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<void> markUserAsVerified() async {
+    final user = state.user;
+    if (user != null && !user.isVerified) {
+      final updatedUser = user.copyWith(isVerified: true);
+      state = state.copyWith(user: updatedUser);
+      await _saveUserToCache(updatedUser);
+      debugPrint('✅ User explicitly marked as verified in cache');
+    }
+  }
+
   void clearError() => state = state.copyWith(clearError: true);
 
   // ==================== PRIVATE HELPERS ====================

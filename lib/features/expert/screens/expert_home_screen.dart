@@ -110,6 +110,8 @@ _ExpertConsultation _bookingToExpertConsultation(
     consultationMethod: 'video',
     problemDescription: b.problemDescription,
     questions: null,
+    grossPrice: b.grossPrice,
+    netPrice: b.netPrice,
   );
 }
 
@@ -576,6 +578,8 @@ class _HomeTabState extends ConsumerState<_HomeTab>
         'consultationMethod': c.consultationMethod,
         'problemDescription': c.problemDescription,
         'questions': c.questions,
+        'grossPrice': c.grossPrice,
+        'netPrice': c.netPrice,
       },
     );
   }
@@ -2159,6 +2163,8 @@ class _ExpertConsultation {
   final DateTime? slotEndTime;
   final _ExpertConsultationStatus status;
   final int feeCost;
+  final int? grossPrice;
+  final int? netPrice;
   final double? rating;
   final int? durationSeconds;
   final int durationMinutes;
@@ -2191,6 +2197,8 @@ class _ExpertConsultation {
     this.consultationMethod = 'video',
     this.problemDescription,
     this.questions,
+    this.grossPrice,
+    this.netPrice,
   });
 }
 
@@ -2212,6 +2220,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
   static const Color _purple = Color(0xFF6C47C2);
 
   List<_ExpertConsultation> _consultations = [];
+  String? _cancellingBookingId;
 
   List<_ExpertConsultation> _consultationsForDay(DateTime day) {
     return _consultations.where((c) {
@@ -2291,8 +2300,8 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
   }
 
   // Navigate to detail screen
-  void _openDetail(BuildContext context, _ExpertConsultation c) {
-    context.push(
+  Future<void> _openDetail(BuildContext context, _ExpertConsultation c) async {
+    final result = await context.push(
       '/expert-consultation-detail',
       extra: {
         'id': c.id,
@@ -2318,8 +2327,78 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
         'consultationMethod': c.consultationMethod,
         'problemDescription': c.problemDescription,
         'questions': c.questions,
+        'grossPrice': c.grossPrice,
+        'netPrice': c.netPrice,
       },
     );
+
+    if (result == true && mounted) {
+      await _loadConsultations();
+    }
+  }
+
+  Future<void> _cancelScheduledBooking(_ExpertConsultation c) async {
+    if (_cancellingBookingId != null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Hủy Lịch Tư Vấn?',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Bạn sắp hủy lịch tư vấn với ${c.patientName}. Hệ thống sẽ xử lý hoàn tiền cho member theo trạng thái booking và gửi thông báo cho member.',
+          style: const TextStyle(fontSize: 14, height: 1.45),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Giữ Lịch'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC3545),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Xác Nhận Hủy'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _cancellingBookingId = c.bookingId);
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      await repo.cancelScheduledBooking(c.bookingId);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã hủy lịch tư vấn. Member sẽ nhận thông báo.'),
+          backgroundColor: Color(0xFF228B22),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _loadConsultations();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: const Color(0xFFDC3545),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _cancellingBookingId = null);
+      }
+    }
   }
 
   @override
@@ -2927,6 +3006,43 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                         ),
                       ],
                     ),
+                    if (canStart) ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 34,
+                        child: TextButton.icon(
+                          onPressed: _cancellingBookingId == c.bookingId
+                              ? null
+                              : () => _cancelScheduledBooking(c),
+                          icon: _cancellingBookingId == c.bookingId
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFF9CA3AF),
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.event_busy_outlined,
+                                  size: 14,
+                                ),
+                          label: const Text(
+                            'Hủy lịch tư vấn',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFF9CA3AF),
+                            alignment: Alignment.center,
+                            padding: const EdgeInsets.symmetric(vertical: 0),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -3062,7 +3178,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '+${_formatFee(item.feeCost)}',
+                      '+${_formatFee(item.netPrice ?? item.feeCost)}',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,

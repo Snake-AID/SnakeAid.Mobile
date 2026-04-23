@@ -59,7 +59,9 @@ class ShiftAssignment {
       status: json['status'] as String? ?? '',
       shift: rawShift is Map<String, dynamic>
           ? ShiftData.fromJson(rawShift)
-          : (rawShift is Map ? ShiftData.fromJson(Map<String, dynamic>.from(rawShift)) : null),
+          : (rawShift is Map
+                ? ShiftData.fromJson(Map<String, dynamic>.from(rawShift))
+                : null),
     );
   }
 }
@@ -69,17 +71,35 @@ class RescuerShiftRepository {
 
   RescuerShiftRepository(this._httpService);
 
-  Future<List<ShiftAssignment>> getAssignments({
+  Future<List<ShiftAssignment>> getAssignmentsToday() async {
+    try {
+      final response = await _httpService.get(
+        '/api/shifts/rescuer/my-assignments-today',
+      );
+      final raw = response.data;
+      if (raw is! Map) return <ShiftAssignment>[];
+
+      final data = raw['data'];
+      if (data is! List) return <ShiftAssignment>[];
+
+      return data
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .map(ShiftAssignment.fromJson)
+          .toList();
+    } catch (e) {
+      throw Exception('Không thể tải lịch làm việc: $e');
+    }
+  }
+
+  Future<List<ShiftAssignment>> getAssignmentsByRescuerRange({
     required String startDate,
     required String endDate,
   }) async {
     try {
       final response = await _httpService.get(
-        '/api/shifts/assignments',
-        queryParameters: {
-          'startDate': startDate,
-          'endDate': endDate,
-        },
+        '/api/shifts/rescuer/assignments',
+        queryParameters: {'startDate': startDate, 'endDate': endDate},
       );
       final raw = response.data;
       if (raw is! Map) return <ShiftAssignment>[];

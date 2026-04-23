@@ -22,7 +22,6 @@ import 'package:snakeaid_mobile/features/snake_catching/screens/rescuers/rescuer
 import 'package:snakeaid_mobile/features/snake_catching/repository/snake_catching_repository.dart';
 import 'package:snakeaid_mobile/features/snake_catching/models/snake_catching_request.dart';
 import '../../notifications/providers/notification_inbox_provider.dart';
-import '../../notifications/screens/notification_inbox_screen.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../repository/rescuer_analytics_repository.dart';
 import '../repository/rescuer_shift_repository.dart';
@@ -40,10 +39,17 @@ final _rescuerDailyStatsProvider =
 final _rescuerShiftScheduleProvider =
     FutureProvider.autoDispose<List<ShiftAssignment>>((ref) async {
       final repo = ref.watch(rescuerShiftRepositoryProvider);
-      final now = DateTime.now();
-      final startDate = DateFormat('yyyy-MM-dd').format(now);
-      final endDate = DateFormat('yyyy-MM-dd').format(now);
-      return repo.getAssignments(startDate: startDate, endDate: endDate);
+      // Lấy rescuerId từ SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final rescuerId = prefs.getString('user_id');
+      if (rescuerId == null || rescuerId.isEmpty) return <ShiftAssignment>[];
+      final today = DateTime.now();
+      final startDate = DateFormat('yyyy-MM-dd').format(today);
+      final endDate = DateFormat('yyyy-MM-dd').format(today);
+      return repo.getAssignmentsByRescuerRange(
+        startDate: startDate,
+        endDate: endDate,
+      );
     });
 
 // ── Active snake catching job provider ──────────────────────────────────
@@ -140,9 +146,9 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
         if (activeRequest?.requestId == requestId) {
           ref.read(activeRescueRequestProvider.notifier).clearRequest();
 
-          // Dismiss modal if open
-          if (Navigator.of(context).canPop()) {
-            Navigator.of(context).pop();
+          // Dismiss modal if open via root navigator, matching how the dialog was shown.
+          if (Navigator.of(context, rootNavigator: true).canPop()) {
+            Navigator.of(context, rootNavigator: true).pop();
           }
 
           ScaffoldMessenger.of(context).showSnackBar(
@@ -167,9 +173,9 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
         if (activeRequest?.requestId == requestId) {
           ref.read(activeRescueRequestProvider.notifier).clearRequest();
 
-          // Dismiss modal if open
-          if (Navigator.of(context).canPop()) {
-            Navigator.of(context).pop();
+          // Dismiss modal if open via root navigator, matching how the dialog was shown.
+          if (Navigator.of(context, rootNavigator: true).canPop()) {
+            Navigator.of(context, rootNavigator: true).pop();
           }
         }
       });
@@ -189,27 +195,25 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
     );
 
     // Listen for request cancelled
-    ref.listen<AsyncValue<dynamic>>(requestCancelledStreamProvider, (
-      previous,
-      next,
-    ) {
-      next.whenData((requestId) {
-        debugPrint('❌ [GLOBAL] Request cancelled: $requestId');
+    ref.listen<
+      AsyncValue<Map<String, dynamic>>
+    >(requestCancelledStreamProvider, (previous, next) {
+      next.whenData((data) {
+        final requestId = data['requestId']?.toString();
+        final message = data['message']?.toString() ?? 'Yêu cầu đã bị hủy';
+        debugPrint('❌ [GLOBAL] Request cancelled: $requestId | $message');
 
         final activeRequest = ref.read(activeRescueRequestProvider).request;
         if (activeRequest?.requestId == requestId) {
           ref.read(activeRescueRequestProvider.notifier).clearRequest();
 
-          // Dismiss modal if open
-          if (Navigator.of(context).canPop()) {
-            Navigator.of(context).pop();
+          // Dismiss modal if open via root navigator, matching how the dialog was shown.
+          if (Navigator.of(context, rootNavigator: true).canPop()) {
+            Navigator.of(context, rootNavigator: true).pop();
           }
 
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Yêu cầu đã bị hủy'),
-              backgroundColor: Colors.grey,
-            ),
+            SnackBar(content: Text(message), backgroundColor: Colors.grey),
           );
         }
       });
@@ -1114,43 +1118,6 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                       // Snake Library section
                       _buildSnakeLibrarySection(context),
                       const SizedBox(height: 24),
-
-                      Container(
-                        color: Colors.purple.shade50,
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              '🎥 Video Call Demonstration',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.purple,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: () =>
-                                    context.push('/demo-video-call'),
-                                icon: const Icon(Icons.video_camera_front),
-                                label: const Text(
-                                  'Mở màn hình Video Call Demonstration',
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.purple,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -1392,9 +1359,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
               Switch(
                 value: _isOnline,
                 activeColor: const Color(0xFFFF6B35),
-                onChanged: rescueModeState.isConnecting
-                    ? null
-                    : (value) => _toggleRescueMode(),
+                onChanged: (value) => _toggleRescueMode(),
               ),
             ],
           ),
@@ -1523,10 +1488,12 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                 ? "${endDt.hour.toString().padLeft(2, '0')}:${endDt.minute.toString().padLeft(2, '0')}"
                 : '';
 
+            final scheduleDayLabel = _buildShiftDateLabel(startDt, endDt);
+
             String statusVi = item.status;
             Color statusColor = const Color(0xFFDDDDDD);
             Color statusBg = const Color(0xFFF9F9F9);
-            
+
             switch (item.status.toLowerCase()) {
               case 'scheduled':
                 statusVi = 'Đã lên lịch';
@@ -1613,7 +1580,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                         ],
                       ),
                     ),
-                    
+
                     // Cột Content bên phải
                     Expanded(
                       child: Padding(
@@ -1637,41 +1604,70 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: statusBg,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    statusVi,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: statusColor,
-                                    ),
-                                  ),
-                                ),
+                                // Container(
+                                //   padding: const EdgeInsets.symmetric(
+                                //     horizontal: 8,
+                                //     vertical: 4,
+                                //   ),
+                                //   decoration: BoxDecoration(
+                                //     color: statusBg,
+                                //     borderRadius: BorderRadius.circular(6),
+                                //   ),
+                                //   child: Text(
+                                //     statusVi,
+                                //     style: TextStyle(
+                                //       fontSize: 11,
+                                //       fontWeight: FontWeight.w600,
+                                //       color: statusColor,
+                                //     ),
+                                //   ),
+                                // ),
                               ],
                             ),
                             const SizedBox(height: 8),
-                            const Row(
-                              children: [
-                                Icon(Icons.today, size: 14, color: Color(0xFF555555)),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Hôm nay',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
+                            if (startDt != null) ...[
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.play_arrow,
+                                    size: 14,
                                     color: Color(0xFF555555),
                                   ),
-                                ),
-                              ],
-                            ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      'Bắt đầu: ${DateFormat('dd/MM/yyyy').format(startDt)}',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF757575),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                            ],
+                            if (endDt != null) ...[
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.stop,
+                                    size: 14,
+                                    color: Color(0xFF555555),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      'Kết thúc: ${DateFormat('dd/MM/yyyy').format(endDt)}',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF757575),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -1705,7 +1701,24 @@ class _HomeTabState extends ConsumerState<_HomeTab>
     );
   }
 
-    Widget _buildStatsGrid() {
+  String _buildShiftDateLabel(DateTime? startDt, DateTime? endDt) {
+    if (startDt == null) return 'Hôm nay';
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final startDate = DateTime(startDt.year, startDt.month, startDt.day);
+    final endDate = endDt != null
+        ? DateTime(endDt.year, endDt.month, endDt.day)
+        : startDate;
+
+    if (!endDate.isBefore(today) && !startDate.isAfter(today)) {
+      return 'Hôm nay';
+    }
+
+    return DateFormat('dd/MM/yyyy').format(startDate);
+  }
+
+  Widget _buildStatsGrid() {
     final statsAsync = ref.watch(_rescuerDailyStatsProvider);
     return statsAsync.when(
       loading: () => Row(

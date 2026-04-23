@@ -28,17 +28,25 @@ class MissionCompletionScreen extends ConsumerStatefulWidget {
       _MissionCompletionScreenState();
 }
 
+enum _EvidenceUploadStatus { pending, uploading, success, failed }
+
+class _EvidencePhoto {
+  final File file;
+  String? mediaId;
+  _EvidenceUploadStatus status;
+  String? errorMessage;
+
+  _EvidencePhoto({required this.file, _EvidenceUploadStatus? status})
+    : status = status ?? _EvidenceUploadStatus.pending;
+}
+
 class _MissionCompletionScreenState
     extends ConsumerState<MissionCompletionScreen> {
   final TextEditingController _notesController = TextEditingController();
-  final List<File> _evidenceImages = [];
+  final List<_EvidencePhoto> _evidencePhotos = [];
   final ImagePicker _picker = ImagePicker();
 
-  // Upload state
-  bool _isUploading = false;
-  String _uploadStatus = '';
-  int _uploadedCount = 0;
-  void Function(void Function())? _dialogSetState; // For updating dialog
+  bool _isCompleting = false;
 
   static const int minEvidencePhotos = 1;
   static const int maxEvidencePhotos = 3;
@@ -51,7 +59,7 @@ class _MissionCompletionScreenState
 
   Future<void> _pickImage() async {
     // Check max limit
-    if (_evidenceImages.length >= maxEvidencePhotos) {
+    if (_evidencePhotos.length >= maxEvidencePhotos) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -101,21 +109,34 @@ class _MissionCompletionScreenState
     );
 
     if (image != null) {
+      final file = File(image.path);
       setState(() {
-        _evidenceImages.add(File(image.path));
+        _evidencePhotos.add(
+          _EvidencePhoto(file: file, status: _EvidenceUploadStatus.uploading),
+        );
       });
+      _uploadEvidencePhoto(_evidencePhotos.length - 1);
     }
   }
 
   void _removeImage(int index) {
     setState(() {
-      _evidenceImages.removeAt(index);
+      _evidencePhotos.removeAt(index);
     });
   }
 
+  bool get _hasUploadedMedia =>
+      _evidencePhotos.any((photo) => photo.mediaId != null);
+
+  bool get _isAnyUploading => _evidencePhotos.any(
+    (photo) => photo.status == _EvidenceUploadStatus.uploading,
+  );
+
+  bool get _canComplete =>
+      _hasUploadedMedia && !_isAnyUploading && !_isCompleting;
+
   Future<void> _handleComplete() async {
-    // Validation: Must have at least 1 evidence photo
-    if (_evidenceImages.isEmpty) {
+    if (_evidencePhotos.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Vui lòng chụp ít nhất 1 ảnh bằng chứng'),
@@ -125,59 +146,90 @@ class _MissionCompletionScreenState
       return;
     }
 
+    if (!_hasUploadedMedia) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Vui lòng upload ít nhất 1 ảnh thành công trước khi hoàn thành',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (_isAnyUploading) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Vui lòng chờ upload ảnh hoàn tất trước khi hoàn thành',
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     _showConfirmationDialog();
   }
 
-  Future<void> _uploadAndComplete() async {
+  Future<void> _uploadEvidencePhoto(int index) async {
+    if (index < 0 || index >= _evidencePhotos.length) return;
+
+    final photo = _evidencePhotos[index];
     setState(() {
-      _isUploading = true;
-      _uploadedCount = 0;
-      _uploadStatus = 'Đang chuẩn bị upload...';
+      photo.status = _EvidenceUploadStatus.uploading;
+      photo.errorMessage = null;
     });
 
     try {
       final mediaRepository = ref.read(mediaRepositoryProvider);
-      final List<String> evidenceMediaIds = [];
+      final mediaId = await mediaRepository.uploadEvidencePhoto(
+        imageFile: photo.file,
+        missionId: widget.missionId,
+      );
 
-      // Upload each evidence photo
-      for (int i = 0; i < _evidenceImages.length; i++) {
-        final newStatus =
-            'Đang upload ảnh ${i + 1}/${_evidenceImages.length}...';
-        setState(() {
-          _uploadStatus = newStatus;
-        });
-        // Update dialog if it's open
-        _dialogSetState?.call(() {
-          _uploadStatus = newStatus;
-        });
-
-        final mediaId = await mediaRepository.uploadEvidencePhoto(
-          imageFile: _evidenceImages[i],
-          missionId: widget.missionId,
-        );
-
-        evidenceMediaIds.add(mediaId);
-
-        final newCount = i + 1;
-        setState(() {
-          _uploadedCount = newCount;
-        });
-        // Update dialog if it's open
-        _dialogSetState?.call(() {
-          _uploadedCount = newCount;
-        });
-      }
-
-      // All photos uploaded, now complete mission
-      final completionStatus = 'Đang hoàn thành nhiệm vụ...';
+      if (!mounted) return;
       setState(() {
-        _uploadStatus = completionStatus;
+        photo.status = _EvidenceUploadStatus.success;
+        photo.mediaId = mediaId;
       });
-      // Update dialog if it's open
-      _dialogSetState?.call(() {
-        _uploadStatus = completionStatus;
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        photo.status = _EvidenceUploadStatus.failed;
+        photo.errorMessage = e.toString().replaceAll('Exception: ', '');
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Upload ảnh thất bại: ${photo.errorMessage ?? 'Vui lòng thử lại'}',
+          ),
+          backgroundColor: Colors.red,
+          action: SnackBarAction(
+            label: 'Thử lại',
+            textColor: Colors.white,
+            onPressed: () => _retryUpload(index),
+          ),
+        ),
+      );
+    }
+  }
 
+  Future<void> _retryUpload(int index) async {
+    if (index < 0 || index >= _evidencePhotos.length) return;
+    await _uploadEvidencePhoto(index);
+  }
+
+  Future<void> _completeMission() async {
+    setState(() => _isCompleting = true);
+
+    final evidenceMediaIds = _evidencePhotos
+        .where((photo) => photo.mediaId != null)
+        .map((photo) => photo.mediaId!)
+        .toList();
+
+    try {
       final success = await ref
           .read(missionDetailProvider.notifier)
           .completeMission(
@@ -189,27 +241,15 @@ class _MissionCompletionScreenState
 
       if (!mounted) return;
 
-      setState(() {
-        _isUploading = false;
-      });
-
-      // Close progress dialog and clear dialogSetState
-      if (Navigator.canPop(context)) {
-        Navigator.pop(context);
-      }
-      _dialogSetState = null;
+      setState(() => _isCompleting = false);
 
       if (success) {
-        // Clean up: stop mission GPS and disconnect MissionHub so the rescuer
-        // can receive new SOS requests immediately after this mission ends.
         ref.read(locationManagerProvider).stopMissionTracking();
         await ref.read(missionHubConnectionProvider.notifier).disconnect();
 
-        // Clear active mission from provider and local storage
         await ref.read(activeMissionProvider.notifier).clearActiveMission();
         debugPrint('✅ Active mission cleared after completion');
 
-        // 🔄 RECONNECT to RescuerHub (resume receiving new rescue requests)
         debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         debugPrint('🔄 Reconnecting to RescuerHub...');
         debugPrint('   Reason: Mission completed, ready for new requests');
@@ -217,11 +257,8 @@ class _MissionCompletionScreenState
           final prefs = await SharedPreferences.getInstance();
           final rescuerId = prefs.getString('user_id');
           if (rescuerId != null) {
-            // Restart idle tracking so this rescuer is discoverable for new missions
             await ref.read(locationManagerProvider).startTracking(rescuerId);
             debugPrint('✅ Restarted idle tracking after mission completion');
-
-            // Reconnect to RescuerHub to receive new rescue requests
             await ref
                 .read(rescueModeProvider.notifier)
                 .startRescueMode(rescuerId);
@@ -229,15 +266,12 @@ class _MissionCompletionScreenState
           }
         } catch (e) {
           debugPrint('⚠️ Failed to reconnect RescuerHub: $e');
-          // Not critical - rescuer can manually toggle rescue mode
         }
         debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-        // Success! Navigate to rescuer mission success screen
         if (!mounted) return;
         context.go('/rescuer/mission-success');
       } else {
-        // Show error
         final error = ref.read(missionDetailProvider).error;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -247,40 +281,14 @@ class _MissionCompletionScreenState
         );
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isUploading = false;
-        });
-
-        // Always clean up hub/GPS on failure too, so the rescuer isn't stuck.
-        ref.read(locationManagerProvider).stopMissionTracking();
-        await ref.read(missionHubConnectionProvider.notifier).disconnect();
-
-        // Restart idle tracking so this rescuer is discoverable for new missions
-        try {
-          final prefs = await SharedPreferences.getInstance();
-          final rescuerId = prefs.getString('user_id');
-          if (rescuerId != null) {
-            await ref.read(locationManagerProvider).startTracking(rescuerId);
-            debugPrint('✅ Restarted idle tracking after mission failure');
-          }
-        } catch (e) {
-          debugPrint('⚠️ Failed to restart idle tracking: $e');
-        }
-
-        // Close progress dialog and clear dialogSetState
-        if (Navigator.canPop(context)) {
-          Navigator.pop(context);
-        }
-        _dialogSetState = null;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi: ${e.toString().replaceAll('Exception: ', '')}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (!mounted) return;
+      setState(() => _isCompleting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -318,7 +326,7 @@ class _MissionCompletionScreenState
               ),
               const SizedBox(height: 12),
               Text(
-                'Bạn đã upload ${_evidenceImages.length} ảnh bằng chứng. Sau khi xác nhận, nhiệm vụ sẽ được hoàn thành và không thể chỉnh sửa.',
+                'Bạn đã upload ${_evidencePhotos.where((p) => p.mediaId != null).length} ảnh bằng chứng thành công. Sau khi xác nhận, nhiệm vụ sẽ được hoàn thành và không thể chỉnh sửa.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 14,
@@ -351,8 +359,7 @@ class _MissionCompletionScreenState
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.pop(dialogContext);
-                        _showUploadProgressDialog();
-                        _uploadAndComplete();
+                        _completeMission();
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFFF8800),
@@ -369,57 +376,6 @@ class _MissionCompletionScreenState
                 ],
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showUploadProgressDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => WillPopScope(
-        onWillPop: () async => false,
-        child: Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: StatefulBuilder(
-              builder: (context, setDialogState) {
-                // Store the setDialogState so we can call it from _uploadAndComplete
-                _dialogSetState = setDialogState;
-
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const CircularProgressIndicator(color: Color(0xFFFF8800)),
-                    const SizedBox(height: 20),
-                    Text(
-                      _uploadStatus,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    if (_uploadedCount > 0)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          '$_uploadedCount/${_evidenceImages.length} ảnh',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
           ),
         ),
       ),
@@ -748,7 +704,7 @@ class _MissionCompletionScreenState
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Tối thiểu $minEvidencePhotos ảnh, tối đa $maxEvidencePhotos ảnh (${_evidenceImages.length}/$maxEvidencePhotos)',
+                    'Tối thiểu $minEvidencePhotos ảnh, tối đa $maxEvidencePhotos ảnh (${_evidencePhotos.length}/$maxEvidencePhotos)',
                     style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 12),
@@ -758,7 +714,7 @@ class _MissionCompletionScreenState
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: _evidenceImages.isEmpty
+                        color: _evidencePhotos.isEmpty
                             ? Colors.red.withOpacity(0.3)
                             : Colors.grey.withOpacity(0.2),
                       ),
@@ -768,9 +724,9 @@ class _MissionCompletionScreenState
                       child: ListView(
                         scrollDirection: Axis.horizontal,
                         children: [
-                          ..._evidenceImages.asMap().entries.map((entry) {
+                          ..._evidencePhotos.asMap().entries.map((entry) {
                             final index = entry.key;
-                            final image = entry.value;
+                            final photo = entry.value;
                             return Padding(
                               padding: const EdgeInsets.only(right: 12),
                               child: Stack(
@@ -778,12 +734,34 @@ class _MissionCompletionScreenState
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(12),
                                     child: Image.file(
-                                      image,
+                                      photo.file,
                                       width: 120,
                                       height: 120,
                                       fit: BoxFit.cover,
                                     ),
                                   ),
+                                  if (photo.status ==
+                                      _EvidenceUploadStatus.uploading)
+                                    Positioned.fill(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withOpacity(0.35),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        child: const Center(
+                                          child: SizedBox(
+                                            width: 24,
+                                            height: 24,
+                                            child: CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 2,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   Positioned(
                                     top: 4,
                                     right: 4,
@@ -803,11 +781,98 @@ class _MissionCompletionScreenState
                                       ),
                                     ),
                                   ),
+                                  Positioned(
+                                    top: 8,
+                                    left: 8,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            photo.status ==
+                                                _EvidenceUploadStatus.success
+                                            ? Colors.green.withOpacity(0.9)
+                                            : photo.status ==
+                                                  _EvidenceUploadStatus.failed
+                                            ? Colors.red.withOpacity(0.9)
+                                            : Colors.black.withOpacity(0.55),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            photo.status ==
+                                                    _EvidenceUploadStatus
+                                                        .success
+                                                ? Icons.check_circle
+                                                : photo.status ==
+                                                      _EvidenceUploadStatus
+                                                          .failed
+                                                ? Icons.error
+                                                : Icons.cloud_upload,
+                                            size: 14,
+                                            color: Colors.white,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            photo.status ==
+                                                    _EvidenceUploadStatus
+                                                        .success
+                                                ? 'Đã upload'
+                                                : photo.status ==
+                                                      _EvidenceUploadStatus
+                                                          .failed
+                                                ? 'Thất bại'
+                                                : 'Đang upload',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  if (photo.status ==
+                                      _EvidenceUploadStatus.failed)
+                                    Positioned(
+                                      bottom: 8,
+                                      left: 8,
+                                      right: 8,
+                                      child: ElevatedButton(
+                                        onPressed: () => _retryUpload(index),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.white
+                                              .withOpacity(0.9),
+                                          foregroundColor: Colors.red,
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 6,
+                                          ),
+                                          elevation: 0,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Thử lại',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                 ],
                               ),
                             );
                           }),
-                          if (_evidenceImages.length < maxEvidencePhotos)
+                          if (_evidencePhotos.length < maxEvidencePhotos)
                             GestureDetector(
                               onTap: _pickImage,
                               child: Container(
@@ -1064,7 +1129,7 @@ class _MissionCompletionScreenState
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton(
-                  onPressed: _isUploading ? null : _handleComplete,
+                  onPressed: _canComplete ? _handleComplete : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFF8800),
                     foregroundColor: Colors.white,
@@ -1074,7 +1139,7 @@ class _MissionCompletionScreenState
                     ),
                     disabledBackgroundColor: Colors.grey,
                   ),
-                  child: _isUploading
+                  child: _isCompleting
                       ? const SizedBox(
                           width: 20,
                           height: 20,

@@ -44,6 +44,8 @@ import 'package:snakeaid_mobile/features/expert/screens/expert_home_screen.dart'
 import 'package:snakeaid_mobile/features/expert/screens/expert_settings_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_edit_profile_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_id_documents_screen.dart';
+import 'package:snakeaid_mobile/features/expert/screens/expert_certificate_detail_screen.dart';
+import 'package:snakeaid_mobile/features/expert/screens/expert_certificate_form_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_specialties_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_feedback_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_working_hours_screen.dart';
@@ -98,8 +100,32 @@ import 'package:snakeaid_mobile/features/blog/screens/expert/expert_blog_form_sc
 import 'package:snakeaid_mobile/features/blog/models/blog_model.dart';
 
 /// App routing configuration using go_router
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../features/auth/providers/auth_provider.dart';
+
 final router = GoRouter(
   initialLocation: '/splash',
+  redirect: (context, state) {
+    final container = ProviderScope.containerOf(context, listen: false);
+    final authState = container.read(authProvider);
+    final user = authState.user;
+    final isExpert = user?.role.name == 'expert';
+    final isVerified = user?.isVerified == true;
+    final isAuth = authState.isAuthenticated;
+    final path = state.uri.path;
+
+    // Nếu là expert, đã đăng nhập, nhưng chưa verified
+    if (isAuth && isExpert && !isVerified) {
+      // Chỉ cho phép vào các trang liên quan đến chứng chỉ
+      if (!path.startsWith('/expert-id-documents') && 
+          !path.startsWith('/expert-credentials') &&
+          !path.startsWith('/registration-pending')) {
+        return '/expert-id-documents';
+      }
+    }
+    // Nếu đã verified hoặc không phải expert thì cho vào bình thường
+    return null;
+  },
   routes: [
     // === AUTH ROUTES ===
     GoRoute(
@@ -201,6 +227,29 @@ final router = GoRouter(
       path: '/expert-id-documents',
       name: 'expert_id_documents',
       builder: (context, state) => const ExpertIdDocumentsScreen(),
+      routes: [
+        GoRoute(
+          path: 'new',
+          name: 'expert_certificate_create',
+          builder: (context, state) => const ExpertCertificateFormScreen(),
+        ),
+        GoRoute(
+          path: ':certificateId',
+          name: 'expert_certificate_detail',
+          builder: (context, state) {
+            final certificateId = state.pathParameters['certificateId'] ?? '';
+            return ExpertCertificateDetailScreen(certificateId: certificateId);
+          },
+        ),
+        GoRoute(
+          path: ':certificateId/edit',
+          name: 'expert_certificate_edit',
+          builder: (context, state) {
+            final certificateId = state.pathParameters['certificateId'] ?? '';
+            return ExpertCertificateFormScreen(certificateId: certificateId);
+          },
+        ),
+      ],
     ),
 
     // Expert Specialties
@@ -320,8 +369,10 @@ final router = GoRouter(
     GoRoute(
       path: '/expert/snake-first-aid-guide',
       name: 'expert_snake_first_aid_guide',
-      builder: (context, state) =>
-          const SnakeLibraryScreen(firstAidMode: true, themeColor: Color(0xFF6C47C2)),
+      builder: (context, state) => const SnakeLibraryScreen(
+        firstAidMode: true,
+        themeColor: Color(0xFF6C47C2),
+      ),
     ),
     // Rescuer variants (orange)
     GoRoute(
@@ -333,8 +384,10 @@ final router = GoRouter(
     GoRoute(
       path: '/rescuer/snake-first-aid-guide',
       name: 'rescuer_snake_first_aid_guide',
-      builder: (context, state) =>
-          const SnakeLibraryScreen(firstAidMode: true, themeColor: Color(0xFFFF6B35)),
+      builder: (context, state) => const SnakeLibraryScreen(
+        firstAidMode: true,
+        themeColor: Color(0xFFFF6B35),
+      ),
     ),
     GoRoute(
       path: '/snake-species/:id',
@@ -774,8 +827,8 @@ final router = GoRouter(
       path: '/rescuer-history-detail',
       name: 'rescuer_history_detail',
       builder: (context, state) {
-        final mission = state.extra as Map<String, dynamic>;
-        return RescuerHistoryDetailScreen(mission: mission);
+        final missionId = state.pathParameters['missionId']!;
+        return RescuerMissionDetailScreen(missionId: missionId);
       },
     ),
 
@@ -966,6 +1019,8 @@ final router = GoRouter(
           incidentId: data?['incidentId'] as String? ?? '',
           recognitionResultId: data?['recognitionResultId'] as String?,
           isDirectEntry: data?['isDirectEntry'] as bool? ?? false,
+          cameFromSymptomReport:
+              data?['cameFromSymptomReport'] as bool? ?? false,
         );
       },
     ),

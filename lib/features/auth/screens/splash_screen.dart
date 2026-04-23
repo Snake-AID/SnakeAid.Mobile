@@ -1,8 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:async';
 import '../providers/auth_provider.dart';
+import '../../expert/repository/expert_certificate_repository.dart';
+import '../models/user.dart';
 
 /// Splash screen — pure UI concern only.
 ///
@@ -63,7 +65,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     });
   }
 
-  void _tryNavigate() {
+  Future<void> _tryNavigate() async {
     if (_hasNavigated || !mounted) return;
 
     final authState = ref.read(authProvider);
@@ -76,7 +78,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       return;
     }
 
-    switch (authState.user!.role.name.toUpperCase()) {
+    final user = authState.user!;
+    switch (user.role.name.toUpperCase()) {
       case 'MEMBER':
         context.go('/member-home');
         break;
@@ -84,10 +87,38 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         context.go('/rescuer-home');
         break;
       case 'EXPERT':
-        context.go('/expert-home');
+        await _checkExpertCertificateAndNavigate(user);
         break;
       default:
         context.go('/role-selection');
+    }
+  }
+
+  Future<void> _checkExpertCertificateAndNavigate(User user) async {
+    try {
+      final repo = ref.read(expertCertificateRepositoryProvider);
+      final certs = await repo.getMyCertificates();
+      
+      final hasVerified = certs.any((c) => c.isVerified);
+      final hasPending = certs.any((c) => !c.isVerified && (c.rejectionReason == null || c.rejectionReason!.isEmpty));
+      
+      if (!mounted) return;
+      
+      if (hasVerified) {
+        await ref.read(authProvider.notifier).markUserAsVerified();
+        if (mounted) context.go('/expert-home');
+      } else if (hasPending) {
+        context.goNamed('registration_pending', extra: user.email);
+      } else {
+        context.goNamed('expert_credentials', extra: {
+          'email': user.email,
+          'fullName': user.fullName,
+          'phoneNumber': user.phoneNumber ?? '',
+          'fromLogin': 'true',
+        });
+      }
+    } catch (e) {
+      if (mounted) context.go('/expert-id-documents');
     }
   }
 

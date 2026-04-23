@@ -11,7 +11,8 @@ class ExpertSettingsScreen extends ConsumerStatefulWidget {
   const ExpertSettingsScreen({super.key});
 
   @override
-  ConsumerState<ExpertSettingsScreen> createState() => _ExpertSettingsScreenState();
+  ConsumerState<ExpertSettingsScreen> createState() =>
+      _ExpertSettingsScreenState();
 }
 
 class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
@@ -120,15 +121,15 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
       await repo.updateExpertSettings(biography: bio);
       if (mounted) {
         setState(() => _biography = bio);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã cập nhật giới thiệu')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Đã cập nhật giới thiệu')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSavingBio = false);
@@ -144,7 +145,10 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Giới thiệu bản thân',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2D2D2D)),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF2D2D2D),
+          ),
         ),
         content: TextField(
           controller: controller,
@@ -159,7 +163,10 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Hủy', style: TextStyle(color: Color(0xFF888888))),
+            child: const Text(
+              'Hủy',
+              style: TextStyle(color: Color(0xFF888888)),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -194,15 +201,15 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
           _scheduledConsultationFee = scheduledFee;
           _emergencyConsultationFee = emergencyFee;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã cập nhật phí tư vấn')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Đã cập nhật phí tư vấn')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSavingFees = false);
@@ -223,7 +230,10 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Cập nhật phí tư vấn',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2D2D2D)),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF2D2D2D),
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -256,7 +266,10 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Hủy', style: TextStyle(color: Color(0xFF888888))),
+            child: const Text(
+              'Hủy',
+              style: TextStyle(color: Color(0xFF888888)),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -369,12 +382,17 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                                   ? const SizedBox(
                                       height: 14,
                                       width: 14,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
                                     )
                                   : _isSavingBio
                                   ? const Text(
                                       'Đang lưu...',
-                                      style: TextStyle(fontSize: 13, color: Colors.grey),
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.grey,
+                                      ),
                                     )
                                   : Text(
                                       _biography.isEmpty
@@ -468,24 +486,26 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
               children: [
                 _buildFeeRow(
                   title: 'Tư vấn đặt lịch (Patient)',
-                  subtitle: 'Bạn nhận: ${((_scheduledConsultationFee * 0.9)).toStringAsFixed(0)} VNĐ (90%)',
+                  subtitle:
+                      'Bạn nhận: ${((_scheduledConsultationFee * 0.9)).toStringAsFixed(0)} VNĐ (90%)',
                   amount: _isLoadingProfile
                       ? '...'
                       : _isSavingFees
-                          ? 'Đang lưu...'
-                          : '${_scheduledConsultationFee.toStringAsFixed(0)} VNĐ',
+                      ? 'Đang lưu...'
+                      : '${_scheduledConsultationFee.toStringAsFixed(0)} VNĐ',
                   editable: true,
                   onEdit: _showEditFeesDialog,
                 ),
                 const Divider(height: 1),
                 _buildFeeRow(
                   title: 'Tư vấn khẩn cấp (SOS)',
-                  subtitle: 'Bạn nhận: ${((_emergencyConsultationFee * 0.9)).toStringAsFixed(0)} VNĐ (90%)',
+                  subtitle:
+                      'Bạn nhận: ${((_emergencyConsultationFee * 0.9)).toStringAsFixed(0)} VNĐ (90%)',
                   amount: _isLoadingProfile
                       ? '...'
                       : _isSavingFees
-                          ? 'Đang lưu...'
-                          : '${_emergencyConsultationFee.toStringAsFixed(0)} VNĐ',
+                      ? 'Đang lưu...'
+                      : '${_emergencyConsultationFee.toStringAsFixed(0)} VNĐ',
                   editable: true,
                   onEdit: _showEditFeesDialog,
                 ),
@@ -557,7 +577,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                 const Divider(height: 1),
                 _buildNotificationRow(
                   title: 'Tin nhắn mới',
-                  subtitle: 'Tin nhắn từ bệnh nhân',
+                  subtitle: 'Tin nhắn từ người dùng',
                   value: _notifyNewMessage,
                   onChanged: (v) => setState(() => _notifyNewMessage = v),
                 ),
@@ -686,10 +706,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                   onChanged: (v) => setState(() => _allowDirectCall = v),
                 ),
                 const Divider(height: 1),
-                _buildSimpleRow(
-                  label: 'Điều khoản sử dụng',
-                  onTap: () {},
-                ),
+                _buildSimpleRow(label: 'Điều khoản sử dụng', onTap: () {}),
                 const Divider(height: 1),
                 _buildSimpleRow(
                   label: 'Chính sách quyền riêng tư',
@@ -751,10 +768,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
             _buildSectionHeader('Hỗ Trợ'),
             _buildCard(
               children: [
-                _buildSimpleRow(
-                  label: 'Hướng dẫn sử dụng',
-                  onTap: () {},
-                ),
+                _buildSimpleRow(label: 'Hướng dẫn sử dụng', onTap: () {}),
                 const Divider(height: 1),
                 _buildDataRow(
                   title: 'Liên hệ hỗ trợ',
@@ -762,10 +776,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                   onTap: () {},
                 ),
                 const Divider(height: 1),
-                _buildSimpleRow(
-                  label: 'Báo cáo sự cố',
-                  onTap: () {},
-                ),
+                _buildSimpleRow(label: 'Báo cáo sự cố', onTap: () {}),
                 const Divider(height: 1),
                 _buildSimpleRow(
                   label: 'Câu hỏi thường gặp (FAQ)',
@@ -794,10 +805,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                       ),
                       Text(
                         '1.2.5 (Build 125)',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                       ),
                       const SizedBox(width: 8),
                       Container(
@@ -891,10 +899,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
             const SizedBox(height: 4),
             Text(
               subtitle,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
           ],
         ],
@@ -951,10 +956,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.right,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
               ),
             ),
             if (verified || statusIcon != null) ...[
@@ -1007,10 +1009,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                     subtitle,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -1066,10 +1065,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
             ),
@@ -1145,10 +1141,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.right,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
               ),
             ),
             const SizedBox(width: 8),
@@ -1189,10 +1182,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                     subtitle,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -1245,10 +1235,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                       const SizedBox(height: 4),
                       Text(
                         subtitle,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ],
                   ],
@@ -1267,9 +1254,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Đăng xuất',
           style: TextStyle(
@@ -1279,10 +1264,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
         ),
         content: const Text(
           'Bạn có chắc muốn đăng xuất khỏi tài khoản?',
-          style: TextStyle(
-            fontSize: 14,
-            color: Color(0xFF666666),
-          ),
+          style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
         ),
         actions: [
           TextButton(
@@ -1297,33 +1279,31 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
               // Lấy navigator và router trước khi async operations
               final navigator = Navigator.of(context);
               final router = GoRouter.of(context);
-              
+
               // Đóng dialog xác nhận
               navigator.pop();
-              
+
               // Show loading
               showDialog(
                 context: context,
                 barrierDismissible: false,
                 builder: (loadingContext) => const Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xFF6C47C2),
-                  ),
+                  child: CircularProgressIndicator(color: Color(0xFF6C47C2)),
                 ),
               );
-              
+
               try {
                 // Call logout API
                 final authRepository = ref.read(authRepositoryProvider);
                 await authRepository.logout();
-                
+
                 // Navigate sử dụng router đã lấy trước đó
                 router.go('/role-selection');
               } catch (e) {
                 // Close loading dialog nếu có lỗi
                 if (mounted) {
                   navigator.pop();
-                  
+
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(e.toString().replaceAll('Exception: ', '')),
@@ -1347,4 +1327,3 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
     );
   }
 }
-
