@@ -27,6 +27,32 @@ class User {
     this.isVerified = false,
   });
 
+  User copyWith({
+    String? id,
+    String? email,
+    String? fullName,
+    String? phoneNumber,
+    String? avatarUrl,
+    bool? isActive,
+    UserRole? role,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    bool? isVerified,
+  }) {
+    return User(
+      id: id ?? this.id,
+      email: email ?? this.email,
+      fullName: fullName ?? this.fullName,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      isActive: isActive ?? this.isActive,
+      role: role ?? this.role,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      isVerified: isVerified ?? this.isVerified,
+    );
+  }
+
   /// Create from JSON
   factory User.fromJson(Map<String, dynamic> json) {
     return User(

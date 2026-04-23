@@ -1,9 +1,8 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import '../models/expert_certificate.dart';
 import '../repository/expert_certificate_repository.dart';
@@ -23,18 +22,19 @@ class ExpertCertificateFormScreen extends ConsumerStatefulWidget {
 
 class _ExpertCertificateFormScreenState
     extends ConsumerState<ExpertCertificateFormScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _orgController = TextEditingController();
-  final _picker = ImagePicker();
-
+  
   bool _isLoading = false;
   bool _isSaving = false;
   String? _error;
 
   DateTime? _issueDate;
   DateTime? _expiryDate;
-  File? _localImage;
   ExpertCertificate? _certificate;
+  
+  final List<Map<String, dynamic>> _selectedFiles = [];
 
   bool get _isEdit => widget.certificateId != null;
 
@@ -69,6 +69,20 @@ class _ExpertCertificateFormScreenState
         _orgController.text = certificate.issuingOrganization;
         _issueDate = certificate.issueDate;
         _expiryDate = certificate.expiryDate;
+        
+        _selectedFiles.clear();
+        for (var media in certificate.reportMediaFiles) {
+          if (media.id.isNotEmpty) {
+            _selectedFiles.add({
+              'id': media.id,
+              'url': media.mediaUrl,
+              'name': 'Ảnh đính kèm',
+              'size': '',
+              'type': 'IMAGE',
+            });
+          }
+        }
+        
         _isLoading = false;
       });
     } catch (e) {
@@ -80,116 +94,92 @@ class _ExpertCertificateFormScreenState
     }
   }
 
-  Future<void> _pickImage(ImageSource source) async {
-    try {
-      final file = await _picker.pickImage(
-        source: source,
-        imageQuality: 85,
-        maxWidth: 1200,
-      );
-      if (file == null) return;
-      if (!mounted) return;
-      setState(() {
-        _localImage = File(file.path);
-      });
-    } catch (_) {
-      // Ignore picker errors (permissions or unavailable source)
+  void _pickIssueDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _issueDate ?? DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      // Ép về múi giờ UTC để tránh bị lùi ngày do chênh lệch +7 khi gửi lên server
+      setState(() => _issueDate = DateTime.utc(picked.year, picked.month, picked.day));
     }
   }
 
-  void _showAttachMenu() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildAttachOption(
-                icon: Icons.photo_library_outlined,
-                label: 'Thư viện',
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickImage(ImageSource.gallery);
-                },
-              ),
-              _buildAttachOption(
-                icon: Icons.camera_alt_outlined,
-                label: 'Chụp ảnh',
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickImage(ImageSource.camera);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAttachOption({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: const Color(0xFF6C47C2), size: 28),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF333333)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _selectDate({required bool isIssueDate}) async {
-    final initialDate = (isIssueDate ? _issueDate : _expiryDate) ?? DateTime.now();
+  void _pickExpiryDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: initialDate,
-      firstDate: DateTime(1990),
-      lastDate: DateTime.now().add(const Duration(days: 3650)),
+      initialDate: _expiryDate ?? DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
     );
-    if (picked == null) return;
-    setState(() {
-      if (isIssueDate) {
-        _issueDate = picked;
-      } else {
-        _expiryDate = picked;
+    if (picked != null) {
+      // Ép về múi giờ UTC để tránh bị lùi ngày
+      setState(() => _expiryDate = DateTime.utc(picked.year, picked.month, picked.day));
+    }
+  }
+
+  void _pickFiles() async {
+    try {
+      FilePickerResult? result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+        allowMultiple: true,
+      );
+
+      if (result != null) {
+        setState(() {
+          for (var file in result.files) {
+            if (file.size > 5 * 1024 * 1024) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('File ${file.name} vượt quá 5MB'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+              continue;
+            }
+            
+            String sizeStr = file.size < 1024 * 1024
+                ? '${(file.size / 1024).toStringAsFixed(1)} KB'
+                : '${(file.size / (1024 * 1024)).toStringAsFixed(1)} MB';
+
+            _selectedFiles.add({
+              'name': file.name,
+              'size': sizeStr,
+              'type': file.extension?.toUpperCase() ?? 'FILE',
+              'path': file.path,
+            });
+          }
+        });
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi chọn file: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _removeFile(int index) {
+    setState(() => _selectedFiles.removeAt(index));
   }
 
   Future<void> _submit() async {
-    final name = _nameController.text.trim();
-    final org = _orgController.text.trim();
+    if (!_formKey.currentState!.validate()) return;
 
-    if (name.isEmpty || org.isEmpty) {
+    if (_issueDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng nhập đủ thông tin bắt buộc')),
+        const SnackBar(content: Text('Vui lòng chọn ngày cấp')),
       );
       return;
     }
 
-    if (_localImage == null && (_certificate?.reportMediaFiles.isEmpty ?? true)) {
+    if (_selectedFiles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng tải lên ảnh chứng chỉ')),
+        const SnackBar(content: Text('Vui lòng chọn ít nhất 1 ảnh chứng chỉ')),
       );
       return;
     }
@@ -200,30 +190,28 @@ class _ExpertCertificateFormScreenState
       final repo = ref.read(expertCertificateRepositoryProvider);
       List<String> mediaIds = [];
 
-      if (_localImage != null) {
-        final media = await repo.uploadCertificateImage(_localImage!);
-        mediaIds = [media.id];
-      } else {
-        mediaIds = _certificate?.reportMediaFiles
-                .map((item) => item.id)
-                .where((id) => id.isNotEmpty)
-                .toList() ??
-            [];
+      for (var f in _selectedFiles) {
+        if (f['path'] != null) {
+          final media = await repo.uploadCertificateImage(File(f['path']));
+          mediaIds.add(media.id);
+        } else if (f['id'] != null) {
+          mediaIds.add(f['id']);
+        }
       }
 
       if (_isEdit) {
         await repo.updateCertificate(
           certificateId: widget.certificateId!,
-          certificateName: name,
-          issuingOrganization: org,
+          certificateName: _nameController.text.trim(),
+          issuingOrganization: _orgController.text.trim(),
           issueDate: _issueDate,
           expiryDate: _expiryDate,
           reportMediaIds: mediaIds,
         );
       } else {
         await repo.createCertificate(
-          certificateName: name,
-          issuingOrganization: org,
+          certificateName: _nameController.text.trim(),
+          issuingOrganization: _orgController.text.trim(),
           issueDate: _issueDate,
           expiryDate: _expiryDate,
           reportMediaIds: mediaIds,
@@ -240,7 +228,7 @@ class _ExpertCertificateFormScreenState
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: $e')),
+        SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
       );
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -250,21 +238,21 @@ class _ExpertCertificateFormScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F6F8),
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF7F6F8),
+        backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF131018)),
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => context.pop(),
         ),
         title: Text(
           _isEdit ? 'Cập Nhật Chứng Chỉ' : 'Thêm Chứng Chỉ',
           style: const TextStyle(
-            fontSize: 18,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF131018),
+            color: Colors.black87,
           ),
         ),
       ),
@@ -272,15 +260,59 @@ class _ExpertCertificateFormScreenState
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? _buildErrorState()
-              : ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    _buildInputCard(),
-                    const SizedBox(height: 16),
-                    _buildImagePicker(),
-                    const SizedBox(height: 24),
-                    _buildSubmitButton(),
-                  ],
+              : Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildInfoBanner(),
+                        const SizedBox(height: 24),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _buildTextField(
+                                  controller: _nameController,
+                                  label: 'Tên chứng chỉ *',
+                                  errorMsg: 'Vui lòng nhập tên chứng chỉ',
+                                ),
+                                const SizedBox(height: 16),
+                                _buildTextField(
+                                  controller: _orgController,
+                                  label: 'Tổ chức cấp *',
+                                  errorMsg: 'Vui lòng nhập tổ chức cấp',
+                                ),
+                                const SizedBox(height: 16),
+                                _buildDatePicker(
+                                  label: 'Ngày cấp *',
+                                  date: _issueDate,
+                                  onTap: _pickIssueDate,
+                                ),
+                                const SizedBox(height: 16),
+                                _buildDatePicker(
+                                  label: 'Ngày hết hạn (không bắt buộc)',
+                                  date: _expiryDate,
+                                  onTap: _pickExpiryDate,
+                                  isOptional: true,
+                                ),
+                                const SizedBox(height: 24),
+                                _buildFileRulesBanner(),
+                                const SizedBox(height: 16),
+                                _buildUploadArea(),
+                                const SizedBox(height: 24),
+                                if (_selectedFiles.isNotEmpty) _buildImageGrid(),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        _buildSubmitButton(),
+                      ],
+                    ),
+                  ),
                 ),
     );
   }
@@ -294,18 +326,12 @@ class _ExpertCertificateFormScreenState
           children: [
             const Icon(Icons.error_outline, color: Colors.red, size: 48),
             const SizedBox(height: 12),
-            Text(
-              _error ?? 'Không thể tải chứng chỉ',
-              textAlign: TextAlign.center,
-            ),
+            Text(_error ?? 'Lỗi', textAlign: TextAlign.center),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _loadDetail,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6C47C2),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Thử lại'),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C47C2)),
+              child: const Text('Thử lại', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -313,184 +339,243 @@ class _ExpertCertificateFormScreenState
     );
   }
 
-  Widget _buildInputCard() {
+  Widget _buildInfoBanner() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.green.shade50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF0F0F0)),
+        border: Border.all(color: Colors.green.shade200),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Icon(Icons.verified_outlined, size: 48, color: Theme.of(context).primaryColor),
+          const SizedBox(height: 16),
           const Text(
-            'Thông tin chứng chỉ',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF131018),
-            ),
+            'Thông Tin Chứng Chỉ',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _nameController,
-            decoration: const InputDecoration(
-              labelText: 'Tên chứng chỉ',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _orgController,
-            decoration: const InputDecoration(
-              labelText: 'Đơn vị cấp',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildDateField(
-            label: 'Ngày cấp',
-            value: _issueDate,
-            onTap: () => _selectDate(isIssueDate: true),
-          ),
-          const SizedBox(height: 12),
-          _buildDateField(
-            label: 'Ngày hết hạn (không bắt buộc)',
-            value: _expiryDate,
-            onTap: () => _selectDate(isIssueDate: false),
-            allowClear: true,
+          const SizedBox(height: 8),
+          Text(
+            'Vui lòng nhập thông tin và tải lên hình ảnh chứng chỉ chuyên môn của bạn.',
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.5),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDateField({
-    required String label,
-    required DateTime? value,
-    required VoidCallback onTap,
-    bool allowClear = false,
-  }) {
-    final text = value == null ? 'Chọn ngày' : DateFormat('dd/MM/yyyy').format(value);
+  Widget _buildTextField({required TextEditingController controller, required String label, required String errorMsg}) {
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+      ),
+      validator: (v) => v == null || v.isEmpty ? errorMsg : null,
+    );
+  }
+
+  Widget _buildDatePicker({required String label, required DateTime? date, required VoidCallback onTap, bool isOptional = false}) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
-          suffixIcon: allowClear && value != null
-              ? IconButton(
-                  icon: const Icon(Icons.close, size: 18),
-                  onPressed: () => setState(() => _expiryDate = null),
-                )
-              : const Icon(Icons.calendar_today, size: 18),
+          suffixIcon: isOptional && date != null
+            ? IconButton(
+                icon: const Icon(Icons.close, size: 18),
+                onPressed: () => setState(() => _expiryDate = null),
+              )
+            : const Icon(Icons.calendar_today, size: 18),
         ),
-        child: Text(text),
+        child: Text(date != null ? DateFormat('dd/MM/yyyy').format(date) : (isOptional ? 'Chọn ngày (nếu có)' : 'Chọn ngày')),
       ),
     );
   }
 
-  Widget _buildImagePicker() {
-    final previewUrl = _certificate?.primaryMediaUrl;
-    final hasImage = _localImage != null || previewUrl != null;
+  Widget _buildFileRulesBanner() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF0F0F0)),
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          const Text(
-            'Ảnh chứng chỉ',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF131018),
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (hasImage)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: _localImage != null
-                  ? Image.file(
-                      _localImage!,
-                      height: 180,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    )
-                  : Image.network(
-                      previewUrl!,
-                      height: 180,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        height: 180,
-                        color: const Color(0xFFF2F2F2),
-                        child: const Icon(Icons.image, color: Colors.grey),
-                      ),
-                    ),
-            )
-          else
-            Container(
-              height: 180,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE0E0E0)),
-              ),
-              child: const Center(
-                child: Text(
-                  'Chưa có ảnh chứng chỉ',
-                  style: TextStyle(color: Color(0xFF888888)),
-                ),
-              ),
-            ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: _showAttachMenu,
-            icon: const Icon(Icons.upload_file),
-            label: Text(_localImage != null || previewUrl != null
-                ? 'Thay ảnh chứng chỉ'
-                : 'Tải ảnh chứng chỉ'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF6C47C2),
-              side: const BorderSide(color: Color(0xFF6C47C2)),
+          Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Chấp nhận hình ảnh: JPG, PNG, GIF, WEBP (tối đa 5MB)',
+              style: TextStyle(fontSize: 13, color: Colors.blue.shade900),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildUploadArea() {
+    return InkWell(
+      onTap: _pickFiles,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).primaryColor.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Theme.of(context).primaryColor.withOpacity(0.3), width: 2),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.cloud_upload_outlined, size: 48, color: Theme.of(context).primaryColor),
+            const SizedBox(height: 12),
+            Text(
+              'Nhấn để chọn hình ảnh chứng chỉ',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Theme.of(context).primaryColor),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Hỗ trợ tải lên nhiều ảnh',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageGrid() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Hình ảnh đã chọn:',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+            ),
+            Text(
+              '${_selectedFiles.length} ảnh',
+              style: TextStyle(fontSize: 14, color: Theme.of(context).primaryColor, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.85,
+          ),
+          itemCount: _selectedFiles.length,
+          itemBuilder: (context, index) {
+            final file = _selectedFiles[index];
+            return Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(11),
+                    child: Container(
+                      width: double.infinity,
+                      height: double.infinity,
+                      color: Colors.grey.shade100,
+                      child: file['path'] != null 
+                          ? Image.file(File(file['path']), fit: BoxFit.contain)
+                          : file['url'] != null
+                              ? Image.network(file['url'], fit: BoxFit.contain)
+                              : Container(
+                                  color: Colors.grey.shade200,
+                                  child: Icon(Icons.image, color: Colors.grey.shade400, size: 40),
+                                ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 0, left: 0, right: 0,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(11)),
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [Colors.black.withOpacity(0.8), Colors.transparent],
+                        ),
+                      ),
+                      padding: const EdgeInsets.fromLTRB(8, 20, 8, 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            file['name'],
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                          ),
+                          if (file['size'] != '') ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              file['size'],
+                              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 10),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 4, right: 4,
+                    child: GestureDetector(
+                      onTap: () => _removeFile(index),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.5),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.close, color: Colors.white, size: 16),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 
   Widget _buildSubmitButton() {
     return SizedBox(
-      height: 48,
+      height: 50,
       child: ElevatedButton(
         onPressed: _isSaving ? null : _submit,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF6C47C2),
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          backgroundColor: Theme.of(context).primaryColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
         child: _isSaving
             ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
+                height: 20, width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
               )
-            : Text(_isEdit ? 'Cập nhật' : 'Tạo chứng chỉ'),
+            : Text(
+                _isEdit ? 'Cập Nhật Chứng Chỉ' : 'Hoàn Thành Nộp Chứng Chỉ',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
       ),
     );
   }
 }
+

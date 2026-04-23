@@ -5,6 +5,7 @@ import '../models/expert_certificate.dart';
 import '../models/expert_profile.dart';
 import '../repository/expert_certificate_repository.dart';
 import '../repository/expert_profile_repository.dart';
+import '../../auth/providers/auth_provider.dart';
 
 /// Expert ID Documents Screen - Manage certificates and credentials for experts
 /// Màn hình chứng chỉ & bằng cấp của Chuyên gia
@@ -74,6 +75,8 @@ class _ExpertIdDocumentsScreenState
 
   @override
   Widget build(BuildContext context) {
+    final hasVerifiedCert = _certificates.any((c) => c.isVerified) || _profile?.isVerified == true;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF7F6F8),
       appBar: _buildAppBar(),
@@ -92,6 +95,34 @@ class _ExpertIdDocumentsScreenState
                       const SizedBox(height: 24),
                       _buildInfoBox(),
                       const SizedBox(height: 24),
+                      if (hasVerifiedCert) ...[
+                          SizedBox(
+                            height: 56,
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                await ref.read(authProvider.notifier).markUserAsVerified();
+                                if (mounted) context.go('/expert-home');
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF6C47C2),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 2,
+                              ),
+                              child: const Text(
+                                'Vào Trang Chủ',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 24),
+                      ],
                     ],
                   ),
                 ),

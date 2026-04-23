@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import '../../../expert/repository/expert_certificate_repository.dart';
+import '../../providers/auth_provider.dart';
 
 class ExpertCredentialsScreen extends ConsumerStatefulWidget {
   final Map<String, String> registrationData;
@@ -44,7 +45,8 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
       lastDate: DateTime.now(),
     );
     if (picked != null) {
-      setState(() => _issueDate = picked);
+      // Ép về múi giờ UTC để tránh bị lùi ngày do chênh lệch +7 khi gửi lên server
+      setState(() => _issueDate = DateTime.utc(picked.year, picked.month, picked.day));
     }
   }
 
@@ -56,7 +58,8 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
       lastDate: DateTime(2100),
     );
     if (picked != null) {
-      setState(() => _expiryDate = picked);
+      // Ép về múi giờ UTC để tránh bị lùi ngày
+      setState(() => _expiryDate = DateTime.utc(picked.year, picked.month, picked.day));
     }
   }
 
@@ -222,16 +225,18 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () {
-            if (context.canPop()) {
+          onPressed: () async {
+            final fromLogin = widget.registrationData['fromLogin'] == 'true';
+            if (fromLogin) {
+              // Bắt buộc hủy phiên đăng nhập nếu quay lại từ màn hình yêu cầu nộp chứng chỉ lúc đăng nhập
+              await ref.read(authProvider.notifier).logout();
+              if (context.mounted) {
+                context.goNamed('role_selection');
+              }
+            } else if (context.canPop()) {
               context.pop();
             } else {
-              final fromLogin = widget.registrationData['fromLogin'] == 'true';
-              if (fromLogin) {
-                context.goNamed('expert_login');
-              } else {
-                context.goNamed('expert_registration');
-              }
+              context.goNamed('expert_registration');
             }
           },
         ),
@@ -373,57 +378,175 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
                       ),
                       const SizedBox(height: 16),
 
-                      // Upload button
-                      OutlinedButton.icon(
-                        onPressed: _pickFiles,
-                        icon: const Icon(Icons.upload_file),
-                        label: const Text('Chọn Hình Ảnh Chứng Chỉ'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.all(16),
-                          side: BorderSide(color: Theme.of(context).primaryColor, width: 2),
-                          shape: RoundedRectangleBorder(
+                      // Upload area
+                      InkWell(
+                        onTap: _pickFiles,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).primaryColor.withOpacity(0.05),
                             borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Theme.of(context).primaryColor.withOpacity(0.3),
+                              width: 2,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.cloud_upload_outlined,
+                                size: 48,
+                                color: Theme.of(context).primaryColor,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Nhấn để chọn hình ảnh chứng chỉ',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Theme.of(context).primaryColor,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Hỗ trợ tải lên nhiều ảnh',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
 
-                      // Files list
+                      // Files list preview
                       if (_selectedFiles.isNotEmpty) ...[
-                        const Text(
-                          'Hình ảnh đã chọn:',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Hình ảnh đã chọn:',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            Text(
+                              '${_selectedFiles.length} ảnh',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Theme.of(context).primaryColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 12),
-                        ListView.builder(
+                        GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: 0.85,
+                          ),
                           itemCount: _selectedFiles.length,
                           itemBuilder: (context, index) {
                             final file = _selectedFiles[index];
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-                                  child: Icon(
-                                    Icons.image,
-                                    color: Theme.of(context).primaryColor,
+                            return Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.grey.shade300),
+                              ),
+                              child: Stack(
+                                children: [
+                                  // Image Preview
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(11),
+                                    child: Container(
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                      color: Colors.grey.shade100, // Background for contain
+                                      child: file['path'] != null 
+                                          ? Image.file(
+                                              File(file['path']),
+                                              fit: BoxFit.contain,
+                                            )
+                                          : Container(
+                                              color: Colors.grey.shade200,
+                                              child: Icon(Icons.image, color: Colors.grey.shade400, size: 40),
+                                            ),
+                                    ),
                                   ),
-                                ),
-                                title: Text(
-                                  file['name'],
-                                  style: const TextStyle(fontWeight: FontWeight.w500),
-                                ),
-                                subtitle: Text('${file['type']} • ${file['size']}'),
-                                trailing: IconButton(
-                                  icon: const Icon(Icons.close, color: Colors.red),
-                                  onPressed: () => _removeFile(index),
-                                ),
+                                  // Gradient Overlay at bottom for text readability
+                                  Positioned(
+                                    bottom: 0,
+                                    left: 0,
+                                    right: 0,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(11)),
+                                        gradient: LinearGradient(
+                                          begin: Alignment.bottomCenter,
+                                          end: Alignment.topCenter,
+                                          colors: [
+                                            Colors.black.withOpacity(0.8),
+                                            Colors.transparent,
+                                          ],
+                                        ),
+                                      ),
+                                      padding: const EdgeInsets.fromLTRB(8, 20, 8, 8),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            file['name'],
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            file['size'],
+                                            style: TextStyle(
+                                              color: Colors.white.withOpacity(0.8),
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  // Remove Button
+                                  Positioned(
+                                    top: 4,
+                                    right: 4,
+                                    child: GestureDetector(
+                                      onTap: () => _removeFile(index),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withOpacity(0.5),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.close,
+                                          color: Colors.white,
+                                          size: 16,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             );
                           },

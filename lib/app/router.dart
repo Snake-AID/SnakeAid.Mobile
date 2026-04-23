@@ -109,15 +109,17 @@ final router = GoRouter(
     final container = ProviderScope.containerOf(context, listen: false);
     final authState = container.read(authProvider);
     final user = authState.user;
-    final isExpert = user?.role.name == 'Expert';
+    final isExpert = user?.role.name == 'expert';
     final isVerified = user?.isVerified == true;
     final isAuth = authState.isAuthenticated;
     final path = state.uri.path;
 
     // Nếu là expert, đã đăng nhập, nhưng chưa verified
     if (isAuth && isExpert && !isVerified) {
-      // Chỉ cho phép vào /expert-id-documents và các route con
-      if (!path.startsWith('/expert-id-documents')) {
+      // Chỉ cho phép vào các trang liên quan đến chứng chỉ
+      if (!path.startsWith('/expert-id-documents') && 
+          !path.startsWith('/expert-credentials') &&
+          !path.startsWith('/registration-pending')) {
         return '/expert-id-documents';
       }
     }
