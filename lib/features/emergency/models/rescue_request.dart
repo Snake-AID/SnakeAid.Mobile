@@ -27,9 +27,17 @@ class RescueRequest {
   @JsonKey(name: 'requestSentAt')
   final DateTime requestSentAt;
 
-  /// Expiry time (60 seconds from sentAt) (UTC)
-  @JsonKey(name: 'expiredAt')
-  final DateTime expiredAt;
+  /// Expiry time (60 seconds from sentAt) (UTC).
+  ///
+  /// Deprecated in backend payload. If the backend does not provide
+  /// `expiredAt`, the client derives expiry as `requestSentAt + requestTimeoutSeconds`.
+  @Deprecated(
+    'Backend no longer sends expiredAt. This field is kept for legacy compatibility.',
+  )
+  @JsonKey(name: 'expiredAt', includeIfNull: false)
+  final DateTime? expiredAt;
+
+  static const int requestTimeoutSeconds = 60;
 
   RescueRequest({
     required this.requestId,
@@ -37,7 +45,7 @@ class RescueRequest {
     required this.incidentId,
     required this.radiusKm,
     required this.requestSentAt,
-    required this.expiredAt,
+    this.expiredAt,
   });
 
   factory RescueRequest.fromJson(Map<String, dynamic> json) =>
@@ -45,12 +53,19 @@ class RescueRequest {
 
   Map<String, dynamic> toJson() => _$RescueRequestToJson(this);
 
+  DateTime get effectiveExpiredAt {
+    if (expiredAt != null) {
+      return expiredAt!.toUtc();
+    }
+    return requestSentAt.toUtc().add(
+      const Duration(seconds: requestTimeoutSeconds),
+    );
+  }
+
   /// Get remaining seconds until expiry (UTC-based calculation)
   int get remainingSeconds {
-    final nowUtc = DateTime.now().toUtc(); // ✅ Convert to UTC
-
-    // Ensure expiredAt is in UTC (should be from backend)
-    final expiredUtc = expiredAt.isUtc ? expiredAt : expiredAt.toUtc();
+    final nowUtc = DateTime.now().toUtc();
+    final expiredUtc = effectiveExpiredAt;
 
     if (nowUtc.isAfter(expiredUtc)) return 0;
 

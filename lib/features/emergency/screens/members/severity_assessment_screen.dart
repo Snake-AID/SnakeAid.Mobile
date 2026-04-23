@@ -11,7 +11,8 @@ import '../../providers/incident_provider.dart';
 class SeverityAssessmentScreen extends ConsumerStatefulWidget {
   final String incidentId;
   final String? recognitionResultId;
-  final bool isDirectEntry; // true = from quick actions, false = from symptom flow
+  final bool
+  isDirectEntry; // true = from quick actions, false = from symptom flow
 
   const SeverityAssessmentScreen({
     super.key,
@@ -47,9 +48,11 @@ class _SeverityAssessmentScreenState
     // Load incident data via provider (uses smart caching)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Get incident ID - prefer from active incident provider if widget.incidentId is empty
-      final activeIncidentId = ref.read(activeIncidentProvider).activeIncidentId;
-      final incidentId = widget.incidentId.isNotEmpty 
-          ? widget.incidentId 
+      final activeIncidentId = ref
+          .read(activeIncidentProvider)
+          .activeIncidentId;
+      final incidentId = widget.incidentId.isNotEmpty
+          ? widget.incidentId
           : (activeIncidentId ?? '');
 
       debugPrint('🔍 Using incident ID: $incidentId');
@@ -63,7 +66,8 @@ class _SeverityAssessmentScreenState
 
       // Check if we already have cached data in DetailedIncidentProvider
       final detailedIncidentState = ref.read(detailedIncidentProvider);
-      final hasValidCache = detailedIncidentState.incident?.id == incidentId && 
+      final hasValidCache =
+          detailedIncidentState.incident?.id == incidentId &&
           detailedIncidentState.isCacheFresh;
 
       if (hasValidCache) {
@@ -72,9 +76,7 @@ class _SeverityAssessmentScreenState
       }
 
       // Otherwise, load from API (will use smart caching)
-      ref
-          .read(detailedIncidentProvider.notifier)
-          .loadIfStale(incidentId);
+      ref.read(detailedIncidentProvider.notifier).loadIfStale(incidentId);
     });
 
     // Load dos from API if recognitionResultId is provided
@@ -194,160 +196,164 @@ class _SeverityAssessmentScreenState
     final detailedIncidentState = ref.watch(detailedIncidentProvider);
     final incident = detailedIncidentState.incident;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF191910)),
-          onPressed: () {
-            // Always pop back (works for both flows)
-            // - From symptom flow: back to symptom report
-            // - From quick actions: back to tracking
-            context.pop();
-          },
-        ),
-        title: const Text(
-          'Đánh giá mức độ nghiêm trọng',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF191910),
+    return WillPopScope(
+      onWillPop: _handleWillPop,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF3F4F6),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new,
+              color: Color(0xFF191910),
+            ),
+            onPressed: _returnToEmergencyTracking,
           ),
-        ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Color(0xFF228B22)),
-            onPressed: () {
-              ref
-                  .read(detailedIncidentProvider.notifier)
-                  .refreshDetailedIncident();
-            },
-            tooltip: 'Làm mới dữ liệu',
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Center(
-              child: Text(
-                'Phân tích lúc $_assessmentTime',
-                style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-              ),
+          title: const Text(
+            'Đánh giá mức độ nghiêm trọng',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF191910),
             ),
           ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: const Color(0xFFE5E5E5)),
-        ),
-      ),
-      body: detailedIncidentState.isLoading
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: Color(0xFF228B22)),
-                  SizedBox(height: 16),
-                  Text('Đang tải thông tin đánh giá...'),
-                ],
+          centerTitle: true,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh, color: Color(0xFF228B22)),
+              onPressed: () {
+                ref
+                    .read(detailedIncidentProvider.notifier)
+                    .refreshDetailedIncident();
+              },
+              tooltip: 'Làm mới dữ liệu',
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Center(
+                child: Text(
+                  'Phân tích lúc $_assessmentTime',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
               ),
-            )
-          : detailedIncidentState.error != null || incident == null
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
+            ),
+          ],
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Container(height: 1, color: const Color(0xFFE5E5E5)),
+          ),
+        ),
+        body: detailedIncidentState.isLoading
+            ? const Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(
-                      Icons.error_outline,
-                      size: 64,
-                      color: Color(0xFFDC3545),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      detailedIncidentState.error ??
-                          'Không tải được thông tin sự cố',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Color(0xFF666666),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: () {
-                        ref
-                            .read(detailedIncidentProvider.notifier)
-                            .loadDetailedIncident(
-                              widget.incidentId,
-                              forceRefresh: true,
-                            );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF228B22),
-                      ),
-                      child: const Text('Thử lại'),
-                    ),
+                    CircularProgressIndicator(color: Color(0xFF228B22)),
+                    SizedBox(height: 16),
+                    Text('Đang tải thông tin đánh giá...'),
                   ],
                 ),
-              ),
-            )
-          : Column(
-              children: [
-                // Severity Banner
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  color: _getSeverityColor(incident),
-                  child: Text(
-                    _getSeverityLevel(incident),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+              )
+            : detailedIncidentState.error != null || incident == null
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        size: 64,
+                        color: Color(0xFFDC3545),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        detailedIncidentState.error ??
+                            'Không tải được thông tin sự cố',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Color(0xFF666666),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: () {
+                          ref
+                              .read(detailedIncidentProvider.notifier)
+                              .loadDetailedIncident(
+                                widget.incidentId,
+                                forceRefresh: true,
+                              );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF228B22),
+                        ),
+                        child: const Text('Thử lại'),
+                      ),
+                    ],
                   ),
                 ),
+              )
+            : Column(
+                children: [
+                  // Severity Banner
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    color: _getSeverityColor(incident),
+                    child: Text(
+                      _getSeverityLevel(incident),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
 
-                // Scrollable Content
-                Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: () async {
-                      await ref
-                          .read(detailedIncidentProvider.notifier)
-                          .refreshDetailedIncident();
-                    },
-                    color: const Color(0xFF228B22),
-                    child: SingleChildScrollView(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            // Score Card
-                            _buildScoreCard(incident),
-                            const SizedBox(height: 16),
+                  // Scrollable Content
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: () async {
+                        await ref
+                            .read(detailedIncidentProvider.notifier)
+                            .refreshDetailedIncident();
+                      },
+                      color: const Color(0xFF228B22),
+                      child: SingleChildScrollView(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            children: [
+                              // Score Card
+                              _buildScoreCard(incident),
+                              const SizedBox(height: 16),
 
-                            // Risk Factors Card
-                            _buildRiskFactorsCard(incident),
-                            const SizedBox(height: 16),
+                              // Risk Factors Card
+                              _buildRiskFactorsCard(incident),
+                              const SizedBox(height: 16),
 
-                            // Action Items Card
-                            _buildActionItemsCard(),
-                            const SizedBox(height: 100),
-                          ],
+                              // Action Items Card
+                              _buildActionItemsCard(),
+                              const SizedBox(height: 100),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
 
-                // Bottom Actions
-                _buildBottomActions(),
-              ],
-            ),
+                  // Bottom Actions
+                  _buildBottomActions(),
+                ],
+              ),
+      ),
     );
   }
 
@@ -613,6 +619,17 @@ class _SeverityAssessmentScreenState
     );
   }
 
+  void _returnToEmergencyTracking() {
+    Navigator.of(context).popUntil((route) {
+      return route.settings.name == 'emergency_tracking' || route.isFirst;
+    });
+  }
+
+  Future<bool> _handleWillPop() async {
+    _returnToEmergencyTracking();
+    return false;
+  }
+
   Widget _buildBottomActions() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -632,16 +649,7 @@ class _SeverityAssessmentScreenState
         children: [
           // Back to Emergency Tracking Button
           ElevatedButton(
-            onPressed: () {
-              // Pop back based on entry context
-              if (widget.isDirectEntry) {
-                // Direct entry: just pop once to tracking
-                Navigator.of(context).pop();
-              } else {
-                // From symptom flow: pop 3 levels (severity + symptom + snake location)
-                Navigator.of(context)..pop()..pop()..pop();
-              }
-            },
+            onPressed: _returnToEmergencyTracking,
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF228B22),
               foregroundColor: Colors.white,

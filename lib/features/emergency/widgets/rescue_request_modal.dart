@@ -67,10 +67,8 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
   void initState() {
     super.initState();
 
-    _remainingSeconds = widget.request.remainingSeconds;
-    debugPrint(
-      '⏱️ Initial remaining seconds: $_remainingSeconds (calculated from UTC)',
-    );
+    _remainingSeconds = RescueRequest.requestTimeoutSeconds;
+    debugPrint('⏱️ Starting internal countdown: $_remainingSeconds seconds');
 
     // Pulse animation
     _pulseController = AnimationController(
@@ -226,6 +224,8 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
   }
 
   void _startCountdown() {
+    _remainingSeconds = RescueRequest.requestTimeoutSeconds;
+
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
@@ -233,7 +233,8 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
       }
 
       setState(() {
-        _remainingSeconds = widget.request.remainingSeconds;
+        final nextSeconds = _remainingSeconds - 1;
+        _remainingSeconds = nextSeconds > 0 ? nextSeconds : 0;
 
         if (_remainingSeconds % 10 == 0 &&
             _remainingSeconds > 0 &&
@@ -725,8 +726,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
                               Text(
                                 '$_remainingSeconds',
                                 style: TextStyle(
-                                  color:
-                                      urgency ? Colors.yellow : Colors.white,
+                                  color: urgency ? Colors.yellow : Colors.white,
                                   fontSize: 24,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -749,12 +749,15 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        urgency ? '⚠️ Sắp hết thời gian!' : 'Thời gian phản hồi',
+                        urgency
+                            ? '⚠️ Sắp hết thời gian!'
+                            : 'Thời gian phản hồi',
                         style: TextStyle(
                           color: urgency ? Colors.yellow : Colors.white,
                           fontSize: 14,
-                          fontWeight:
-                              urgency ? FontWeight.bold : FontWeight.w500,
+                          fontWeight: urgency
+                              ? FontWeight.bold
+                              : FontWeight.w500,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -787,8 +790,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
           onPressed: _isAccepting || _incident == null ? null : _onAccept,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF2E7D32),
-            disabledBackgroundColor:
-                const Color(0xFF2E7D32).withOpacity(0.4),
+            disabledBackgroundColor: const Color(0xFF2E7D32).withOpacity(0.4),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
             ),
@@ -835,11 +837,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.error_outline,
-              size: 58,
-              color: Color(0xFFD32F2F),
-            ),
+            const Icon(Icons.error_outline, size: 58, color: Color(0xFFD32F2F)),
             const SizedBox(height: 16),
             Text(
               _errorMessage!,
@@ -944,10 +942,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
                         color: Colors.white70,
                         child: const Text(
                           '© OpenStreetMap',
-                          style: TextStyle(
-                            fontSize: 8,
-                            color: Colors.black54,
-                          ),
+                          style: TextStyle(fontSize: 8, color: Colors.black54),
                         ),
                       ),
                     ),
@@ -1200,8 +1195,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
                     : null,
                 child: account?.avatarUrl == null
                     ? Text(
-                        account?.fullName?.substring(0, 1).toUpperCase() ??
-                            'U',
+                        account?.fullName?.substring(0, 1).toUpperCase() ?? 'U',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -1227,11 +1221,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
                     if (user.ratingCount > 0)
                       Row(
                         children: [
-                          const Icon(
-                            Icons.star,
-                            size: 13,
-                            color: Colors.amber,
-                          ),
+                          const Icon(Icons.star, size: 13, color: Colors.amber),
                           const SizedBox(width: 4),
                           Text(
                             '${user.rating.toStringAsFixed(1)} (${user.ratingCount} đánh giá)',
@@ -1245,10 +1235,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
                     else
                       Text(
                         'Người dùng mới',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[500],
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                       ),
                   ],
                 ),
@@ -1258,10 +1245,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
           if (user.hasUnderlyingDisease) ...[
             const SizedBox(height: 12),
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 8,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
                 color: Colors.orange.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(8),
@@ -1307,8 +1291,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
                 final phone = entry.value;
                 return Column(
                   children: [
-                    if (index > 0)
-                      Divider(height: 16, color: Colors.grey[200]),
+                    if (index > 0) Divider(height: 16, color: Colors.grey[200]),
                     Row(
                       children: [
                         Expanded(
@@ -1436,8 +1419,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
 
   Widget _buildSnakeDetectionCard() {
     final media = _incident!.media;
-    final hasMedia =
-        media.isNotEmpty && media.first.mediaUrl.trim().isNotEmpty;
+    final hasMedia = media.isNotEmpty && media.first.mediaUrl.trim().isNotEmpty;
     final firstMedia = hasMedia ? media.first : null;
     final hasAI = firstMedia?.detectedSpecies.isNotEmpty ?? false;
 
