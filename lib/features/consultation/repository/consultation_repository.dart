@@ -1402,7 +1402,7 @@ class ConsultationRepository {
             : <String, dynamic>{};
 
           final resolvedFee =
-            parseAmount(e['price']) ??
+            parseAmount(e['grossPrice']) ??
             parseAmount(e['feeCost']) ??
             parseAmount(e['fee']) ??
             parseAmount(e['amount']) ??
@@ -1454,8 +1454,9 @@ class ConsultationRepository {
             'slotEndTime': e['slotEndTime'] ?? e['endTime'],
             'status': normalizedStatus,
             'feeCost': resolvedFee,
-            'price': resolvedFee,
             'bookedAt': e['startTime'],
+            'grossPrice': e['grossPrice'] ?? resolvedFee,
+            'netPrice': e['netPrice'],
           };
 
           return ConsultationBookingResponse.fromJson(normalized);

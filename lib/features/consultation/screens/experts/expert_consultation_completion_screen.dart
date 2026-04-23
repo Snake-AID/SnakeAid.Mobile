@@ -10,10 +10,7 @@ import '../../repository/consultation_repository.dart';
 class ExpertConsultationCompletionScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> data;
 
-  const ExpertConsultationCompletionScreen({
-    super.key,
-    required this.data,
-  });
+  const ExpertConsultationCompletionScreen({super.key, required this.data});
 
   @override
   ConsumerState<ExpertConsultationCompletionScreen> createState() =>
@@ -31,17 +28,21 @@ class _ExpertConsultationCompletionScreenState
   late int _feeCost;
   DateTime? _sessionTime;
   String? _problemDescription;
+  int? _grossPrice;
+  int? _netPrice;
 
   @override
   void initState() {
     super.initState();
-    _patientName = (widget.data['patientName'] as String?)?.trim().isNotEmpty == true
+    _patientName =
+        (widget.data['patientName'] as String?)?.trim().isNotEmpty == true
         ? (widget.data['patientName'] as String).trim()
-        : 'Bệnh Nhân';
+        : 'Bệnh nhân';
     _durationSeconds = _toInt(widget.data['durationSeconds']);
     _feeCost = _toInt(widget.data['feeCost']);
     _sessionTime = widget.data['sessionTime'] as DateTime?;
-    _problemDescription = (widget.data['problemDescription'] as String?)?.trim();
+    _problemDescription = (widget.data['problemDescription'] as String?)
+        ?.trim();
 
     _syncCompletedSessionData();
   }
@@ -53,8 +54,9 @@ class _ExpertConsultationCompletionScreenState
   }
 
   Future<void> _syncCompletedSessionData() async {
-    final consultationId =
-        (widget.data['consultationId'] ?? '').toString().trim();
+    final consultationId = (widget.data['consultationId'] ?? '')
+        .toString()
+        .trim();
     if (consultationId.isEmpty) return;
 
     setState(() => _isSyncingSessionData = true);
@@ -73,7 +75,8 @@ class _ExpertConsultationCompletionScreenState
 
           for (final item in items) {
             final itemConsultationId = (item.consultationId ?? '').trim();
-            if (itemConsultationId == consultationId || item.id == consultationId) {
+            if (itemConsultationId == consultationId ||
+                item.id == consultationId) {
               matched = item;
               break;
             }
@@ -92,10 +95,8 @@ class _ExpertConsultationCompletionScreenState
       final resolvedName = (booking.userName ?? '').trim();
       final resolvedDurationSeconds =
           booking.slotStartTime != null && booking.slotEndTime != null
-              ? booking.slotEndTime!
-                  .difference(booking.slotStartTime!)
-                  .inSeconds
-              : 0;
+          ? booking.slotEndTime!.difference(booking.slotStartTime!).inSeconds
+          : 0;
 
       setState(() {
         if (resolvedName.isNotEmpty) {
@@ -104,6 +105,9 @@ class _ExpertConsultationCompletionScreenState
         if (booking.feeCost > 0) {
           _feeCost = booking.feeCost;
         }
+        _grossPrice = booking.grossPrice;
+        _netPrice = booking.netPrice;
+
         if (_durationSeconds <= 0 && resolvedDurationSeconds > 0) {
           _durationSeconds = resolvedDurationSeconds;
         }
@@ -146,9 +150,14 @@ class _ExpertConsultationCompletionScreenState
   Widget build(BuildContext context) {
     final patientName = _patientName;
     final durationSeconds = _durationSeconds;
-    final feeCost = _feeCost;
-    final platformFee = (feeCost * 0.1).round();
-    final netAmount = feeCost - platformFee;
+
+    // Logic: Use grossPrice/netPrice if available from sync, otherwise fallback to feeCost (10%)
+    final int feeCost = _grossPrice ?? _feeCost;
+    final int? netAmount = _netPrice;
+    final int platformFee = (netAmount != null)
+        ? (feeCost - netAmount)
+        : (feeCost * 0.1).round();
+    final int finalNet = netAmount ?? (feeCost - platformFee);
 
     final now = _sessionTime ?? DateTime.now();
     final dateStr =
@@ -174,19 +183,28 @@ class _ExpertConsultationCompletionScreenState
                           alignment: Alignment.center,
                           clipBehavior: Clip.none,
                           children: [
-                            const Icon(Icons.check_circle,
-                                color: _green, size: 100),
+                            const Icon(
+                              Icons.check_circle,
+                              color: _green,
+                              size: 100,
+                            ),
                             Positioned(
                               top: -8,
                               right: -12,
-                              child: Icon(Icons.auto_awesome,
-                                  color: Colors.amber[400], size: 28),
+                              child: Icon(
+                                Icons.auto_awesome,
+                                color: Colors.amber[400],
+                                size: 28,
+                              ),
                             ),
                             Positioned(
                               bottom: -4,
                               left: -12,
-                              child: Icon(Icons.auto_awesome,
-                                  color: Colors.amber[400], size: 22),
+                              child: Icon(
+                                Icons.auto_awesome,
+                                color: Colors.amber[400],
+                                size: 22,
+                              ),
                             ),
                           ],
                         ),
@@ -206,7 +224,9 @@ class _ExpertConsultationCompletionScreenState
                           'Báo cáo đã được gửi đến $patientName',
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                              fontSize: 15, color: Color(0xFF888888)),
+                            fontSize: 15,
+                            color: Color(0xFF888888),
+                          ),
                         ),
                       ],
                     ),
@@ -243,11 +263,15 @@ class _ExpertConsultationCompletionScreenState
                                       color: _purple.withOpacity(0.1),
                                       shape: BoxShape.circle,
                                       border: Border.all(
-                                          color: _purple.withOpacity(0.2),
-                                          width: 2),
+                                        color: _purple.withOpacity(0.2),
+                                        width: 2,
+                                      ),
                                     ),
-                                    child: const Icon(Icons.person,
-                                        color: _purple, size: 30),
+                                    child: const Icon(
+                                      Icons.person,
+                                      color: _purple,
+                                      size: 30,
+                                    ),
                                   ),
                                   Positioned(
                                     bottom: 0,
@@ -266,8 +290,7 @@ class _ExpertConsultationCompletionScreenState
                               const SizedBox(width: 14),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       patientName,
@@ -281,8 +304,9 @@ class _ExpertConsultationCompletionScreenState
                                     Text(
                                       dateStr,
                                       style: const TextStyle(
-                                          fontSize: 13,
-                                          color: Color(0xFF888888)),
+                                        fontSize: 13,
+                                        color: Color(0xFF888888),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -290,8 +314,7 @@ class _ExpertConsultationCompletionScreenState
                             ],
                           ),
                           const SizedBox(height: 14),
-                          const Divider(
-                              height: 1, color: Color(0xFFF0F0F0)),
+                          const Divider(height: 1, color: Color(0xFFF0F0F0)),
                           const SizedBox(height: 12),
                           Row(
                             children: [
@@ -322,8 +345,9 @@ class _ExpertConsultationCompletionScreenState
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF9FAFB),
                                 borderRadius: BorderRadius.circular(10),
-                                border:
-                                    Border.all(color: const Color(0xFFE5E7EB)),
+                                border: Border.all(
+                                  color: const Color(0xFFE5E7EB),
+                                ),
                               ),
                               child: Text(
                                 _problemDescription!,
@@ -355,7 +379,9 @@ class _ExpertConsultationCompletionScreenState
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 5),
+                              horizontal: 12,
+                              vertical: 5,
+                            ),
                             decoration: BoxDecoration(
                               color: _green,
                               borderRadius: BorderRadius.circular(20),
@@ -378,7 +404,7 @@ class _ExpertConsultationCompletionScreenState
                           ),
                           const SizedBox(height: 10),
                           _PayRow(
-                            label: 'Phí nền tảng (10%)',
+                            label: 'Phí nền tảng',
                             value: '-${_fmtCurrency(platformFee)}',
                             valueColor: const Color(0xFFDC3545),
                           ),
@@ -387,8 +413,7 @@ class _ExpertConsultationCompletionScreenState
                             child: DashedDivider(),
                           ),
                           Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               const Text(
@@ -400,9 +425,9 @@ class _ExpertConsultationCompletionScreenState
                                 ),
                               ),
                               Text(
-                                '+${_fmtCurrency(netAmount)}',
+                                '+${_fmtCurrency(finalNet)}',
                                 style: TextStyle(
-                                  fontSize: feeCost > 999999 ? 20 : 22,
+                                  fontSize: finalNet > 999999 ? 20 : 22,
                                   fontWeight: FontWeight.bold,
                                   color: _green,
                                 ),
@@ -412,14 +437,16 @@ class _ExpertConsultationCompletionScreenState
                           const SizedBox(height: 10),
                           const Row(
                             children: [
-                              Icon(Icons.account_balance_wallet,
-                                  size: 16, color: _green),
+                              Icon(
+                                Icons.account_balance_wallet,
+                                size: 16,
+                                color: _green,
+                              ),
                               SizedBox(width: 6),
                               Expanded(
                                 child: Text(
                                   'Chuyển vào ví SnakeAid trong vòng 24h',
-                                  style: TextStyle(
-                                      fontSize: 12, color: _green),
+                                  style: TextStyle(fontSize: 12, color: _green),
                                 ),
                               ),
                             ],
@@ -443,7 +470,8 @@ class _ExpertConsultationCompletionScreenState
                           _CheckItem('Báo cáo đã được lưu vào hồ sơ'),
                           SizedBox(height: 12),
                           _CheckItem(
-                              "Bạn có thể xem lại trong 'Lịch Sử Tư Vấn'"),
+                            "Bạn có thể xem lại trong 'Lịch Sử Tư Vấn'",
+                          ),
                         ],
                       ),
                     ),
@@ -457,10 +485,10 @@ class _ExpertConsultationCompletionScreenState
           Container(
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.95),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(24)),
-              border:
-                  const Border(top: BorderSide(color: Color(0xFFF0F0F0))),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+              border: const Border(top: BorderSide(color: Color(0xFFF0F0F0))),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.06),
@@ -479,10 +507,7 @@ class _ExpertConsultationCompletionScreenState
                   child: OutlinedButton.icon(
                     onPressed: () => context.go(
                       '/expert-home',
-                      extra: {
-                        'initialTab': 1,
-                        'initialConsultationsTab': 1,
-                      },
+                      extra: {'initialTab': 1, 'initialConsultationsTab': 1},
                     ),
                     icon: const Icon(Icons.description_outlined, size: 20),
                     label: const Text('Về Lịch Sử Tư Vấn'),
@@ -490,9 +515,12 @@ class _ExpertConsultationCompletionScreenState
                       side: const BorderSide(color: _purple, width: 1.5),
                       foregroundColor: _purple,
                       textStyle: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.bold),
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(100)),
+                        borderRadius: BorderRadius.circular(100),
+                      ),
                     ),
                   ),
                 ),
@@ -507,9 +535,12 @@ class _ExpertConsultationCompletionScreenState
                       foregroundColor: Colors.white,
                       elevation: 0,
                       textStyle: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold),
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(100)),
+                        borderRadius: BorderRadius.circular(100),
+                      ),
                     ),
                     child: const Text('Về Trang Chủ'),
                   ),
@@ -521,7 +552,9 @@ class _ExpertConsultationCompletionScreenState
                       : 'Bạn có thể xem lại phiên tư vấn trong Lịch Sử bất kỳ lúc nào.',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                      fontSize: 12, color: Color(0xFFAAAAAA)),
+                    fontSize: 12,
+                    color: Color(0xFFAAAAAA),
+                  ),
                 ),
               ],
             ),
@@ -565,9 +598,10 @@ class _Pill extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: textColor),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
           ),
         ],
       ),
@@ -595,8 +629,7 @@ class _PayRow extends StatelessWidget {
             label,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-                fontSize: 14, color: Color(0xFF6B7280)),
+            style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
           ),
         ),
         const SizedBox(width: 12),
@@ -607,9 +640,10 @@ class _PayRow extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: valueColor),
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: valueColor,
+            ),
           ),
         ),
       ],
@@ -633,15 +667,13 @@ class _CheckItem extends StatelessWidget {
             color: Color(0xFFDCFCE7),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.check,
-              color: Color(0xFF16A34A), size: 16),
+          child: const Icon(Icons.check, color: Color(0xFF16A34A), size: 16),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(
-                fontSize: 13, color: Color(0xFF374151)),
+            style: const TextStyle(fontSize: 13, color: Color(0xFF374151)),
           ),
         ),
       ],
@@ -658,9 +690,8 @@ class DashedDivider extends StatelessWidget {
       builder: (context, constraints) {
         const dashWidth = 6.0;
         const dashSpace = 4.0;
-        final count =
-            (constraints.constrainWidth() / (dashWidth + dashSpace))
-                .floor();
+        final count = (constraints.constrainWidth() / (dashWidth + dashSpace))
+            .floor();
         return Row(
           children: List.generate(
             count,
@@ -670,8 +701,8 @@ class DashedDivider extends StatelessWidget {
                 width: dashWidth,
                 height: 1,
                 child: DecoratedBox(
-                    decoration: BoxDecoration(
-                        color: Color(0xFF86EFAC))),
+                  decoration: BoxDecoration(color: Color(0xFF86EFAC)),
+                ),
               ),
             ),
           ),
