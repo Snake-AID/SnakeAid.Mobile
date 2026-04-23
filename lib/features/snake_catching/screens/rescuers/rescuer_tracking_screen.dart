@@ -27,13 +27,17 @@ class RescuerTrackingScreen extends ConsumerStatefulWidget {
 
 class _RescuerTrackingScreenState extends ConsumerState<RescuerTrackingScreen> {
   final List<File> _capturedPhotos = [];
-  // Upload state per photo index
+  // Upload state per photo index (Flow 1 — hoàn thành bắt rắn)
   final Map<int, _UploadState> _uploadStates = {};
   final TextEditingController _notesController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
   bool _isSubmittingUncomplete = false;
 
-  // At least one photo successfully uploaded
+  // Flow 2 — báo cáo chưa hoàn thành (hoàn toàn độc lập với Flow 1)
+  final List<File> _reportPhotos = [];
+  final Map<int, _UploadState> _reportUploadStates = {};
+
+  // At least one photo successfully uploaded (Flow 1 only)
   bool get _hasUploadedPhoto => _uploadStates.values.any((s) => s == _UploadState.done);
 
   SnakeSpecies? _species;
@@ -147,16 +151,43 @@ class _RescuerTrackingScreenState extends ConsumerState<RescuerTrackingScreen> {
 }
 
 Future<void> _openUncompleteDialog() async {
-    final reasonController = TextEditingController(text: _notesController.text);
+    // State riêng của dialog — hoàn toàn độc lập với flow chính
+    final reasonController = TextEditingController();
+    // Dùng list/map local được truyền vào StatefulBuilder để tránh share state
+    final dialogPhotos = <File>[];
+    final dialogUploadStates = <int, _UploadState>{};
 
-    // 1. Chờ Dialog đóng và lấy kết quả trả về (là chuỗi lý do hoặc null)
+    Future<void> captureForReport(StateSetter setSheet) async {
+      try {
+        final XFile? photo = await _picker.pickImage(
+          source: ImageSource.camera,
+          imageQuality: 85,
+        );
+        if (photo == null) return;
+        final file = File(photo.path);
+        final index = dialogPhotos.length;
+        setSheet(() {
+          dialogPhotos.add(file);
+          dialogUploadStates[index] = _UploadState.uploading;
+        });
+        try {
+          final repo = ref.read(snakeCatchingRepositoryProvider);
+          // Flow 2: luôn dùng requestId
+          await repo.uploadRequestEvidence(widget.requestData.id, file);
+          setSheet(() => dialogUploadStates[index] = _UploadState.done);
+        } catch (_) {
+          setSheet(() => dialogUploadStates[index] = _UploadState.failed);
+        }
+      } catch (_) {}
+    }
+
     final String? submitReason = await showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          final uploadedCount = _uploadStates.values.where((s) => s == _UploadState.done).length;
-          bool canConfirm = reasonController.text.trim().isNotEmpty;
+          final uploadedCount = dialogUploadStates.values.where((s) => s == _UploadState.done).length;
+          final bool canConfirm = reasonController.text.trim().isNotEmpty;
 
           return AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -169,7 +200,7 @@ Future<void> _openUncompleteDialog() async {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Bạn cần ít nhất 1 ảnh bằng chứng và lý do chưa hoàn thành nhiệm vụ.',
+                      'Nhập lý do và có thể đính kèm ảnh bằng chứng.',
                       style: TextStyle(fontSize: 14, color: Color(0xFF555555), height: 1.4),
                     ),
                     const SizedBox(height: 14),
@@ -179,36 +210,44 @@ Future<void> _openUncompleteDialog() async {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Đã tải lên $uploadedCount ảnh bằng chứng.',
+                            uploadedCount > 0
+                                ? 'Đã tải lên $uploadedCount/${dialogPhotos.length} ảnh'
+                                : 'Chưa có ảnh bằng chứng (tùy chọn)',
                             style: const TextStyle(fontSize: 13, color: Color(0xFF555555)),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    
-                    if (_capturedPhotos.isNotEmpty) ...[
+                    if (dialogPhotos.isNotEmpty) ...[
+                      const SizedBox(height: 10),
                       SizedBox(
                         height: 90,
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: Row(
-                            children: _capturedPhotos.asMap().entries.map((entry) {
+                            children: dialogPhotos.asMap().entries.map((entry) {
                               final index = entry.key;
-                              final state = _uploadStates[index] ?? _UploadState.uploading;
+                              final state = dialogUploadStates[index] ?? _UploadState.uploading;
                               return Padding(
                                 padding: const EdgeInsets.only(right: 10),
                                 child: Stack(
                                   children: [
                                     ClipRRect(
                                       borderRadius: BorderRadius.circular(10),
-                                      child: Image.file(_capturedPhotos[index], width: 90, height: 90, fit: BoxFit.cover),
+                                      child: Image.file(entry.value, width: 90, height: 90, fit: BoxFit.cover),
                                     ),
                                     Positioned(
                                       bottom: 4, right: 4,
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
+                                        decoration: BoxDecoration(
+                                          color: state == _UploadState.done
+                                              ? Colors.green.shade700
+                                              : state == _UploadState.uploading
+                                                  ? Colors.black54
+                                                  : Colors.red.shade700,
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
                                         child: Text(
                                           state == _UploadState.done ? 'OK' : (state == _UploadState.uploading ? 'Đang tải' : 'Lỗi'),
                                           style: const TextStyle(fontSize: 10, color: Colors.white),
@@ -222,17 +261,17 @@ Future<void> _openUncompleteDialog() async {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 14),
                     ],
-
+                    const SizedBox(height: 12),
                     TextButton.icon(
                       onPressed: () async {
-                        await _capturePhoto();
-                        setDialogState(() {}); 
+                        await captureForReport(setDialogState);
                       },
                       icon: const Icon(Icons.add_a_photo, color: Color(0xFFFF6B35)),
-                      label: const Text('Chụp thêm ảnh bằng chứng', 
-                        style: TextStyle(color: Color(0xFFFF6B35), fontWeight: FontWeight.bold)),
+                      label: const Text(
+                        'Chụp ảnh bằng chứng (tùy chọn)',
+                        style: TextStyle(color: Color(0xFFFF6B35), fontWeight: FontWeight.bold),
+                      ),
                       style: TextButton.styleFrom(
                         backgroundColor: const Color(0xFFFFF3EE),
                         minimumSize: const Size(double.infinity, 45),
@@ -240,16 +279,18 @@ Future<void> _openUncompleteDialog() async {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    
                     TextField(
                       controller: reasonController,
                       maxLines: 4,
-                      onChanged: (value) => setDialogState(() {}),
+                      onChanged: (_) => setDialogState(() {}),
                       decoration: InputDecoration(
-                        hintText: 'Nhập lý do...',
+                        hintText: 'Nhập lý do chưa hoàn thành...',
                         filled: true,
                         fillColor: const Color(0xFFF7F7F7),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
                       ),
                     ),
                   ],
@@ -258,20 +299,19 @@ Future<void> _openUncompleteDialog() async {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(ctx).pop(), // Trả về null
+                onPressed: () => Navigator.of(ctx).pop(),
                 child: const Text('Hủy', style: TextStyle(color: Color(0xFF666666))),
               ),
               ElevatedButton(
-                onPressed: canConfirm ? () {
-                  // Chỉ pop và trả về kết quả string, KHÔNG gọi logic submit ở đây
-                  Navigator.of(ctx).pop(reasonController.text.trim());
-                } : null,
+                onPressed: canConfirm
+                    ? () => Navigator.of(ctx).pop(reasonController.text.trim())
+                    : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFF6B35),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Gửi báo cáo', 
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                child: const Text('Gửi báo cáo',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
               ),
             ],
           );
@@ -279,24 +319,16 @@ Future<void> _openUncompleteDialog() async {
       ),
     );
 
-    // 2. Logic Submit nằm hoàn toàn ở ngoài, khi Dialog đã biến mất hẳn
-   if (submitReason != null && mounted) {
-  await Future.delayed(const Duration(milliseconds: 100));
-  
-  // Hiển thị loading hoặc thực hiện submit
-  try {
-    await _submitUncomplete(submitReason);
-    
-    // NẾU HÀM _submitUncomplete CHƯA CÓ POPUNTIL THÌ GỌI Ở ĐÂY:
-    if (mounted) {
-      _showSuccessDialog(); // <--- Gọi Pop-up đẹp ở đây
-    }
-  } catch (e) {
-    // Xử lý lỗi nếu cần
-  }
     reasonController.dispose();
+
+    if (submitReason != null && mounted) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      try {
+        await _submitUncomplete(submitReason);
+        if (mounted) _showSuccessDialog();
+      } catch (_) {}
+    }
   }
-}
 
   Future<void> _submitUncomplete(String reason) async {
     if (_isSubmittingUncomplete) return;
@@ -325,7 +357,7 @@ Future<void> _openUncompleteDialog() async {
     }
   }
 
-  Future<void> _capturePhoto() async {
+  Future<void> _capturePhoto({bool forReportFlow = false}) async {
     try {
       final XFile? photo = await _picker.pickImage(
         source: ImageSource.camera,
@@ -342,7 +374,13 @@ Future<void> _openUncompleteDialog() async {
 
       try {
         final repo = ref.read(snakeCatchingRepositoryProvider);
-        await repo.uploadRequestEvidence(widget.requestData.id, file);
+        if (forReportFlow) {
+          // Flow 2: member bao cao -> upload voi requestId (SnakeCatchingRequest)
+          await repo.uploadRequestEvidence(widget.requestData.id, file);
+        } else {
+          // Flow 1: happy case -> upload voi missionId (snakeCatchingMission)
+          await repo.uploadMissionEvidence(widget.missionId, file);
+        }
         if (mounted) setState(() => _uploadStates[index] = _UploadState.done);
       } catch (e) {
         debugPrint('⚠️ Upload failed for photo $index: $e');
@@ -370,13 +408,19 @@ Future<void> _openUncompleteDialog() async {
     }
   }
 
-  /// Retry upload for a failed photo
-  Future<void> _retryUpload(int index) async {
+  /// Retry upload for a failed photo.
+  ///
+  /// [forReportFlow] ph\u1ea3i kh\u1edbp v\u1edbi flag \u0111\u00e3 d\u00f9ng l\u00fac capture ban \u0111\u1ea7u.
+  Future<void> _retryUpload(int index, {bool forReportFlow = false}) async {
     if (index >= _capturedPhotos.length) return;
     setState(() => _uploadStates[index] = _UploadState.uploading);
     try {
       final repo = ref.read(snakeCatchingRepositoryProvider);
-      await repo.uploadRequestEvidence(widget.requestData.id, _capturedPhotos[index]);
+      if (forReportFlow) {
+        await repo.uploadRequestEvidence(widget.requestData.id, _capturedPhotos[index]);
+      } else {
+        await repo.uploadMissionEvidence(widget.missionId, _capturedPhotos[index]);
+      }
       if (mounted) setState(() => _uploadStates[index] = _UploadState.done);
     } catch (e) {
       if (mounted) setState(() => _uploadStates[index] = _UploadState.failed);
@@ -1034,21 +1078,21 @@ Future<void> _openUncompleteDialog() async {
               width: double.infinity,
               height: 52,
               child: OutlinedButton(
-                onPressed: _hasUploadedPhoto ? _openUncompleteDialog : null,
+                onPressed: _openUncompleteDialog,
                 style: OutlinedButton.styleFrom(
-                  backgroundColor: _hasUploadedPhoto ? Colors.white : const Color(0xFFF5F5F5),
-                  foregroundColor: _hasUploadedPhoto ? const Color(0xFFFF6B35) : const Color(0xFF999999),
-                  side: BorderSide(
-                    color: _hasUploadedPhoto ? const Color(0xFFFF6B35) : const Color(0xFFDDDDDD),
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFFFF6B35),
+                  side: const BorderSide(
+                    color: Color(0xFFFF6B35),
                     width: 1.5,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Text(
+                child: const Text(
                   'Báo cáo',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
