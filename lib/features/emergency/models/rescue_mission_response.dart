@@ -253,6 +253,11 @@ class BriefIncidentForMission {
     if (severityLevel! >= 10) return 'FFC107';
     return '4CAF50';
   }
+
+  String getIsVenomousText() {
+    if (identifiedSnakeSpecies == null) return 'Chưa xác định';
+    return identifiedSnakeSpecies!.isVenomous ? 'Rắn độc' : 'Rắn không độc';
+  }
 }
 
 /// Update Mission Status Request

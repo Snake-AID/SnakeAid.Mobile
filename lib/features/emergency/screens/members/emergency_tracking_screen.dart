@@ -56,16 +56,16 @@ class _EmergencyTrackingScreenState
   bool _hasInitialGps = false;
 
   // ── Member location broadcast throttle ───────────────────────────────────
+  Timer? _memberBroadcastTimer;
   Timer? _memberBroadcastThrottle;
   bool _isMemberBroadcastThrottled = false;
   bool _hasInitialLocationBroadcast =
       false; // Track if we've sent first location
-  LatLng? _lastBroadcastPosition;
 
+  static const Duration _memberBroadcastInterval = Duration(seconds: 15);
   static const Duration _memberBroadcastThrottleDuration = Duration(
-    seconds: 12,
-  ); // aligned with rescuer logic
-  static const double _memberBroadcastDistanceThreshold = 10.0; // meters
+    seconds: 15,
+  ); // align with periodic member broadcast
 
   // ── SOS origin (static pin — where SOS was first pressed) ────────────────
   LatLng? _sosOriginPosition;
@@ -289,6 +289,8 @@ class _EmergencyTrackingScreenState
         distanceFilter: 15, // Increased from 5m for battery/thermal savings
       ),
     ).listen(_onMemberPositionUpdate);
+
+    _startMemberBroadcastTimer();
   }
 
   void _onMemberPositionUpdate(Position pos) {
@@ -318,6 +320,30 @@ class _EmergencyTrackingScreenState
     if (!_hasInitialLocationBroadcast || _shouldBroadcastMemberLocation(ll)) {
       _broadcastMemberLocation(ll);
     }
+  }
+
+  void _startMemberBroadcastTimer() {
+    _memberBroadcastTimer?.cancel();
+    _memberBroadcastTimer = Timer.periodic(_memberBroadcastInterval, (_) {
+      if (!mounted || widget.incidentId == null || _memberPosition == null) {
+        return;
+      }
+
+      final missionStatus = ref.read(missionStatusProvider);
+      if (missionStatus.rescuerArrived || missionStatus.missionCompleted) {
+        return;
+      }
+
+      if (ref.read(missionHubServiceProvider).isConnected == false) {
+        return;
+      }
+
+      if (_isMemberBroadcastThrottled) {
+        return;
+      }
+
+      _broadcastMemberLocation(_memberPosition!);
+    });
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -426,39 +452,13 @@ class _EmergencyTrackingScreenState
     if (widget.incidentId == null) return false;
     if (_isMemberBroadcastThrottled) return false;
     if (ref.read(missionHubServiceProvider).isConnected == false) return false;
-
-    if (_lastBroadcastPosition == null) return true;
-
-    final distance = Geolocator.distanceBetween(
-      candidate.latitude,
-      candidate.longitude,
-      _lastBroadcastPosition!.latitude,
-      _lastBroadcastPosition!.longitude,
-    );
-
-    return distance >= _memberBroadcastDistanceThreshold;
+    return true;
   }
 
   void _broadcastMemberLocation(LatLng pos) {
     if (widget.incidentId == null) return;
     final svc = ref.read(missionHubServiceProvider);
     if (!svc.isConnected) return;
-
-    // Avoid redundant sends when the position is effectively the same.
-    if (_lastBroadcastPosition != null) {
-      final distance = Geolocator.distanceBetween(
-        pos.latitude,
-        pos.longitude,
-        _lastBroadcastPosition!.latitude,
-        _lastBroadcastPosition!.longitude,
-      );
-      if (distance < _memberBroadcastDistanceThreshold) {
-        debugPrint(
-          '📍 Member location update ignored (distance ${distance.toStringAsFixed(1)}m < $_memberBroadcastDistanceThreshold m)',
-        );
-        return;
-      }
-    }
 
     debugPrint(
       '📍 Broadcasting member location: ${pos.latitude}, ${pos.longitude}',
@@ -467,7 +467,6 @@ class _EmergencyTrackingScreenState
 
     _hasInitialLocationBroadcast = true;
     _isMemberBroadcastThrottled = true;
-    _lastBroadcastPosition = pos;
     _memberBroadcastThrottle?.cancel();
     _memberBroadcastThrottle = Timer(_memberBroadcastThrottleDuration, () {
       _isMemberBroadcastThrottled = false;
@@ -858,6 +857,7 @@ class _EmergencyTrackingScreenState
   @override
   void dispose() {
     _gpsSubscription?.cancel();
+    _memberBroadcastTimer?.cancel();
     _memberBroadcastThrottle?.cancel();
     _routeDebounce?.cancel();
 

@@ -320,8 +320,10 @@ final router = GoRouter(
     GoRoute(
       path: '/expert/snake-first-aid-guide',
       name: 'expert_snake_first_aid_guide',
-      builder: (context, state) =>
-          const SnakeLibraryScreen(firstAidMode: true, themeColor: Color(0xFF6C47C2)),
+      builder: (context, state) => const SnakeLibraryScreen(
+        firstAidMode: true,
+        themeColor: Color(0xFF6C47C2),
+      ),
     ),
     // Rescuer variants (orange)
     GoRoute(
@@ -333,8 +335,10 @@ final router = GoRouter(
     GoRoute(
       path: '/rescuer/snake-first-aid-guide',
       name: 'rescuer_snake_first_aid_guide',
-      builder: (context, state) =>
-          const SnakeLibraryScreen(firstAidMode: true, themeColor: Color(0xFFFF6B35)),
+      builder: (context, state) => const SnakeLibraryScreen(
+        firstAidMode: true,
+        themeColor: Color(0xFFFF6B35),
+      ),
     ),
     GoRoute(
       path: '/snake-species/:id',
@@ -966,6 +970,8 @@ final router = GoRouter(
           incidentId: data?['incidentId'] as String? ?? '',
           recognitionResultId: data?['recognitionResultId'] as String?,
           isDirectEntry: data?['isDirectEntry'] as bool? ?? false,
+          cameFromSymptomReport:
+              data?['cameFromSymptomReport'] as bool? ?? false,
         );
       },
     ),

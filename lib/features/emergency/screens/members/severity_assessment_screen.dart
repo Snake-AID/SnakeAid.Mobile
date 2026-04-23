@@ -13,12 +13,15 @@ class SeverityAssessmentScreen extends ConsumerStatefulWidget {
   final String? recognitionResultId;
   final bool
   isDirectEntry; // true = from quick actions, false = from symptom flow
+  final bool
+  cameFromSymptomReport; // true when opened from symptom report screen
 
   const SeverityAssessmentScreen({
     super.key,
     required this.incidentId,
     this.recognitionResultId,
     this.isDirectEntry = false, // Default: from symptom flow
+    this.cameFromSymptomReport = false,
   });
 
   @override
@@ -686,8 +689,19 @@ class _SeverityAssessmentScreenState
                 WidgetSpan(
                   child: GestureDetector(
                     onTap: () {
-                      // Pop back to symptom report (works for both flows)
-                      context.pop();
+                      if (widget.cameFromSymptomReport) {
+                        context.pop();
+                        return;
+                      }
+
+                      context.push(
+                        '/symptom-report',
+                        extra: {
+                          'incidentId': widget.incidentId,
+                          'recognitionResultId': widget.recognitionResultId,
+                          'isDirectEntry': widget.isDirectEntry,
+                        },
+                      );
                     },
                     child: const Text(
                       'Cập nhật triệu chứng',
