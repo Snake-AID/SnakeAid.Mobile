@@ -4708,7 +4708,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
 // ──────────────────────────────────────────────────────────────────────────────
 // Payment Method Bottom Sheet
 // ──────────────────────────────────────────────────────────────────────────────
-class _PaymentMethodSheet extends StatelessWidget {
+class _PaymentMethodSheet extends StatefulWidget {
   final bool isFinalPayment;
   final WalletInfo? walletInfo;
   final double amount;
@@ -4723,6 +4723,13 @@ class _PaymentMethodSheet extends StatelessWidget {
     required this.onWallet,
   });
 
+  @override
+  State<_PaymentMethodSheet> createState() => _PaymentMethodSheetState();
+}
+
+class _PaymentMethodSheetState extends State<_PaymentMethodSheet> {
+  bool _agreedToTerms = false;
+
   String _fmt(double v) {
     final s = v
         .toStringAsFixed(0)
@@ -4733,8 +4740,8 @@ class _PaymentMethodSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool hasSufficientBalance =
-        walletInfo != null && walletInfo!.balance >= amount;
-    final double balance = walletInfo?.balance ?? 0;
+        widget.walletInfo != null && widget.walletInfo!.balance >= widget.amount;
+    final double balance = widget.walletInfo?.balance ?? 0;
 
     return Container(
       decoration: const BoxDecoration(
@@ -4785,7 +4792,7 @@ class _PaymentMethodSheet extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    isFinalPayment
+                    widget.isFinalPayment
                         ? 'Thanh toán dịch vụ'
                         : 'Thanh toán đặt cọc',
                     style: const TextStyle(
@@ -4818,18 +4825,82 @@ class _PaymentMethodSheet extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  isFinalPayment ? 'Đợt 2 — Dịch vụ' : 'Đợt 1 — Đặt cọc',
+                  widget.isFinalPayment ? 'Đợt 2 — Dịch vụ' : 'Đợt 1 — Đặt cọc',
                   style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFF555555),
                   ),
                 ),
                 Text(
-                  _fmt(amount),
+                  _fmt(widget.amount),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF228B22),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // ── Terms & Conditions ────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF8E1), // Light amber/warning background
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFFFB300).withOpacity(0.5)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Checkbox(
+                    value: _agreedToTerms,
+                    onChanged: (val) {
+                      setState(() {
+                        _agreedToTerms = val ?? false;
+                      });
+                    },
+                    activeColor: const Color(0xFFFF8F00),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text.rich(
+                    TextSpan(
+                      text: 'Tôi đã hiểu và đồng ý với ',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF424242), height: 1.4),
+                      children: [
+                        TextSpan(
+                          text: 'Chính sách thanh toán',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFFF8F00),
+                          ),
+                        ),
+                        TextSpan(
+                          text: '. Xin lưu ý: Mọi khoản thanh toán (bao gồm phí di chuyển và phí dịch vụ) ',
+                        ),
+                        TextSpan(
+                          text: 'sẽ KHÔNG được hoàn lại',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFD32F2F),
+                          ),
+                        ),
+                        TextSpan(
+                          text: ' dưới bất kỳ hình thức nào.',
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -4927,7 +4998,7 @@ class _PaymentMethodSheet extends StatelessWidget {
                               color: Colors.grey[600],
                             ),
                           ),
-                          walletInfo == null
+                          widget.walletInfo == null
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
@@ -4948,7 +5019,7 @@ class _PaymentMethodSheet extends StatelessWidget {
                                 ),
                         ],
                       ),
-                      if (!hasSufficientBalance && walletInfo != null) ...[
+                      if (!hasSufficientBalance && widget.walletInfo != null) ...[
                         const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -4969,7 +5040,7 @@ class _PaymentMethodSheet extends StatelessWidget {
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  'Số dư không đủ. Cần nạp thêm ${_fmt(amount - balance)}.',
+                                  'Số dư không đủ. Cần nạp thêm ${_fmt(widget.amount - balance)}.',
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: Color(0xFFDC3545),
@@ -4984,7 +5055,7 @@ class _PaymentMethodSheet extends StatelessWidget {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: hasSufficientBalance ? onWallet : null,
+                          onPressed: (hasSufficientBalance && _agreedToTerms) ? widget.onWallet : null,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF228B22),
                             foregroundColor: Colors.white,
@@ -5111,10 +5182,12 @@ class _PaymentMethodSheet extends StatelessWidget {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: onPayOS,
+                          onPressed: _agreedToTerms ? widget.onPayOS : null,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF1565C0),
                             foregroundColor: Colors.white,
+                            disabledBackgroundColor: Colors.grey[200],
+                            disabledForegroundColor: Colors.grey[400],
                             padding: const EdgeInsets.symmetric(vertical: 13),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
