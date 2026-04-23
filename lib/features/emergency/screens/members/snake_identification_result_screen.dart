@@ -407,9 +407,10 @@ class _SnakeIdentificationResultScreenState
                       onPressed: () {
                         // Pop all sub-screens back to tracking
                         // This preserves tracking screen state
-                        Navigator.of(
-                          context,
-                        ).popUntil((route) => route.isFirst);
+                        Navigator.of(context).popUntil((route) {
+                          return route.settings.name == 'emergency_tracking' ||
+                              route.isFirst;
+                        });
                       },
                       icon: const Icon(Icons.skip_next, size: 20),
                       label: const Text(

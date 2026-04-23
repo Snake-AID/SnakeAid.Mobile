@@ -11,7 +11,8 @@ import '../../providers/detailed_incident_provider.dart';
 class SymptomReportScreen extends ConsumerStatefulWidget {
   final String incidentId;
   final String? recognitionResultId;
-  final bool isDirectEntry; // true = from quick actions, false = from snake flow
+  final bool
+  isDirectEntry; // true = from quick actions, false = from snake flow
 
   const SymptomReportScreen({
     super.key,
@@ -330,6 +331,7 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
               'incidentId': widget.incidentId,
               'recognitionResultId': widget.recognitionResultId,
               'isDirectEntry': widget.isDirectEntry, // Propagate context
+              'cameFromSymptomReport': true,
             },
           );
         } else {
@@ -452,7 +454,9 @@ class _SymptomReportScreenState extends ConsumerState<SymptomReportScreen> {
                             Navigator.of(context).pop();
                           } else {
                             // From snake flow: pop twice (symptom + snake location)
-                            Navigator.of(context)..pop()..pop();
+                            Navigator.of(context)
+                              ..pop()
+                              ..pop();
                           }
                         },
                         icon: const Icon(Icons.crisis_alert, size: 18),
