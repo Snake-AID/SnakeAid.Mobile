@@ -117,7 +117,7 @@ final router = GoRouter(
     // Nếu là expert, đã đăng nhập, nhưng chưa verified
     if (isAuth && isExpert && !isVerified) {
       // Chỉ cho phép vào các trang liên quan đến chứng chỉ
-      if (!path.startsWith('/expert-id-documents') && 
+      if (!path.startsWith('/expert-id-documents') &&
           !path.startsWith('/expert-credentials') &&
           !path.startsWith('/registration-pending')) {
         return '/expert-id-documents';
@@ -331,6 +331,7 @@ final router = GoRouter(
         final data = state.extra as Map<String, dynamic>;
         return ResetPasswordScreen(
           email: data['email'] as String,
+          otp: data['otp'] as String,
           themeColor: data['themeColor'] as Color,
           roleRoute: data['roleRoute'] as String,
         );

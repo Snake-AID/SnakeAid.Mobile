@@ -1,29 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../models/forgot_password_request.dart';
+import '../repository/auth_repository.dart';
 
 /// Reset Password Screen - Enter New Password
 /// Màn hình đặt lại mật khẩu mới
-class ResetPasswordScreen extends StatefulWidget {
+class ResetPasswordScreen extends ConsumerStatefulWidget {
   final String email;
+  final String otp;
   final Color themeColor;
   final String roleRoute;
 
   const ResetPasswordScreen({
     super.key,
     required this.email,
+    required this.otp,
     required this.themeColor,
     required this.roleRoute,
   });
 
   @override
-  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
+  ConsumerState<ResetPasswordScreen> createState() =>
+      _ResetPasswordScreenState();
 }
 
-class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   bool _isNewPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
@@ -45,11 +51,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   void _calculatePasswordStrength(String password) {
     setState(() {
       _hasMinLength = password.length >= 8;
-      _hasUpperLower = password.contains(RegExp(r'[a-z]')) &&
+      _hasUpperLower =
+          password.contains(RegExp(r'[a-z]')) &&
           password.contains(RegExp(r'[A-Z]'));
       _hasDigit = password.contains(RegExp(r'[0-9]'));
-      _hasSpecialChar =
-          password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;/~`]'));
+      _hasSpecialChar = password.contains(
+        RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;/~`]'),
+      );
 
       // Calculate strength
       if (password.isEmpty) {
@@ -58,7 +66,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         bool hasLetters = password.contains(RegExp(r'[a-zA-Z]'));
         bool hasDigits = password.contains(RegExp(r'[0-9]'));
         bool hasSpecialCharacters = password.contains(
-            RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;/~`]'));
+          RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;/~`]'),
+        );
 
         if (hasLetters && hasDigits && hasSpecialCharacters) {
           _passwordStrength = 1.0;
@@ -73,6 +82,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     });
   }
 
+  String _normalizeException(Object error) {
+    return error.toString().replaceAll('Exception: ', '').trim();
+  }
+
   void _handleResetPassword() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -82,22 +95,49 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       _isLoading = true;
     });
 
-    // TODO: Reset password API call
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final request = ForgotPasswordRequest(
+        email: widget.email,
+        otp: widget.otp,
+        newPassword: _newPasswordController.text.trim(),
+        confirmPassword: _confirmPasswordController.text.trim(),
+      );
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
+      final authRepository = ref.read(authRepositoryProvider);
+      await authRepository.forgotPassword(request);
 
-      // Navigate to success screen
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Đặt lại mật khẩu thành công'),
+          backgroundColor: widget.themeColor,
+        ),
+      );
+
       context.goNamed(
         'password_reset_success',
-        extra: {
-          'themeColor': widget.themeColor,
-          'roleRoute': widget.roleRoute,
-        },
+        extra: {'themeColor': widget.themeColor, 'roleRoute': widget.roleRoute},
       );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_normalizeException(error)),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -440,10 +480,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                               'Có chữ hoa và chữ thường',
                               _hasUpperLower,
                             ),
-                            _buildRequirement(
-                              'Có ít nhất 1 số',
-                              _hasDigit,
-                            ),
+                            _buildRequirement('Có ít nhất 1 số', _hasDigit),
                             _buildRequirement(
                               'Có ký tự đặc biệt (!@#\$%...)',
                               _hasSpecialChar,
@@ -479,8 +516,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                           height: 24,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         )
                       : const Text(

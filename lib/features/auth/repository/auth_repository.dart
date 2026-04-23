@@ -10,8 +10,11 @@ import '../models/register_response.dart';
 import '../models/verify_account_request.dart';
 import '../models/verify_account_response.dart';
 import '../models/send_otp_request.dart';
+import '../models/otp_validate_request.dart';
+import '../models/otp_validate_response.dart';
 import '../models/login_request.dart';
 import '../models/login_response.dart';
+import '../models/forgot_password_request.dart';
 import '../models/refresh_token_request.dart';
 import '../models/refresh_token_response.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -139,6 +142,64 @@ class AuthRepository {
       return verifyResponse;
     } on DioException catch (e) {
       debugPrint('❌ Verify account failed: ${e.message}');
+      debugPrint('❌ Response: ${e.response?.data}');
+      throw _handleError(e);
+    } catch (e) {
+      debugPrint('❌ Unexpected error: $e');
+      rethrow;
+    }
+  }
+
+  /// Validate OTP for forgot password flow
+  ///
+  /// Gọi API POST /api/otp/validate
+  /// Xác thực OTP trước khi cho phép đặt lại mật khẩu
+  Future<OtpValidateResponse> validateOtp(OtpValidateRequest request) async {
+    try {
+      debugPrint('🔐 Validating OTP for email: ${request.email}');
+      debugPrint('🔐 Request data: ${request.toJson()}');
+
+      final response = await httpService.post(
+        '/api/otp/validate',
+        data: request.toJson(),
+      );
+
+      debugPrint('✅ OTP validated successfully');
+      debugPrint('✅ Response: ${response.data}');
+
+      return OtpValidateResponse.fromJson(response.data);
+    } on DioException catch (e) {
+      debugPrint('❌ Validate OTP failed: ${e.message}');
+      debugPrint('❌ Response: ${e.response?.data}');
+      throw _handleError(e);
+    } catch (e) {
+      debugPrint('❌ Unexpected error: $e');
+      rethrow;
+    }
+  }
+
+  /// Reset password in forgot password flow
+  ///
+  /// Gọi API POST /api/auth/forgot-password
+  /// Trả về message thành công khi đặt lại mật khẩu hoàn tất
+  Future<String> forgotPassword(ForgotPasswordRequest request) async {
+    try {
+      debugPrint('🔄 Resetting password for: ${request.email}');
+      debugPrint('🔄 Request data: ${request.toJson()}');
+
+      final response = await httpService.post(
+        '/api/auth/forgot-password',
+        data: request.toJson(),
+      );
+
+      final responseData = response.data as Map<String, dynamic>;
+      final message =
+          (responseData['message'] as String?) ?? 'Đặt lại mật khẩu thành công';
+
+      debugPrint('✅ Forgot password success: $message');
+      return message;
+    } on DioException catch (e) {
+      debugPrint('❌ Forgot password failed: ${e.message}');
       debugPrint('❌ Response: ${e.response?.data}');
       throw _handleError(e);
     } catch (e) {
@@ -452,7 +513,15 @@ class AuthRepository {
     String errorMessage = 'Đã có lỗi xảy ra';
     final requestPath = e.requestOptions.path.toLowerCase();
     final isLoginEndpoint = requestPath.contains('/api/auth/login');
-    final isVerifyOtpEndpoint = requestPath.contains('/api/auth/verify-account');
+    final isVerifyOtpEndpoint = requestPath.contains(
+      '/api/auth/verify-account',
+    );
+    final isValidateForgotOtpEndpoint = requestPath.contains(
+      '/api/otp/validate',
+    );
+    final isForgotPasswordEndpoint = requestPath.contains(
+      '/api/auth/forgot-password',
+    );
 
     if (e.response != null) {
       final data = e.response?.data;
@@ -492,12 +561,18 @@ class AuthRepository {
       switch (e.response?.statusCode) {
         case 400:
           // Lỗi dữ liệu không hợp lệ
-          if (isVerifyOtpEndpoint) {
+          if (isVerifyOtpEndpoint || isValidateForgotOtpEndpoint) {
             if (errorMessage == 'Đã có lỗi xảy ra' ||
                 errorMessage.toLowerCase().contains('invalid') ||
                 errorMessage.toLowerCase().contains('incorrect')) {
               errorMessage =
                   'Mã OTP không hợp lệ hoặc đã hết hạn. Vui lòng kiểm tra lại';
+            }
+          } else if (isForgotPasswordEndpoint) {
+            if (errorMessage == 'Đã có lỗi xảy ra' ||
+                errorMessage.toLowerCase().contains('password')) {
+              errorMessage =
+                  'Mật khẩu mới không hợp lệ. Vui lòng kiểm tra lại thông tin';
             }
           } else if (isLoginEndpoint &&
               (errorMessage.toLowerCase().contains('invalid') ||
@@ -509,9 +584,12 @@ class AuthRepository {
           break;
         case 401:
           // Unauthorized - thường là sai mật khẩu hoặc tài khoản
-          if (isVerifyOtpEndpoint) {
+          if (isVerifyOtpEndpoint || isValidateForgotOtpEndpoint) {
             errorMessage =
                 'Mã OTP không chính xác hoặc đã hết hạn. Vui lòng thử lại';
+          } else if (isForgotPasswordEndpoint) {
+            errorMessage =
+                'Không thể đặt lại mật khẩu do OTP không hợp lệ hoặc đã hết hạn';
           } else if (isLoginEndpoint) {
             errorMessage =
                 'Email hoặc mật khẩu không đúng. Vui lòng kiểm tra lại';
