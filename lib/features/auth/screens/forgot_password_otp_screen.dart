@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../models/otp_validate_request.dart';
+import '../repository/auth_repository.dart';
 
 /// Forgot Password OTP Verification Screen
 /// Màn hình xác thực OTP quên mật khẩu
-class ForgotPasswordOtpScreen extends StatefulWidget {
+class ForgotPasswordOtpScreen extends ConsumerStatefulWidget {
   final String email;
   final Color themeColor;
   final String roleRoute;
@@ -17,18 +20,22 @@ class ForgotPasswordOtpScreen extends StatefulWidget {
   });
 
   @override
-  State<ForgotPasswordOtpScreen> createState() =>
+  ConsumerState<ForgotPasswordOtpScreen> createState() =>
       _ForgotPasswordOtpScreenState();
 }
 
-class _ForgotPasswordOtpScreenState extends State<ForgotPasswordOtpScreen> {
-  final List<TextEditingController> _otpControllers =
-      List.generate(6, (_) => TextEditingController());
+class _ForgotPasswordOtpScreenState
+    extends ConsumerState<ForgotPasswordOtpScreen> {
+  final List<TextEditingController> _otpControllers = List.generate(
+    6,
+    (_) => TextEditingController(),
+  );
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
-  
+
   int _remainingTime = 59;
   Timer? _timer;
   bool _isLoading = false;
+  bool _isResending = false;
 
   @override
   void initState() {
@@ -49,6 +56,7 @@ class _ForgotPasswordOtpScreenState extends State<ForgotPasswordOtpScreen> {
   }
 
   void _startTimer() {
+    _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_remainingTime > 0) {
         setState(() {
@@ -60,23 +68,62 @@ class _ForgotPasswordOtpScreenState extends State<ForgotPasswordOtpScreen> {
     });
   }
 
-  void _handleResendCode() {
+  String _normalizeException(Object error) {
+    return error.toString().replaceAll('Exception: ', '').trim();
+  }
+
+  void _handleResendCode() async {
+    if (_remainingTime > 0 || _isResending) {
+      return;
+    }
+
     setState(() {
-      _remainingTime = 59;
+      _isResending = true;
     });
-    _startTimer();
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Mã xác thực đã được gửi lại'),
-        duration: Duration(seconds: 2),
-      ),
-    );
+
+    try {
+      final authRepository = ref.read(authRepositoryProvider);
+      await authRepository.sendOtp(widget.email);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _remainingTime = 59;
+      });
+      _startTimer();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Mã OTP mới đã được gửi đến email của bạn'),
+          backgroundColor: widget.themeColor,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_normalizeException(error)),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isResending = false;
+        });
+      }
+    }
   }
 
   void _handleVerify() async {
-    final otp = _otpControllers.map((c) => c.text).join();
-    
+    final otp = _otpControllers.map((c) => c.text).join().trim();
+
     if (otp.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -91,23 +138,60 @@ class _ForgotPasswordOtpScreenState extends State<ForgotPasswordOtpScreen> {
       _isLoading = true;
     });
 
-    // TODO: Verify OTP API call
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final authRepository = ref.read(authRepositoryProvider);
+      final request = OtpValidateRequest(email: widget.email, otp: otp);
+      final response = await authRepository.validateOtp(request);
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
+      if (!mounted) {
+        return;
+      }
 
-      // Navigate to reset password screen
-      context.goNamed(
-        'reset_password',
-        extra: {
-          'email': widget.email,
-          'themeColor': widget.themeColor,
-          'roleRoute': widget.roleRoute,
-        },
+      if (response.isSuccess && (response.data?.success ?? false)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Xác thực OTP thành công'),
+            backgroundColor: widget.themeColor,
+          ),
+        );
+
+        context.goNamed(
+          'reset_password',
+          extra: {
+            'email': widget.email,
+            'otp': otp,
+            'themeColor': widget.themeColor,
+            'roleRoute': widget.roleRoute,
+          },
+        );
+      } else {
+        final message = response.data?.message.isNotEmpty == true
+            ? response.data!.message
+            : (response.message.isNotEmpty
+                  ? response.message
+                  : 'Xác thực OTP thất bại. Vui lòng thử lại');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        );
+      }
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_normalizeException(error)),
+          backgroundColor: Colors.red,
+        ),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -116,7 +200,7 @@ class _ForgotPasswordOtpScreenState extends State<ForgotPasswordOtpScreen> {
       final parts = widget.email.split('@');
       final username = parts[0];
       final domain = parts[1];
-      
+
       if (username.length <= 3) {
         return '${username[0]}***@$domain';
       }
@@ -171,11 +255,7 @@ class _ForgotPasswordOtpScreenState extends State<ForgotPasswordOtpScreen> {
                   color: widget.themeColor.withOpacity(0.2),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  Icons.mail,
-                  size: 48,
-                  color: widget.themeColor,
-                ),
+                child: Icon(Icons.mail, size: 48, color: widget.themeColor),
               ),
               const SizedBox(height: 32),
 
@@ -192,10 +272,7 @@ class _ForgotPasswordOtpScreenState extends State<ForgotPasswordOtpScreen> {
               const SizedBox(height: 12),
               const Text(
                 'Mã xác thực đã được gửi đến',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF666666),
-                ),
+                style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 4),
@@ -272,20 +349,13 @@ class _ForgotPasswordOtpScreenState extends State<ForgotPasswordOtpScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.timer,
-                    size: 16,
-                    color: Colors.grey.shade600,
-                  ),
+                  Icon(Icons.timer, size: 16, color: Colors.grey.shade600),
                   const SizedBox(width: 8),
                   Text(
                     _remainingTime > 0
                         ? 'Gửi lại mã sau 00:${_remainingTime.toString().padLeft(2, '0')}'
-                        : 'Mã đã hết hạn',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                    ),
+                        : 'Bạn có thể gửi lại mã mới',
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                   ),
                 ],
               ),
@@ -312,8 +382,9 @@ class _ForgotPasswordOtpScreenState extends State<ForgotPasswordOtpScreen> {
                           height: 24,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         )
                       : const Text(
@@ -333,15 +404,14 @@ class _ForgotPasswordOtpScreenState extends State<ForgotPasswordOtpScreen> {
                 children: [
                   Text(
                     'Không nhận được mã? ',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                   ),
                   GestureDetector(
-                    onTap: _remainingTime == 0 ? _handleResendCode : null,
+                    onTap: _remainingTime == 0 && !_isResending
+                        ? _handleResendCode
+                        : null,
                     child: Text(
-                      'Gửi lại',
+                      _isResending ? 'Đang gửi lại...' : 'Gửi lại',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
