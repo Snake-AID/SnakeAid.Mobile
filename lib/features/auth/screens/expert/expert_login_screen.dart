@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/user_role.dart';
 import '../../providers/auth_provider.dart';
+import '../../../expert/repository/expert_certificate_repository.dart';
 
 /// Expert Login Screen
 /// Màn hình đăng nhập cho chuyên gia
@@ -82,8 +83,40 @@ class _ExpertLoginScreenState extends ConsumerState<ExpertLoginScreen> {
           ),
         );
 
-        // Navigate to expert home screen
-        context.goNamed('expert_home');
+        // Navigate to expert home screen or credentials screen if not verified
+        if (user?.isVerified == true) {
+          context.goNamed('expert_home');
+        } else {
+          try {
+            final repo = ref.read(expertCertificateRepositoryProvider);
+            final certs = await repo.getMyCertificates();
+            
+            // Nếu có ít nhất 1 chứng chỉ đang chờ duyệt -> Vào trang Pending
+            final hasPending = certs.any((c) => !c.isVerified && (c.rejectionReason == null || c.rejectionReason!.isEmpty));
+            
+            if (!mounted) return;
+            if (hasPending) {
+              context.goNamed('registration_pending', extra: user?.email ?? '');
+            } else {
+              // Chưa có chứng chỉ hoặc tất cả đều bị Reject -> Bắt nộp lại
+              context.goNamed('expert_credentials', extra: {
+                'email': user?.email ?? '',
+                'fullName': user?.fullName ?? '',
+                'phoneNumber': user?.phoneNumber ?? '',
+                'fromLogin': 'true',
+              });
+            }
+          } catch (e) {
+            if (!mounted) return;
+            // Lỗi khi fetch cert -> Tạm thời cho qua trang nộp chứng chỉ để an toàn
+            context.goNamed('expert_credentials', extra: {
+              'email': user?.email ?? '',
+              'fullName': user?.fullName ?? '',
+              'phoneNumber': user?.phoneNumber ?? '',
+              'fromLogin': 'true',
+            });
+          }
+        }
       } else {
         // Hiển thị lỗi từ provider state
         final error = ref.read(authProvider).error ?? 'Đăng nhập thất bại';

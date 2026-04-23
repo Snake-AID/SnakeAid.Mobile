@@ -12,6 +12,7 @@ class User {
   final UserRole role;
   final DateTime createdAt;
   final DateTime? updatedAt;
+  final bool isVerified;
 
   User({
     required this.id,
@@ -23,6 +24,7 @@ class User {
     required this.role,
     required this.createdAt,
     this.updatedAt,
+    this.isVerified = false,
   });
 
   /// Create from JSON
@@ -43,6 +45,7 @@ class User {
       updatedAt: json['updatedAt'] != null 
           ? DateTime.parse(json['updatedAt']) 
           : null,
+      isVerified: json['isVerified'] ?? false,
     );
   }
 
@@ -91,6 +94,7 @@ class User {
       'role': _roleToInt(role),
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
+      'isVerified': isVerified,
     };
   }
 

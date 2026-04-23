@@ -508,6 +508,8 @@ class _VideoConsultationScreenState
               final targetRoute =
                   widget.afterCallRoute ??
                   '/video-waiting/${widget.consultationId}';
+
+              // Truyền lại canReportExpertAbsent nếu có, hoặc mặc định true nếu là tư vấn đặt lịch
               context.go(
                 targetRoute,
                 extra: {
@@ -515,7 +517,7 @@ class _VideoConsultationScreenState
                   'expertSpecialty': widget.expertSpecialty,
                   'durationSeconds': _secondsElapsed,
                   'showCompleteButton': true,
-                  // Đồng bộ trạng thái mic/camera về sảnh chờ
+                  'canReportExpertAbsent': true,
                   'initialMicOn': _isMicOn,
                   'initialCameraOn': _isCameraOn,
                 },
