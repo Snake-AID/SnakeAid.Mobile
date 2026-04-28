@@ -613,9 +613,9 @@ class _ConsultationWaitingRoomScreenState
                           const Icon(Icons.schedule_outlined,
                               size: 16, color: Color(0xFF6B7280)),
                           const SizedBox(width: 4),
-                          const Text(
-                            'Lịch: 14:00 - 14:30',
-                            style: TextStyle(
+                          Text(
+                            'Lịch: ${_formatTimeRange(widget.scheduledStartAtMs, widget.durationSeconds)}',
+                            style: const TextStyle(
                                 fontSize: 13,
                                 color: Color(0xFF6B7280),
                                 fontWeight: FontWeight.w500),
@@ -629,24 +629,6 @@ class _ConsultationWaitingRoomScreenState
             ),
 
             const SizedBox(height: 16),
-
-            // Status checks
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _bg,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  _buildStatusRow('Camera hoạt động'),
-                  const SizedBox(height: 8),
-                  _buildStatusRow('Micro hoạt động'),
-                  const SizedBox(height: 8),
-                  _buildStatusRow('Kết nối ổn định'),
-                ],
-              ),
-            ),
           ],
         ),
       ),
@@ -717,7 +699,7 @@ class _ConsultationWaitingRoomScreenState
               child: ElevatedButton(
                 onPressed: _endConsultation,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
+                  backgroundColor: const Color.fromARGB(255, 34, 139, 34),
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -780,7 +762,7 @@ class _ConsultationWaitingRoomScreenState
           GestureDetector(
             onTap: _cancelCall,
             child: const Text(
-              'Hủy cuộc gọi',
+              'Rời phòng chờ',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
@@ -791,5 +773,20 @@ class _ConsultationWaitingRoomScreenState
         ],
       ),
     );
+  }
+  String _formatTimeRange(int? startMs, int durationSeconds) {
+    if (startMs == null || startMs == 0) return 'Đang cập nhật...';
+    
+    final start = DateTime.fromMillisecondsSinceEpoch(startMs);
+    // Use durationSeconds if provided (> 0), otherwise fallback to 30 mins (1800s)
+    final duration = durationSeconds > 0 ? durationSeconds : 1800;
+    final end = start.add(Duration(seconds: duration));
+    
+    final h1 = start.hour.toString().padLeft(2, '0');
+    final m1 = start.minute.toString().padLeft(2, '0');
+    final h2 = end.hour.toString().padLeft(2, '0');
+    final m2 = end.minute.toString().padLeft(2, '0');
+    
+    return '$h1:$m1 - $h2:$m2';
   }
 }

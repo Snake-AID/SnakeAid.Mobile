@@ -99,8 +99,10 @@ class ConsultationBookingResponse {
               (_parseBackendDate(json['scheduledTime']) ?? DateTime.now())),
       status: _parseStatus(json['status'] as String?),
       feeCost: (json['grossPrice'] as num?)?.toInt() ??
+          (json['grossAmount'] as num?)?.toInt() ??
           (json['feeCost'] as num?)?.toInt() ??
           (json['fee'] as num?)?.toInt() ??
+          (json['price'] as num?)?.toInt() ??
           0,
       timeSlotId: (json['timeSlotId'] as String?),
       rating: (json['rating'] as num?)?.toDouble(),
@@ -112,8 +114,10 @@ class ConsultationBookingResponse {
       userName: json['userName'] as String?,
       problemDescription: json['problemDescription'] as String?,
       bookedAt: _parseBackendDate(json['bookedAt']),
-      grossPrice: (json['grossPrice'] as num?)?.toInt(),
-      netPrice: (json['netPrice'] as num?)?.toInt(),
+      grossPrice: (json['grossPrice'] as num?)?.toInt() ??
+          (json['grossAmount'] as num?)?.toInt(),
+      netPrice: (json['netPrice'] as num?)?.toInt() ??
+          (json['netAmount'] as num?)?.toInt(),
     );
   }
 

@@ -133,8 +133,11 @@ class MyConsultationResponse {
         json['endTime'],
         treatUtcAsWallClock: treatUtcAsWallClock,
       ),
-      grossPrice: (json['grossPrice'] as num?)?.toDouble() ?? (json['price'] as num?)?.toDouble(),
-      netPrice: (json['netPrice'] as num?)?.toDouble(),
+      grossPrice: (json['grossPrice'] as num?)?.toDouble() ??
+          (json['grossAmount'] as num?)?.toDouble() ??
+          (json['price'] as num?)?.toDouble(),
+      netPrice: (json['netPrice'] as num?)?.toDouble() ??
+          (json['netAmount'] as num?)?.toDouble(),
       problemDescription: json['problemDescription']?.toString(),
       customerReport: json['customerReport']?.toString(),
       customerReportSubmittedAt: parseDate(
