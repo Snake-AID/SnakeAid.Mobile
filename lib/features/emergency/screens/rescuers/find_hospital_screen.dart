@@ -4,15 +4,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/hospital_provider.dart';
 import '../../repository/rescue_mission_repository.dart';
 import '../../models/hospital_response.dart';
+import '../../models/hospital_transfer_pricing_response.dart';
 import '../../../../core/providers/openroute_provider.dart';
-import '../../providers/mission_hub_provider.dart';
-import '../../providers/active_mission_provider.dart';
-import '../../providers/rescuer_emergency_provider.dart';
-import '../../../rescuer/providers/tracking_provider.dart';
+import '../../../../core/services/openroute_service.dart' as ors;
 
 class FindHospitalScreen extends ConsumerStatefulWidget {
   final String missionId;
@@ -30,7 +27,7 @@ class FindHospitalScreen extends ConsumerStatefulWidget {
 
 class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
   final MapController _mapController = MapController();
-  final TextEditingController _searchController = TextEditingController();
+  ors.RouteData? _routeData;
 
   // controller that allows programmatic expansion/collapse of the bottom sheet
   final DraggableScrollableController _draggableSheetController =
@@ -45,17 +42,86 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
   @override
   void initState() {
     super.initState();
-    // Load hospitals on init
+    // Initialize mission selection and load hospitals on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(hospitalProvider.notifier).getCurrentLocation();
+      _initializeScreen();
     });
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
     _mapController.dispose();
     super.dispose();
+  }
+
+  Future<void> _initializeScreen() async {
+    final notifier = ref.read(hospitalProvider.notifier);
+    notifier.setCurrentMission(widget.missionId);
+
+    try {
+      final missionDetail = await ref
+          .read(rescueMissionRepositoryProvider)
+          .getMissionDetail(missionId: widget.missionId);
+
+      notifier.restoreSelectedHospitalFromMissionDetail(missionDetail);
+
+      if (missionDetail.hospitalId != null) {
+        setState(() {
+          _highlightedHospitalId = missionDetail.hospitalId;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Could not restore selected hospital: $e');
+    } finally {
+      await notifier.getCurrentLocation();
+
+      final hospitalState = ref.read(hospitalProvider);
+      if (hospitalState.hasSelectedHospital &&
+          hospitalState.currentPosition != null) {
+        final selectedHospital = hospitalState.hospitals.firstWhere(
+          (h) => h.id == hospitalState.selectedHospitalPricing!.hospitalId,
+          orElse: () => HospitalResponse(
+            id: hospitalState.selectedHospitalPricing!.hospitalId,
+            name: hospitalState.selectedHospitalPricing!.hospitalName,
+            address: '',
+            contactNumber: null,
+            distanceKm: 0,
+            latitude: 0,
+            longitude: 0,
+          ),
+        );
+
+        if (selectedHospital.latitude != 0 || selectedHospital.longitude != 0) {
+          if (hospitalState.selectedHospitalPricing!.hospitalName ==
+              'Bệnh viện đã chọn') {
+            notifier.setSelectedHospitalPricing(
+              HospitalTransferPricingResponse(
+                hospitalId: hospitalState.selectedHospitalPricing!.hospitalId,
+                hospitalName: selectedHospital.name,
+                requiresHospitalization: hospitalState
+                    .selectedHospitalPricing!
+                    .requiresHospitalization,
+                updatedAt: hospitalState.selectedHospitalPricing!.updatedAt,
+              ),
+            );
+          }
+
+          final openRoute = ref.read(openRouteServiceProvider);
+          final routeData = await openRoute.getRoute(
+            start: LatLng(
+              hospitalState.currentPosition!.latitude,
+              hospitalState.currentPosition!.longitude,
+            ),
+            end: LatLng(selectedHospital.latitude, selectedHospital.longitude),
+          );
+
+          setState(() {
+            _routeData = routeData;
+          });
+          _fitRouteBounds(routeData);
+        }
+      }
+    }
   }
 
   Future<void> _openGoogleMaps(
@@ -64,7 +130,7 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
     String hospitalName,
   ) async {
     final url = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1&destination=$latitude,$longitude&destination_place_id=$hospitalName',
+      'https://www.google.com/maps/dir/?api=1&destination=$latitude,$longitude&travelmode=driving',
     );
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -132,14 +198,20 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
         );
       }
 
-      // Get actual route distance from OpenRouteService
+      // Get actual route and draw it on the map
       final openRoute = ref.read(openRouteServiceProvider);
       final currentPos = hospitalState.currentPosition!;
 
-      final routeData = await openRoute.getRoute(
+      final ors.RouteData routeData = await openRoute.getRoute(
         start: LatLng(currentPos.latitude, currentPos.longitude),
         end: LatLng(hospital.latitude, hospital.longitude),
       );
+
+      setState(() {
+        _routeData = routeData;
+        _highlightedHospitalId = hospital.id;
+      });
+      _fitRouteBounds(routeData);
 
       final actualDistanceKm = routeData.distanceKm;
       debugPrint(
@@ -149,7 +221,7 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
         '   (Straight-line was: ${hospital.distanceKm.toStringAsFixed(2)} km)',
       );
 
-      // Call API to report hospital transfer with actual route distance
+      // Call API to report hospital transfer
       final repository = ref.read(rescueMissionRepositoryProvider);
       final pricingResponse = await repository.reportTranferToHospital(
         missionId: widget.missionId,
@@ -253,7 +325,6 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.pop(dialogContext);
-                        // Open Google Maps
                         _openGoogleMaps(
                           hospital.latitude,
                           hospital.longitude,
@@ -299,53 +370,56 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
     }
   }
 
+  void _moveToCurrentLocation() {
+    final hospitalState = ref.read(hospitalProvider);
+    if (hospitalState.hasLocation) {
+      _mapController.move(
+        LatLng(
+          hospitalState.currentPosition!.latitude,
+          hospitalState.currentPosition!.longitude,
+        ),
+        15.0,
+      );
+    } else {
+      ref.read(hospitalProvider.notifier).getCurrentLocation();
+    }
+  }
+
+  void _fitRouteBounds(ors.RouteData routeData) {
+    if (routeData.points.isEmpty) return;
+
+    final points = routeData.points;
+    double minLat = points.first.latitude;
+    double maxLat = points.first.latitude;
+    double minLng = points.first.longitude;
+    double maxLng = points.first.longitude;
+
+    for (final point in points) {
+      if (point.latitude < minLat) minLat = point.latitude;
+      if (point.latitude > maxLat) maxLat = point.latitude;
+      if (point.longitude < minLng) minLng = point.longitude;
+      if (point.longitude > maxLng) maxLng = point.longitude;
+    }
+
+    final latPadding = (maxLat - minLat) * 0.2;
+    final lngPadding = (maxLng - minLng) * 0.2;
+
+    final bounds = LatLngBounds(
+      LatLng(minLat - latPadding, minLng - lngPadding),
+      LatLng(maxLat + latPadding, maxLng + lngPadding),
+    );
+
+    _mapController.fitCamera(
+      CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50)),
+    );
+  }
+
   Future<void> _performCompletion() async {
     if (!mounted) return;
     // Navigate to mission completion screen where user can upload evidence photos.
     context.push(
       '/rescuer/mission-completion',
       extra: {'missionId': widget.missionId, 'incidentId': widget.incidentId},
-    );
-  }
-
-  Widget _buildPricingRow(
-    String label,
-    double amount, {
-    String? subtitle,
-    bool isBold = false,
-  }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: isBold ? 16 : 14,
-                fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-                color: const Color(0xFF1C100D),
-              ),
-            ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF999999)),
-              ),
-            ],
-          ],
-        ),
-        Text(
-          '${amount.toStringAsFixed(0)}đ',
-          style: TextStyle(
-            fontSize: isBold ? 18 : 15,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-            color: isBold ? const Color(0xFFFF8800) : const Color(0xFF1C100D),
-          ),
-        ),
-      ],
     );
   }
 
@@ -496,74 +570,15 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
                   ),
                   IconButton(
                     icon: const Icon(
-                      Icons.filter_list,
+                      Icons.my_location,
                       color: Color(0xFF1C100D),
                     ),
-                    onPressed: () {
-                      // TODO: Show filter options
-                    },
+                    onPressed: _moveToCurrentLocation,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
                 ],
               ),
-            ),
-          ),
-
-          // Search Bar
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.white,
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF0F0F0),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: TextField(
-                          controller: _searchController,
-                          decoration: const InputDecoration(
-                            hintText: 'Tìm theo tên hoặc vị trí...',
-                            hintStyle: TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF999999),
-                            ),
-                            prefixIcon: Icon(
-                              Icons.search,
-                              color: Color(0xFF999999),
-                            ),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    GestureDetector(
-                      onTap: () {
-                        ref
-                            .read(hospitalProvider.notifier)
-                            .getCurrentLocation();
-                      },
-                      child: const Text(
-                        'Dùng vị trí của tôi',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFFFF8800),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
             ),
           ),
 
@@ -615,6 +630,18 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
                         'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     userAgentPackageName: 'com.snakeaid.mobile',
                   ),
+                  if (_routeData != null && _routeData!.points.isNotEmpty)
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: _routeData!.points,
+                          strokeWidth: 6.0,
+                          color: const Color(0xFFFF8800),
+                          borderColor: Colors.white,
+                          borderStrokeWidth: 2.0,
+                        ),
+                      ],
+                    ),
                   MarkerLayer(
                     markers: [
                       // Current location marker
@@ -905,9 +932,6 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
     final isSelected =
         hospitalState.hasSelectedHospital &&
         hospitalState.selectedHospitalPricing!.hospitalId == hospital.id;
-    final isAnotherSelected =
-        hospitalState.hasSelectedHospital &&
-        hospitalState.selectedHospitalPricing!.hospitalId != hospital.id;
 
     // Calculate estimated duration (rough estimate: 30 km/h average)
     final durationMinutes = (hospital.distanceKm * 2).round();
@@ -919,9 +943,9 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
         borderRadius: BorderRadius.circular(12),
         border: isSelected
             ? Border.all(color: const Color(0xFF28A745), width: 2)
-            : (isHighlighted && !isAnotherSelected)
-            ? Border.all(color: const Color(0xFFFF8800), width: 2)
-            : null,
+            : (isHighlighted
+                  ? Border.all(color: const Color(0xFFFF8800), width: 2)
+                  : null),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(
@@ -1047,9 +1071,7 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: isAnotherSelected
-                      ? null
-                      : isSelected
+                  onPressed: isSelected
                       ? () => _openGoogleMaps(
                           hospital.latitude,
                           hospital.longitude,
@@ -1062,14 +1084,10 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
                   ),
                   label: Text(isSelected ? 'Chỉ đường' : 'Chọn bệnh viện'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isAnotherSelected
-                        ? Colors.grey.shade300
-                        : (isSelected
-                              ? const Color(0xFFFF8800)
-                              : const Color(0xFF28A745)),
-                    foregroundColor: isAnotherSelected
-                        ? Colors.grey.shade500
-                        : Colors.white,
+                    backgroundColor: isSelected
+                        ? const Color(0xFFFF8800)
+                        : const Color(0xFF28A745),
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
@@ -1133,7 +1151,10 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
           children: [
             if (hasSelected && pricing != null) ...[
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
@@ -1145,56 +1166,66 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
                     ),
                   ],
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.check_circle,
-                          color: Color(0xFF28A745),
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
+                    const Icon(
+                      Icons.check_circle,
+                      color: Color(0xFF28A745),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
                             pricing.hospitalName,
                             style: const TextStyle(
-                              fontSize: 15,
+                              fontSize: 14,
                               fontWeight: FontWeight.bold,
                               color: Color(0xFF1C100D),
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 4),
+                          Text(
+                            pricing.requiresHospitalization
+                                ? 'Cần nhập viện'
+                                : 'Không cần nhập viện',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF666666),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const Divider(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Cần nhập viện:',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF666666),
-                          ),
-                        ),
-                        Text(
-                          pricing.requiresHospitalization ? 'Có' : 'Không',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF28A745),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Cập nhật: ${pricing.updatedAt.toLocal()}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF999999),
+                    const SizedBox(width: 10),
+                    IconButton(
+                      onPressed: () {
+                        final selectedHospital = hospitalState.hospitals
+                            .firstWhere(
+                              (h) => h.id == pricing.hospitalId,
+                              orElse: () => HospitalResponse(
+                                id: pricing.hospitalId,
+                                name: pricing.hospitalName,
+                                address: '',
+                                contactNumber: null,
+                                distanceKm: 0.0,
+                                latitude: 0,
+                                longitude: 0,
+                              ),
+                            );
+                        _openGoogleMaps(
+                          selectedHospital.latitude,
+                          selectedHospital.longitude,
+                          selectedHospital.name,
+                        );
+                      },
+                      icon: const Icon(
+                        Icons.navigation,
+                        color: Color(0xFFFF8800),
                       ),
                     ),
                   ],

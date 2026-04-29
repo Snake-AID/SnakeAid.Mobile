@@ -92,6 +92,15 @@ class DetailRescueMissionResponse {
   @JsonKey(name: 'costFromCenter')
   final double? costFromCenter;
 
+  @JsonKey(name: 'requiresHospitalization', defaultValue: false)
+  final bool requiresHospitalization;
+
+  @JsonKey(name: 'hospitalId')
+  final int? hospitalId;
+
+  @JsonKey(name: 'hospitalInfo')
+  final HospitalTransferResponse? hospitalInfo;
+
   // Related entities
   @JsonKey(name: 'incident')
   final BriefIncidentForMission incident;
@@ -122,6 +131,9 @@ class DetailRescueMissionResponse {
     this.actualCost,
     this.distanceFromCenterKm,
     this.costFromCenter,
+    this.requiresHospitalization = false,
+    this.hospitalId,
+    this.hospitalInfo,
     required this.incident,
     required this.rescuer,
     required this.user,
@@ -175,6 +187,34 @@ class DetailRescueMissionResponse {
     }
     return '$minutes phút';
   }
+}
+
+/// Hospital transfer details returned by mission detail API
+@JsonSerializable(explicitToJson: true)
+class HospitalTransferResponse {
+  @JsonKey(name: 'hospitalId')
+  final int hospitalId;
+
+  @JsonKey(name: 'hospitalName')
+  final String hospitalName;
+
+  @JsonKey(name: 'address')
+  final String address;
+
+  @JsonKey(name: 'contactNumber')
+  final String contactNumber;
+
+  HospitalTransferResponse({
+    required this.hospitalId,
+    required this.hospitalName,
+    required this.address,
+    required this.contactNumber,
+  });
+
+  factory HospitalTransferResponse.fromJson(Map<String, dynamic> json) =>
+      _$HospitalTransferResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$HospitalTransferResponseToJson(this);
 }
 
 /// Brief Incident Response for Mission

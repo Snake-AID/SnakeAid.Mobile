@@ -2,14 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/first_aid_recommendation_response.dart';
 import '../../repository/snake_ai_repository.dart';
-import '../../repository/rescue_mission_repository.dart';
-import '../../providers/mission_hub_provider.dart';
-import '../../providers/active_mission_provider.dart';
-import '../../providers/rescuer_emergency_provider.dart';
-import '../../../rescuer/providers/tracking_provider.dart';
 
 class RescuerSupportScreen extends ConsumerStatefulWidget {
   final String missionId;
@@ -33,6 +27,7 @@ class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
   FirstAidRecommendationResponse? _firstAidRecommendation;
   bool _isLoadingFirstAid = true;
   String? _firstAidError;
+  int _selectedTabIndex = 0;
 
   @override
   void initState() {
@@ -190,8 +185,10 @@ class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  // Main First Aid Content
-                  _buildFirstAidContent(),
+                  _buildTabBar(),
+                  const SizedBox(height: 16),
+                  if (_selectedTabIndex == 0) _buildRescuerInProgressContent(),
+                  if (_selectedTabIndex == 1) _buildFirstAidContent(),
                   const SizedBox(height: 16),
                 ],
               ),
@@ -219,88 +216,87 @@ class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Reference Buttons Row
-                  Row(
-                    children: [
-                      // "Nên làm" button
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _showDosBottomSheet,
-                          icon: const Icon(Icons.check_circle, size: 18),
-                          label: const Text(
-                            'Nên làm',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
+                  if (_selectedTabIndex == 1) ...[
+                    // Reference Buttons Row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _showDosBottomSheet,
+                            icon: const Icon(Icons.check_circle, size: 18),
+                            label: const Text(
+                              'Nên làm',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF228B22),
-                            side: const BorderSide(
-                              color: Color(0xFF228B22),
-                              width: 2,
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // "Không nên làm" button
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _showDontsBottomSheet,
-                          icon: const Icon(Icons.cancel, size: 18),
-                          label: const Text(
-                            'Không nên',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFFDC3545),
-                            side: const BorderSide(
-                              color: Color(0xFFDC3545),
-                              width: 2,
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF228B22),
+                              side: const BorderSide(
+                                color: Color(0xFF228B22),
+                                width: 2,
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      // "Lưu ý" button
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _showNotesBottomSheet,
-                          icon: const Icon(Icons.info_outline, size: 18),
-                          label: const Text(
-                            'Lưu ý',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _showDontsBottomSheet,
+                            icon: const Icon(Icons.cancel, size: 18),
+                            label: const Text(
+                              'Không nên',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFFFF8800),
-                            side: const BorderSide(
-                              color: Color(0xFFFF8800),
-                              width: 2,
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFDC3545),
+                              side: const BorderSide(
+                                color: Color(0xFFDC3545),
+                                width: 2,
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _showNotesBottomSheet,
+                            icon: const Icon(Icons.info_outline, size: 18),
+                            label: const Text(
+                              'Lưu ý',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFFF8800),
+                              side: const BorderSide(
+                                color: Color(0xFFFF8800),
+                                width: 2,
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   // Main Action Buttons Row
                   Row(
@@ -400,6 +396,175 @@ class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
     context.push(
       '/rescuer/mission-completion',
       extra: {'missionId': widget.missionId, 'incidentId': widget.incidentId},
+    );
+  }
+
+  Widget _buildTabBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F4F6),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          _buildTabItem(index: 0, label: 'Đang xử lý'),
+          _buildTabItem(index: 1, label: 'Sơ cứu'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabItem({required int index, required String label}) {
+    final selected = _selectedTabIndex == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedTabIndex = index;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFFFFEDD6) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+              color: selected
+                  ? const Color(0xFFFF8800)
+                  : const Color(0xFF6E6E73),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRescuerInProgressContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFFD4EDDA),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: const Color(0xFF155724).withOpacity(0.1),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF155724),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Text(
+                  'Đã đến hiện trường và đang xử lý sự cố.',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF155724),
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(0xFFFF8800).withOpacity(0.15),
+                      const Color(0xFFFF8800).withOpacity(0.05),
+                    ],
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.medical_services,
+                  size: 52,
+                  color: Color(0xFFFF8800),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF0E1),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: const Color(0xFFFF8800).withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(
+                      Icons.autorenew_rounded,
+                      size: 18,
+                      color: Color(0xFFFF8800),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Đang xử lý',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFFF8800),
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -783,7 +948,7 @@ class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
                       const SizedBox(width: 12),
                       const Expanded(
                         child: Text(
-                          '✅ NÊN LÀM',
+                          'NÊN LÀM',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -968,7 +1133,7 @@ class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
                       const SizedBox(width: 12),
                       const Expanded(
                         child: Text(
-                          '❌ KHÔNG NÊN LÀM',
+                          'KHÔNG NÊN LÀM',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -1153,7 +1318,7 @@ class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
                       const SizedBox(width: 12),
                       const Expanded(
                         child: Text(
-                          '⚠️ LƯU Ý QUAN TRỌNG',
+                          'LƯU Ý QUAN TRỌNG',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
