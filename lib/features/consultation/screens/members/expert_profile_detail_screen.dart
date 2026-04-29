@@ -111,10 +111,6 @@ class _ExpertProfileDetailScreenState
                                         _buildIntroductionSection(context, state.expert!),
                                         const SizedBox(height: 24),
 
-                                        // Experience
-                                        _buildExperienceSection(context, state.expert!),
-                                        const SizedBox(height: 24),
-
                                         // Statistics
                                         _buildStatisticsSection(context, state.expert!),
                                         const SizedBox(height: 24),
@@ -349,67 +345,6 @@ class _ExpertProfileDetailScreenState
       ],
     );
   }
-
-  /// Build experience section
-  Widget _buildExperienceSection(BuildContext context, expert) {
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Kinh Nghiệm',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: expert.experienceList.map<Widget>((experience) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        experience,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          height: 1.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-      ],
-    );
-  }
-
   /// Build statistics section
   Widget _buildStatisticsSection(BuildContext context, expert) {
     final theme = Theme.of(context);

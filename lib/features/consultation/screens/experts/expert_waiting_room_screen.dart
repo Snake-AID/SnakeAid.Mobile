@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../repository/consultation_repository.dart';
+import '../../../../core/services/consultation_chat_signalr_service.dart';
 
 /// Phòng chờ tư vấn video dành cho chuyên gia
 /// Hiển thị trước/sau buổi tư vấn, chờ bệnh nhân tham gia
@@ -55,6 +56,11 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
   late List<AnimationController> _dotControllers;
   late List<Animation<double>> _dotAnims;
 
+  // SignalR for "end consultation" listener
+  ConsultationChatSignalRService? _chatService;
+  StreamSubscription<ConsultationCallEndedEvent>? _consultationCallEndedSub;
+  bool _isHandlingEndEvent = false;
+
   @override
   void initState() {
     super.initState();
@@ -84,12 +90,65 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
         () { if (mounted) _dotControllers[1].repeat(reverse: true); });
     Future.delayed(const Duration(milliseconds: 400),
         () { if (mounted) _dotControllers[2].repeat(reverse: true); });
+
+    // Initialize SignalR listener for end-consultation events
+    _initSignalR();
+  }
+
+  void _initSignalR() async {
+    try {
+      final baseUrl = ref.read(consultationRepositoryProvider).httpService.baseUrl;
+      _chatService = ConsultationChatSignalRService(baseUrl: baseUrl);
+
+      _consultationCallEndedSub = _chatService!.consultationCallEndedStream.listen((event) {
+        if (event.consultationId == widget.consultationId) {
+          _handleConsultationEnded(event.reason);
+        }
+      });
+
+      await _chatService!.connect(widget.consultationId);
+      debugPrint('🔔 Expert Waiting Room connected to SignalR');
+    } catch (e) {
+      debugPrint('⚠️ Expert Waiting Room SignalR connection failed: $e');
+    }
+  }
+
+  void _handleConsultationEnded(String reason) {
+    if (!mounted || _isHandlingEndEvent) return;
+    _isHandlingEndEvent = true;
+
+    debugPrint('🏁 Consultation ended detected in waiting room: $reason');
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          reason.toLowerCase() == 'timeout'
+              ? 'Phiên tư vấn đã hết thời gian.'
+              : 'Phiên tư vấn đã kết thúc.',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
+    // Auto-navigate to completion screen
+    context.go(
+      '/expert-consultation-complete',
+      extra: {
+        'consultationId': widget.consultationId,
+        'patientName': widget.patientName,
+        'durationSeconds': 0, // In waiting room, duration spent in call is 0
+        'feeCost': widget.feeCost,
+        'expiryReason': reason,
+      },
+    );
   }
 
   @override
   void dispose() {
     _clockTimer.cancel();
     for (final c in _dotControllers) c.dispose();
+    _consultationCallEndedSub?.cancel();
+    _chatService?.dispose();
     super.dispose();
   }
 
@@ -324,14 +383,6 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Đang chờ khách hàng...',
-                          style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500),
                         ),
                       ],
                     ),

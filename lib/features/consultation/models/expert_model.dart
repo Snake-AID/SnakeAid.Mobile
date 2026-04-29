@@ -124,12 +124,27 @@ class ExpertModel {
               json['totalFeedbacks'] ??
               json['feedbackCount'] ??
               0) as int,
-      consultationFee:
-          ((json['consultationFee'] ?? json['fee'] ?? 0) as num).toDouble(),
-      scheduledConsultationFee:
-          ((json['scheduledConsultationFee'] ?? json['consultationFee'] ?? json['fee'] ?? 0) as num).toDouble(),
-      emergencyConsultationFee:
-          ((json['emergencyConsultationFee'] ?? 0) as num).toDouble(),
+      consultationFee: ((json['grossConsultationFee'] ??
+              json['grossFee'] ??
+              json['consultationFee'] ??
+              json['fee'] ??
+              json['price'] ??
+              0) as num)
+          .toDouble(),
+      scheduledConsultationFee: ((json['grossScheduledConsultationFee'] ??
+              json['scheduledGrossFee'] ??
+              json['scheduledConsultationFee'] ??
+              json['consultationFee'] ??
+              json['fee'] ??
+              json['price'] ??
+              0) as num)
+          .toDouble(),
+      emergencyConsultationFee: ((json['grossEmergencyConsultationFee'] ??
+              json['emergencyGrossFee'] ??
+              json['emergencyConsultationFee'] ??
+              json['price'] ??
+              0) as num)
+          .toDouble(),
       consultationDuration: (json['consultationDuration'] ?? 30) as int,
       // biography (production) | bio/introduction/description (legacy)
       bio: (json['biography'] ?? json['bio'] ?? json['introduction'] ?? json['description'])
