@@ -152,7 +152,7 @@ class SnakeRiskBadges {
     if (riskLevel >= 5) {
       return const Color(0xFFFF6F00); // Cam đậm - Nguy hiểm
     }
-    if (riskLevel > 4) {
+    if (riskLevel > 3) {
       return const Color(0xFFFFA726); // Cam nhạt - Trung bình
     }
     return const Color(0xFF43A047); // Xanh lá - Thấp
@@ -169,7 +169,7 @@ class SnakeRiskBadges {
     if (riskLevel >= 5) {
       return [const Color(0xFFFFF3E0), const Color(0xFFFFCC80)];
     }
-    if (riskLevel > 4) {
+    if (riskLevel > 3) {
       return [const Color(0xFFFFF8E1), const Color(0xFFFFE082)];
     }
     return [
@@ -183,7 +183,7 @@ class SnakeRiskBadges {
     if (riskLevel >= 8) return 'Cực kỳ nguy hiểm';
     if (riskLevel >= 6) return 'Rất nguy hiểm';
     if (riskLevel >= 5) return 'Nguy hiểm';
-    if (riskLevel > 4) return 'Trung bình';
+    if (riskLevel > 3) return 'Trung bình';
     return 'Thấp';
   }
 

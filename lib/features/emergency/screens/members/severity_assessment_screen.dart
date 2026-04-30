@@ -160,11 +160,11 @@ class _SeverityAssessmentScreenState
   String _getSeverityLevel(DetailedIncidentData? incident) {
     final level = incident?.severityLevel ?? 0;
     if (level >= 70) {
-      return '🚨 NGHIÊM TRỌNG - CẦN CẤP CỨU NGAY';
+      return 'NGHIÊM TRỌNG - CẦN CẨN TRỌNG';
     } else if (level >= 40) {
-      return '⚠️ TRUNG BÌNH - CẦN THEO DÕI';
+      return 'TRUNG BÌNH - CẦN THEO DÕI';
     } else {
-      return '✓ NHẸ - TIẾP TỤC SƠ CỨU';
+      return 'NHẸ - TIẾP TỤC SƠ CỨU';
     }
   }
 

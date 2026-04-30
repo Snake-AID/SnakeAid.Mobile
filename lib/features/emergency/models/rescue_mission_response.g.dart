@@ -33,6 +33,13 @@ DetailRescueMissionResponse _$DetailRescueMissionResponseFromJson(
   actualCost: (json['actualCost'] as num?)?.toDouble(),
   distanceFromCenterKm: (json['distanceFromCenterKm'] as num?)?.toDouble(),
   costFromCenter: (json['costFromCenter'] as num?)?.toDouble(),
+  requiresHospitalization: json['requiresHospitalization'] as bool? ?? false,
+  hospitalId: json['hospitalId'] as int?,
+  hospitalInfo: json['hospitalInfo'] == null
+      ? null
+      : HospitalTransferResponse.fromJson(
+          json['hospitalInfo'] as Map<String, dynamic>,
+        ),
   incident: BriefIncidentForMission.fromJson(
     json['incident'] as Map<String, dynamic>,
   ),
@@ -66,6 +73,9 @@ Map<String, dynamic> _$DetailRescueMissionResponseToJson(
   'actualCost': instance.actualCost,
   'distanceFromCenterKm': instance.distanceFromCenterKm,
   'costFromCenter': instance.costFromCenter,
+  'requiresHospitalization': instance.requiresHospitalization,
+  'hospitalId': instance.hospitalId,
+  'hospitalInfo': instance.hospitalInfo?.toJson(),
   'incident': instance.incident.toJson(),
   'rescuer': instance.rescuer.toJson(),
   'user': instance.user.toJson(),
@@ -120,6 +130,24 @@ Map<String, dynamic> _$BriefIncidentForMissionToJson(
   'identifiedSnake': instance.identifiedSnakeSpecies?.toJson(),
   'identificationContext': instance.identificationContext?.toJson(),
   'media': instance.media.map((e) => e.toJson()).toList(),
+};
+
+HospitalTransferResponse _$HospitalTransferResponseFromJson(
+  Map<String, dynamic> json,
+) => HospitalTransferResponse(
+  hospitalId: json['hospitalId'] as int,
+  hospitalName: json['hospitalName'] as String,
+  address: json['address'] as String,
+  contactNumber: json['contactNumber'] as String,
+);
+
+Map<String, dynamic> _$HospitalTransferResponseToJson(
+  HospitalTransferResponse instance,
+) => <String, dynamic>{
+  'hospitalId': instance.hospitalId,
+  'hospitalName': instance.hospitalName,
+  'address': instance.address,
+  'contactNumber': instance.contactNumber,
 };
 
 UpdateMissionStatusRequest _$UpdateMissionStatusRequestFromJson(

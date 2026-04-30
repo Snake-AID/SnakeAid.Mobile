@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models/hospital_response.dart';
 import '../models/hospital_transfer_pricing_response.dart';
+import '../models/rescue_mission_response.dart';
 import '../repository/treatment_facility_repository.dart';
 
 /// Hospital State
 class HospitalState {
+  final String? missionId;
   final List<HospitalResponse> hospitals;
   final Position? currentPosition;
   final bool isLoading;
@@ -16,6 +18,7 @@ class HospitalState {
   final bool isSelectingHospital;
 
   HospitalState({
+    this.missionId,
     this.hospitals = const [],
     this.currentPosition,
     this.isLoading = false,
@@ -26,6 +29,7 @@ class HospitalState {
   });
 
   HospitalState copyWith({
+    String? missionId,
     List<HospitalResponse>? hospitals,
     Position? currentPosition,
     bool? isLoading,
@@ -38,6 +42,7 @@ class HospitalState {
     bool clearSelectedHospital = false,
   }) {
     return HospitalState(
+      missionId: missionId ?? this.missionId,
       hospitals: clearHospitals ? [] : (hospitals ?? this.hospitals),
       currentPosition: currentPosition ?? this.currentPosition,
       isLoading: isLoading ?? this.isLoading,
@@ -172,6 +177,32 @@ class HospitalNotifier extends StateNotifier<HospitalState> {
   /// Clear error
   void clearError() {
     state = state.copyWith(clearError: true);
+  }
+
+  /// Set the current mission and clear stale selection when mission changes.
+  void setCurrentMission(String missionId) {
+    if (state.missionId == missionId) return;
+    state = state.copyWith(missionId: missionId, clearSelectedHospital: true);
+  }
+
+  /// Restore selected hospital from mission detail when backend already knows it.
+  void restoreSelectedHospitalFromMissionDetail(
+    DetailRescueMissionResponse missionDetail,
+  ) {
+    if (missionDetail.hospitalId == null) {
+      clearSelectedHospital();
+      return;
+    }
+
+    state = state.copyWith(
+      selectedHospitalPricing: HospitalTransferPricingResponse(
+        hospitalId: missionDetail.hospitalId!,
+        hospitalName:
+            missionDetail.hospitalInfo?.hospitalName ?? 'Bệnh viện đã chọn',
+        requiresHospitalization: missionDetail.requiresHospitalization,
+        updatedAt: missionDetail.updatedAt ?? DateTime.now(),
+      ),
+    );
   }
 
   /// Set selected hospital details after successful API call

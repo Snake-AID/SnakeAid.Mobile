@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../providers/hospital_provider.dart';
 import '../../providers/mission_detail_provider.dart';
 
 class RescuerMissionSuccessScreen extends ConsumerStatefulWidget {
@@ -14,6 +15,14 @@ class RescuerMissionSuccessScreen extends ConsumerStatefulWidget {
 
 class _RescuerMissionSuccessScreenState
     extends ConsumerState<RescuerMissionSuccessScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(hospitalProvider.notifier).clearSelectedHospital();
+    });
+  }
+
   String _formatCurrency(double? value) {
     if (value == null) return '-';
     final formatted = value
@@ -126,14 +135,6 @@ class _RescuerMissionSuccessScreenState
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 8),
-                        const Text(
-                          'Nhiệm vụ hoàn thành. Cảm ơn bạn đã đóng góp cho cộng đồng!',
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: Color(0xFF666666),
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
                       ],
                     ),
                   ),
@@ -215,7 +216,7 @@ class _RescuerMissionSuccessScreenState
                                           : Colors.grey[600],
                                     ),
                                   ),
-                                   const SizedBox(height: 4),
+                                  const SizedBox(height: 4),
                                   Text(
                                     'Khách hàng thanh toán',
                                     style: TextStyle(
@@ -503,5 +504,4 @@ class _RescuerMissionSuccessScreenState
       ],
     );
   }
-
 }

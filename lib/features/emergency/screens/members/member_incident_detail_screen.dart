@@ -1263,7 +1263,7 @@ class _MethodBadge extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           Text(
-            isAI ? 'AI' : 'Chuyên gia',
+            isAI ? 'AI' : 'Thủ công',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,

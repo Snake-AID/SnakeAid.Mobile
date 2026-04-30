@@ -49,8 +49,8 @@ class _RescuerAvailableJobsScreenState
   void initState() {
     super.initState();
     _initialize();
-    // Auto-refresh every 15 seconds
-    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+    // Auto-refresh every 45 seconds
+    _refreshTimer = Timer.periodic(const Duration(seconds: 45), (_) {
       _silentRefresh();
     });
   }
@@ -1029,8 +1029,8 @@ class _RescuerAvailableJobsScreenState
         return 'Đã hủy nhiệm vụ';
       case 'missioncompleted':
         return 'Đã hoàn thành';
-       case 'missionuncompleted':
-        return 'Chưa hoàn thành';  
+      case 'missionuncompleted':
+        return 'Chưa hoàn thành';
       case 'paid':
         return 'Đã thanh toán';
       case 'completed':

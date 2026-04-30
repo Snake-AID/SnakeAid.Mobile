@@ -717,7 +717,7 @@ class DetectedSnakeSpecies {
     if (riskLevel >= 8) return 'Cực kỳ nguy hiểm';
     if (riskLevel >= 6) return 'Rất Nguy hiểm';
     if (riskLevel >= 5) return 'Nguy hiểm';
-    if (riskLevel > 4) return 'Trung bình';
+    if (riskLevel > 3) return 'Trung bình';
     return 'Thấp';
   }
 }

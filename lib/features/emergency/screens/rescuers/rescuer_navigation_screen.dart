@@ -299,19 +299,8 @@ class _RescuerNavigationScreenState
       _checkOffRoute(position);
     }
 
-    // Auto-suggest arrival when very close (100 meters = 0.1km)
-    if (_distanceToVictim != null &&
-        _distanceToVictim! < 0.1 &&
-        (previousDistance == null || previousDistance >= 0.1) &&
-        widget.mission.status == 'EnRoute' &&
-        widget.mission.arrivedAt == null) {
-      // Show arrival confirmation automatically
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _showArrivedConfirmation(context);
-        }
-      });
-    }
+    // No automatic arrival confirmation popup.
+    // Arrival confirmation is shown only when user taps the button.
   }
 
   /// Calculate distance to next maneuver point
