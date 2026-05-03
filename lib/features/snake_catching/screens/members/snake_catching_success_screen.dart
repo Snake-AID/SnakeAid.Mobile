@@ -7,10 +7,7 @@ import 'package:intl/intl.dart';
 class SnakeCatchingSuccessScreen extends StatelessWidget {
   final SnakeCatchingRequestData requestData;
 
-  const SnakeCatchingSuccessScreen({
-    super.key,
-    required this.requestData,
-  });
+  const SnakeCatchingSuccessScreen({super.key, required this.requestData});
 
   String _formatCurrency(double value) {
     final fmt = NumberFormat('#,###', 'vi_VN');
@@ -79,9 +76,16 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white.withValues(alpha: 0.15),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    width: 2,
+                  ),
                 ),
-                child: const Icon(Icons.check_circle_rounded, size: 60, color: Colors.white),
+                child: const Icon(
+                  Icons.check_circle_rounded,
+                  size: 60,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(height: 20),
               const Text(
@@ -113,8 +117,10 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
 
   // ─── Payment call-to-action card ─────────────────────────────────────────
   Widget _buildPaymentCallout(BuildContext context) {
-    final hasPrice = requestData.estimatedPrice != null && requestData.estimatedPrice! > 0;
-    final hasDistance = requestData.distanceKm != null && requestData.distanceKm! > 0;
+    final hasPrice =
+        requestData.estimatedPrice != null && requestData.estimatedPrice! > 0;
+    final hasDistance =
+        requestData.distanceKm != null && requestData.distanceKm! > 0;
 
     return Container(
       decoration: BoxDecoration(
@@ -143,109 +149,120 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8F5E9),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.payments_rounded,
-                            color: Color(0xFF228B22), size: 22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Phí Di Chuyển',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1B5E20),
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Xác nhận đơn để ưu tiên phân công cứu hộ viên',
-                              style: TextStyle(fontSize: 12, color: Color(0xFF757575)),
-                            ),
-                          ],
-                        ),
+                      child: const Icon(
+                        Icons.payments_rounded,
+                        color: Color(0xFF228B22),
+                        size: 22,
                       ),
-                    ],
-                  ),
-
-                  if (hasPrice || hasDistance) ...[
-                    const SizedBox(height: 16),
-                    const Divider(height: 1, color: Color(0xFFF0F0F0)),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        if (hasDistance) ...[
-                          Expanded(
-                            child: _buildMetricTile(
-                              icon: Icons.route_rounded,
-                              iconColor: const Color(0xFF1976D2),
-                              bgColor: const Color(0xFFE3F2FD),
-                              label: 'Khoảng cách',
-                              value: '${requestData.distanceKm!.toStringAsFixed(1)} km',
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                        ],
-                        if (hasPrice)
-                          Expanded(
-                            child: _buildMetricTile(
-                              icon: Icons.account_balance_wallet_rounded,
-                              iconColor: const Color(0xFF388E3C),
-                              bgColor: const Color(0xFFE8F5E9),
-                              label: 'Phí di chuyển',
-                              value: _formatCurrency(requestData.estimatedPrice!),
-                              valueColor: const Color(0xFF1B5E20),
-                              bold: true,
-                            ),
-                          ),
-                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '* Phí thực tế sẽ được xác nhận sau khi hoàn thành nhiệm vụ',
-                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Phí Di Chuyển',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1B5E20),
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Xác nhận đơn để ưu tiên phân công cứu hộ viên',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF757575),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
+                ),
 
+                if (hasPrice || hasDistance) ...[
                   const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => context.push('/activity-detail/${requestData.id}'),
-                      icon: const Icon(Icons.payments_rounded, size: 20),
-                      label: const Text(
-                        'Thanh Toán Phí Di Chuyển',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF228B22),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  const Divider(height: 1, color: Color(0xFFF0F0F0)),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      if (hasDistance) ...[
+                        Expanded(
+                          child: _buildMetricTile(
+                            icon: Icons.route_rounded,
+                            iconColor: const Color(0xFF1976D2),
+                            bgColor: const Color(0xFFE3F2FD),
+                            label: 'Khoảng cách',
+                            value:
+                                '${requestData.distanceKm!.toStringAsFixed(1)} km',
+                          ),
                         ),
+                        const SizedBox(width: 12),
+                      ],
+                      if (hasPrice)
+                        Expanded(
+                          child: _buildMetricTile(
+                            icon: Icons.account_balance_wallet_rounded,
+                            iconColor: const Color(0xFF388E3C),
+                            bgColor: const Color(0xFFE8F5E9),
+                            label: 'Phí di chuyển',
+                            value: _formatCurrency(requestData.estimatedPrice!),
+                            valueColor: const Color(0xFF1B5E20),
+                            bold: true,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '* Phí thực tế sẽ được xác nhận sau khi hoàn thành nhiệm vụ',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                  ),
+                ],
+
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () =>
+                        context.push('/activity-detail/${requestData.id}'),
+                    icon: const Icon(Icons.payments_rounded, size: 20),
+                    label: const Text(
+                      'Thanh Toán Phí Di Chuyển',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF228B22),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -272,8 +289,10 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label,
-                    style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                ),
                 const SizedBox(height: 2),
                 Text(
                   value,
@@ -349,7 +368,11 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
         children: [
           const Row(
             children: [
-              Icon(Icons.linear_scale_rounded, color: Color(0xFF228B22), size: 20),
+              Icon(
+                Icons.linear_scale_rounded,
+                color: Color(0xFF228B22),
+                size: 20,
+              ),
               SizedBox(width: 8),
               Text(
                 'Quy trình xử lý',
@@ -391,8 +414,8 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
                 color: step.done
                     ? const Color(0xFF228B22)
                     : step.active
-                        ? const Color(0xFFE8F5E9)
-                        : const Color(0xFFF5F5F5),
+                    ? const Color(0xFFE8F5E9)
+                    : const Color(0xFFF5F5F5),
                 border: step.active
                     ? Border.all(color: const Color(0xFF228B22), width: 2)
                     : null,
@@ -403,8 +426,8 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
                 color: step.done
                     ? Colors.white
                     : step.active
-                        ? const Color(0xFF228B22)
-                        : const Color(0xFFBDBDBD),
+                    ? const Color(0xFF228B22)
+                    : const Color(0xFFBDBDBD),
               ),
             ),
             if (!isLast)
@@ -440,11 +463,16 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
                 if (step.active)
                   Container(
                     margin: const EdgeInsets.only(top: 6),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFE8F5E9),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF228B22).withValues(alpha: 0.4)),
+                      border: Border.all(
+                        color: const Color(0xFF228B22).withValues(alpha: 0.4),
+                      ),
                     ),
                     child: const Text(
                       'Bước hiện tại',
@@ -492,7 +520,11 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.receipt_long_rounded, color: Color(0xFF2E7D32), size: 20),
+                const Icon(
+                  Icons.receipt_long_rounded,
+                  color: Color(0xFF2E7D32),
+                  size: 20,
+                ),
                 const SizedBox(width: 10),
                 const Expanded(
                   child: Text(
@@ -505,7 +537,10 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF228B22),
                     borderRadius: BorderRadius.circular(20),
@@ -522,7 +557,7 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // Content
           Padding(
             padding: const EdgeInsets.all(16),
@@ -533,20 +568,18 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
                 _buildInfoRow(
                   Icons.access_time,
                   'Thời gian gửi',
-                  DateFormat('dd/MM/yyyy, HH:mm').format(requestData.requestDate.toLocal()),
+                  DateFormat(
+                    'dd/MM/yyyy, HH:mm',
+                  ).format(requestData.requestDate.toLocal()),
                 ),
-                
+
                 const SizedBox(height: 16),
                 const Divider(height: 1),
                 const SizedBox(height: 16),
-                
+
                 // Location
-                _buildInfoRow(
-                  Icons.location_on,
-                  'Vị trí',
-                  requestData.address,
-                ),
-                
+                _buildInfoRow(Icons.location_on, 'Vị trí', requestData.address),
+
                 // Preferred Time
                 if (requestData.preferredTime != null) ...[
                   const SizedBox(height: 16),
@@ -555,14 +588,16 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
                   _buildInfoRow(
                     Icons.schedule,
                     'Thời gian mong muốn',
-                    DateFormat('HH:mm').format(requestData.preferredTime!.toLocal()),
+                    DateFormat(
+                      'HH:mm',
+                    ).format(requestData.preferredTime!.toLocal()),
                   ),
                 ],
-                
+
                 const SizedBox(height: 16),
                 const Divider(height: 1),
                 const SizedBox(height: 16),
-                
+
                 // Snake Species
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -602,15 +637,18 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          ...requestData.details.map((detail) => _buildSpeciesChip(detail)),
+                          ...requestData.details.map(
+                            (detail) => _buildSpeciesChip(detail),
+                          ),
                         ],
                       ),
                     ),
                   ],
                 ),
-                
+
                 // Additional Details
-                if (requestData.additionalDetails != null && requestData.additionalDetails!.isNotEmpty) ...[
+                if (requestData.additionalDetails != null &&
+                    requestData.additionalDetails!.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   const Divider(height: 1),
                   const SizedBox(height: 16),
@@ -657,9 +695,10 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
                     ],
                   ),
                 ],
-                
+
                 // Notes (Thông tin bổ sung)
-                if (requestData.notes != null && requestData.notes!.isNotEmpty) ...[
+                if (requestData.notes != null &&
+                    requestData.notes!.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   const Divider(height: 1),
                   const SizedBox(height: 16),
@@ -706,7 +745,7 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
                     ],
                   ),
                 ],
-                
+
                 // Priority
                 if (requestData.priority != 'Normal') ...[
                   const SizedBox(height: 16),
@@ -727,7 +766,12 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value, {Color? valueColor}) {
+  Widget _buildInfoRow(
+    IconData icon,
+    String label,
+    String value, {
+    Color? valueColor,
+  }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -737,11 +781,7 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
             color: const Color(0xFF228B22).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(
-            icon,
-            size: 20,
-            color: const Color(0xFF228B22),
-          ),
+          child: Icon(icon, size: 20, color: const Color(0xFF228B22)),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -847,7 +887,8 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () => context.push('/activity-detail/${requestData.id}'),
+                onPressed: () =>
+                    context.push('/activity-detail/${requestData.id}'),
                 icon: const Icon(Icons.payments_rounded, size: 20),
                 label: const Text(
                   'Thanh Toán Phí Di Chuyển',
