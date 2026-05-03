@@ -651,7 +651,6 @@ class _HomeTabState extends ConsumerState<_HomeTab>
               elevation: 0,
               title: Row(
                 children: [
-                  Icon(Icons.pets, color: const Color(0xFF6C47C2), size: 32),
                   const SizedBox(width: 8),
                   const Text(
                     'SnakeAid Expert',
