@@ -24,7 +24,7 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
   bool _sosReadAloud = true;
   bool _catchingReadAloud = true;
   bool _vibration = true;
-  final String _notificationSound = 'Hệ thống';
+  final String _notificationSound = 'Nam';
 
   @override
   void initState() {
@@ -297,13 +297,13 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
               ),
               const Divider(height: 1, color: Color(0xFFF0F0F0)),
               _buildSwitchRow(
-                'Âm thanh đọc rắn cắn',
+                'Âm thanh đọc yêu cầu rắn cắn',
                 _sosReadAloud,
                 (value) => _setSettingAndSave(() => _sosReadAloud = value),
               ),
               const Divider(height: 1, color: Color(0xFFF0F0F0)),
               _buildSwitchRow(
-                'Âm thanh đọc đơn bắt rắn',
+                'Âm thanh đọc yêu cầu bắt rắn',
                 _catchingReadAloud,
                 (value) => _setSettingAndSave(() => _catchingReadAloud = value),
               ),

@@ -74,7 +74,23 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
           children: [
             const SizedBox(height: 8),
 
-            // SECTION 1: Notifications
+            // SECTION 2: System
+            _buildSectionHeader('Chế Độ Làm Việc'),
+            _buildCard(
+              children: [
+                _buildNotificationRow(
+                  title: 'Tự động online khi mở lại app',
+                  subtitle: 'Tự động kích hoạt online khi bạn mở lại ứng dụng',
+                  value: _autoOnline,
+                  onChanged: _saveAutoOnline,
+                  isMandatory: false,
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 32),
+
+             // SECTION 1: Notifications
             _buildSectionHeader('Thông Báo'),
             _buildCard(
               children: [
@@ -89,22 +105,6 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                 _buildMandatoryNotificationRow(
                   title: 'Yêu cầu tư vấn mới',
                   subtitle: 'Bắt buộc để không bỏ lỡ các yêu cầu',
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 32),
-
-            // SECTION 2: System
-            _buildSectionHeader('Hệ Thống'),
-            _buildCard(
-              children: [
-                _buildNotificationRow(
-                  title: 'Tự động online khi mở lại app',
-                  subtitle: 'Tự động kích hoạt online khi bạn mở lại ứng dụng',
-                  value: _autoOnline,
-                  onChanged: _saveAutoOnline,
-                  isMandatory: false,
                 ),
               ],
             ),
