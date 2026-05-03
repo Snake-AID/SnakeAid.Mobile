@@ -5,6 +5,7 @@ class MemberConsultationDetailScreen extends StatelessWidget {
   final String? consultationId;
   final String expertName;
   final String expertSpecialty;
+  final String? expertAvatarUrl;
   final String serviceType;
   final DateTime scheduledTime;
   final int feeCost;
@@ -20,6 +21,7 @@ class MemberConsultationDetailScreen extends StatelessWidget {
     this.consultationId,
     required this.expertName,
     required this.expertSpecialty,
+    this.expertAvatarUrl,
     required this.serviceType,
     required this.scheduledTime,
     required this.feeCost,
@@ -59,14 +61,10 @@ class MemberConsultationDetailScreen extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _primary.withOpacity(0.1),
-                  ),
-                  child: const Icon(Icons.person, color: _primary),
+                _Avatar(
+                  avatarUrl: expertAvatarUrl,
+                  fallbackColor: _primary.withOpacity(0.1),
+                  iconColor: _primary,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -303,6 +301,36 @@ class _SectionCard extends StatelessWidget {
           child,
         ],
       ),
+    );
+  }
+}
+
+class _Avatar extends StatelessWidget {
+  final String? avatarUrl;
+  final Color fallbackColor;
+  final Color iconColor;
+
+  const _Avatar({
+    this.avatarUrl,
+    required this.fallbackColor,
+    required this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final url = (avatarUrl ?? '').trim();
+    final hasAvatar = url.isNotEmpty;
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: fallbackColor,
+        image: hasAvatar
+            ? DecorationImage(image: NetworkImage(url), fit: BoxFit.cover)
+            : null,
+      ),
+      child: hasAvatar ? null : Icon(Icons.person, color: iconColor),
     );
   }
 }

@@ -205,6 +205,7 @@ class _ExpertConsultationDetailScreenState
     final consultationId =
         (data['consultationId'] as String?) ?? (data['id'] as String?) ?? '';
     final patientName = data['patientName'] as String? ?? '';
+    final patientAvatarUrl = data['patientAvatarUrl'] as String?;
     final patientPhone = data['patientPhone'] as String? ?? '';
     final consultationType = data['consultationType'] as String? ?? '';
     final scheduledMs = (data['scheduledTime'] as int?) ?? 0;
@@ -280,18 +281,11 @@ class _ExpertConsultationDetailScreenState
                 _SectionCard(
                   child: Row(
                     children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: _purple.withOpacity(0.12),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.person,
-                          color: _purple,
-                          size: 30,
-                        ),
+                      _Avatar(
+                        avatarUrl: patientAvatarUrl,
+                        fallbackColor: _purple.withOpacity(0.12),
+                        iconColor: _purple,
+                        size: 56,
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -799,6 +793,40 @@ class _SectionCard extends StatelessWidget {
           child,
         ],
       ),
+    );
+  }
+}
+
+class _Avatar extends StatelessWidget {
+  final String? avatarUrl;
+  final Color fallbackColor;
+  final Color iconColor;
+  final double size;
+
+  const _Avatar({
+    this.avatarUrl,
+    required this.fallbackColor,
+    required this.iconColor,
+    this.size = 52,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final url = (avatarUrl ?? '').trim();
+    final hasAvatar = url.isNotEmpty;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: fallbackColor,
+        image: hasAvatar
+            ? DecorationImage(image: NetworkImage(url), fit: BoxFit.cover)
+            : null,
+      ),
+      child: hasAvatar
+          ? null
+          : Icon(Icons.person, size: size * 0.55, color: iconColor),
     );
   }
 }
