@@ -188,14 +188,6 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
                       ),
                       const SizedBox(height: 12),
                       _buildMenuItem(
-                        icon: Icons.psychology_alt,
-                        title: 'Chuyên Môn & Lĩnh Vực',
-                        onTap: () {
-                          context.pushNamed('expert_specialties');
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _buildMenuItem(
                         icon: Icons.calendar_month,
                         title: 'Cài Đặt Lịch Làm Việc',
                         onTap: () {
@@ -208,14 +200,6 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
                         title: 'Xem Xét AI Nhận Diện',
                         onTap: () {
                           context.pushNamed('expert_ai_review_queue');
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _buildMenuItem(
-                        icon: Icons.settings,
-                        title: 'Cài Đặt',
-                        onTap: () {
-                          context.pushNamed('expert_settings');
                         },
                       ),
                     ],

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -94,6 +95,10 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
   int _selectedIndex = 0;
   final AudioPlayer _snakeCatchingAudioPlayer = AudioPlayer();
   final AudioPlayer _sosAudioPlayer = AudioPlayer();
+  int _snakeCatchingAlertPlays = 0;
+  StreamSubscription<void>? _snakeCatchingCompleteSub;
+  int _sosAlertPlays = 0;
+  StreamSubscription<void>? _sosCompleteSub;
 
   final List<Widget> _screens = [
     const _HomeTab(),
@@ -527,10 +532,30 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
   Future<void> _playSnakeCatchingAlert() async {
     // Sound — requires assets/sounds/snake_alert.mp3 (see assets/sounds/README.md)
     try {
-      // Reset player state before playing to avoid stuck state
+      // Reset player state and play up to 3 times (no infinite loop)
       await _snakeCatchingAudioPlayer.stop();
       await _snakeCatchingAudioPlayer.setVolume(1.0);
-      await _snakeCatchingAudioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _snakeCatchingAudioPlayer.setReleaseMode(ReleaseMode.stop);
+      // Cancel any existing subscription
+      await _snakeCatchingCompleteSub?.cancel();
+      _snakeCatchingAlertPlays = 0;
+      _snakeCatchingCompleteSub = _snakeCatchingAudioPlayer.onPlayerComplete
+          .listen((_) async {
+            _snakeCatchingAlertPlays++;
+            if (_snakeCatchingAlertPlays < 3) {
+              // replay
+              await _snakeCatchingAudioPlayer.seek(Duration.zero);
+              await _snakeCatchingAudioPlayer.play(
+                AssetSource('sounds/snake_alert.mp3'),
+              );
+            } else {
+              // reached max plays — stop and cancel subscription
+              await _snakeCatchingAudioPlayer.stop();
+              await _snakeCatchingCompleteSub?.cancel();
+              _snakeCatchingCompleteSub = null;
+            }
+          });
+      // Start first play
       await _snakeCatchingAudioPlayer.play(
         AssetSource('sounds/snake_alert.mp3'),
       );
@@ -551,6 +576,9 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
   void _stopSnakeCatchingAlert() {
     try {
       _snakeCatchingAudioPlayer.stop();
+      _snakeCatchingCompleteSub?.cancel();
+      _snakeCatchingCompleteSub = null;
+      _snakeCatchingAlertPlays = 0;
     } catch (_) {}
     try {
       Vibration.cancel();
@@ -561,9 +589,23 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
   Future<void> _playSnakebiteIncidentAlert() async {
     // Sound — requires assets/sounds/sos_alert.mp3
     try {
+      // play up to 3 times and avoid infinite loop
       await _sosAudioPlayer.stop();
       await _sosAudioPlayer.setVolume(1.0);
-      await _sosAudioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _sosAudioPlayer.setReleaseMode(ReleaseMode.stop);
+      await _sosCompleteSub?.cancel();
+      _sosAlertPlays = 0;
+      _sosCompleteSub = _sosAudioPlayer.onPlayerComplete.listen((_) async {
+        _sosAlertPlays++;
+        if (_sosAlertPlays < 3) {
+          await _sosAudioPlayer.seek(Duration.zero);
+          await _sosAudioPlayer.play(AssetSource('sounds/sos_alert.mp3'));
+        } else {
+          await _sosAudioPlayer.stop();
+          await _sosCompleteSub?.cancel();
+          _sosCompleteSub = null;
+        }
+      });
       await _sosAudioPlayer.play(AssetSource('sounds/sos_alert.mp3'));
     } catch (e) {
       debugPrint('⚠️ Could not play SOS alert sound: $e');
@@ -582,6 +624,9 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
   void _stopSnakebiteIncidentAlert() {
     try {
       _sosAudioPlayer.stop();
+      _sosCompleteSub?.cancel();
+      _sosCompleteSub = null;
+      _sosAlertPlays = 0;
     } catch (_) {}
     try {
       Vibration.cancel();
@@ -797,8 +842,54 @@ class _HomeTabState extends ConsumerState<_HomeTab>
       });
 
       debugPrint('👤 Rescuer ID loaded: $_rescuerId');
+
+      // Check if auto-online is enabled and activate rescue mode
+      if (mounted) {
+        await _autoGoOnlineIfEnabled();
+      }
     } catch (e) {
       debugPrint('❌ Error loading rescuer ID: $e');
+    }
+  }
+
+  Future<void> _autoGoOnlineIfEnabled() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final autoOnline = prefs.getBool('rescuer_autoOnline') ?? true;
+
+      if (!autoOnline || _rescuerId == null) {
+        debugPrint('ℹ️ Auto-online disabled or rescuer ID not available');
+        return;
+      }
+
+      debugPrint('🟢 Auto-online enabled - checking GPS and activating...');
+
+      // Check GPS readiness first
+      final gpsResult = await ref.read(locationManagerProvider).checkGpsReady();
+
+      if (gpsResult != GpsCheckResult.ready) {
+        debugPrint('⚠️ GPS not ready: $gpsResult');
+        return;
+      }
+
+      // GPS OK - start rescue mode
+      final rescueModeState = ref.read(rescueModeProvider);
+      if (!rescueModeState.isActive) {
+        await ref
+            .read(rescueModeProvider.notifier)
+            .startRescueMode(_rescuerId!);
+
+        // Start location tracking
+        await ref.read(locationManagerProvider).startTracking(_rescuerId!);
+
+        setState(() {
+          _isOnline = true;
+        });
+
+        debugPrint('✅ Auto-online activated successfully');
+      }
+    } catch (e) {
+      debugPrint('❌ Error in auto-online: $e');
     }
   }
 
@@ -1628,11 +1719,6 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                             if (startDt != null) ...[
                               Row(
                                 children: [
-                                  const Icon(
-                                    Icons.play_arrow,
-                                    size: 14,
-                                    color: Color(0xFF555555),
-                                  ),
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: Text(
@@ -1650,11 +1736,6 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                             if (endDt != null) ...[
                               Row(
                                 children: [
-                                  const Icon(
-                                    Icons.stop,
-                                    size: 14,
-                                    color: Color(0xFF555555),
-                                  ),
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: Text(

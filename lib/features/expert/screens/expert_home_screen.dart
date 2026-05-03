@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../repository/expert_analytics_repository.dart';
 import '../models/expert_daily_stats.dart';
 import '../../../core/providers/http_provider.dart';
@@ -252,7 +253,7 @@ class _HomeTab extends ConsumerStatefulWidget {
 }
 
 class _HomeTabState extends ConsumerState<_HomeTab>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnimation;
 
@@ -296,6 +297,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
     );
 
     _pulseController.repeat(reverse: true);
+    WidgetsBinding.instance.addObserver(this);
     // Handled globally at app root so popup can appear on every expert screen.
 
     // Reload data mỗi khi vào màn hình
@@ -303,6 +305,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
       ref.invalidate(_expertBookingsFutureProvider);
       ref.invalidate(_expertDailyStatsProvider);
       _loadStats();
+      _autoGoOnlineIfEnabled();
     });
   }
 
@@ -354,6 +357,41 @@ class _HomeTabState extends ConsumerState<_HomeTab>
         backgroundColor: nextOnline ? Colors.green : Colors.grey,
       ),
     );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      _handleAppResumed();
+    }
+  }
+
+  Future<void> _handleAppResumed() async {
+    await _autoGoOnlineIfEnabled();
+  }
+
+  Future<void> _autoGoOnlineIfEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    final autoOnline = prefs.getBool('expert_autoOnline') ?? true;
+    if (!autoOnline) return;
+
+    final availabilityState = ref.read(expertAvailabilityProvider);
+    if (availabilityState.isOnline || availabilityState.isLoading) return;
+
+    final notifier = ref.read(expertAvailabilityProvider.notifier);
+    await notifier.setOnline(true);
+    if (!mounted) return;
+
+    final nextState = ref.read(expertAvailabilityProvider);
+    if (nextState.error == null && nextState.isOnline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tự động chuyển sang trạng thái online'),
+          backgroundColor: Color(0xFF6C47C2),
+        ),
+      );
+    }
   }
 
   // Public method to reload data when tab is selected
@@ -589,6 +627,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _countdownTimer?.cancel();
     _emergencyRequestSub?.cancel();
     _emergencyInboxService?.dispose();
