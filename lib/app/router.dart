@@ -619,6 +619,7 @@ final router = GoRouter(
         return ConsultationCompletionScreen(
           expertName: extra?['expertName'] as String? ?? 'Chuyên Gia',
           expertSpecialty: extra?['expertSpecialty'] as String? ?? '',
+          expertAvatarUrl: extra?['expertAvatarUrl'] as String?,
           durationSeconds: extra?['durationSeconds'] as int? ?? 0,
           consultationId: extra?['consultationId'] as String? ?? '',
           consultationTime: extra?['consultationTime'] as DateTime?,

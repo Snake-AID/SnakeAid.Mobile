@@ -90,6 +90,7 @@ _ExpertConsultation _bookingToExpertConsultation(
     userId: b.userId,
     expertId: b.expertId,
     patientName: b.userName ?? 'Bệnh nhân',
+    patientAvatarUrl: b.userAvatarUrl,
     patientPhone: '',
     consultationType: b.consultationType == 'Instant' ? 'Khẩn Cấp' : 'Đặt Lịch',
     snakeSuspect: '',
@@ -563,6 +564,7 @@ class _HomeTabState extends ConsumerState<_HomeTab>
         'userId': c.userId,
         'expertId': c.expertId,
         'patientName': c.patientName,
+        'patientAvatarUrl': c.patientAvatarUrl,
         'patientPhone': c.patientPhone,
         'consultationType': c.consultationType,
         'snakeSuspect': c.snakeSuspect,
@@ -2180,6 +2182,7 @@ class _ExpertConsultation {
   final String? userId;
   final String expertId;
   final String patientName;
+  final String? patientAvatarUrl;
   final String patientPhone;
   final String consultationType;
   final String snakeSuspect;
@@ -2208,6 +2211,7 @@ class _ExpertConsultation {
     this.userId,
     required this.expertId,
     required this.patientName,
+    this.patientAvatarUrl,
     this.patientPhone = '',
     required this.consultationType,
     required this.snakeSuspect,
@@ -2737,6 +2741,25 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
     );
   }
 
+  Widget _buildPatientAvatar(String? avatarUrl, {double size = 40}) {
+    final url = (avatarUrl ?? '').trim();
+    final hasAvatar = url.isNotEmpty;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: _purple.withOpacity(0.08),
+        image: hasAvatar
+            ? DecorationImage(image: NetworkImage(url), fit: BoxFit.cover)
+            : null,
+      ),
+      child: hasAvatar
+          ? null
+          : Icon(Icons.person, color: _purple, size: size * 0.5),
+    );
+  }
+
   Widget _buildScheduleCard(BuildContext context, _ExpertConsultation c) {
     final isWaiting = c.status == _ExpertConsultationStatus.waiting;
     // Cho phép expert vào video call bất cứ lúc nào (không cần chờ đến giờ)
@@ -2856,13 +2879,24 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                                 ),
                               ),
                               const SizedBox(height: 6),
-                              Text(
-                                c.patientName,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1A1A2E),
-                                ),
+                              Row(
+                                children: [
+                                  _buildPatientAvatar(
+                                    c.patientAvatarUrl,
+                                    size: 36,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      c.patientName,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF1A1A2E),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 4),
                               if (c.snakeSuspect.trim().isNotEmpty)
@@ -3139,19 +3173,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
         children: [
           Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: _purple.withOpacity(0.08),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.person,
-                  color: Color(0xFF6C47C2),
-                  size: 22,
-                ),
-              ),
+              _buildPatientAvatar(item.patientAvatarUrl, size: 44),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

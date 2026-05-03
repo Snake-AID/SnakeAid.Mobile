@@ -1444,6 +1444,7 @@ class ConsultationRepository {
             'roomId': e['roomId'],
             'userId': e['userId'],
             'userName': e['userName'],
+            'userAvatarUrl': e['userAvatarUrl'] ?? e['patientAvatarUrl'],
             'expertId': '',
             'expertName': 'Chuyên gia',
             'consultationType': endpointType == 'emergency'
