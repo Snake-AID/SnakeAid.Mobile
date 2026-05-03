@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -131,70 +132,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
               event.orderCode == _pendingFinalPayOsContext!.orderCode)) {
         _pendingFinalPayOsContext = null;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Bạn đã hủy thanh toán. Vui lòng thử lại khi cần.'),
-          backgroundColor: Color(0xFFFF8F00),
-        ),
-      );
-    }
-  }
-
-  Future<void> _verifyPendingDepositPayOs(PaymentDeepLinkEvent event) async {
-    final pendingContext = _pendingDepositPayOsContext;
-    if (pendingContext == null) return;
-
-    final verifier = ref.read(payOsPaymentVerifierProvider);
-    final result = await verifier.verify(context: pendingContext, event: event);
-
-    if (!mounted) return;
-    if (result.status == PayOsVerificationStatus.confirmed) {
-      setState(() {
-        _transaction = result.transaction;
-        _depositPaid = true;
-        _pendingDepositPayOsContext = null;
-      });
-      _paymentTimer?.cancel();
-      await _silentRefresh();
-      return;
-    }
-
-    if (result.status == PayOsVerificationStatus.mismatch) {
-      setState(() {
-        _pendingDepositPayOsContext = null;
-      });
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(result.message)));
-    }
-  }
-
-  Future<void> _verifyPendingFinalPayOs(PaymentDeepLinkEvent event) async {
-    final pendingContext = _pendingFinalPayOsContext;
-    if (pendingContext == null) return;
-
-    final verifier = ref.read(payOsPaymentVerifierProvider);
-    final result = await verifier.verify(context: pendingContext, event: event);
-
-    if (!mounted) return;
-    if (result.status == PayOsVerificationStatus.confirmed) {
-      setState(() {
-        _finalTransaction = result.transaction;
-        _pendingFinalPayOsContext = null;
-        _hasTransferredToRescuer = true;
-      });
-      _finalPaymentTimer?.cancel();
-      await _silentRefresh();
+      ).showSnackBar(const SnackBar(content: Text('Thanh toán đã bị huỷ')));
       return;
-    }
-
-    if (result.status == PayOsVerificationStatus.mismatch) {
-      setState(() {
-        _pendingFinalPayOsContext = null;
-      });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(result.message)));
     }
   }
 
@@ -1367,6 +1308,93 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     } catch (_) {}
   }
 
+  /// Verify a pending PayOS deposit/payment when a deep-link event arrives.
+  Future<void> _verifyPendingDepositPayOs(PaymentDeepLinkEvent event) async {
+    final pendingContext = _pendingDepositPayOsContext;
+    if (pendingContext == null) return;
+
+    final verifier = ref.read(payOsPaymentVerifierProvider);
+    final result = await verifier.verify(context: pendingContext, event: event);
+
+    if (!mounted) return;
+
+    if (result.status == PayOsVerificationStatus.confirmed) {
+      setState(() {
+        _transaction = result.transaction;
+        _pendingDepositPayOsContext = null;
+        _depositPaid = true;
+      });
+      _paymentTimer?.cancel();
+      await _silentRefresh();
+      return;
+    }
+
+    if (result.status == PayOsVerificationStatus.cancelled) {
+      setState(() {
+        _pendingDepositPayOsContext = null;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Thanh toán bị hủy')));
+      return;
+    }
+
+    if (result.status == PayOsVerificationStatus.mismatch ||
+        result.status == PayOsVerificationStatus.notFound) {
+      setState(() {
+        _pendingDepositPayOsContext = null;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result.message)));
+      return;
+    }
+    // pendingBackendConfirmation -> leave pending and let polling handle it
+  }
+
+  Future<void> _verifyPendingFinalPayOs(PaymentDeepLinkEvent event) async {
+    final pendingContext = _pendingFinalPayOsContext;
+    if (pendingContext == null) return;
+
+    final verifier = ref.read(payOsPaymentVerifierProvider);
+    final result = await verifier.verify(context: pendingContext, event: event);
+
+    if (!mounted) return;
+
+    if (result.status == PayOsVerificationStatus.confirmed) {
+      setState(() {
+        _finalTransaction = result.transaction;
+        _pendingFinalPayOsContext = null;
+        _hasTransferredToRescuer = true;
+      });
+      _finalPaymentTimer?.cancel();
+      await _silentRefresh();
+      return;
+    }
+
+    if (result.status == PayOsVerificationStatus.cancelled) {
+      setState(() {
+        _pendingFinalPayOsContext = null;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Thanh toán bị hủy')));
+      return;
+    }
+
+    if (result.status == PayOsVerificationStatus.mismatch ||
+        result.status == PayOsVerificationStatus.notFound) {
+      setState(() {
+        _pendingFinalPayOsContext = null;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result.message)));
+      return;
+    }
+    // pendingBackendConfirmation -> leave pending and let polling handle it
+  }
+
   /// Create PayOS final payment link (CatchingPayment) and open checkout
   Future<void> _openFinalPayment() async {
     if (_request == null) return;
@@ -1640,11 +1668,11 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     ],
                   ),
                 ),
-
                 // Info Content
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildInfoRow(
                         Icons.access_time,
@@ -1670,6 +1698,28 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                         maxLines: 3,
                       ),
 
+                      if (request.additionalDetails != null &&
+                          request.additionalDetails!.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _buildInfoRow(
+                          Icons.edit_location,
+                          'Ghi chú địa chỉ',
+                          request.additionalDetails!,
+                          maxLines: 5,
+                        ),
+                      ],
+
+                      if (request.notes != null &&
+                          request.notes!.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _buildInfoRow(
+                          Icons.info_outline,
+                          'Thông tin bổ sung',
+                          request.notes!,
+                          maxLines: 5,
+                        ),
+                      ],
+
                       if (request.distanceKm != null) ...[
                         const SizedBox(height: 12),
                         _buildInfoRow(
@@ -1677,17 +1727,6 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                           'Khoảng cách',
                           '${request.distanceKm!.toStringAsFixed(1)} km',
                           valueColor: const Color(0xFF2196F3),
-                        ),
-                      ],
-
-                      if (request.preferredTime != null) ...[
-                        const SizedBox(height: 12),
-                        _buildInfoRow(
-                          Icons.schedule,
-                          'Thời gian mong muốn',
-                          DateFormat(
-                            'HH:mm',
-                          ).format(request.preferredTime!.toLocal()),
                         ),
                       ],
 
@@ -1851,103 +1890,6 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 children: request.details
                     .map((detail) => _buildSpeciesChip(detail))
                     .toList(),
-              ),
-            ),
-          ],
-
-          // Additional Details
-          if (request.additionalDetails != null &&
-              request.additionalDetails!.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0F8FF),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFF2196F3).withOpacity(0.3),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        color: Color(0xFF2196F3),
-                        size: 20,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Ghi Chú Địa Chỉ',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2196F3),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    request.additionalDetails!,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      height: 1.5,
-                      color: Color(0xFF333333),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          // Notes
-          if (request.notes != null && request.notes!.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF3E0),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFFFF9800).withOpacity(0.3),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: Color(0xFFFF9800),
-                        size: 20,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Thông Tin Bổ Sung',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFFFF9800),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    request.notes!,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      height: 1.5,
-                      color: Color(0xFF333333),
-                    ),
-                  ),
-                ],
               ),
             ),
           ],
@@ -2728,9 +2670,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 // ── Deposit amount (round 1) ──
                 if (amount != null) ...[
                   _buildPayRow(
-                    'Phí di chuyển (đang thanh toán):',
+                    'Phí di chuyển:',
                     _formatCurrency(amount),
-                    icon: Icons.directions_car,
                     valueColor: const Color(0xFF28A745),
                   ),
                   if (request.distanceKm != null)
@@ -2945,7 +2886,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       Icon(Icons.refresh, size: 12, color: Color(0xFF999999)),
                       SizedBox(width: 4),
                       Text(
-                        'Tự động kiểm tra mỗi 5 giây',
+                        'Tự động kiểm tra',
                         style: TextStyle(
                           fontSize: 11,
                           color: Color(0xFF999999),
@@ -3428,10 +3369,6 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   }) {
     return Row(
       children: [
-        if (icon != null) ...[
-          Icon(icon, size: 16, color: const Color(0xFF6C757D)),
-          const SizedBox(width: 8),
-        ],
         Expanded(
           child: Text(
             label,
@@ -3473,35 +3410,26 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     Color? valueColor,
     int maxLines = 2,
   }) {
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: const Color(0xFF228B22)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                maxLines: maxLines,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 15,
-                  color: valueColor ?? const Color(0xFF333333),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            color: Colors.grey[600],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          maxLines: maxLines,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 15,
+            color: valueColor ?? const Color(0xFF333333),
+            fontWeight: FontWeight.w600,
           ),
         ),
       ],
@@ -4799,7 +4727,7 @@ class _PaymentMethodSheetState extends State<_PaymentMethodSheet> {
                   Text(
                     widget.isFinalPayment
                         ? 'Thanh toán dịch vụ'
-                        : 'Thanh toán đặt cọc',
+                        : 'Thanh toán phí di chuyển',
                     style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
@@ -4890,38 +4818,16 @@ class _PaymentMethodSheetState extends State<_PaymentMethodSheet> {
                         height: 1.4,
                       ),
                       children: [
-                        const TextSpan(
+                        TextSpan(
                           text: 'Chính sách thanh toán',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Color(0xFFFF8F00),
                           ),
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () => _showPaymentTermsDialog(context),
                         ),
-                        const TextSpan(
-                          text:
-                              '. Xin lưu ý: Mọi khoản thanh toán (bao gồm phí di chuyển và phí dịch vụ) ',
-                        ),
-                        const TextSpan(
-                          text: 'sẽ KHÔNG được hoàn lại',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFD32F2F),
-                          ),
-                        ),
-                        const TextSpan(
-                          text:
-                              ' dưới bất kỳ hình thức nào. Đây là chính sách nhằm bảo vệ quyền lợi cho đội ngũ cứu hộ của hệ thống.',
-                        ),
-                        if (!widget.isFinalPayment)
-                          const TextSpan(
-                            text:
-                                '\n\n*Đặc quyền bảo vệ:* Nếu chuyên viên đến hiện trường nhưng không phát hiện hoặc không bắt được rắn, quý khách sẽ KHÔNG phải thanh toán chi phí dịch vụ cho Đợt 2.',
-                            style: TextStyle(
-                              fontStyle: FontStyle.italic,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFFE65100),
-                            ),
-                          ),
+                        const TextSpan(text: '.'),
                       ],
                     ),
                   ),
@@ -5258,6 +5164,208 @@ class _PaymentMethodSheetState extends State<_PaymentMethodSheet> {
               fontSize: 11,
               color: Color(0xFF1565C0),
               fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPaymentTermsDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.8,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header - full-width professional style
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 18,
+                  horizontal: 20,
+                ),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                  border: Border.all(color: const Color(0xFF196619)),
+                ),
+                child: const Center(
+                  child: Text(
+                    'Chính Sách Thanh Toán',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              // Content
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Vui lòng đọc kỹ các điều khoản sau đây trước khi thanh toán:',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF6B7280),
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      _buildPolicyBullet(
+                        Icons.info_outline,
+                        'Xin lưu ý: Các khoản thanh toán (bao gồm phí di chuyển và phí dịch vụ) sẽ không được hoàn lại trong trường hợp khách hàng tự huỷ yêu cầu.',
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Trong một số trường hợp:',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF374151),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildSubBullet(
+                        'Nếu hệ thống hoặc nhân viên huỷ yêu cầu, tiền đặt cọc sẽ được hoàn lại.',
+                      ),
+                      _buildSubBullet(
+                        'Nếu cứu hộ viên không thể tiếp tục nhiệm vụ, hệ thống sẽ sắp xếp người thay thế. Trường hợp không thể sắp xếp, yêu cầu sẽ được xử lý theo quy định.',
+                      ),
+                      const SizedBox(height: 16),
+                      _buildPolicyBullet(
+                        Icons.shield,
+                        'Đặc quyền bảo vệ: Nếu chuyên viên đến hiện trường nhưng không phát hiện hoặc không bắt được rắn, quý khách không cần thanh toán chi phí dịch vụ cho yêu cầu này.',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Actions
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(24),
+                  ),
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF228B22),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Đã hiểu',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPolicyBullet(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: const Color(0xFF228B22).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 16, color: const Color(0xFF228B22)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF374151),
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubBullet(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, left: 44),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '• ',
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF6B7280),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF6B7280),
+                height: 1.5,
+              ),
             ),
           ),
         ],

@@ -17,6 +17,11 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
     return '${fmt.format(value.round())}đ';
   }
 
+  String _buildOrderCode(String id) {
+    final suffix = id.length > 6 ? id.substring(id.length - 6) : id;
+    return 'CAR-${suffix.toUpperCase()}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -91,7 +96,7 @@ class SnakeCatchingSuccessScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Mã đơn: #${requestData.id.substring(0, 8).toUpperCase()}',
+                'Mã đơn: ${_buildOrderCode(requestData.id)}',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
