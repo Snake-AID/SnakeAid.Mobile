@@ -19,6 +19,7 @@ class MyConsultationResponse {
   final MyConsultationStatus status;
   final String expertId;
   final String expertName;
+  final String? expertAvatarUrl;
   final String? roomId;
   final DateTime? startTime;
   final DateTime? endTime;
@@ -38,6 +39,7 @@ class MyConsultationResponse {
     required this.status,
     required this.expertId,
     required this.expertName,
+    this.expertAvatarUrl,
     this.roomId,
     this.startTime,
     this.endTime,
@@ -124,6 +126,7 @@ class MyConsultationResponse {
       status: parseStatus(json['status']?.toString()),
       expertId: (json['expertId'] ?? '').toString(),
       expertName: (json['expertName'] ?? 'Chuyen gia').toString(),
+      expertAvatarUrl: json['expertAvatarUrl']?.toString(),
       roomId: json['roomId']?.toString(),
       startTime: parseDate(
         json['startTime'],

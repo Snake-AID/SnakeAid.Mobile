@@ -90,7 +90,7 @@ class _ConsultationItem {
       expertId: c.expertId,
       expertName: c.expertName,
       expertSpecialty: '',
-      expertAvatarUrl: null,
+      expertAvatarUrl: c.expertAvatarUrl,
       scheduledTime: scheduledAt,
       status: uiStatus,
       serviceType: serviceType,
@@ -1094,6 +1094,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                             builder: (_) => ConsultationCompletionScreen(
                               expertName: item.expertName,
                               expertSpecialty: item.expertSpecialty,
+                              expertAvatarUrl: item.expertAvatarUrl,
                               durationSeconds: 1800,
                               consultationId: consultationId,
                               consultationTime: item.scheduledTime,
@@ -1195,6 +1196,8 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
   // ─── Shared Widgets ────────────────────────────────────────────────────────
 
   Widget _buildAvatar(_ConsultationItem item, {bool greyed = false}) {
+    final avatarUrl = (item.expertAvatarUrl ?? '').trim();
+    final hasAvatar = avatarUrl.isNotEmpty;
     return Container(
       width: 52,
       height: 52,
@@ -1203,12 +1206,22 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
         color: greyed
             ? const Color(0xFFE5E7EB)
             : const Color(0xFF228B22).withOpacity(0.1),
+        image: hasAvatar
+            ? DecorationImage(
+                image: NetworkImage(avatarUrl),
+                fit: BoxFit.cover,
+              )
+            : null,
       ),
-      child: Icon(
-        Icons.person,
-        size: 28,
-        color: greyed ? const Color(0xFF9CA3AF) : const Color(0xFF228B22),
-      ),
+      child: hasAvatar
+          ? null
+          : Icon(
+              Icons.person,
+              size: 28,
+              color: greyed
+                  ? const Color(0xFF9CA3AF)
+                  : const Color(0xFF228B22),
+            ),
     );
   }
 
@@ -1417,6 +1430,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
           consultationId: item.consultationId,
           expertName: item.expertName,
           expertSpecialty: item.expertSpecialty,
+          expertAvatarUrl: item.expertAvatarUrl,
           serviceType: item.serviceType,
           scheduledTime: item.scheduledTime,
           feeCost: item.feeCost,
