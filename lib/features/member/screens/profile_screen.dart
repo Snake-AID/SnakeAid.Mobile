@@ -303,7 +303,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                     const SizedBox(height: 16),
 
-                    // Info Card: phone, rating, reputation
+                    // Info Card: reputation
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -319,121 +319,65 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                       child: Column(
                         children: [
-                          // Rating + Reputation row
-                          IntrinsicHeight(
-                            child: Row(
-                              children: [
-                                // Rating
-                                Expanded(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(
-                                            Icons.star_rounded,
-                                            size: 20,
-                                            color: Color(0xFFFFA500),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            (_profile?.rating ?? 0.0)
-                                                .toStringAsFixed(1),
-                                            style: const TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                              color: Color(0xFF1F1F1F),
-                                            ),
-                                          ),
-                                        ],
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.workspace_premium_rounded,
+                                    size: 20,
+                                    color: _reputationColor(
+                                      _profile?.reputationStatus,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${_profile?.reputationPoints ?? 0}',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: _reputationColor(
+                                        _profile?.reputationStatus,
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${_profile?.ratingCount ?? 0} đánh giá',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey[500],
-                                        ),
-                                      ),
-                                    ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              if (_profile?.reputationStatus != null)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _reputationColor(
+                                      _profile?.reputationStatus,
+                                    ),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    _translateReputationStatus(
+                                      _profile!.reputationStatus!,
+                                    ),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                )
+                              else
+                                Text(
+                                  'Uy tín',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[500],
                                   ),
                                 ),
-                                // Divider
-                                VerticalDivider(
-                                  color: Colors.grey[200],
-                                  thickness: 1,
-                                  width: 1,
-                                ),
-                                // Reputation
-                                Expanded(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.workspace_premium_rounded,
-                                            size: 20,
-                                            color: _reputationColor(
-                                              _profile?.reputationStatus,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            '${_profile?.reputationPoints ?? 0}',
-                                            style: TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                              color: _reputationColor(
-                                                _profile?.reputationStatus,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      if (_profile?.reputationStatus != null)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: _reputationColor(
-                                              _profile?.reputationStatus,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              20,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            _translateReputationStatus(
-                                              _profile!.reputationStatus!,
-                                            ),
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        )
-                                      else
-                                        Text(
-                                          'Uy tín',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey[500],
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
+                            ],
                           ),
                           // Has Underlying Disease
                           if (_profile?.hasUnderlyingDisease == true) ...[

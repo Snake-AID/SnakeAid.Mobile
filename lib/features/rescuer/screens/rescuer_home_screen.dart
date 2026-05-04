@@ -364,18 +364,15 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _modalInfoRow(
-                              Icons.assignment_turned_in_rounded,
-                              const Color(0xFF28A745),
                               'Trạng thái',
                               'Đã được phân công',
                             ),
                             if (assignedAtText != null) ...[
                               const Divider(height: 16, thickness: 0.5),
                               _modalInfoRow(
-                                Icons.schedule_rounded,
-                                const Color(0xFF666666),
                                 'Thời gian phân công',
                                 assignedAtText,
                               ),
@@ -635,52 +632,36 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
 
   /// Labeled info row widget used inside the snake catching modal
   Widget _modalInfoRow(
-    IconData icon,
-    Color iconColor,
-    String label,
-    String value,
-  ) {
-    return Row(
+  String label,
+  String value,
+) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(6),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            color: Color(0xFF999999),
+            fontWeight: FontWeight.w500,
           ),
-          child: Icon(icon, size: 15, color: iconColor),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF999999),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF333333),
-                  fontWeight: FontWeight.w500,
-                  height: 1.3,
-                ),
-              ),
-            ],
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14, // tăng nhẹ cho dễ đọc
+            color: Color(0xFF333333),
+            fontWeight: FontWeight.w500,
+            height: 1.3,
           ),
         ),
       ],
-    );
-  }
+    ),
+  );
+}
 
   /// Show emergency alert modal - works across all tabs
   void _showEmergencyAlert(dynamic request) {

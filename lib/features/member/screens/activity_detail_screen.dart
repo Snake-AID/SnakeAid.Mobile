@@ -1903,58 +1903,176 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
             _buildFeedbackCard(request),
 
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: const Color(0xFFFAFCFA),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE6E8EC)),
+                border: Border.all(color: const Color(0xFFDDEBDD)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 18,
+                    color: const Color(0xFF228B22).withOpacity(0.06),
+                    blurRadius: 16,
                     offset: const Offset(0, 6),
                   ),
                 ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.support_agent,
-                        color: Color(0xFF228B22),
-                        size: 20,
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF228B22).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.support_agent_rounded,
+                          color: Color(0xFF228B22),
+                          size: 20,
+                        ),
                       ),
-                      SizedBox(width: 10),
+                      const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          'Hỗ trợ khách hàng',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1F2937),
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Expanded(
+                                  child: Text(
+                                    'Hỗ trợ khách hàng',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF1F2937),
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF228B22).withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: const Text(
+                                    '24/7',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF228B22),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Nếu bạn cần hỗ trợ, tra cứu hoặc phản ánh về yêu cầu này, hãy liên hệ tổng đài để được phản hồi sớm nhất.',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                height: 1.55,
+                                color: Color(0xFF475569),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 10),
-                  Text(
-                    'Nếu bạn có bất cứ thắc mắc hoặc báo cáo về yêu cầu này hãy liên hệ tổng đài 0787171699 để được phản hồi sớm nhất.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      height: 1.6,
-                      color: Color(0xFF475569),
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE5EFE5)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF228B22).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.phone_rounded,
+                            size: 18,
+                            color: Color(0xFF228B22),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            '0787171699',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF1F2937),
+                            ),
+                          ),
+                        ),
+                        OutlinedButton(
+                          onPressed: () async {
+                            final uri = Uri(scheme: 'tel', path: '0787171699');
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri);
+                            }
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF228B22),
+                            side: const BorderSide(color: Color(0xFF228B22)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text(
+                            'Gọi ngay',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
           ),
+
+          const SizedBox(height: 12),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Divider(
+              height: 1,
+              thickness: 1,
+              color: const Color(0xFFE7F0E7),
+            ),
+          ),
+
+          const SizedBox(height: 12),
 
           const SizedBox(height: 32),
         ],
@@ -2296,12 +2414,6 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(
-                            Icons.account_balance_wallet,
-                            size: 18,
-                            color: Color(0xFF228B22),
-                          ),
-                          const SizedBox(width: 10),
                           const Text(
                             'Phương thức',
                             style: TextStyle(
@@ -2334,12 +2446,6 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(
-                            Icons.access_time,
-                            size: 18,
-                            color: Color(0xFF888888),
-                          ),
-                          const SizedBox(width: 10),
                           const Text(
                             'Thời gian',
                             style: TextStyle(
@@ -2555,7 +2661,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           ),
 
           // Phone call button
-          if (phone != null && phone.isNotEmpty)
+          if (phone != null && phone.isNotEmpty && request.status.toLowerCase() != 'completed')
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: SizedBox(
@@ -3024,14 +3130,20 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(
-                        Icons.verified,
-                        color: Color(0xFF28A745),
-                        size: 16,
+                      Expanded(
+                        child: Text(
+                          'Đã thanh toán',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF28A745),
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Đã thanh toán ${_formatCurrency(travelFee)}',
+                        _formatCurrency(travelFee),
+                        textAlign: TextAlign.right,
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -3091,30 +3203,38 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     _formatCurrency(snakeFee),
                     icon: Icons.pest_control,
                   ),
-                  ...(mission?.missionDetails ?? []).map(
-                    (d) => Padding(
-                      padding: const EdgeInsets.only(top: 4, left: 28),
+                  ...(mission?.missionDetails ?? []).map((d) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 6, left: 12),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            '${d.snakeSpeciesName} × ${d.quantity}',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF888888),
+                          Expanded(
+                            child: Text(
+                              '${d.snakeSpeciesName} × ${d.quantity}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF888888),
+                              ),
                             ),
                           ),
-                          Text(
-                            _formatCurrency(d.price),
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF888888),
+                          const SizedBox(width: 12),
+                          Flexible(
+                            child: Text(
+                              _formatCurrency(d.price),
+                              textAlign: TextAlign.right,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF888888),
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ),
+                    );
+                  }),
                 ],
 
                 // Environment fee
