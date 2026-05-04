@@ -33,12 +33,14 @@ class _ExpertConsultationDetailScreenState
   double? _expertPayout;
   bool _isCancellingBooking = false;
 
-  // status index: 0=waiting, 1=upcoming, 2=completed, 3=cancelled
+  // status index: 0=waiting, 1=upcoming, 2=completed, 3=cancelled, 4=expertAbsent, 5=expertAbsentHandled
   int get _statusIndex => (data['statusIndex'] as int?) ?? 1;
   bool get _isWaiting => _statusIndex == 0;
   bool get _isUpcoming => _statusIndex == 1;
   bool get _isCompleted => _statusIndex == 2;
   bool get _isCancelled => _statusIndex == 3;
+  bool get _isExpertAbsent => _statusIndex == 4;
+  bool get _isExpertAbsentHandled => _statusIndex == 5;
   bool get _isActionable => _isWaiting || _isUpcoming;
 
   String get _statusLabel {
@@ -51,6 +53,10 @@ class _ExpertConsultationDetailScreenState
         return 'HOÀN THÀNH';
       case 3:
         return 'ĐÃ HỦY';
+      case 4:
+        return 'VẮNG MẶT';
+      case 5:
+        return 'ĐÃ HOÀN TIỀN';
       default:
         return 'SẮP TỚI';
     }
@@ -66,6 +72,10 @@ class _ExpertConsultationDetailScreenState
         return _green;
       case 3:
         return Colors.grey;
+      case 4:
+        return const Color(0xFFF59E0B);
+      case 5:
+        return const Color(0xFF16A34A);
       default:
         return _purple;
     }
@@ -447,6 +457,42 @@ class _ExpertConsultationDetailScreenState
                   ),
                 ),
                 const SizedBox(height: 12),
+
+                if (_isExpertAbsent || _isExpertAbsentHandled) ...[
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF59E0B).withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFFF59E0B).withOpacity(0.25),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.info_outline,
+                          color: Color(0xFFF59E0B),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _isExpertAbsentHandled
+                                ? 'Admin đã xác nhận vắng mặt và đã hoàn tiền cho bệnh nhân.'
+                                : 'Báo cáo vắng mặt đã được ghi nhận. Admin đang xem xét và sẽ hoàn tiền cho bệnh nhân sau khi phê duyệt.',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFFB45309),
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
 
                 // ── Questions ──────────────────────────────────────────────
                 if (questions?.isNotEmpty == true) ...[

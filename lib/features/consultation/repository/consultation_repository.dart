@@ -1428,6 +1428,12 @@ class ConsultationRepository {
             case 'canceled':
               normalizedStatus = 'Cancelled';
               break;
+            case 'expertabsent':
+              normalizedStatus = 'ExpertAbsent';
+              break;
+            case 'expertabsenthandled':
+              normalizedStatus = 'ExpertAbsentHandled';
+              break;
             case 'pendingpayment':
               normalizedStatus = 'PendingPayment';
               break;

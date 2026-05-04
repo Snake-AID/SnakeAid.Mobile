@@ -10,6 +10,7 @@ enum MyConsultationStatus {
   cancelled,
   userAbsent,
   expertAbsent,
+  expertAbsentHandled,
   allAbsent,
 }
 
@@ -76,6 +77,8 @@ class MyConsultationResponse {
           return MyConsultationStatus.userAbsent;
         case 'expertabsent':
           return MyConsultationStatus.expertAbsent;
+        case 'expertabsenthandled':
+          return MyConsultationStatus.expertAbsentHandled;
         case 'allabsent':
           return MyConsultationStatus.allAbsent;
         case 'completed':
