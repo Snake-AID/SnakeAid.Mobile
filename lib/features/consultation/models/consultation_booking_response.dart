@@ -4,6 +4,8 @@ enum ConsultationBookingStatus {
   confirmed,      // Đã xác nhận
   completed,      // Đã hoàn thành
   cancelled,      // Đã hủy
+  expertAbsent,   // Chuyên gia vắng mặt
+  expertAbsentHandled, // Đã hoàn tiền
 }
 
 /// Response DTO for a consultation booking
@@ -134,6 +136,10 @@ class ConsultationBookingResponse {
         return ConsultationBookingStatus.completed;
       case 'Cancelled':
         return ConsultationBookingStatus.cancelled;
+      case 'ExpertAbsent':
+        return ConsultationBookingStatus.expertAbsent;
+      case 'ExpertAbsentHandled':
+        return ConsultationBookingStatus.expertAbsentHandled;
       default:
         return ConsultationBookingStatus.confirmed;
     }

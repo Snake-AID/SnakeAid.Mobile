@@ -80,6 +80,12 @@ _ExpertConsultation _bookingToExpertConsultation(
     case ConsultationBookingStatus.completed:
       status = _ExpertConsultationStatus.completed;
       break;
+    case ConsultationBookingStatus.expertAbsent:
+      status = _ExpertConsultationStatus.expertAbsent;
+      break;
+    case ConsultationBookingStatus.expertAbsentHandled:
+      status = _ExpertConsultationStatus.expertAbsentHandled;
+      break;
     default:
       status = _ExpertConsultationStatus.cancelled;
   }
@@ -2210,7 +2216,14 @@ class _HomeTabState extends ConsumerState<_HomeTab>
   }
 }
 
-enum _ExpertConsultationStatus { waiting, upcoming, completed, cancelled }
+enum _ExpertConsultationStatus {
+  waiting,
+  upcoming,
+  completed,
+  cancelled,
+  expertAbsent,
+  expertAbsentHandled,
+}
 
 class _ExpertConsultation {
   final String id;
@@ -2311,7 +2324,9 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
           .where(
             (c) =>
                 c.status == _ExpertConsultationStatus.completed ||
-                c.status == _ExpertConsultationStatus.cancelled,
+                c.status == _ExpertConsultationStatus.cancelled ||
+                c.status == _ExpertConsultationStatus.expertAbsent ||
+                c.status == _ExpertConsultationStatus.expertAbsentHandled,
           )
           .toList()
         ..sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
@@ -3187,6 +3202,26 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
 
   Widget _buildHistoryCard(BuildContext context, _ExpertConsultation item) {
     final isDone = item.status == _ExpertConsultationStatus.completed;
+    final isExpertAbsent =
+        item.status == _ExpertConsultationStatus.expertAbsent;
+    final isExpertAbsentHandled =
+        item.status == _ExpertConsultationStatus.expertAbsentHandled;
+
+    String statusLabel;
+    Color statusColor;
+    if (isDone) {
+      statusLabel = 'HOÀN THÀNH';
+      statusColor = const Color(0xFF28A745);
+    } else if (isExpertAbsentHandled) {
+      statusLabel = 'ĐÃ HOÀN TIỀN';
+      statusColor = const Color(0xFF16A34A);
+    } else if (isExpertAbsent) {
+      statusLabel = 'VẮNG MẶT';
+      statusColor = const Color(0xFFF59E0B);
+    } else {
+      statusLabel = 'ĐÃ HỦY';
+      statusColor = const Color(0xFF999999);
+    }
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -3194,7 +3229,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
         borderRadius: BorderRadius.circular(16),
         border: Border(
           left: BorderSide(
-            color: isDone ? const Color(0xFF28A745) : const Color(0xFFAAAAAA),
+            color: statusColor,
             width: 4,
           ),
         ),
@@ -3234,19 +3269,15 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: isDone
-                                ? const Color(0xFF28A745).withOpacity(0.1)
-                                : Colors.grey.withOpacity(0.1),
+                            color: statusColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            isDone ? 'HOÀN THÀNH' : 'ĐÃ HỦY',
+                            statusLabel,
                             style: TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.bold,
-                              color: isDone
-                                  ? const Color(0xFF28A745)
-                                  : const Color(0xFF999999),
+                              color: statusColor,
                             ),
                           ),
                         ),

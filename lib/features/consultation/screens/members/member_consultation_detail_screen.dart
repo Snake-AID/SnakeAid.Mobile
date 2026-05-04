@@ -11,6 +11,7 @@ class MemberConsultationDetailScreen extends StatelessWidget {
   final int feeCost;
   final String statusLabel;
   final Color statusColor;
+  final String? statusNote;
   final double? rating;
   final String? problemDescription;
   final String? customerReport;
@@ -27,6 +28,7 @@ class MemberConsultationDetailScreen extends StatelessWidget {
     required this.feeCost,
     required this.statusLabel,
     required this.statusColor,
+    this.statusNote,
     this.rating,
     this.problemDescription,
     this.customerReport,
@@ -115,6 +117,31 @@ class MemberConsultationDetailScreen extends StatelessWidget {
                           ),
                         ),
                       ),
+                      if ((statusNote ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: statusColor.withOpacity(0.25),
+                            ),
+                          ),
+                          child: Text(
+                            statusNote!.trim(),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF4B5563),
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
