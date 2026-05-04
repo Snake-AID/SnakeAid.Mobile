@@ -75,6 +75,28 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   StreamSubscription<PaymentDeepLinkEvent>? _deepLinkSub;
   int? _lastHandledDeepLinkEventId;
 
+  bool _isWalletPayment(wallet_tx.TransactionInfo tx) {
+    return tx.paymentMethod.trim().toLowerCase() == 'wallet';
+  }
+
+  bool _isConfirmedCatchingDeposit(
+    wallet_tx.TransactionInfo tx, {
+    int? pendingOrderCode,
+  }) {
+    if (!tx.matchesTransactionType('CatchingDeposit')) return false;
+
+    if (tx.isPaid) return true;
+
+    // Wallet transactions are completed immediately and may come back without
+    // an explicit "status" in list responses.
+    if (_isWalletPayment(tx) && tx.hasExternalTransactionId) return true;
+
+    // PayOS is confirmed when order prefix matches and external id is present.
+    return tx.isPayOsPayment &&
+        tx.matchesPrefix('CATCHING-', pendingOrderCode) &&
+        tx.hasExternalTransactionId;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -167,10 +189,15 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       if (mounted && response.data != null) {
         setState(() {
           _request = response.data;
-          _isLoading = false;
           // Mission only exists after deposit is confirmed — use as proxy for paid state
           if (response.data!.mission != null) _depositPaid = true;
         });
+
+        // Re-sync deposit state from transactions by ReferenceId to persist across reopen.
+        await _syncDepositPaymentByReferenceId();
+
+        if (!mounted) return;
+        setState(() => _isLoading = false);
 
         // Load species details for each species in the request
         _loadSpeciesDetails();
@@ -244,6 +271,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           if (response.data!.mission != null) _depositPaid = true;
         });
 
+        // Keep deposit state accurate even after reopening app/screen.
+        await _syncDepositPaymentByReferenceId();
+
         // Load any new species details
         _loadSpeciesDetails();
 
@@ -278,17 +308,12 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       final repo = ref.read(wallet_tx.transactionRepositoryProvider);
       final tx = await repo.getTransactionById(tid);
       if (!mounted) return;
-      final txIsDeposit =
-          tx != null && tx.matchesTransactionType('CatchingDeposit');
       final isConfirmedDeposit =
-          txIsDeposit &&
-          (tx.isPaid ||
-              (tx.isPayOsPayment &&
-                  tx.matchesPrefix(
-                    'CATCHING-',
-                    _pendingDepositPayOsContext?.orderCode,
-                  ) &&
-                  tx.hasExternalTransactionId));
+          tx != null &&
+          _isConfirmedCatchingDeposit(
+            tx,
+            pendingOrderCode: _pendingDepositPayOsContext?.orderCode,
+          );
       setState(() {
         _transaction = tx;
         _isCheckingPayment = false;
@@ -313,6 +338,39 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       }
     } catch (_) {
       if (mounted) setState(() => _isCheckingPayment = false);
+    }
+  }
+
+  /// Sync round-1 deposit by querying transactions with ReferenceId (request id).
+  /// This ensures paid state persists when re-entering the detail screen.
+  Future<void> _syncDepositPaymentByReferenceId() async {
+    final requestId = _request?.id ?? widget.requestId;
+    if (requestId.isEmpty) return;
+    try {
+      final repo = ref.read(wallet_tx.transactionRepositoryProvider);
+      final txs = await repo.getTransactions(
+        referenceId: requestId,
+        pageSize: 100,
+      );
+
+      final deposits = txs
+          .where((t) => t.matchesTransactionType('CatchingDeposit'))
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      final latestDeposit = deposits.isNotEmpty ? deposits.first : null;
+        final isConfirmedDeposit =
+          latestDeposit != null && _isConfirmedCatchingDeposit(latestDeposit);
+
+      if (!mounted) return;
+      final paidFromMission = _request?.mission != null;
+      setState(() {
+        _transaction = latestDeposit;
+        _depositTransactionId = latestDeposit?.id;
+        _depositPaid = paidFromMission || isConfirmedDeposit;
+      });
+    } catch (e) {
+      debugPrint('⚠️ _syncDepositPaymentByReferenceId error: $e');
     }
   }
 
@@ -1474,7 +1532,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           : _request != null
           ? _buildDetailView()
           : _buildNotFoundView(),
-      bottomSheet: _request != null ? _buildStickyFooter(_request!) : null,
+      bottomSheet: (!_isLoading && _request != null)
+          ? _buildStickyFooter(_request!)
+          : null,
     );
   }
 
@@ -1925,20 +1985,6 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF228B22).withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.support_agent_rounded,
-                          color: Color(0xFF228B22),
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2002,24 +2048,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       border: Border.all(color: const Color(0xFFE5EFE5)),
                     ),
                     child: Row(
-                      children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF228B22).withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            Icons.phone_rounded,
-                            size: 18,
-                            color: Color(0xFF228B22),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
+                      children: [                      
                         const Expanded(
                           child: Text(
-                            '0787171699',
+                            'Hotline: 0787171699',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
