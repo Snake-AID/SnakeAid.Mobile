@@ -1,3 +1,5 @@
+import 'package:snakeaid_mobile/features/emergency/models/rescue_mission_response.dart';
+
 import 'snake_identification_response.dart';
 import 'sos_incident_response.dart';
 
@@ -433,6 +435,9 @@ class RescueMission {
   final double? costFromCenter;
   final double? actualCost;
   final double? distanceFromCenterKm;
+  final bool requiresHospitalization;
+  final int? hospitalId;
+  final HospitalTransferResponse? hospital;
 
   RescueMission({
     required this.id,
@@ -448,6 +453,9 @@ class RescueMission {
     this.costFromCenter,
     this.actualCost,
     this.distanceFromCenterKm,
+    this.requiresHospitalization = false,
+    this.hospitalId,
+    this.hospital,
   });
 
   factory RescueMission.fromJson(Map<String, dynamic> json) {
@@ -477,6 +485,11 @@ class RescueMission {
       distanceFromCenterKm: json['distanceFromCenterKm'] != null
           ? (json['distanceFromCenterKm'] as num).toDouble()
           : null,
+      requiresHospitalization: json['requiresHospitalization'] ?? false,
+      hospitalId: json['hospitalId'],
+      hospital: json['hospital'] != null
+          ? HospitalTransferResponse.fromJson(json['hospital'])
+          : null,
     );
   }
 
@@ -494,6 +507,9 @@ class RescueMission {
     'costFromCenter': costFromCenter,
     'distanceFromCenterKm': distanceFromCenterKm,
     'actualCost': actualCost,
+    'requiresHospitalization': requiresHospitalization,
+    'hospitalId': hospitalId,
+    'hospital': hospital?.toJson(),
   };
 
   /// Get mission duration in minutes

@@ -258,11 +258,10 @@ class RescueMissionRepository {
     }
   }
 
-  /// Report hospital transfer and get pricing
+  /// Report hospital transfer
   ///
   /// Gọi API PATCH /api/rescue-missions/{missionId}/hospital-transfer
-  /// Returns pricing calculation including hospital transfer fee
-  Future<HospitalTransferPricingResponse> reportTranferToHospital({
+  Future<HospitalTransferPricingResponse> reportTransferToHospital({
     required String missionId,
     required int hospitalId,
     String? note,
@@ -309,6 +308,46 @@ class RescueMissionRepository {
     } catch (e) {
       debugPrint('❌ Unexpected error: $e');
       throw Exception('Lỗi khi báo cáo chuyển viện');
+    }
+  }
+
+  /// Report no need hospital transfer
+  ///
+  /// Gọi API PATCH /api/rescue-missions/{missionId}/no-need-hospital-transfer
+  Future<bool> reportNoNeedTransferToHospital({
+    required String missionId,
+    String? note,
+  }) async {
+    try {
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint('🏥 Reporting no-need hospital transfer: $missionId');
+      if (note != null) {
+        debugPrint('   Note: $note');
+      }
+
+      final response = await httpService.patch(
+        '/api/rescue-missions/$missionId/no-need-hospital-transfer',
+        data: note != null ? {'notes': note} : {},
+      );
+
+      debugPrint('response: ${response.data}');
+
+      final body = response.data as Map<String, dynamic>;
+      final isSuccess = body['isSuccess'] == true || body['is_success'] == true;
+      final result = body['data'];
+
+      if (!isSuccess || result is! bool) {
+        throw Exception(body['message'] ?? 'Yêu cầu không hợp lệ');
+      }
+
+      debugPrint('✅ Reported no-need hospital transfer');
+      return result;
+    } on DioException catch (e) {
+      debugPrint('❌ Report no-need hospital transfer failed: ${e.message}');
+      throw _handleError(e);
+    } catch (e) {
+      debugPrint('❌ Unexpected error: $e');
+      throw Exception('Lỗi khi báo cáo không cần chuyển viện');
     }
   }
 

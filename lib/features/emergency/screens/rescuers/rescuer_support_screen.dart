@@ -330,7 +330,7 @@ class _RescuerSupportScreenState extends ConsumerState<RescuerSupportScreen> {
                                   ),
                                 ),
                                 Text(
-                                  'Không cần bệnh viện',
+                                  'Không cần nhập viện',
                                   style: TextStyle(fontSize: 11),
                                 ),
                               ],

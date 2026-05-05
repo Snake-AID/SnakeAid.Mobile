@@ -114,11 +114,12 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
             ),
             end: LatLng(selectedHospital.latitude, selectedHospital.longitude),
           );
+          final reducedRouteData = _reduceRouteData(routeData);
 
           setState(() {
-            _routeData = routeData;
+            _routeData = reducedRouteData;
           });
-          _fitRouteBounds(routeData);
+          _fitRouteBounds(reducedRouteData);
         }
       }
     }
@@ -206,12 +207,13 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
         start: LatLng(currentPos.latitude, currentPos.longitude),
         end: LatLng(hospital.latitude, hospital.longitude),
       );
+      final reducedRouteData = _reduceRouteData(routeData);
 
       setState(() {
-        _routeData = routeData;
+        _routeData = reducedRouteData;
         _highlightedHospitalId = hospital.id;
       });
-      _fitRouteBounds(routeData);
+      _fitRouteBounds(reducedRouteData);
 
       final actualDistanceKm = routeData.distanceKm;
       debugPrint(
@@ -223,7 +225,7 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
 
       // Call API to report hospital transfer
       final repository = ref.read(rescueMissionRepositoryProvider);
-      final pricingResponse = await repository.reportTranferToHospital(
+      final pricingResponse = await repository.reportTransferToHospital(
         missionId: widget.missionId,
         hospitalId: hospital.id,
         note: null,
@@ -414,10 +416,30 @@ class _FindHospitalScreenState extends ConsumerState<FindHospitalScreen> {
     );
   }
 
+  ors.RouteData _reduceRouteData(ors.RouteData routeData) {
+    const maxPoints = 120;
+    if (routeData.points.length <= maxPoints) return routeData;
+
+    final step = (routeData.points.length / maxPoints).ceil();
+    final reducedPoints = <LatLng>[];
+    for (var i = 0; i < routeData.points.length; i += step) {
+      reducedPoints.add(routeData.points[i]);
+    }
+    if (reducedPoints.isEmpty || reducedPoints.last != routeData.points.last) {
+      reducedPoints.add(routeData.points.last);
+    }
+
+    return ors.RouteData(
+      points: reducedPoints,
+      distanceKm: routeData.distanceKm,
+      durationMinutes: routeData.durationMinutes,
+      steps: routeData.steps,
+    );
+  }
+
   Future<void> _performCompletion() async {
     if (!mounted) return;
-    // Navigate to mission completion screen where user can upload evidence photos.
-    context.push(
+    context.go(
       '/rescuer/mission-completion',
       extra: {'missionId': widget.missionId, 'incidentId': widget.incidentId},
     );

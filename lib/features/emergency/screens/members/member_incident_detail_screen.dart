@@ -97,11 +97,10 @@ class _MemberIncidentDetailScreenState
   Future<String?> _showCancelReasonDialog(BuildContext context) async {
     String? selectedReason;
     final reasons = <Map<String, String>>[
-      {'value': 'location_unreachable', 'label': 'Không thể đến vị trí'},
-      {'value': 'resolved_by_self', 'label': 'Đã tự xử lý xong'},
-      {'value': 'not_needed', 'label': 'Không cần cứu hộ nữa'},
-      {'value': 'wrong_location', 'label': 'Nhập sai địa điểm'},
-      {'value': 'other', 'label': 'Lý do khác'},
+      {'value': 'Đã tự xử lý xong', 'label': 'Đã tự xử lý xong'},
+      {'value': 'Không cần cứu hộ nữa', 'label': 'Không cần cứu hộ nữa'},
+      {'value': 'Nhập sai địa điểm', 'label': 'Nhập sai địa điểm'},
+      {'value': 'Lý do khác', 'label': 'Lý do khác'},
     ];
     return showDialog<String>(
       context: context,
