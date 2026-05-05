@@ -7,6 +7,8 @@ import '../../models/snake_species.dart';
 import '../../repository/snake_catching_repository.dart';
 import '../../repository/snake_species_repository.dart';
 import 'rescuer_result_confirmation_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../emergency/providers/rescuer_emergency_provider.dart';
 
 enum _UploadState { uploading, done, failed }
 
@@ -523,6 +525,16 @@ Future<void> _openUncompleteDialog() async {
     try {
       final repo = ref.read(snakeCatchingRepositoryProvider);
       await repo.uncompleteMission(widget.missionId, reason);
+      
+      // Tắt và bật lại rescue mode để refresh trạng thái của rescuer với server
+      final prefs = await SharedPreferences.getInstance();
+      final rescuerId = prefs.getString('user_id');
+      if (rescuerId != null && rescuerId.isNotEmpty) {
+        await ref.read(rescueModeProvider.notifier).stopRescueMode();
+        await Future.delayed(const Duration(milliseconds: 300));
+        await ref.read(rescueModeProvider.notifier).startRescueMode(rescuerId);
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

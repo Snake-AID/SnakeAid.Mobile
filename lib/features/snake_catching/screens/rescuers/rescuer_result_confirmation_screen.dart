@@ -9,6 +9,8 @@ import '../../repository/snake_catching_repository.dart';
 import '../../repository/snake_species_repository.dart';
 import '../../repository/catching_environment_repository.dart';
 import 'rescuer_mission_success_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../emergency/providers/rescuer_emergency_provider.dart';
 
 /// A confirmed snake entry (species + quantity) — submitted to backend
 class _SnakeEntry {
@@ -489,6 +491,16 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
     try {
       final repo = ref.read(snakeCatchingRepositoryProvider);
       await repo.completeMission(widget.missionId, catchingEnvironmentId: _catchingEnvironmentId!);
+      
+      // Tắt và bật lại rescue mode để refresh trạng thái của rescuer với server
+      final prefs = await SharedPreferences.getInstance();
+      final rescuerId = prefs.getString('user_id');
+      if (rescuerId != null && rescuerId.isNotEmpty) {
+        await ref.read(rescueModeProvider.notifier).stopRescueMode();
+        await Future.delayed(const Duration(milliseconds: 300));
+        await ref.read(rescueModeProvider.notifier).startRescueMode(rescuerId);
+      }
+
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
