@@ -303,7 +303,7 @@ class _RescuerArrivedScreenState extends ConsumerState<RescuerArrivedScreen> {
 
           // Status Text
           Text(
-            'Đội cứu hộ đang an toàn bắt rắn',
+            'Đội cứu hộ đang tiến hành xử lý. Vui lòng giữ bình tĩnh và tuân theo hướng dẫn.',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w500,

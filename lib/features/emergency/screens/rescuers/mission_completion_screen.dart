@@ -105,7 +105,9 @@ class _MissionCompletionScreenState
 
     final XFile? image = await _picker.pickImage(
       source: ImageSource.camera,
-      imageQuality: 85, // Compress to reduce size
+      imageQuality: 60,
+      maxWidth: 1080,
+      maxHeight: 1080,
     );
 
     if (image != null) {

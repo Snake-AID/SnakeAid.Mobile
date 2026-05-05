@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
 import 'package:go_router/go_router.dart';
@@ -15,7 +16,7 @@ import '../../repository/consultation_repository.dart';
 import '../../../wallet/repository/wallet_repository.dart';
 import 'emergency_request_waiting_screen.dart';
 
-// Primary color constant
+// Primary color constant - Green for member flow (consultation)
 const Color _primaryColor = Color(0xFF228B22);
 const Color _backgroundColor = Color(0xFFF6F8F6);
 
@@ -628,11 +629,6 @@ class _PaymentConfirmationScreenState
   Future<void> _handlePayment() async {
     // Booking flow has priority: when bookingId exists, never call emergency APIs.
     if (!_hasBookingId && _isInstantFlow) {
-      if (_selectedPaymentMethod == PaymentMethod.snakeaidPay) {
-        final confirmed = await _showWalletPaymentDialog();
-        if (confirmed != true) return;
-      }
-
       setState(() => _isPaymentLoading = true);
       String? requestId;
 
@@ -758,12 +754,6 @@ class _PaymentConfirmationScreenState
     if (!_hasBookingId) {
       context.go('/consultation-home');
       return;
-    }
-
-    // If SnakeAid Pay is selected, show confirmation dialog first
-    if (_selectedPaymentMethod == PaymentMethod.snakeaidPay) {
-      final confirmed = await _showWalletPaymentDialog();
-      if (confirmed != true) return;
     }
 
     setState(() => _isPaymentLoading = true);
@@ -1188,19 +1178,11 @@ class _PaymentConfirmationScreenState
                         _buildPaymentDetails(theme),
                         const SizedBox(height: 16),
 
-                        // Payment Method Section
-                        _buildPaymentMethods(theme),
-                        const SizedBox(height: 16),
-
                         // Security Info Box
                         _buildSecurityInfo(theme),
                         const SizedBox(height: 12),
 
-                        // Payment policy dropdown
-                        _buildPaymentPolicyDropdown(theme),
-                        const SizedBox(height: 8),
-                        _buildTermsCheckbox(theme),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 12),
                       ],
                     ),
                   ),
@@ -1213,10 +1195,9 @@ class _PaymentConfirmationScreenState
     );
   }
 
-  /// Build consultation summary card
   Widget _buildConsultationSummary(
     BuildContext context,
-    expert,
+    dynamic expert,
     ThemeData theme,
   ) {
     return Container(
@@ -1235,11 +1216,9 @@ class _PaymentConfirmationScreenState
       ),
       child: Column(
         children: [
-          // Expert info row
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Avatar with verified badge
               Stack(
                 children: [
                   Container(
@@ -1269,7 +1248,7 @@ class _PaymentConfirmationScreenState
                         width: 20,
                         height: 20,
                         decoration: const BoxDecoration(
-                          color: Color(0xFF8A2BE2), // Purple verified badge
+                          color: Color(0xFF8A2BE2),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -1282,8 +1261,6 @@ class _PaymentConfirmationScreenState
                 ],
               ),
               const SizedBox(width: 16),
-
-              // Expert details
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1297,8 +1274,6 @@ class _PaymentConfirmationScreenState
                       ),
                     ),
                     const SizedBox(height: 6),
-
-                    // Consultation type badge
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
@@ -1317,8 +1292,6 @@ class _PaymentConfirmationScreenState
                       ),
                     ),
                     const SizedBox(height: 8),
-
-                    // Date & Time (for scheduled)
                     if (widget.selectedDate != null) ...[
                       Row(
                         children: [
@@ -1342,8 +1315,6 @@ class _PaymentConfirmationScreenState
                       ),
                       const SizedBox(height: 4),
                     ],
-
-                    // Duration
                     Row(
                       children: [
                         Icon(
@@ -1426,25 +1397,6 @@ class _PaymentConfirmationScreenState
               const SizedBox(height: 12),
 
               // Platform fee
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Phí nền tảng (đã bao gồm)',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  Text(
-                    '0 VNĐ',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
               Divider(color: Colors.grey.shade200),
               const SizedBox(height: 12),
 
@@ -1465,52 +1417,6 @@ class _PaymentConfirmationScreenState
                       color: _primaryColor,
                     ),
                   ),
-                ],
-              ),
-
-              // Wallet balance
-              const SizedBox(height: 16),
-              Divider(color: Colors.grey.shade200),
-              const SizedBox(height: 12),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.account_balance_wallet,
-                        size: 18,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Số dư ví hiện tại',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                  _isLoadingWallet
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(
-                          _walletBalance != null
-                              ? _formatPrice(_walletBalance!.toInt().toString())
-                              : 'Không có dữ liệu',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color:
-                                _walletBalance != null &&
-                                    _walletBalance! >= int.parse(priceAmount)
-                                ? _primaryColor
-                                : Colors.red,
-                          ),
-                        ),
                 ],
               ),
 
@@ -1553,7 +1459,12 @@ class _PaymentConfirmationScreenState
     );
   }
 
-  /// Build payment methods section
+  /// Build payment methods section - Only shown after confirming terms
+  Widget _buildPaymentMethodsSection(ThemeData theme) {
+    return _buildPaymentMethods(theme);
+  }
+
+  /// Show payment methods in bottom sheet (similar to rescuer flow)
   Widget _buildPaymentMethods(ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1564,34 +1475,47 @@ class _PaymentConfirmationScreenState
             fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
 
-        // PayOS
-        _buildPaymentMethodOption(
-          PaymentMethod.payos,
-          'PayOS',
-          'assets/images/logo/payosicon.png',
-          theme,
-          subtitle: 'Thanh toán qua QR / Internet Banking',
+        // ── Card 1: SnakeAidPay ────────────────────────────────────────
+        _buildPaymentMethodCard(
+          method: PaymentMethod.snakeaidPay,
+          title: 'Ví SnakeAidPay',
+          subtitle: 'Thanh toán tức thì, không phí giao dịch',
+          icon: Icons.account_balance_wallet,
+          headerGradient: const LinearGradient(
+            colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          buttonColor: const Color(0xFF228B22),
+          child: _buildSnakeAidPayContent(),
         ),
         const SizedBox(height: 12),
 
-        // SnakeAid Pay
-        _buildPaymentMethodOption(
-          PaymentMethod.snakeaidPay,
-          'SnakeAid Pay',
-          null,
-          theme,
-          subtitle: 'Thanh toán từ ví SnakeAid của bạn',
+        // ── Card 2: PayOS ─────────────────────────────────────────────
+        _buildPaymentMethodCard(
+          method: PaymentMethod.payos,
+          title: 'PayOS',
+          subtitle: 'Thẻ ngân hàng, QR code, Internet Banking',
+          icon: Icons.credit_card_rounded,
+          headerGradient: const LinearGradient(
+            colors: [Color(0xFF1565C0), Color(0xFF0D47A1)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          buttonColor: const Color(0xFF1565C0),
+          child: _buildPayOsContent(),
         ),
+
         if (_lockedPaymentMethod != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: const Color(0xFFFFF8E1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFFFE0B2)),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFFFB300).withOpacity(0.5)),
             ),
             child: const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1604,7 +1528,7 @@ class _PaymentConfirmationScreenState
                     style: TextStyle(
                       fontSize: 12,
                       color: Color(0xFF92400E),
-                      height: 1.35,
+                      height: 1.4,
                     ),
                   ),
                 ),
@@ -1616,247 +1540,277 @@ class _PaymentConfirmationScreenState
     );
   }
 
-  /// Build fallback icon for payment method
-  Widget _buildFallbackIcon(PaymentMethod method) {
-    switch (method) {
-      case PaymentMethod.payos:
-        return Container(
-          width: 72,
-          height: 36,
-          decoration: BoxDecoration(
-            color: const Color(0xFF0C6EF2),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          alignment: Alignment.center,
-          child: const Text(
-            'PayOS',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.5,
-            ),
-          ),
-        );
-      case PaymentMethod.snakeaidPay:
-        return Container(
-          width: 72,
-          height: 36,
-          decoration: BoxDecoration(
-            color: const Color(0xFF228B22),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          alignment: Alignment.center,
-          child: const Text(
-            'S·Pay',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.5,
-            ),
-          ),
-        );
-    }
-  }
-
-  /// Build payment method option
-  Widget _buildPaymentMethodOption(
-    PaymentMethod method,
-    String label,
-    String? logoUrl,
-    ThemeData theme, {
-    String? subtitle,
+  /// Build modern payment method card
+  Widget _buildPaymentMethodCard({
+    required PaymentMethod method,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required LinearGradient headerGradient,
+    required Color buttonColor,
+    required Widget child,
   }) {
     final isSelected = _selectedPaymentMethod == method;
-    final isLockedToOther =
-        _lockedPaymentMethod != null && _lockedPaymentMethod != method;
+    final isLockedToOther = _lockedPaymentMethod != null && _lockedPaymentMethod != method;
+    final isEnabled = !isLockedToOther;
 
     return InkWell(
-      onTap: () {
-        if (isLockedToOther) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Phương thức thanh toán của đơn này đã được khóa theo PayOS.',
+      onTap: isEnabled
+          ? () {
+              setState(() {
+                _selectedPaymentMethod = method;
+              });
+            }
+          : () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Phương thức thanh toán của đơn này đã được khóa theo PayOS.',
+                  ),
+                  backgroundColor: Color(0xFFFF8F00),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+      child: Opacity(
+        opacity: isEnabled ? 1.0 : 0.6,
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: isSelected ? Border.all(color: _primaryColor, width: 2) : null,
+            boxShadow: [
+              BoxShadow(
+                color: isSelected
+                    ? _primaryColor.withOpacity(0.2)
+                    : Colors.black.withOpacity(0.06),
+                blurRadius: isSelected ? 16 : 12,
+                offset: Offset(0, isSelected ? 4 : 3),
               ),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: Color(0xFFFF8F00),
-            ),
-          );
-          return;
-        }
-        setState(() {
-          _selectedPaymentMethod = method;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? _primaryColor : Colors.grey.shade200,
-            width: isSelected ? 2 : 1,
+            ],
           ),
-          gradient: isLockedToOther
-              ? LinearGradient(
-                  colors: [Colors.grey.shade50, Colors.grey.shade100],
-                )
-              : null,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
+        child: Column(
           children: [
-            // Radio button
+            // Card header
             Container(
-              width: 20,
-              height: 20,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected ? _primaryColor : Colors.grey.shade300,
-                  width: 2,
+                gradient: isEnabled ? headerGradient : LinearGradient(
+                  colors: [Colors.grey[400]!, Colors.grey[500]!],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
                 ),
               ),
-              child: isSelected
-                  ? Center(
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _primaryColor,
-                        ),
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 16),
-
-            // Logo or icon (fixed width container for alignment)
-            SizedBox(
-              width: 72,
-              height: 36,
-              child: logoUrl != null
-                  ? (logoUrl.startsWith('assets/')
-                        ? Image.asset(
-                            logoUrl,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) {
-                              return _buildFallbackIcon(method);
-                            },
-                          )
-                        : CachedNetworkImage(
-                            imageUrl: logoUrl,
-                            fit: BoxFit.contain,
-                            placeholder: (context, url) => Center(
-                              child: SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.grey.shade400,
-                                ),
-                              ),
-                            ),
-                            errorWidget: (context, url, error) {
-                              return _buildFallbackIcon(method);
-                            },
-                          ))
-                  : _buildFallbackIcon(method),
-            ),
-            const SizedBox(width: 16),
-
-            // Label + subtitle
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Text(
-                    label,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      icon,
+                      color: Colors.white,
+                      size: 20,
                     ),
                   ),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isSelected)
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                      ),
+                      child: Icon(
+                        Icons.check,
+                        size: 16,
+                        color: isEnabled ? buttonColor : Colors.grey,
                       ),
                     ),
-                  ],
-                  if (method == PaymentMethod.snakeaidPay) ...[
-                    const SizedBox(height: 6),
-                    _isLoadingWallet
-                        ? SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 1.5,
-                              color: Colors.grey.shade400,
-                            ),
-                          )
-                        : Row(
-                            children: [
-                              Icon(
-                                Icons.account_balance_wallet_outlined,
-                                size: 13,
-                                color:
-                                    _walletBalance != null &&
-                                        _walletBalance! >=
-                                            (int.tryParse(_getPriceAmount()) ??
-                                                0)
-                                    ? _primaryColor
-                                    : Colors.red.shade400,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                _walletBalance != null
-                                    ? 'Số dư: ${_formatBalance(_walletBalance!)}'
-                                    : 'Không thể tải số dư',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color:
-                                      _walletBalance != null &&
-                                          _walletBalance! >=
-                                              (int.tryParse(
-                                                    _getPriceAmount(),
-                                                  ) ??
-                                                  0)
-                                      ? _primaryColor
-                                      : Colors.red.shade400,
-                                ),
-                              ),
-                            ],
-                          ),
-                  ],
                 ],
               ),
             ),
-            if (isLockedToOther)
-              const Padding(
-                padding: EdgeInsets.only(left: 8),
-                child: Icon(
-                  Icons.lock_outline,
-                  size: 16,
-                  color: Color(0xFF9CA3AF),
-                ),
+            // Card body
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  child,
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: (isSelected && _agreedToTerms && isEnabled)
+                          ? _handlePayment
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isEnabled ? buttonColor : Colors.grey[300],
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: Colors.grey[200],
+                        disabledForegroundColor: Colors.grey[400],
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        method == PaymentMethod.snakeaidPay
+                            ? 'Thanh toán bằng ví'
+                            : 'Thanh toán qua PayOS',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
+            ),
           ],
+        ),
         ),
       ),
     );
   }
+
+  /// Build SnakeAid Pay card content
+  Widget _buildSnakeAidPayContent() {
+    final hasSufficientBalance = _walletBalance != null &&
+        _walletBalance! >= (int.tryParse(_getPriceAmount()) ?? 0);
+
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Số dư hiện tại',
+              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            ),
+            _isLoadingWallet
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFF228B22),
+                    ),
+                  )
+                : Text(
+                    _formatBalance(_walletBalance ?? 0),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: hasSufficientBalance
+                          ? const Color(0xFF228B22)
+                          : const Color(0xFFDC3545),
+                    ),
+                  ),
+          ],
+        ),
+        if (!hasSufficientBalance && _walletBalance != null) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFDC3545).withOpacity(0.06),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, size: 14, color: Color(0xFFDC3545)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Số dư không đủ. Cần nạp thêm ${_formatPrice(((int.tryParse(_getPriceAmount()) ?? 0) - (_walletBalance?.toInt() ?? 0)).toString())}.',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFFDC3545)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Build PayOS card content with feature chips
+  Widget _buildPayOsContent() {
+    return Row(
+      children: [
+        _featureChip(Icons.qr_code_2, 'QR Code'),
+        const SizedBox(width: 8),
+        _featureChip(Icons.credit_card, 'ATM / Visa'),
+        const SizedBox(width: 8),
+        _featureChip(Icons.account_balance, 'Internet Banking'),
+      ],
+    );
+  }
+
+  /// Build feature chip for PayOS
+  Widget _featureChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1565C0).withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFF1565C0).withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: const Color(0xFF1565C0)),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF1565C0),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
 
   /// Build security info box
   Widget _buildSecurityInfo(ThemeData theme) {
@@ -1887,131 +1841,9 @@ class _PaymentConfirmationScreenState
     );
   }
 
-  Widget _buildPaymentPolicyDropdown(ThemeData theme) {
-    final isInstant = _isInstantFlow;
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Theme(
-        data: theme.copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-          leading: Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: _primaryColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            alignment: Alignment.center,
-            child: const Icon(
-              Icons.policy_outlined,
-              size: 17,
-              color: _primaryColor,
-            ),
-          ),
-          title: Text(
-            'Chính Sách Thanh Toán',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF1F2937),
-            ),
-          ),
-          subtitle: Text(
-            'Xem quy định trước khi xác nhận',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: const Color(0xFF6B7280),
-            ),
-          ),
-          children: [
-            _buildPolicyBullet(
-              theme,
-              'Sau khi thanh toán thành công, không thể tự hủy đơn tư vấn.',
-            ),
-            if (isInstant)
-              _buildPolicyBullet(
-                theme,
-                'Đối với tư vấn ngay: nếu không được chuyên gia chấp nhận, hệ thống sẽ hoàn tiền.',
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPolicyBullet(ThemeData theme, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            margin: const EdgeInsets.only(top: 6),
-            decoration: const BoxDecoration(
-              color: Color(0xFF6B7280),
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: theme.textTheme.bodySmall?.copyWith(
-                height: 1.45,
-                color: const Color(0xFF374151),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Build policy acknowledgement checkbox
-  Widget _buildTermsCheckbox(ThemeData theme) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Checkbox(
-          value: _agreedToTerms,
-          onChanged: (value) {
-            setState(() {
-              _agreedToTerms = value ?? false;
-            });
-          },
-          activeColor: _primaryColor,
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
-        ),
-        Expanded(
-          child: Text(
-            'Tôi đã đọc và hiểu Chính Sách Thanh Toán bên trên.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              height: 1.35,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   /// Build bottom actions
   Widget _buildBottomActions(ThemeData theme) {
-    final canProceed = _agreedToTerms && !_isPaymentLoading;
+    final canProceed = !_isPaymentLoading;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -2030,21 +1862,7 @@ class _PaymentConfirmationScreenState
               child: FilledButton(
                 onPressed: _isPaymentLoading
                     ? null
-                    : () {
-                        if (!_agreedToTerms) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Vui lòng xác nhận bạn đã đọc Chính Sách Thanh Toán trước khi tiếp tục.',
-                              ),
-                              behavior: SnackBarBehavior.floating,
-                              backgroundColor: Color(0xFFFF8F00),
-                            ),
-                          );
-                          return;
-                        }
-                        _handlePayment();
-                      },
+                    : _showPaymentMethodsSheet,
                 style: FilledButton.styleFrom(
                   backgroundColor: canProceed
                       ? _primaryColor
@@ -2088,6 +1906,770 @@ class _PaymentConfirmationScreenState
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Show payment methods in a modern bottom sheet
+  void _showPaymentMethodsSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _PaymentMethodsSheet(
+        walletBalance: _walletBalance,
+        amount: double.tryParse(_getPriceAmount()) ?? 0,
+        onPayOS: () async {
+          Navigator.of(context).pop();
+          setState(() {
+            _selectedPaymentMethod = PaymentMethod.payos;
+          });
+          await _handlePayment();
+        },
+        onWallet: () async {
+          Navigator.of(context).pop();
+          setState(() {
+            _selectedPaymentMethod = PaymentMethod.snakeaidPay;
+          });
+          await _handlePayment();
+        },
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Payment Methods Bottom Sheet Widget
+// ──────────────────────────────────────────────────────────────────────────────
+class _PaymentMethodsSheet extends StatefulWidget {
+  final double? walletBalance;
+  final double amount;
+  final VoidCallback onPayOS;
+  final VoidCallback onWallet;
+
+  const _PaymentMethodsSheet({
+    required this.walletBalance,
+    required this.amount,
+    required this.onPayOS,
+    required this.onWallet,
+  });
+
+  @override
+  State<_PaymentMethodsSheet> createState() => _PaymentMethodsSheetState();
+}
+
+class _PaymentMethodsSheetState extends State<_PaymentMethodsSheet> {
+  bool _agreedToTerms = false;
+
+  String _fmt(double v) {
+    final s = v
+        .toInt()
+        .toString()
+        .replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+    return '$s đ';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool hasSufficientBalance =
+        widget.walletBalance != null && widget.walletBalance! >= widget.amount;
+    final double balance = widget.walletBalance ?? 0;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFF6F8F6),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        12,
+        20,
+        MediaQuery.of(context).padding.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ── Handle ────────────────────────────────────────────────
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // ── Header ────────────────────────────────────────────────
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF228B22).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.payment_rounded,
+                  color: Color(0xFF228B22),
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Thanh toán tư vấn',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1F1F1F),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Chọn phương thức thanh toán',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // ── Amount pill ───────────────────────────────────────────
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF228B22).withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Phí tư vấn',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF555555),
+                  ),
+                ),
+                Text(
+                  _fmt(widget.amount),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF228B22),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // ── Terms & Conditions ────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF8E1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFFFB300).withOpacity(0.5),
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Checkbox(
+                    value: _agreedToTerms,
+                    onChanged: (val) {
+                      setState(() {
+                        _agreedToTerms = val ?? false;
+                      });
+                    },
+                    activeColor: const Color(0xFFFF8F00),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text.rich(
+                    TextSpan(
+                      text: 'Tôi đã hiểu và đồng ý với ',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF424242),
+                        height: 1.4,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: 'Chính sách thanh toán',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFFF8F00),
+                          ),
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () => _showPaymentTermsDialog(context),
+                        ),
+                        const TextSpan(text: '.'),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── Card 1: SnakeAidPay ───────────────────────────────────
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 12,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Card header
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.account_balance_wallet,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Ví SnakeAidPay',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              'Thanh toán tức thì, không phí giao dịch',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Card body
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Số dư hiện tại',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          widget.walletBalance == null
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFF228B22),
+                                  ),
+                                )
+                              : Text(
+                                  _fmt(balance),
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: hasSufficientBalance
+                                        ? const Color(0xFF228B22)
+                                        : const Color(0xFFDC3545),
+                                  ),
+                                ),
+                        ],
+                      ),
+                      if (!hasSufficientBalance && widget.walletBalance != null) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDC3545).withOpacity(0.06),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.info_outline,
+                                size: 14,
+                                color: Color(0xFFDC3545),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Số dư không đủ. Cần nạp thêm ${_fmt(widget.amount - balance)}.',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFFDC3545),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: (hasSufficientBalance && _agreedToTerms)
+                              ? widget.onWallet
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF228B22),
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: Colors.grey[200],
+                            disabledForegroundColor: Colors.grey[400],
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            hasSufficientBalance
+                                ? 'Thanh toán bằng ví'
+                                : 'Số dư không đủ',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // ── Card 2: PayOS ─────────────────────────────────────────
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 12,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Card header
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF1565C0), Color(0xFF0D47A1)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.credit_card_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'PayOS',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              'Thẻ ngân hàng, QR code, Internet Banking',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Card body
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          _featureChip(Icons.qr_code_2, 'QR Code'),
+                          const SizedBox(width: 8),
+                          _featureChip(Icons.credit_card, 'ATM / Visa'),
+                          const SizedBox(width: 8),
+                          _featureChip(
+                            Icons.account_balance,
+                            'Internet Banking',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _agreedToTerms ? widget.onPayOS : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1565C0),
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: Colors.grey[200],
+                            disabledForegroundColor: Colors.grey[400],
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Thanh toán qua PayOS',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _featureChip(IconData icon, String label) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE3F2FD),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF90CAF9)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: const Color(0xFF1565C0)),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF1565C0),
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPaymentTermsDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext ctx) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.8,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header - full-width professional style
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 18,
+                  horizontal: 20,
+                ),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                  border: Border.all(color: const Color(0xFF196619)),
+                ),
+                child: const Center(
+                  child: Text(
+                    'Chính Sách Thanh Toán',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              // Content
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Vui lòng đọc kỹ các điều khoản sau đây trước khi thanh toán:',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF6B7280),
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      _buildPolicyBullet(
+                        Icons.lock_outlined,
+                        'Sau khi thanh toán thành công, không thể tự hủy đơn tư vấn.',
+                      ),
+                      _buildPolicyBullet(
+                        Icons.check_circle,
+                        'Thanh toán an toàn và bảo mật với các phương thức được kiểm chứng.',
+                      ),
+                      _buildPolicyBullet(
+                        Icons.visibility,
+                        'Không có phí ẩn. Tất cả chi phí đã được hiển thị rõ ràng.',
+                      ),
+                      _buildPolicyBullet(
+                        Icons.receipt,
+                        'Hoàn tiền nếu dịch vụ không thực hiện.',
+                      ),
+                      _buildSubBullet(
+                        'Vui lòng liên hệ hotline: 0787171699 để được hỗ trợ.',
+                      ),
+                      const SizedBox(height: 16),
+                      _buildPolicyBullet(
+                        Icons.gavel,
+                        'Tuân thủ các quy định pháp luật về thanh toán điện tử.',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Actions
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(24),
+                  ),
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF228B22),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Đã hiểu',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPolicyBullet(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: const Color(0xFF228B22).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 16, color: const Color(0xFF228B22)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF374151),
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubBullet(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, left: 44),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '• ',
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF6B7280),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF6B7280),
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

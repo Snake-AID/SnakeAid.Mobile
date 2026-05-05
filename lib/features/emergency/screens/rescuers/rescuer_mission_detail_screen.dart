@@ -303,8 +303,12 @@ class _RescuerMissionDetailScreenState
                     const SizedBox(height: 12),
                   ],
                   _buildVictimCard(mission),
-                  const SizedBox(height: 12),
-                  _buildEmergencyContactsCard(mission),
+                  if (mission.user.emergencyContacts.any(
+                    (c) => c.trim().isNotEmpty,
+                  )) ...[
+                    const SizedBox(height: 12),
+                    _buildEmergencyContactsCard(mission),
+                  ],
                   const SizedBox(height: 12),
                   _buildLocationCard(mission),
                   const SizedBox(height: 12),
@@ -995,6 +999,8 @@ class _RescuerMissionDetailScreenState
     final contacts = mission.user.emergencyContacts
         .where((c) => c.trim().isNotEmpty)
         .toList();
+    if (contacts.isEmpty) return const SizedBox.shrink();
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1011,73 +1017,63 @@ class _RescuerMissionDetailScreenState
             'Liên hệ khẩn cấp',
           ),
           const SizedBox(height: 12),
-          if (contacts.isEmpty)
-            const Text(
-              'Chưa có số liên hệ khẩn cấp',
-              style: TextStyle(
-                fontSize: 14,
-                color: _textSecondary,
-                fontStyle: FontStyle.italic,
-              ),
-            )
-          else
-            ...contacts.asMap().entries.map((e) {
-              final i = e.key;
-              final phone = e.value;
-              return Column(
-                children: [
-                  if (i > 0) const Divider(height: 16, color: _divider),
-                  Row(
-                    children: [
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: _accent.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Center(
-                          child: Text(
-                            '${i + 1}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: _accent,
-                            ),
-                          ),
-                        ),
+          ...contacts.asMap().entries.map((e) {
+            final i = e.key;
+            final phone = e.value;
+            return Column(
+              children: [
+                if (i > 0) const Divider(height: 16, color: _divider),
+                Row(
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: _accent.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
+                      child: Center(
                         child: Text(
-                          phone,
+                          '${i + 1}',
                           style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: _textPrimary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: _accent,
                           ),
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.phone_outlined,
-                          size: 18,
-                          color: _accent,
-                        ),
-                        onPressed: () => _makePhoneCall(phone),
-                        style: IconButton.styleFrom(
-                          backgroundColor: _accent.withOpacity(0.08),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.all(6),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        phone,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: _textPrimary,
                         ),
                       ),
-                    ],
-                  ),
-                ],
-              );
-            }).toList(),
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.phone_outlined,
+                        size: 18,
+                        color: _accent,
+                      ),
+                      onPressed: () => _makePhoneCall(phone),
+                      style: IconButton.styleFrom(
+                        backgroundColor: _accent.withOpacity(0.08),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.all(6),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          }).toList(),
         ],
       ),
     );

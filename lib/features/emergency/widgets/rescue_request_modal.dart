@@ -280,7 +280,7 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
     try {
       await ref
           .read(rescuerSignalRServiceProvider)
-          .declineDispatchRequest(widget.request.requestId, 'TIMEOUT');
+          .declineDispatchRequest(widget.request.requestId, 'Không phản hồi');
     } catch (e) {
       debugPrint('❌ Failed to send decline request on timeout: $e');
     }
@@ -872,16 +872,16 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
           const SizedBox(height: 14),
 
           // ─── Price ───────────────────────────────────────────────
-          _buildMissionPriceCard(),
-          const SizedBox(height: 12),
+          // _buildMissionPriceCard(),
+          // const SizedBox(height: 12),
 
           // ─── Victim ──────────────────────────────────────────────
           _buildVictimInfoCard(),
           const SizedBox(height: 12),
 
-          // ─── Emergency contacts ──────────────────────────────────
-          _buildEmergencyContactsCard(),
-          const SizedBox(height: 12),
+          // // ─── Emergency contacts ──────────────────────────────────
+          // _buildEmergencyContactsCard(),
+          // const SizedBox(height: 12),
 
           // ─── Map ─────────────────────────────────────────────────
           _buildSectionCard(
@@ -1105,74 +1105,74 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
     );
   }
 
-  Widget _buildMissionPriceCard() {
-    final mission = _incident!.activeMission;
-    final hasPrice = mission != null;
+  // Widget _buildMissionPriceCard() {
+  //   final mission = _incident!.activeMission;
+  //   final hasPrice = mission != null;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: hasPrice
-            ? const LinearGradient(
-                colors: [Color(0xFF2E7D32), Color(0xFF388E3C)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              )
-            : LinearGradient(
-                colors: [Colors.grey[400]!, Colors.grey[500]!],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              hasPrice ? Icons.attach_money : Icons.info_outline,
-              color: Colors.white,
-              size: 26,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Phí dịch vụ',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  hasPrice ? mission.formattedPrice : 'Chưa xác định',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (!hasPrice)
-                  const Text(
-                    'Sẽ được tính sau khi hoàn thành',
-                    style: TextStyle(
-                      color: Colors.white60,
-                      fontSize: 11,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  //   return Container(
+  //     padding: const EdgeInsets.all(16),
+  //     decoration: BoxDecoration(
+  //       gradient: hasPrice
+  //           ? const LinearGradient(
+  //               colors: [Color(0xFF2E7D32), Color(0xFF388E3C)],
+  //               begin: Alignment.topLeft,
+  //               end: Alignment.bottomRight,
+  //             )
+  //           : LinearGradient(
+  //               colors: [Colors.grey[400]!, Colors.grey[500]!],
+  //               begin: Alignment.topLeft,
+  //               end: Alignment.bottomRight,
+  //             ),
+  //       borderRadius: BorderRadius.circular(14),
+  //     ),
+  //     child: Row(
+  //       children: [
+  //         Container(
+  //           padding: const EdgeInsets.all(10),
+  //           decoration: BoxDecoration(
+  //             color: Colors.white.withOpacity(0.15),
+  //             borderRadius: BorderRadius.circular(10),
+  //           ),
+  //           child: Icon(
+  //             hasPrice ? Icons.attach_money : Icons.info_outline,
+  //             color: Colors.white,
+  //             size: 26,
+  //           ),
+  //         ),
+  //         const SizedBox(width: 14),
+  //         Expanded(
+  //           child: Column(
+  //             crossAxisAlignment: CrossAxisAlignment.start,
+  //             children: [
+  //               const Text(
+  //                 'Phí dịch vụ',
+  //                 style: TextStyle(color: Colors.white70, fontSize: 12),
+  //               ),
+  //               const SizedBox(height: 2),
+  //               Text(
+  //                 hasPrice ? mission.formattedPrice : 'Chưa xác định',
+  //                 style: const TextStyle(
+  //                   color: Colors.white,
+  //                   fontSize: 22,
+  //                   fontWeight: FontWeight.bold,
+  //                 ),
+  //               ),
+  //               if (!hasPrice)
+  //                 const Text(
+  //                   'Sẽ được tính sau khi hoàn thành',
+  //                   style: TextStyle(
+  //                     color: Colors.white60,
+  //                     fontSize: 11,
+  //                     fontStyle: FontStyle.italic,
+  //                   ),
+  //                 ),
+  //             ],
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget _buildVictimInfoCard() {
     final user = _incident!.user;
@@ -1218,30 +1218,29 @@ class _RescueRequestModalState extends ConsumerState<RescueRequestModal>
                       ),
                     ),
                     const SizedBox(height: 4),
-                    if (user.ratingCount > 0)
-                      Row(
-                        children: [
-                          const Icon(Icons.star, size: 13, color: Colors.amber),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${user.rating.toStringAsFixed(1)} (${user.ratingCount} đánh giá)',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      )
-                    else
-                      Text(
-                        'Người dùng mới',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                      ),
                   ],
                 ),
               ),
             ],
           ),
+          if (user.phoneNumber != null &&
+              user.phoneNumber!.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.phone, size: 14, color: Color(0xFF4CAF50)),
+                const SizedBox(width: 6),
+                Text(
+                  user.phoneNumber!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF4CAF50),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ],
           if (user.hasUnderlyingDisease) ...[
             const SizedBox(height: 12),
             Container(

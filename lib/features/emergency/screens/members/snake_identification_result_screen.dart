@@ -265,9 +265,9 @@ class _SnakeIdentificationResultScreenState
                   _buildFirstAidCard(),
                   const SizedBox(height: 16),
 
-                  // Details Section
-                  _buildDetailsSection(),
-                  const SizedBox(height: 24),
+                  // // Details Section
+                  // _buildDetailsSection(),
+                  // const SizedBox(height: 24),
 
                   // ⭐ CONDITIONAL BUTTONS BASED ON CONFIDENCE & CONFIRMATION STATE
                   if (!_isConfirmed) ...[
