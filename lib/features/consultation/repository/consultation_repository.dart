@@ -1011,22 +1011,71 @@ class ConsultationRepository {
     int pageNumber = 1,
     int pageSize = 10,
   }) async {
-    final response = await httpService.get(
-      '/api/consultations/$consultationId/messages-history',
-      queryParameters: {
-        'pageNumber': pageNumber,
-        'pageSize': pageSize,
-      },
-    );
-
-    final body = response.data as Map<String, dynamic>;
-    if (body['is_success'] == true && body['data'] is Map<String, dynamic>) {
-      return ConsultationMessageHistoryResponse.fromJson(
-        body['data'] as Map<String, dynamic>,
+    try {
+      final response = await httpService.get(
+        '/api/consultations/$consultationId/messages-history',
+        queryParameters: {
+          'pageNumber': pageNumber,
+          'pageSize': pageSize,
+        },
       );
-    }
 
-    throw Exception(body['message'] ?? 'Không thể tải lịch sử tin nhắn');
+      final body = response.data as Map<String, dynamic>;
+      if (body['is_success'] == true && body['data'] is Map<String, dynamic>) {
+        return ConsultationMessageHistoryResponse.fromJson(
+          body['data'] as Map<String, dynamic>,
+        );
+      }
+
+      final message = body['message']?.toString().toLowerCase() ?? '';
+      if (message.contains('không có') ||
+          message.contains('khong co') ||
+          message.contains('no message') ||
+          message.contains('not found') ||
+          message.contains('terminal consultations') ||
+          message.contains('available only for terminal consultations') ||
+          message.contains('current status is scheduled')) {
+        return const ConsultationMessageHistoryResponse(
+          items: [],
+          meta: ConsultationMessageHistoryMeta(
+            totalPages: 1,
+            totalItems: 0,
+            currentPage: 1,
+            pageSize: 10,
+          ),
+        );
+      }
+
+      throw Exception(body['message'] ?? 'Không thể tải lịch sử tin nhắn');
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      final responseData = e.response?.data;
+      final message = responseData is Map<String, dynamic>
+          ? responseData['message']?.toString().toLowerCase() ?? ''
+          : e.message?.toLowerCase() ?? '';
+
+      if (statusCode == 404 ||
+          statusCode == 204 ||
+          message.contains('không có') ||
+          message.contains('khong co') ||
+          message.contains('no message') ||
+          message.contains('not found') ||
+          message.contains('terminal consultations') ||
+          message.contains('available only for terminal consultations') ||
+          message.contains('current status is scheduled')) {
+        return const ConsultationMessageHistoryResponse(
+          items: [],
+          meta: ConsultationMessageHistoryMeta(
+            totalPages: 1,
+            totalItems: 0,
+            currentPage: 1,
+            pageSize: 10,
+          ),
+        );
+      }
+
+      rethrow;
+    }
   }
 
   // ---------------------------------------------------------------------------
