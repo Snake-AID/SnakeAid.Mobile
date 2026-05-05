@@ -146,7 +146,7 @@
 | 1. Giới Thiệu | Điều khoản điều chỉnh việc sử dụng nền tảng SnakeAid với tư cách chuyên gia. Bằng cách đăng ký, bạn đồng ý tuân thủ. |
 | 2. Tư Cách Đủ Điều Kiện | Đủ 18 tuổi, có pháp lý đầy đủ, không bị cấm cung cấp dịch vụ, cung cấp thông tin chính xác, có chuyên môn thích hợp. |
 | 3. Nghĩa Vụ Chuyên Gia | Cung cấp tư vấn chính xác, chuyên nghiệp; tuân thủ pháp luật; không phân biệt đối xử; bảo mật thông tin khách hàng. |
-| 4. Giá Dịch Vụ | Bạn tự thiết lập giá. Nền tảng thu phí hoa hồng **10%** mỗi giao dịch. Thay đổi giá có hiệu lực trong 24 giờ. |
+| 4. Giá Dịch Vụ | Bạn tự thiết lập giá. Nền tảng thu phí hoa hồng **20%** mỗi giao dịch. Thay đổi giá có hiệu lực trong 24 giờ. |
 | 5. Thanh Toán | Tiền vào ví SnakeAidPay ngay sau phiên tư vấn. Rút tiền bất kỳ lúc nào, miễn phí, xử lý trong 1-3 ngày làm việc. |
 | 6. Hủy / Không Tham Gia | "No-show" = mất thu nhập phiên đó, khách hàng được hoàn tiền. Nhiều No-show có thể bị tạm ngừng tài khoản. |
 | 7. Giới Hạn Trách Nhiệm | Nền tảng không chịu trách nhiệm về kết luận tư vấn, hành động của khách hàng, tranh chấp, hoặc mất mát gián tiếp. |

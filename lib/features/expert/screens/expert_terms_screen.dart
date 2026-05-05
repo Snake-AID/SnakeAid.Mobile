@@ -85,7 +85,7 @@ class ExpertTermsScreen extends ConsumerWidget {
             _buildSection(
               title: '4. Giá Dịch Vụ',
               content:
-                  'Bạn có quyền thiết lập giá tư vấn của mình. Nền tảng sẽ thu phí hoa hồng 10% trên mỗi giao dịch. Ví dụ: Nếu bạn tính giá 100,000 VNĐ, bạn sẽ nhận 90,000 VNĐ. Các thay đổi giá sẽ có hiệu lực trong vòng 24 giờ.',
+                  'Bạn có quyền thiết lập giá tư vấn của mình. Nền tảng sẽ thu phí hoa hồng 20% trên mỗi giao dịch. Ví dụ: Nếu bạn tính giá 100,000 VNĐ, bạn sẽ nhận 90,000 VNĐ. Các thay đổi giá sẽ có hiệu lực trong vòng 24 giờ.',
             ),
             _buildSection(
               title: '5. Thanh Toán',
