@@ -97,6 +97,7 @@ class _EmergencyRequestWaitingDialogState
   bool _isConnecting = true;
   bool _isPollingStatus = false;
   String? _acceptedConsultationId;
+  DateTime? _requestedAt;
 
   @override
   void initState() {
@@ -273,6 +274,9 @@ class _EmergencyRequestWaitingDialogState
           if (request.consultationId != null &&
               request.consultationId!.isNotEmpty) {
             _acceptedConsultationId = request.consultationId;
+          }
+          if (_requestedAt == null && request.requestedAt != null) {
+            _requestedAt = request.requestedAt!.toLocal();
           }
         });
 
@@ -477,13 +481,38 @@ class _EmergencyRequestWaitingDialogState
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () {
+                    onPressed: () async {
+                      DateTime? requestedAt = _requestedAt;
+                      DateTime? respondedAt;
+                      try {
+                        final repo = ref.read(consultationRepositoryProvider);
+                        final request =
+                            await repo.getEmergencyRequestStatus(widget.requestId);
+                        if (request != null) {
+                          if (request.requestedAt != null) {
+                            requestedAt = request.requestedAt!.toLocal();
+                          }
+                          if (request.respondedAt != null) {
+                            respondedAt = request.respondedAt!.toLocal();
+                          }
+                        }
+                      } catch (_) {
+                        // Ignore fetch failure and continue with last known data.
+                      }
+
+                      final startAt =
+                          requestedAt ?? respondedAt ?? DateTime.now();
+                      if (!mounted) return;
                       Navigator.of(context).pop();
                       context.go(
                         '/video-waiting/$_acceptedConsultationId',
                         extra: {
                           'expertName': widget.expertName,
                           'expertSpecialty': 'Tư vấn ngay',
+                          'scheduledStartAtMs':
+                              startAt.millisecondsSinceEpoch,
+                          'scheduledDurationSeconds': 1800,
+                          'canReportExpertAbsent': false,
                         },
                       );
                     },
