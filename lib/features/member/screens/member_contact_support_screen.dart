@@ -109,9 +109,9 @@ class _MemberContactSupportScreenState
                     const Text(
                       'Chúng tôi luôn sẵn sàng lắng nghe và giải đáp mọi thắc mắc của bạn.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 14,
-                        color: Colors.whiteEms,
+                        color: Color(0xFFF0F0F0),
                         height: 1.5,
                       ),
                     ),
@@ -195,7 +195,7 @@ class _MemberContactSupportScreenState
               color: AppTheme.primaryGreen.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
+            child: Icon(
               icon,
               color: AppTheme.primaryGreen,
               size: 24,
@@ -231,6 +231,3 @@ class _MemberContactSupportScreenState
   }
 }
 
-extension on Color {
-  static const Color whiteEms = Color(0xFFF0F0F0);
-}

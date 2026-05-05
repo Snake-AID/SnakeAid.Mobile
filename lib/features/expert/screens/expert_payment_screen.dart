@@ -69,7 +69,7 @@ class ExpertPaymentScreen extends ConsumerWidget {
             _buildSectionCard(
               title: '1. Ghi Nhận Thu Nhập',
               content:
-                  'Thu nhập từ các phiên tư vấn sẽ được cộng vào ví SnakeAidPay của bạn ngay sau khi phiên tư vấn kết thúc và khách hàng xác nhận hoàn thành. Hệ thống sẽ tự động trừ phí hoa hồng 10% theo quy định.',
+                  'Thu nhập từ các phiên tư vấn sẽ được cộng vào ví SnakeAidPay của bạn ngay sau khi phiên tư vấn kết thúc và khách hàng xác nhận hoàn thành. Hệ thống sẽ tự động trừ phí hoa hồng 20% theo quy định.',
             ),
             _buildSectionCard(
               title: '2. Quy Trình Rút Tiền',

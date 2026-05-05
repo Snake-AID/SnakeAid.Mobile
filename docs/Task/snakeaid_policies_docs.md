@@ -158,7 +158,7 @@
 
 | Mục | Nội dung |
 |-----|----------|
-| 1. Ghi Nhận Thu Nhập | Thu nhập được cộng vào ví SnakeAidPay ngay sau khi phiên tư vấn kết thúc. Phí hoa hồng hệ thống là 10%. |
+| 1. Ghi Nhận Thu Nhập | Thu nhập được cộng vào ví SnakeAidPay ngay sau khi phiên tư vấn kết thúc. Phí hoa hồng hệ thống là 20%. |
 | 2. Quy Trình Rút Tiền | Chuyên gia có thể rút tiền về ngân hàng bất kỳ lúc nào. Thông tin ngân hàng phải trùng khớp với thông tin định danh. |
 | 3. Thời Gian Xử Lý | Xử lý trong vòng 1 đến 3 ngày làm việc (không tính Thứ 7, Chủ nhật và ngày lễ). |
 | 4. Phí Rút Tiền | Miễn phí hoàn toàn các giao dịch rút tiền cho chuyên gia từ phía SnakeAid. |
