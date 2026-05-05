@@ -181,6 +181,9 @@ class _MemberIncidentFinishedDetailScreenState
           amount: result.transaction!.amount,
           method: 'PayOS',
         );
+        if (mounted) {
+          await _showFeedbackSheet();
+        }
         return;
       }
 
@@ -212,6 +215,9 @@ class _MemberIncidentFinishedDetailScreenState
           ),
           method: 'PayOS',
         );
+        if (mounted) {
+          await _showFeedbackSheet();
+        }
         return;
       }
 
@@ -287,7 +293,7 @@ class _MemberIncidentFinishedDetailScreenState
     _isAwaitingPayOsReturn = false;
   }
 
-  void _showFeedbackSheet() {
+  Future<void> _showFeedbackSheet() async {
     final incident = ref.read(detailedIncidentProvider).incident;
     if (incident == null) return;
     final rescuer = incident.assignedRescuer;
@@ -307,7 +313,7 @@ class _MemberIncidentFinishedDetailScreenState
         );
     if (alreadyReviewed) return;
 
-    showModalBottomSheet(
+    await showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
@@ -966,6 +972,9 @@ class _MemberIncidentFinishedDetailScreenState
           amount: 0,
           method: 'Miễn phí',
         );
+        if (mounted) {
+          await _showFeedbackSheet();
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1083,6 +1092,9 @@ class _MemberIncidentFinishedDetailScreenState
           amount: amount,
           method: 'SnakeAidPay',
         );
+        if (mounted) {
+          await _showFeedbackSheet();
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -2029,28 +2041,18 @@ class _MemberIncidentFinishedDetailScreenState
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                _infoRowIcon(
-                  'Mức độ',
-                  incident.severityText,
-                  const Color(0xFFDC3545),
-                ),
+                _infoRowIcon('Mức độ', incident.severityText),
                 _infoRowIcon(
                   'Thời gian',
                   DateFormat('dd/MM/yyyy  HH:mm').format(
                     (incident.incidentOccurredAt ?? DateTime.now()).toLocal(),
                   ),
-                  const Color(0xFF2196F3),
                 ),
-                _infoRowIcon(
-                  'Địa chỉ',
-                  incident.address ?? 'Chưa có',
-                  const Color(0xFF228B22),
-                ),
+                _infoRowIcon('Địa chỉ', incident.address ?? 'Chưa có'),
                 _infoRowIcon(
                   'Tọa độ',
                   '${incident.locationCoordinates.latitude.toStringAsFixed(6)}, '
                       '${incident.locationCoordinates.longitude.toStringAsFixed(6)}',
-                  Colors.grey,
                 ),
                 if (incident.symptomsReport?.isNotEmpty ?? false)
                   _infoRowIcon(
@@ -2058,25 +2060,21 @@ class _MemberIncidentFinishedDetailScreenState
                     incident.symptomsReport!
                         .map((e) => e.symptomName)
                         .join('; '),
-                    const Color(0xFFFF9800),
                   ),
                 if (incident.identifiedSnakeSpecies != null)
                   _infoRowIcon(
                     'Loài rắn',
                     incident.identifiedSnakeSpecies!.commonName,
-                    const Color(0xFF7B1FA2),
                   ),
                 if (mission != null)
                   _infoRowIcon(
                     'Cần nhập viện',
                     mission.requiresHospitalization == true ? 'Có' : 'Không',
-                    const Color(0xFF7B1FA2),
                   ),
                 if (mission?.hospital != null)
                   _infoRowIcon(
                     'Bệnh viện chuyển đến',
                     mission!.hospital?.hospitalName ?? 'Chưa có',
-                    const Color(0xFF7B1FA2),
                   ),
               ],
             ),
@@ -2191,7 +2189,9 @@ class _MemberIncidentFinishedDetailScreenState
                                 ),
                               ],
                             ),
-                            if (rescuer.phoneNumber != null) ...[
+                            if (rescuer.phoneNumber != null &&
+                                incident.status !=
+                                    IncidentStatus.completed) ...[
                               const SizedBox(height: 4),
                               Text(
                                 rescuer.phoneNumber!,
@@ -2204,7 +2204,8 @@ class _MemberIncidentFinishedDetailScreenState
                           ],
                         ),
                       ),
-                      if (rescuer.phoneNumber != null)
+                      if (rescuer.phoneNumber != null &&
+                          incident.status != IncidentStatus.completed)
                         InkWell(
                           onTap: () async {
                             final uri = Uri(
@@ -2517,25 +2518,6 @@ class _MemberIncidentFinishedDetailScreenState
                                               borderRadius:
                                                   BorderRadius.circular(999),
                                             ),
-                                            child: Text(
-                                              'Mission ${group.shortMissionId}',
-                                              style: const TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w700,
-                                                color: Color(0xFF1565C0),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              group.missionStatusText,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey[600],
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
                                           ),
                                         ],
                                       ),
@@ -2640,7 +2622,7 @@ class _MemberIncidentFinishedDetailScreenState
     );
   }
 
-  Widget _infoRowIcon(String label, String value, Color color) {
+  Widget _infoRowIcon(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
@@ -2649,12 +2631,8 @@ class _MemberIncidentFinishedDetailScreenState
           Container(
             width: 2,
             height: 24,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(2),
-            ),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(2)),
           ),
-          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
