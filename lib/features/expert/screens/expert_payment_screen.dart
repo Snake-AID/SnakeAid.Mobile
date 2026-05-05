@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/expert_services_and_terms_provider.dart';
 
 /// Expert Payment Screen - Payment and withdrawal policies for experts
 class ExpertPaymentScreen extends ConsumerWidget {
@@ -94,7 +95,10 @@ class ExpertPaymentScreen extends ConsumerWidget {
             const SizedBox(height: 24),
             Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF6C47C2).withOpacity(0.08),
                   borderRadius: BorderRadius.circular(12),

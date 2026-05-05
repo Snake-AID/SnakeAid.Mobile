@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class RescuerFaqScreen extends StatefulWidget {
+import '../models/rescuer_services_and_terms.dart';
+import '../providers/rescuer_services_and_terms_provider.dart';
+
+class RescuerFaqScreen extends ConsumerStatefulWidget {
   const RescuerFaqScreen({super.key});
 
   @override
-  State<RescuerFaqScreen> createState() => _RescuerFaqScreenState();
+  ConsumerState<RescuerFaqScreen> createState() => _RescuerFaqScreenState();
 }
 
-class _RescuerFaqScreenState extends State<RescuerFaqScreen> {
+class _RescuerFaqScreenState extends ConsumerState<RescuerFaqScreen> {
   int _expandedIndex = -1;
 
-  final List<Map<String, dynamic>> _faqs = [
+  final List<Map<String, dynamic>> _fallbackFaqs = [
     {
       'category': 'Bắt Đầu',
       'question': 'Tôi cần những gì để bắt đầu?',
@@ -167,11 +171,7 @@ class _RescuerFaqScreenState extends State<RescuerFaqScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final groupedFaqs = <String, List<Map<String, dynamic>>>{};
-    for (var faq in _faqs) {
-      final category = faq['category'] as String;
-      groupedFaqs.putIfAbsent(category, () => []).add(faq);
-    }
+    final termsAsync = ref.watch(rescuerServicesAndTermsProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7F5),
@@ -192,58 +192,89 @@ class _RescuerFaqScreenState extends State<RescuerFaqScreen> {
           ),
         ),
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: groupedFaqs.length,
-        itemBuilder: (context, categoryIndex) {
-          final categories = groupedFaqs.keys.toList();
-          final category = categories[categoryIndex];
-          final faqs = groupedFaqs[category]!;
+      body: termsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => _buildFaqList(_fallbackFaqs),
+        data: (terms) {
+          final apiFaqs = _mapFaqFromApi(terms.faq);
+          final displayFaqs = apiFaqs.isNotEmpty ? apiFaqs : _fallbackFaqs;
+          return _buildFaqList(displayFaqs);
+        },
+      ),
+    );
+  }
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
+  List<Map<String, dynamic>> _mapFaqFromApi(List<RescuerFaqItem> faqItems) {
+    return faqItems
+        .where((faq) => faq.question.isNotEmpty && faq.items.isNotEmpty)
+        .map(
+          (faq) => <String, dynamic>{
+            'category': faq.category,
+            'question': faq.question,
+            'items': faq.items,
+          },
+        )
+        .toList();
+  }
+
+  Widget _buildFaqList(List<Map<String, dynamic>> sourceFaqs) {
+    final groupedFaqs = <String, List<Map<String, dynamic>>>{};
+    for (final faq in sourceFaqs) {
+      final category = faq['category'] as String;
+      groupedFaqs.putIfAbsent(category, () => []).add(faq);
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: groupedFaqs.length,
+      itemBuilder: (context, categoryIndex) {
+        final categories = groupedFaqs.keys.toList();
+        final category = categories[categoryIndex];
+        final faqs = groupedFaqs[category]!;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF6B35).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: const Color(0xFFFF6B35).withOpacity(0.3),
                   ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF6B35).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: const Color(0xFFFF6B35).withOpacity(0.3),
-                    ),
-                  ),
-                  child: Text(
-                    category,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFFFF6B35),
-                      letterSpacing: 0.3,
-                    ),
+                ),
+                child: Text(
+                  category,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFFF6B35),
+                    letterSpacing: 0.3,
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              ...faqs.asMap().entries.map((entry) {
-                final faq = entry.value;
-                final globalIndex = _faqs.indexOf(faq);
+            ),
+            const SizedBox(height: 8),
+            ...faqs.asMap().entries.map((entry) {
+              final faq = entry.value;
+              final globalIndex = sourceFaqs.indexOf(faq);
 
-                return _buildFaqItem(
-                  globalIndex,
-                  faq['question'] as String,
-                  faq['items'] as List<String>,
-                );
-              }),
-              const SizedBox(height: 20),
-            ],
-          );
-        },
-      ),
+              return _buildFaqItem(
+                globalIndex,
+                faq['question'] as String,
+                (faq['items'] as List<dynamic>).cast<String>(),
+              );
+            }),
+            const SizedBox(height: 20),
+          ],
+        );
+      },
     );
   }
 

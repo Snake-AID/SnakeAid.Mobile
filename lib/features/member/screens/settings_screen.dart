@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../../auth/repository/auth_repository.dart';
 import 'member_contact_support_screen.dart';
 import 'member_faq_screen.dart';
+import '../models/member_services_and_terms.dart';
+import '../providers/member_services_and_terms_provider.dart';
+
 /// Settings Screen - App settings and preferences
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -58,21 +61,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
           ),
-          
+
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
               children: [
                 _buildSectionHeader('Thông báo'),
                 _buildNotificationToggle(),
-                
+
                 const SizedBox(height: 28),
-                
+
                 _buildSectionHeader('Chính sách & Hỗ trợ'),
                 _buildPolicyList(),
-                
+
                 const SizedBox(height: 32),
-                
+
                 // Logout Button
                 Center(
                   child: TextButton.icon(
@@ -98,19 +101,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      backgroundColor: const Color(0xFFE53935).withOpacity(0.08),
+                      backgroundColor: const Color(
+                        0xFFE53935,
+                      ).withOpacity(0.08),
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 40),
                 Center(
                   child: Text(
                     'Phiên bản 1.0.0',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[400],
-                    ),
+                    style: TextStyle(fontSize: 13, color: Colors.grey[400]),
                   ),
                 ),
               ],
@@ -159,7 +161,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             });
           },
           activeColor: const Color(0xFF228B22),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
           title: const Text(
             'Thông báo đẩy',
             style: TextStyle(
@@ -220,7 +225,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: 'Cách dùng các tính năng',
             onTap: _showUserGuide,
           ),
-          const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFEEEEEE)),
+          const Divider(
+            height: 1,
+            indent: 64,
+            endIndent: 16,
+            color: Color(0xFFEEEEEE),
+          ),
           _buildPolicyItem(
             icon: Icons.shield_rounded,
             iconColor: const Color(0xFFFF8F00),
@@ -228,7 +238,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: 'Bảo vệ thông tin cá nhân',
             onTap: _showPrivacyPolicy,
           ),
-          const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFEEEEEE)),
+          const Divider(
+            height: 1,
+            indent: 64,
+            endIndent: 16,
+            color: Color(0xFFEEEEEE),
+          ),
           _buildPolicyItem(
             icon: Icons.account_balance_wallet_rounded,
             iconColor: const Color(0xFF228B22),
@@ -236,7 +251,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: 'Quy định giao dịch, nạp/rút tiền',
             onTap: _showPaymentPolicy,
           ),
-          const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFEEEEEE)),
+          const Divider(
+            height: 1,
+            indent: 64,
+            endIndent: 16,
+            color: Color(0xFFEEEEEE),
+          ),
           _buildPolicyItem(
             icon: Icons.help_outline_rounded,
             iconColor: const Color(0xFF673AB7),
@@ -244,7 +264,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: 'Giải đáp thắc mắc phổ biến',
             onTap: _showFaq,
           ),
-          const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFEEEEEE)),
+          const Divider(
+            height: 1,
+            indent: 64,
+            endIndent: 16,
+            color: Color(0xFFEEEEEE),
+          ),
           _buildPolicyItem(
             icon: Icons.support_agent_rounded,
             iconColor: const Color(0xFFE91E63),
@@ -279,11 +304,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   color: iconColor.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                  size: 22,
-                ),
+                child: Icon(icon, color: iconColor, size: 22),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -323,7 +344,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  void _showUserGuide() {
+  Future<void> _showUserGuide() async {
+    final terms = await _loadMemberServicesAndTerms();
+    if (terms == null || !mounted) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -332,75 +356,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         'Hướng dẫn sử dụng',
         Icons.menu_book_rounded,
         const Color(0xFF2196F3),
-        [
-          _buildGuideCard(
-            icon: Icons.sos_rounded,
-            iconColor: const Color(0xFFE53935),
-            title: 'Cấp cứu rắn cắn (SOS)',
-            description: 'Hỗ trợ y tế khẩn cấp cho người bị rắn cắn.',
-            bulletPoints: [
-              'Chỉ hỗ trợ khu vực: Tp.HCM, Thủ Đức, Bình Dương, Đồng Nai, Vũng Tàu.',
-              'Nhấn nút SOS > Cung cấp hình ảnh/mô tả tình trạng.',
-              'Đội ngũ y tế / chuyên gia sẽ liên hệ hoặc đến hỗ trợ ngay lập tức.',
-            ],
-          ),
-          _buildGuideCard(
-            icon: Icons.catching_pokemon_rounded,
-            iconColor: const Color(0xFFFF8F00),
-            title: 'Yêu cầu bắt rắn',
-            description: 'Gọi chuyên gia đến bắt rắn an toàn tại nhà.',
-            bulletPoints: [
-              'Chỉ hỗ trợ khu vực: Tp.HCM, Thủ Đức, Bình Dương, Đồng Nai, Vũng Tàu.',
-              'Nhấn "Cần bắt rắn" > Chọn vị trí > Điền thông tin.',
-              'Chuyên gia gần nhất sẽ nhận đơn và di chuyển đến vị trí của bạn.',
-            ],
-          ),
-          _buildGuideCard(
-            icon: Icons.support_agent_rounded,
-            iconColor: const Color(0xFF2196F3),
-            title: 'Tư vấn khẩn cấp & Tư vấn ngay',
-            description: 'Liên hệ trực tiếp với chuyên gia mọi lúc mọi nơi.',
-            bulletPoints: [
-              'Nhận lời khuyên xử lý khi gặp rắn hoặc cần xác định loài rắn.',
-              'Hỗ trợ qua gọi điện, nhắn tin trực tiếp.',
-            ],
-          ),
-          _buildGuideCard(
-            icon: Icons.map_rounded,
-            iconColor: const Color(0xFF8E24AA),
-            title: 'Báo cáo cộng đồng',
-            description: 'Chung tay xây dựng bản đồ an toàn.',
-            bulletPoints: [
-              'Đánh dấu vị trí bạn nhìn thấy rắn.',
-              'Cảnh báo những người dùng khác trong khu vực để họ đề phòng.',
-            ],
-          ),
-          _buildGuideCard(
-            icon: Icons.library_books_rounded,
-            iconColor: const Color(0xFF228B22),
-            title: 'Thư viện & Sơ cứu',
-            description: 'Kiến thức an toàn thiết yếu.',
-            bulletPoints: [
-              'Tra cứu đặc điểm nhận dạng của các loài rắn phổ biến.',
-              'Xem hướng dẫn sơ cứu chuẩn y tế khi bị rắn cắn.',
-            ],
-          ),
-          _buildGuideCard(
-            icon: Icons.account_balance_wallet_rounded,
-            iconColor: const Color(0xFF00897B),
-            title: 'Nạp/Rút tiền',
-            description: 'Quản lý ví SnakeAidPay.',
-            bulletPoints: [
-              'Nạp tiền: Mở "Hồ sơ" > "Nạp tiền" > Chuyển khoản theo cú pháp.',
-              'Rút tiền: Mở "Hồ sơ" > "Rút tiền" > Nhập tài khoản > Hệ thống sẽ duyệt tự động.',
-            ],
-          ),
-        ],
+        terms.usageGuide
+            .map(
+              (guide) => _buildGuideCard(
+                icon: _guideIcon(guide.feature),
+                iconColor: _guideColor(guide.feature),
+                title: guide.feature,
+                description: guide.description,
+                bulletPoints: guide.steps,
+              ),
+            )
+            .toList(),
       ),
     );
   }
 
-  void _showPrivacyPolicy() {
+  Future<void> _showPrivacyPolicy() async {
+    final terms = await _loadMemberServicesAndTerms();
+    if (terms == null || !mounted) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -410,24 +384,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         Icons.shield_rounded,
         const Color(0xFFFF8F00),
         [
-          _buildPolicySection(
-            'Cam kết chung',
-            'SnakeAid cam kết bảo vệ tuyệt đối thông tin cá nhân và dữ liệu vị trí của người dùng. Mọi dữ liệu thu thập chỉ phục vụ cho một mục đích duy nhất: điều phối chuyên gia và đội cứu hộ nhanh nhất có thể.',
-          ),
+          _buildPolicySection('Cam kết chung', terms.privacyPolicy.commitment),
           _buildPolicySection(
             'Quyền truy cập vị trí',
-            'Thông tin vị trí chỉ được thu thập khi bạn chủ động sử dụng các tính năng liên quan đến bản đồ (như Báo cáo cộng đồng) và các tính năng yêu cầu cứu hộ khẩn cấp (SOS/Bắt rắn).',
+            terms.privacyPolicy.locationAccess,
           ),
           _buildPolicySection(
             'Bảo mật thông tin',
-            'Dữ liệu cá nhân của bạn sẽ không bao giờ được chia sẻ cho bất kỳ bên thứ ba nào vì mục đích thương mại hay quảng cáo.',
+            terms.privacyPolicy.dataSecurity,
           ),
         ],
       ),
     );
   }
 
-  void _showPaymentPolicy() {
+  Future<void> _showPaymentPolicy() async {
+    final terms = await _loadMemberServicesAndTerms();
+    if (terms == null || !mounted) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -436,20 +410,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         'Chính sách thanh toán',
         Icons.account_balance_wallet_rounded,
         const Color(0xFF228B22),
-        [
-          _buildPolicySection(
-            '1. Thanh toán đặt cọc',
-            'Dịch vụ Bắt rắn sẽ yêu cầu bạn thanh toán một khoản đặt cọc nhỏ thông qua ví SnakeAidPay trước khi chuyên gia xuất phát. Việc này giúp hệ thống hạn chế các đơn yêu cầu giả mạo.\n\nĐặc biệt: Số tiền này sẽ được hoàn trả đầy đủ vào ví của bạn nếu chuyên gia không đến hoặc đơn bị hủy bởi hệ thống.',
-          ),
-          _buildPolicySection(
-            '2. Phí dịch vụ chuyên gia',
-            'Phí dịch vụ cuối cùng được tính toán tự động dựa trên giá của chuyên gia đưa ra',
-          ),
-          _buildPolicySection(
-            '3. Nạp và Rút tiền',
-            'Số dư trong ví SnakeAidPay là của bạn. Bạn hoàn toàn có thể rút về tài khoản ngân hàng cá nhân bất kỳ lúc nào với các hạn mức quy định theo từng hạng thành viên của ứng dụng.',
-          ),
-        ],
+        terms.paymentPolicy
+            .map((item) => _buildPolicySection(item.item, item.content))
+            .toList(),
       ),
     );
   }
@@ -468,7 +431,74 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildPolicySheet(String title, IconData titleIcon, Color titleColor, List<Widget> children) {
+  Future<MemberServicesAndTerms?> _loadMemberServicesAndTerms() async {
+    try {
+      return await ref.read(memberServicesAndTermsProvider.future);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Không thể tải dữ liệu: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return null;
+    }
+  }
+
+  IconData _guideIcon(String feature) {
+    final normalized = feature.toLowerCase();
+    if (normalized.contains('sos') || normalized.contains('cấp cứu')) {
+      return Icons.sos_rounded;
+    }
+    if (normalized.contains('bắt rắn')) {
+      return Icons.catching_pokemon_rounded;
+    }
+    if (normalized.contains('tư vấn')) {
+      return Icons.support_agent_rounded;
+    }
+    if (normalized.contains('báo cáo')) {
+      return Icons.map_rounded;
+    }
+    if (normalized.contains('thư viện') || normalized.contains('sơ cứu')) {
+      return Icons.library_books_rounded;
+    }
+    if (normalized.contains('nạp') || normalized.contains('rút')) {
+      return Icons.account_balance_wallet_rounded;
+    }
+    return Icons.info_outline_rounded;
+  }
+
+  Color _guideColor(String feature) {
+    final normalized = feature.toLowerCase();
+    if (normalized.contains('sos') || normalized.contains('cấp cứu')) {
+      return const Color(0xFFE53935);
+    }
+    if (normalized.contains('bắt rắn')) {
+      return const Color(0xFFFF8F00);
+    }
+    if (normalized.contains('tư vấn')) {
+      return const Color(0xFF2196F3);
+    }
+    if (normalized.contains('báo cáo')) {
+      return const Color(0xFF8E24AA);
+    }
+    if (normalized.contains('thư viện') || normalized.contains('sơ cứu')) {
+      return const Color(0xFF228B22);
+    }
+    if (normalized.contains('nạp') || normalized.contains('rút')) {
+      return const Color(0xFF00897B);
+    }
+    return const Color(0xFF607D8B);
+  }
+
+  Widget _buildPolicySheet(
+    String title,
+    IconData titleIcon,
+    Color titleColor,
+    List<Widget> children,
+  ) {
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
       decoration: const BoxDecoration(
@@ -548,7 +578,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.check_circle_rounded, color: Color(0xFF228B22), size: 18),
+              const Icon(
+                Icons.check_circle_rounded,
+                color: Color(0xFF228B22),
+                size: 18,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -652,29 +686,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
             ),
             child: Column(
-              children: bulletPoints.map((point) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 6),
-                      child: Icon(Icons.circle, size: 6, color: Color(0xFFCCCCCC)),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        point,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF444444),
-                          height: 1.4,
-                        ),
+              children: bulletPoints
+                  .map(
+                    (point) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.only(top: 6),
+                            child: Icon(
+                              Icons.circle,
+                              size: 6,
+                              color: Color(0xFFCCCCCC),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              point,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF444444),
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              )).toList(),
+                  )
+                  .toList(),
             ),
           ),
         ],

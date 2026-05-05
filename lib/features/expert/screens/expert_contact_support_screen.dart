@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../snake_catching/repository/system_settings_repository.dart';
+import '../providers/expert_services_and_terms_provider.dart';
 
 class ExpertContactSupportScreen extends ConsumerStatefulWidget {
   const ExpertContactSupportScreen({super.key});
@@ -11,7 +12,8 @@ class ExpertContactSupportScreen extends ConsumerStatefulWidget {
       _ExpertContactSupportScreenState();
 }
 
-class _ExpertContactSupportScreenState extends ConsumerState<ExpertContactSupportScreen> {
+class _ExpertContactSupportScreenState
+    extends ConsumerState<ExpertContactSupportScreen> {
   String? _latitude;
   String? _longitude;
   bool _isLoadingMap = true;
@@ -28,8 +30,12 @@ class _ExpertContactSupportScreenState extends ConsumerState<ExpertContactSuppor
       final settings = await repo.getSystemSettings();
       if (mounted) {
         setState(() {
-          _latitude = settings.firstWhere((s) => s.settingKey == 'Center:Latitude').value;
-          _longitude = settings.firstWhere((s) => s.settingKey == 'Center:Longitude').value;
+          _latitude = settings
+              .firstWhere((s) => s.settingKey == 'Center:Latitude')
+              .value;
+          _longitude = settings
+              .firstWhere((s) => s.settingKey == 'Center:Longitude')
+              .value;
           _isLoadingMap = false;
         });
       }
@@ -42,14 +48,19 @@ class _ExpertContactSupportScreenState extends ConsumerState<ExpertContactSuppor
 
   Future<void> _openMap() async {
     if (_latitude == null || _longitude == null) return;
-    final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$_latitude,$_longitude');
+    final url = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$_latitude,$_longitude',
+    );
     try {
       if (await canLaunchUrl(url)) {
         await launchUrl(url, mode: LaunchMode.externalApplication);
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Không thể mở bản đồ'), backgroundColor: Colors.red),
+            const SnackBar(
+              content: Text('Không thể mở bản đồ'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       }
@@ -61,6 +72,7 @@ class _ExpertContactSupportScreenState extends ConsumerState<ExpertContactSuppor
       }
     }
   }
+
   Future<void> _callHotline() async {
     const phoneNumber = 'tel:0787171699';
     final uri = Uri.parse(phoneNumber);
@@ -280,7 +292,9 @@ class _ExpertContactSupportScreenState extends ConsumerState<ExpertContactSuppor
     if (_isLoadingMap) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 16),
-        child: Center(child: CircularProgressIndicator(color: Color(0xFF6C47C2))),
+        child: Center(
+          child: CircularProgressIndicator(color: Color(0xFF6C47C2)),
+        ),
       );
     }
     if (_latitude == null || _longitude == null) return const SizedBox();
@@ -309,7 +323,11 @@ class _ExpertContactSupportScreenState extends ConsumerState<ExpertContactSuppor
                 color: const Color(0xFF6C47C2).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.location_on_rounded, color: Color(0xFF6C47C2), size: 24),
+              child: const Icon(
+                Icons.location_on_rounded,
+                color: Color(0xFF6C47C2),
+                size: 24,
+              ),
             ),
             const SizedBox(width: 16),
             const Expanded(
@@ -337,7 +355,11 @@ class _ExpertContactSupportScreenState extends ConsumerState<ExpertContactSuppor
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFF6C47C2)),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 16,
+              color: Color(0xFF6C47C2),
+            ),
           ],
         ),
       ),

@@ -1,12 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/rescuer_services_and_terms.dart';
+import '../providers/rescuer_services_and_terms_provider.dart';
+
 /// Rescuer Privacy Screen - Privacy policy for rescuers
 class RescuerPrivacyScreen extends ConsumerWidget {
   const RescuerPrivacyScreen({super.key});
 
+  List<RescuerPolicyItem> _fallbackPolicy() {
+    return const [
+      RescuerPolicyItem(
+        item: 'Thu Thập Vị Trí GPS',
+        content:
+            'Để điều phối cứu hộ hiệu quả, chúng tôi thu thập vị trí chính xác của bạn ngay cả khi ứng dụng đang chạy nền (khi bạn đang ở chế độ ONLINE). Điều này giúp hệ thống xác định người cứu hộ gần nhất với sự cố.',
+      ),
+      RescuerPolicyItem(
+        item: 'Thông Tin Hoạt Động',
+        content:
+            'Chúng tôi lưu lại lịch sử di chuyển trong nhiệm vụ, thời gian phản hồi, và kết quả xử lý sự cố để đảm bảo chất lượng dịch vụ và tính minh bạch trong việc thanh toán thu nhập.',
+      ),
+      RescuerPolicyItem(
+        item: 'Chia Sẻ Thông Tin Nhiệm Vụ',
+        content:
+            'Khi bạn chấp nhận nhiệm vụ, tên và số điện thoại của bạn sẽ được chia sẻ với khách hàng (Member) và Điều phối viên (Operator) để liên lạc trong quá trình cứu hộ.',
+      ),
+      RescuerPolicyItem(
+        item: 'Bảo Mật Dữ Liệu Cá Nhân',
+        content:
+            'Thông tin định danh (CCCD/ID) và thông tin thanh toán của bạn được mã hóa và chỉ sử dụng cho mục đích xác thực danh tính và chi trả thu nhập, tuyệt đối không chia sẻ cho bên thứ ba.',
+      ),
+      RescuerPolicyItem(
+        item: 'Quyền Hạn Của Bạn',
+        content:
+            'Bạn có quyền yêu cầu trích xuất dữ liệu hoạt động cá nhân, yêu cầu chỉnh sửa thông tin hoặc xóa tài khoản (kèm theo yêu cầu xóa dữ liệu) bất cứ lúc nào thông qua đội ngũ hỗ trợ.',
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final termsAsync = ref.watch(rescuerServicesAndTermsProvider);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7F5),
       appBar: AppBar(
@@ -26,85 +61,79 @@ class RescuerPrivacyScreen extends ConsumerWidget {
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFF8800), Color(0xFFFF6B00)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(24),
+      body: termsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => _buildPrivacyContent(_fallbackPolicy()),
+        data: (terms) {
+          final policy = terms.privacyPolicy.isNotEmpty
+              ? terms.privacyPolicy
+              : _fallbackPolicy();
+          return _buildPrivacyContent(policy);
+        },
+      ),
+    );
+  }
+
+  Widget _buildPrivacyContent(List<RescuerPolicyItem> policy) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFF8800), Color(0xFFFF6B00)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    'Chính Sách Bảo Mật',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Chính Sách Bảo Mật',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
                   ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Cách chúng tôi thu thập và bảo mật dữ liệu đội cứu hộ.',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                      height: 1.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            _buildSectionCard(
-              title: '1. Thu Thập Vị Trí GPS',
-              content:
-                  'Để điều phối cứu hộ hiệu quả, chúng tôi thu thập vị trí chính xác của bạn ngay cả khi ứng dụng đang chạy nền (khi bạn đang ở chế độ ONLINE). Điều này giúp hệ thống xác định người cứu hộ gần nhất với sự cố.',
-            ),
-            _buildSectionCard(
-              title: '2. Thông Tin Hoạt Động',
-              content:
-                  'Chúng tôi lưu lại lịch sử di chuyển trong nhiệm vụ, thời gian phản hồi, và kết quả xử lý sự cố để đảm bảo chất lượng dịch vụ và tính minh bạch trong việc thanh toán thu nhập.',
-            ),
-            _buildSectionCard(
-              title: '3. Chia Sẻ Thông Tin Nhiệm Vụ',
-              content:
-                  'Khi bạn chấp nhận nhiệm vụ, tên và số điện thoại của bạn sẽ được chia sẻ với khách hàng (Member) và Điều phối viên (Operator) để liên lạc trong quá trình cứu hộ.',
-            ),
-            _buildSectionCard(
-              title: '4. Bảo Mật Dữ Liệu Cá Nhân',
-              content:
-                  'Thông tin định danh (CCCD/ID) và thông tin thanh toán của bạn được mã hóa và chỉ sử dụng cho mục đích xác thực danh tính và chi trả thu nhập, tuyệt đối không chia sẻ cho bên thứ ba.',
-            ),
-            _buildSectionCard(
-              title: '5. Quyền Hạn Của Bạn',
-              content:
-                  'Bạn có quyền yêu cầu trích xuất dữ liệu hoạt động cá nhân, yêu cầu chỉnh sửa thông tin hoặc xóa tài khoản (kèm theo yêu cầu xóa dữ liệu) bất cứ lúc nào thông qua đội ngũ hỗ trợ.',
-            ),
-            const SizedBox(height: 24),
-            Center(
-              child: Text(
-                'Phiên bản 1.0.0 • SnakeAid Rescuer',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[500],
-                  fontStyle: FontStyle.italic,
                 ),
+                SizedBox(height: 8),
+                Text(
+                  'Cách chúng tôi thu thập và bảo mật dữ liệu đội cứu hộ.',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          ...policy.asMap().entries.map(
+            (entry) => _buildSectionCard(
+              title: '${entry.key + 1}. ${entry.value.item}',
+              content: entry.value.content,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Center(
+            child: Text(
+              'Phiên bản 1.0.0 • SnakeAid Rescuer',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[500],
+                fontStyle: FontStyle.italic,
               ),
             ),
-            const SizedBox(height: 32),
-          ],
-        ),
+          ),
+          const SizedBox(height: 32),
+        ],
       ),
     );
   }

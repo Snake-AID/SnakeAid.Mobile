@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/expert_services_and_terms_provider.dart';
 
 /// Expert Terms Screen - Terms of service for experts
 class ExpertTermsScreen extends ConsumerWidget {
@@ -45,7 +46,6 @@ class ExpertTermsScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: const [
-                
                   Text(
                     'Điều Khoản & Điều Kiện',
                     style: TextStyle(
@@ -119,7 +119,10 @@ class ExpertTermsScreen extends ConsumerWidget {
             ),
             Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 margin: const EdgeInsets.only(top: 8),
                 decoration: BoxDecoration(
                   color: const Color(0xFF6C47C2).withOpacity(0.08),
