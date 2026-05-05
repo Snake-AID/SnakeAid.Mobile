@@ -5,11 +5,13 @@ class MemberConsultationDetailScreen extends StatelessWidget {
   final String? consultationId;
   final String expertName;
   final String expertSpecialty;
+  final String? expertAvatarUrl;
   final String serviceType;
   final DateTime scheduledTime;
   final int feeCost;
   final String statusLabel;
   final Color statusColor;
+  final String? statusNote;
   final double? rating;
   final String? problemDescription;
   final String? customerReport;
@@ -20,11 +22,13 @@ class MemberConsultationDetailScreen extends StatelessWidget {
     this.consultationId,
     required this.expertName,
     required this.expertSpecialty,
+    this.expertAvatarUrl,
     required this.serviceType,
     required this.scheduledTime,
     required this.feeCost,
     required this.statusLabel,
     required this.statusColor,
+    this.statusNote,
     this.rating,
     this.problemDescription,
     this.customerReport,
@@ -59,14 +63,10 @@ class MemberConsultationDetailScreen extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _primary.withOpacity(0.1),
-                  ),
-                  child: const Icon(Icons.person, color: _primary),
+                _Avatar(
+                  avatarUrl: expertAvatarUrl,
+                  fallbackColor: _primary.withOpacity(0.1),
+                  iconColor: _primary,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -117,6 +117,31 @@ class MemberConsultationDetailScreen extends StatelessWidget {
                           ),
                         ),
                       ),
+                      if ((statusNote ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: statusColor.withOpacity(0.25),
+                            ),
+                          ),
+                          child: Text(
+                            statusNote!.trim(),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF4B5563),
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -303,6 +328,36 @@ class _SectionCard extends StatelessWidget {
           child,
         ],
       ),
+    );
+  }
+}
+
+class _Avatar extends StatelessWidget {
+  final String? avatarUrl;
+  final Color fallbackColor;
+  final Color iconColor;
+
+  const _Avatar({
+    this.avatarUrl,
+    required this.fallbackColor,
+    required this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final url = (avatarUrl ?? '').trim();
+    final hasAvatar = url.isNotEmpty;
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: fallbackColor,
+        image: hasAvatar
+            ? DecorationImage(image: NetworkImage(url), fit: BoxFit.cover)
+            : null,
+      ),
+      child: hasAvatar ? null : Icon(Icons.person, color: iconColor),
     );
   }
 }

@@ -10,6 +10,7 @@ enum MyConsultationStatus {
   cancelled,
   userAbsent,
   expertAbsent,
+  expertAbsentHandled,
   allAbsent,
 }
 
@@ -19,6 +20,7 @@ class MyConsultationResponse {
   final MyConsultationStatus status;
   final String expertId;
   final String expertName;
+  final String? expertAvatarUrl;
   final String? roomId;
   final DateTime? startTime;
   final DateTime? endTime;
@@ -38,6 +40,7 @@ class MyConsultationResponse {
     required this.status,
     required this.expertId,
     required this.expertName,
+    this.expertAvatarUrl,
     this.roomId,
     this.startTime,
     this.endTime,
@@ -74,6 +77,8 @@ class MyConsultationResponse {
           return MyConsultationStatus.userAbsent;
         case 'expertabsent':
           return MyConsultationStatus.expertAbsent;
+        case 'expertabsenthandled':
+          return MyConsultationStatus.expertAbsentHandled;
         case 'allabsent':
           return MyConsultationStatus.allAbsent;
         case 'completed':
@@ -124,6 +129,7 @@ class MyConsultationResponse {
       status: parseStatus(json['status']?.toString()),
       expertId: (json['expertId'] ?? '').toString(),
       expertName: (json['expertName'] ?? 'Chuyen gia').toString(),
+      expertAvatarUrl: json['expertAvatarUrl']?.toString(),
       roomId: json['roomId']?.toString(),
       startTime: parseDate(
         json['startTime'],

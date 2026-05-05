@@ -206,6 +206,8 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
     }
   }
 
+  String? get _customerAvatarUrl => widget.requestData.user?.account?.avatarUrl;
+
   void _startStatusRefresh() {
     _statusRefreshTimer?.cancel();
     _refreshRequestStatus();
@@ -321,70 +323,148 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
   void _confirmArrived() {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Xác nhận đến nơi', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Bạn đã đến vị trí của khách hàng?'),
-            if (_directDistanceM != null) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(8)),
-                child: Row(
-                  children: [
-                    const Icon(Icons.location_on, color: Color(0xFF28A745), size: 16),
-                    const SizedBox(width: 6),
-                    Text('Cách điểm đến ${_fmtDist(_directDistanceM!)}',
-                        style: const TextStyle(fontSize: 13, color: Color(0xFF28A745), fontWeight: FontWeight.w600)),
-                  ],
-                ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        contentPadding: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        content: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(maxWidth: 420),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.18),
+                blurRadius: 28,
+                offset: const Offset(0, 16),
               ),
             ],
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Chưa đến')),
-          StatefulBuilder(
-            builder: (ctx2, setDialogState) => ElevatedButton(
-              onPressed: _isArriving
-                  ? null
-                  : () async {
-                      setDialogState(() {});
-                      setState(() => _isArriving = true);
-                      try {
-                        final repo = ref.read(snakeCatchingRepositoryProvider);
-                        await repo.arrivedMission(widget.missionId);
-                      } catch (e) {
-                        debugPrint('⚠️ arrivedMission error: $e');
-                        // non-fatal — still navigate
-                      } finally {
-                        if (mounted) setState(() => _isArriving = false);
-                      }
-                      if (!mounted) return;
-                      Navigator.pop(ctx);
-                      _positionSub?.cancel();
-                      _routeRefreshTimer?.cancel();
-                      Navigator.of(context).pushReplacement(MaterialPageRoute(
-                        builder: (_) => RescuerTrackingScreen(
-                          requestData: widget.requestData,
-                          missionId: widget.missionId,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+            child: StatefulBuilder(
+              builder: (ctx2, setDialogState) => Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF6B35).withOpacity(0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.place_rounded,
+                        color: Color(0xFFFF6B35),
+                        size: 26,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Xác nhận đã đến nơi?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1F1F1F),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Chỉ xác nhận khi bạn đã đến đúng vị trí của khách hàng để tiếp tục xử lý đơn.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.5,
+                      color: Color(0xFF666666),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF666666),
+                            side: const BorderSide(color: Color(0xFFE2E2E2)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Text(
+                            'Chưa đến',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
                         ),
-                      ));
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF28A745),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isArriving
+                              ? null
+                              : () async {
+                                  setDialogState(() {});
+                                  setState(() => _isArriving = true);
+                                  try {
+                                    final repo = ref.read(snakeCatchingRepositoryProvider);
+                                    await repo.arrivedMission(widget.missionId);
+                                  } catch (e) {
+                                    debugPrint('⚠️ arrivedMission error: $e');
+                                  } finally {
+                                    if (mounted) setState(() => _isArriving = false);
+                                  }
+                                  if (!mounted) return;
+                                  Navigator.pop(ctx);
+                                  _positionSub?.cancel();
+                                  _routeRefreshTimer?.cancel();
+                                  Navigator.of(context).pushReplacement(
+                                    MaterialPageRoute(
+                                      builder: (_) => RescuerTrackingScreen(
+                                        requestData: widget.requestData,
+                                        missionId: widget.missionId,
+                                      ),
+                                    ),
+                                  );
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFF6B35),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: _isArriving
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text(
+                                  'Đã đến nơi',
+                                  style: TextStyle(fontWeight: FontWeight.w800),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              child: _isArriving
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Đã đến nơi'),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -622,12 +702,12 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFF1B8F3A), Color(0xFF28A745)],
+              colors: [Color(0xFFFF6B35), Color(0xFFFF6B35)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(30),
-            boxShadow: [BoxShadow(color: const Color(0xFF28A745).withOpacity(0.55), blurRadius: 14, offset: const Offset(0, 5))],
+            boxShadow: [BoxShadow(color: const Color(0xFFFF6B35).withOpacity(0.55), blurRadius: 14, offset: const Offset(0, 5))],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -639,10 +719,7 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text('ĐÃ ĐẾN NƠI',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),
-                  if (_directDistanceM != null)
-                    Text('Cách ${_fmtDist(_directDistanceM!)}',
-                        style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),   
                 ],
               ),
             ],
@@ -937,8 +1014,6 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
       children: [
         Row(
           children: [
-            const Icon(Icons.pest_control, size: 14, color: Color(0xFFFF6B35)),
-            const SizedBox(width: 6),
             Text(
               '${details.length} loài rắn trong đơn',
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
@@ -1377,19 +1452,9 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
       child: Row(
         children: [
-          const CircleAvatar(backgroundColor: Color(0xFFE0E0E0), radius: 18,
-              child: Icon(Icons.person, color: Color(0xFF999999), size: 20)),
+          _buildCustomerAvatar(radius: 18),
           const SizedBox(width: 10),
           Expanded(child: Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold))),
-          if (_directDistanceM != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 10),
-              child: Text(
-                _fmtDist(_directDistanceM!),
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold,
-                    color: _canMarkArrived ? const Color(0xFF28A745) : const Color(0xFFFF6B35)),
-              ),
-            ),
           if (phone.isNotEmpty)
             GestureDetector(
               onTap: _callCustomer,
@@ -1418,8 +1483,7 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
         children: [
           Row(
             children: [
-              const CircleAvatar(backgroundColor: Color(0xFFE0E0E0), radius: 23,
-                  child: Icon(Icons.person, color: Color(0xFF999999), size: 26)),
+              _buildCustomerAvatar(radius: 23),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1429,12 +1493,10 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                     Text(name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF222222))),
                     const SizedBox(height: 2),
                     Row(children: [
-                      const Icon(Icons.location_on, size: 12, color: Color(0xFFFF6B35)),
-                      const SizedBox(width: 3),
                       Expanded(
-                        child: Text(request.address,
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF666666)),
-                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                        child: Text('Địa chỉ: ${request.address}',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF666666), height: 1.35),
+                            maxLines: 2, softWrap: true, overflow: TextOverflow.visible),
                       ),
                     ]),
                   ],
@@ -1445,7 +1507,7 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                   onTap: _callCustomer,
                   child: Container(
                     width: 42, height: 42,
-                    decoration: const BoxDecoration(color: Color(0xFF28A745), shape: BoxShape.circle),
+                    decoration: const BoxDecoration(color: Color(0xFFFF6B35), shape: BoxShape.circle),
                     child: const Icon(Icons.call, color: Colors.white, size: 20),
                   ),
                 ),
@@ -1470,10 +1532,10 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                 Expanded(
                   child: Text(
                     _directDistanceM == null
-                        ? 'Đang lấy vị trí'
-                        : _canMarkArrived
-                            ? 'Bạn đã gần đến nơi! Bấm "ĐÃ ĐẾN NƠI" ở phía trên'
-                            : 'Còn cách ${_fmtDist(_directDistanceM!)}  nút "Đã đến nơi" hiện trong vòng 1 km',
+                      ? 'Đang lấy vị trí'
+                      : _canMarkArrived
+                        ? 'Bạn đã gần đến nơi! Bấm "ĐÃ ĐẾN NƠI" ở phía trên'
+                        : 'Nút "Đã đến nơi" sẽ hiện khi bạn vào trong phạm vi 1 km',
                     style: TextStyle(
                       fontSize: 12, fontWeight: FontWeight.w600,
                       color: _canMarkArrived ? const Color(0xFF28A745) : const Color(0xFFFF8F00),
@@ -1514,6 +1576,34 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCustomerAvatar({required double radius}) {
+    final avatarUrl = _customerAvatarUrl;
+    final size = radius * 2;
+
+    return ClipOval(
+      child: Container(
+        width: size,
+        height: size,
+        color: const Color(0xFFE0E0E0),
+        child: avatarUrl != null && avatarUrl.isNotEmpty
+            ? Image.network(
+                avatarUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Icon(
+                  Icons.person,
+                  color: const Color(0xFF999999),
+                  size: radius * 1.1,
+                ),
+              )
+            : Icon(
+                Icons.person,
+                color: const Color(0xFF999999),
+                size: radius * 1.1,
+              ),
       ),
     );
   }

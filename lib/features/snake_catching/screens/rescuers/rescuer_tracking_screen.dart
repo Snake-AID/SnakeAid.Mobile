@@ -156,6 +156,17 @@ Future<void> _openUncompleteDialog() async {
     // Dùng list/map local được truyền vào StatefulBuilder để tránh share state
     final dialogPhotos = <File>[];
     final dialogUploadStates = <int, _UploadState>{};
+    final presetReasons = <String>[
+      'Rắn đã rời khỏi khu vực',
+      'Không tìm thấy rắn / không còn dấu vết',
+      'Khách hàng không còn ở hiện trường',
+      'Điều kiện không an toàn để tiếp cận',
+      'Thiết bị / dụng cụ gặp sự cố',
+      'Thời tiết hoặc giao thông gây trở ngại',
+      'Lý do khác',
+    ];
+
+    String? selectedReason;
 
     Future<void> captureForReport(StateSetter setSheet) async {
       try {
@@ -187,133 +198,309 @@ Future<void> _openUncompleteDialog() async {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
           final uploadedCount = dialogUploadStates.values.where((s) => s == _UploadState.done).length;
-          final bool canConfirm = reasonController.text.trim().isNotEmpty;
+          final bool isCustomReason = selectedReason == 'Lý do khác';
+          final bool canConfirm = selectedReason != null && uploadedCount > 0 && (!isCustomReason || reasonController.text.trim().isNotEmpty);
 
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Báo cáo chưa hoàn thành', style: TextStyle(fontWeight: FontWeight.bold)),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Nhập lý do và có thể đính kèm ảnh bằng chứng.',
-                      style: TextStyle(fontSize: 14, color: Color(0xFF555555), height: 1.4),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        const Icon(Icons.photo_camera, color: Color(0xFFFF6B35), size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            uploadedCount > 0
-                                ? 'Đã tải lên $uploadedCount/${dialogPhotos.length} ảnh'
-                                : 'Chưa có ảnh bằng chứng (tùy chọn)',
-                            style: const TextStyle(fontSize: 13, color: Color(0xFF555555)),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (dialogPhotos.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        height: 90,
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: dialogPhotos.asMap().entries.map((entry) {
-                              final index = entry.key;
-                              final state = dialogUploadStates[index] ?? _UploadState.uploading;
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 10),
-                                child: Stack(
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(10),
-                                      child: Image.file(entry.value, width: 90, height: 90, fit: BoxFit.cover),
-                                    ),
-                                    Positioned(
-                                      bottom: 4, right: 4,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: state == _UploadState.done
-                                              ? Colors.green.shade700
-                                              : state == _UploadState.uploading
-                                                  ? Colors.black54
-                                                  : Colors.red.shade700,
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          state == _UploadState.done ? 'OK' : (state == _UploadState.uploading ? 'Đang tải' : 'Lỗi'),
-                                          style: const TextStyle(fontSize: 10, color: Colors.white),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    TextButton.icon(
-                      onPressed: () async {
-                        await captureForReport(setDialogState);
-                      },
-                      icon: const Icon(Icons.add_a_photo, color: Color(0xFFFF6B35)),
-                      label: const Text(
-                        'Chụp ảnh bằng chứng (tùy chọn)',
-                        style: TextStyle(color: Color(0xFFFF6B35), fontWeight: FontWeight.bold),
-                      ),
-                      style: TextButton.styleFrom(
-                        backgroundColor: const Color(0xFFFFF3EE),
-                        minimumSize: const Size(double.infinity, 45),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: reasonController,
-                      maxLines: 4,
-                      onChanged: (_) => setDialogState(() {}),
-                      decoration: InputDecoration(
-                        hintText: 'Nhập lý do chưa hoàn thành...',
-                        filled: true,
-                        fillColor: const Color(0xFFF7F7F7),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                      ),
+          return Dialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            backgroundColor: Colors.transparent,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.18),
+                      blurRadius: 28,
+                      offset: const Offset(0, 16),
                     ),
                   ],
                 ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 54,
+                          height: 54,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF6B35).withOpacity(0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.report_problem_rounded,
+                            color: Color(0xFFFF6B35),
+                            size: 28,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Báo cáo chưa hoàn thành',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF222222),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Chọn lý do phù hợp để hệ thống ghi nhận chính xác tình huống thực tế.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.5,
+                          color: Color(0xFF666666),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF4ED),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0xFFFFD7C2)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFF6B35).withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.photo_camera_outlined,
+                                color: Color(0xFFFF6B35),
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Ảnh bằng chứng',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF8A5A45),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    uploadedCount > 0
+                                        ? 'Đã tải lên $uploadedCount/${dialogPhotos.length} ảnh'
+                                          : 'Bắt buộc: cần ít nhất 1 ảnh bằng chứng',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF7A6A61),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (dialogPhotos.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 92,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: dialogPhotos.asMap().entries.map((entry) {
+                                final index = entry.key;
+                                final state = dialogUploadStates[index] ?? _UploadState.uploading;
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 10),
+                                  child: Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(14),
+                                        child: Image.file(entry.value, width: 92, height: 92, fit: BoxFit.cover),
+                                      ),
+                                      Positioned(
+                                        bottom: 6,
+                                        right: 6,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: state == _UploadState.done
+                                                ? Colors.green.shade700
+                                                : state == _UploadState.uploading
+                                                    ? Colors.black54
+                                                    : Colors.red.shade700,
+                                            borderRadius: BorderRadius.circular(999),
+                                          ),
+                                          child: Text(
+                                            state == _UploadState.done
+                                                ? 'OK'
+                                                : (state == _UploadState.uploading ? 'Đang tải' : 'Lỗi'),
+                                            style: const TextStyle(fontSize: 10, color: Colors.white),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 14),
+                      TextButton.icon(
+                        onPressed: () async {
+                          await captureForReport(setDialogState);
+                        },
+                        icon: const Icon(Icons.add_a_photo, color: Color(0xFFFF6B35)),
+                        label: const Text(
+                          'Chụp ảnh bằng chứng (tùy chọn)',
+                          style: TextStyle(
+                            color: Color(0xFFFF6B35),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          backgroundColor: const Color(0xFFFFF3EE),
+                          minimumSize: const Size(double.infinity, 46),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      const Text(
+                        'Lý do báo cáo',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF222222),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: presetReasons.map((reason) {
+                          final selected = selectedReason == reason;
+                          return ChoiceChip(
+                            label: Text(reason),
+                            selected: selected,
+                            onSelected: (_) {
+                              setDialogState(() {
+                                selectedReason = reason;
+                                if (reason != 'Lý do khác') {
+                                  reasonController.clear();
+                                }
+                              });
+                            },
+                            selectedColor: const Color(0xFFFF6B35).withOpacity(0.14),
+                            backgroundColor: const Color(0xFFF7F7F7),
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: selected ? const Color(0xFFFF6B35) : const Color(0xFF555555),
+                            ),
+                            side: BorderSide(
+                              color: selected ? const Color(0xFFFF6B35) : const Color(0xFFE5E5E5),
+                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                          );
+                        }).toList(),
+                      ),
+                      if (isCustomReason) ...[
+                        const SizedBox(height: 14),
+                        TextField(
+                          controller: reasonController,
+                          maxLines: 3,
+                          onChanged: (_) => setDialogState(() {}),
+                          decoration: InputDecoration(
+                            hintText: 'Nhập lý do cụ thể...',
+                            hintStyle: const TextStyle(color: Color(0xFF9A9A9A)),
+                            filled: true,
+                            fillColor: const Color(0xFFF7F7F7),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            focusedBorder: const OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(14)),
+                              borderSide: BorderSide(color: Color(0xFFFF6B35)),
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (selectedReason == null) ...[
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Hãy chọn một lý do để tiếp tục.',
+                          style: TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                        ),
+                      ],
+                      if (uploadedCount == 0) ...[
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Bạn cần tải lên ít nhất 1 ảnh bằng chứng trước khi gửi báo cáo.',
+                          style: TextStyle(fontSize: 12, color: Color(0xFFB26A00), height: 1.4),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.of(ctx).pop(),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF666666),
+                                side: const BorderSide(color: Color(0xFFE2E2E2)),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              ),
+                              child: const Text('Hủy', style: TextStyle(fontWeight: FontWeight.w700)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: canConfirm
+                                  ? () {
+                                      final reason = selectedReason == 'Lý do khác'
+                                          ? reasonController.text.trim()
+                                          : selectedReason!;
+                                      Navigator.of(ctx).pop(reason);
+                                    }
+                                  : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFF6B35),
+                                disabledBackgroundColor: const Color(0xFFF0C9B7),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              ),
+                              child: const Text('Gửi báo cáo', style: TextStyle(fontWeight: FontWeight.w800)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Hủy', style: TextStyle(color: Color(0xFF666666))),
-              ),
-              ElevatedButton(
-                onPressed: canConfirm
-                    ? () => Navigator.of(ctx).pop(reasonController.text.trim())
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF6B35),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Gửi báo cáo',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-              ),
-            ],
           );
         },
       ),
@@ -658,19 +845,6 @@ Future<void> _openUncompleteDialog() async {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF6B35).withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.gpp_maybe,
-              color: Color(0xFFFF6B35),
-              size: 24,
-            ),
-          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(

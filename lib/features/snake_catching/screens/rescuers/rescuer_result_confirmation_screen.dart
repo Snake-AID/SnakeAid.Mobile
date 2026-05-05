@@ -98,79 +98,169 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
     }
   }
 
-  Future<void> _showConfirmSnakeDialog() async {
-    if (_pendingSpecies == null) return;
-    final confirmed = await showDialog<bool>(
+  CatchingEnvironment? get _selectedEnvironment {
+    final selectedId = _catchingEnvironmentId;
+    if (selectedId == null) return null;
+    for (final environment in _allEnvironments) {
+      if (environment.id == selectedId) return environment;
+    }
+    return null;
+  }
+
+  String? _cleanText(String? value) {
+    final normalized = value?.trim();
+    if (normalized == null || normalized.isEmpty) return null;
+    if (normalized.toLowerCase() == 'none') return null;
+    return normalized;
+  }
+
+  Future<void> _openEnvironmentPicker() async {
+    final selectedId = await showModalBottomSheet<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle_outline, color: Color(0xFFFF6B35)),
-            SizedBox(width: 8),
-            Text('Xác nhận loài rắn', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Bạn muốn thêm:', style: TextStyle(fontSize: 14, color: Color(0xFF666666))),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF3EE),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFFF6B35).withOpacity(0.4)),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.45,
+        maxChildSize: 0.92,
+        builder: (ctx, scrollCtrl) => Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFFF8F6F5),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFBFBFBF).withOpacity(0.45),
+                  borderRadius: BorderRadius.circular(999),
+                ),
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.pest_control, color: Color(0xFFFF6B35), size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      _pendingSpecies!.commonName,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+              const SizedBox(height: 16),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Chọn nơi bắt rắn',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF222222)),
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFF6B35),
+                    SizedBox(height: 4),
+                    Text(
+                      'Chọn vị trí phù hợp để hệ thống xử lý chính xác',
+                      style: TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFF777777)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView.separated(
+                  controller: scrollCtrl,
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  itemCount: _allEnvironments.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (_, index) {
+                    final environment = _allEnvironments[index];
+                    final isSelected = environment.id == _catchingEnvironmentId;
+                    final description = _cleanText(environment.description);
+                    return InkWell(
+                      onTap: () => Navigator.pop(ctx, environment.id),
                       borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '× $_pendingQuantity',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
-                  ),
-                ],
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFFFFF3EE) : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isSelected ? const Color(0xFFFF6B35) : const Color(0xFFE9E9E9),
+                            width: isSelected ? 1.4 : 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 14,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          environment.name,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xFF222222),
+                                          ),
+                                        ),
+                                      ),
+                                      if (isSelected)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFF6B35),
+                                            borderRadius: BorderRadius.circular(999),
+                                          ),
+                                          child: const Text(
+                                            'Đã chọn',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  if (description != null) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      description,
+                                      style: const TextStyle(
+                                        fontSize: 12.5,
+                                        height: 1.4,
+                                        color: Color(0xFF666666),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            const Text('Sau khi xác nhận sẽ được ghi nhận vào hệ thống.', style: TextStyle(fontSize: 12, color: Color(0xFF999999))),
-          ],
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Hủy', style: TextStyle(color: Color(0xFF999999))),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF6B35),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('Xác nhận', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     );
-    if (confirmed == true) _confirmSnake();
+
+    if (selectedId != null && mounted) {
+      setState(() => _catchingEnvironmentId = selectedId);
+    }
+  }
+
+  Future<void> _showConfirmSnakeDialog() async {
+    if (_pendingSpecies == null) return;
+    await _confirmSnake();
   }
 
   Future<void> _confirmSnake() async {
@@ -225,86 +315,168 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
   Future<void> _confirmAndSubmit() async {
     if (!_isValid || _isSubmitting) return;
     final totalSnakes = _confirmedSnakes.fold<int>(0, (s, e) => s + e.quantity);
+    final selectedEnvironment = _selectedEnvironment;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.send_rounded, color: Color(0xFF28A745)),
-            SizedBox(width: 8),
-            Text('Xác nhận gửi kết quả', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Bạn sắp gửi kết quả cho khách hàng:', style: TextStyle(fontSize: 14, color: Color(0xFF666666))),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0FFF4),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF28A745).withOpacity(0.35)),
-              ),
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        backgroundColor: Colors.transparent,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.18),
+                  blurRadius: 28,
+                  offset: const Offset(0, 16),
+                ),
+              ],
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ..._confirmedSnakes.map((e) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(
+                  const SizedBox(height: 6),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Xác nhận gửi kết quả',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF222222)),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Kiểm tra lại thông tin trước khi gửi cho khách hàng.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 13, height: 1.5, color: Color(0xFF666666)),
+                  ),
+                  const SizedBox(height: 18),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3EE),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFFFD7C2)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.pest_control, size: 14, color: Color(0xFFFF6B35)),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(e.species.commonName,
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                                  color: Color(0xFF333333))),
+                        Row(
+                          children: const [
+                            Expanded(
+                              child: Text(
+                                'Loài rắn đã xác nhận',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF1F3D26)),
+                              ),
+                            ),
+                          ],
                         ),
-                        Text('× ${e.quantity}',
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold,
-                                color: Color(0xFFFF6B35))),
+                        const SizedBox(height: 12),
+                        ..._confirmedSnakes.map((e) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  e.species.commonName,
+                                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w400, color: Color(0xFF333333)),
+                                ),
+                              ),
+                              Text(
+                                '× ${e.quantity}',
+                                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFFFF6B35)),
+                              ),
+                            ],
+                          ),
+                        )),
+                        Row(
+                          children: [
+                            Text(
+                              'Tổng cộng: $totalSnakes con',
+                              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFFFF6B35)),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
-                  )),
-                  const Divider(height: 12, color: Color(0xFFDDEEDD)),
-                  Row(
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF7F3),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFFFD7C2)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Nơi bắt rắn',
+                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF8A4E34)),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          selectedEnvironment?.name ?? 'Chưa chọn',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+                        ),
+                        if (_cleanText(selectedEnvironment?.description) != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _cleanText(selectedEnvironment?.description)!,
+                            style: const TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFF666666)),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Sau khi gửi, kết quả sẽ được chốt và không thể chỉnh sửa.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFF777777)),
+                  ),
+                  const SizedBox(height: 18),
+                      Row(
                     children: [
-                      const Icon(Icons.summarize_outlined, size: 14, color: Color(0xFF28A745)),
-                      const SizedBox(width: 6),
-                      Text('Tổng cộng: $totalSnakes con',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold,
-                              color: Color(0xFF28A745))),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF666666),
+                            side: const BorderSide(color: Color(0xFFE2E2E2)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          child: const Text('Kiểm tra lại', style: TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('Gửi ngay', style: TextStyle(fontWeight: FontWeight.w800)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFF6B35),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 10),
-            const Text('Sau khi gửi sẽ không thể chỉnh sửa.',
-                style: TextStyle(fontSize: 12, color: Color(0xFF999999))),
-          ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Kiểm tra lại', style: TextStyle(color: Color(0xFF666666))),
-          ),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pop(ctx, true),
-            icon: const Icon(Icons.send_rounded, size: 16),
-            label: const Text('Gửi ngay', style: TextStyle(fontWeight: FontWeight.bold)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF28A745),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-          ),
-        ],
       ),
     );
     if (confirmed != true) return;
@@ -509,6 +681,13 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
     return Icons.warning_amber_rounded;
   }
 
+  String? _displayMetaValue(String? value) {
+    final normalized = value?.trim();
+    if (normalized == null || normalized.isEmpty) return null;
+    if (normalized.toLowerCase() == 'none') return null;
+    return normalized;
+  }
+
   void _openSpeciesPicker() {
     _speciesSearchController.clear();
     showModalBottomSheet(
@@ -550,15 +729,6 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFF6B35).withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.pest_control, color: Color(0xFFFF6B35), size: 20),
-                        ),
-                        const SizedBox(width: 10),
                         const Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -715,7 +885,7 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                                                     ),
                                                   ),
                                                   if (s.primaryVenomType != null &&
-                                                      s.primaryVenomType!.isNotEmpty) ...[
+                                                      _displayMetaValue(s.primaryVenomType) != null) ...[
                                                     const SizedBox(width: 6),
                                                     Container(
                                                       padding: const EdgeInsets.symmetric(
@@ -725,7 +895,7 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                                                         borderRadius: BorderRadius.circular(20),
                                                       ),
                                                       child: Text(
-                                                        s.primaryVenomType!,
+                                                        _displayMetaValue(s.primaryVenomType)!,
                                                         style: const TextStyle(
                                                           fontSize: 10,
                                                           color: Color(0xFF666666),
@@ -788,15 +958,6 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
           // ── Section header ─────────────────────────────────────────
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF6B35).withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.pest_control, color: Color(0xFFFF6B35), size: 18),
-              ),
-              const SizedBox(width: 10),
               const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1210,7 +1371,7 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
               Text(
                 'Nơi bắt rắn',
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF666666),
                 ),
@@ -1249,42 +1410,61 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
               ),
             )
           else
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: _catchingEnvironmentId == null
-                      ? const Color(0xFFFF6B35)
-                      : const Color(0xFF28A745),
-                  width: 1.5,
+            GestureDetector(
+              onTap: _openEnvironmentPicker,
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: _catchingEnvironmentId == null
+                        ? const Color(0xFFFF6B35)
+                          : const Color(0xFFFF6B35),
+                    width: 1.4,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.white,
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  isExpanded: true,
-                  value: _catchingEnvironmentId,
-                  hint: const Text('Chọn nơi bắt rắn', style: TextStyle(color: Color(0xFF999999))),
-                  items: _allEnvironments.map((env) {
-                    return DropdownMenuItem<String>(
-                      value: env.id,
+                child: Row(
+                  children: [
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(env.name,
-                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600,
-                                  color: Color(0xFF333333))),
-                          if (env.description != null && env.description!.isNotEmpty)
-                            Text(env.description!,
-                                style: const TextStyle(fontSize: 12, color: Color(0xFF888888)),
-                                overflow: TextOverflow.ellipsis),
+                          Text(
+                            _selectedEnvironment?.name ?? 'Chọn nơi bắt rắn',
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800,
+                              color: _catchingEnvironmentId == null
+                                  ? const Color(0xFFBB7055)
+                                  : const Color(0xFF222222),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _cleanText(_selectedEnvironment?.description) ?? 'Chạm để chọn môi trường phù hợp',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: Color(0xFF777777),
+                              height: 1.35,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ],
                       ),
-                    );
-                  }).toList(),
-                  onChanged: (val) => setState(() => _catchingEnvironmentId = val),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -1361,7 +1541,7 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: (_isValid && !_isSubmitting) ? const Color(0xFF28A745) : const Color(0xFFDDDDDD),
+              backgroundColor: (_isValid && !_isSubmitting) ? const Color(0xFFFF6B35) : const Color(0xFFDDDDDD),
               foregroundColor: (_isValid && !_isSubmitting) ? Colors.white : const Color(0xFF999999),
               elevation: 0,
               disabledBackgroundColor: const Color(0xFFDDDDDD),

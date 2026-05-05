@@ -1428,6 +1428,12 @@ class ConsultationRepository {
             case 'canceled':
               normalizedStatus = 'Cancelled';
               break;
+            case 'expertabsent':
+              normalizedStatus = 'ExpertAbsent';
+              break;
+            case 'expertabsenthandled':
+              normalizedStatus = 'ExpertAbsentHandled';
+              break;
             case 'pendingpayment':
               normalizedStatus = 'PendingPayment';
               break;
@@ -1444,6 +1450,7 @@ class ConsultationRepository {
             'roomId': e['roomId'],
             'userId': e['userId'],
             'userName': e['userName'],
+            'userAvatarUrl': e['userAvatarUrl'] ?? e['patientAvatarUrl'],
             'expertId': '',
             'expertName': 'Chuyên gia',
             'consultationType': endpointType == 'emergency'

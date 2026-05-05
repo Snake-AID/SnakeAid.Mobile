@@ -7,6 +7,7 @@ import '../../repository/consultation_repository.dart';
 class ConsultationCompletionScreen extends ConsumerStatefulWidget {
   final String expertName;
   final String expertSpecialty;
+  final String? expertAvatarUrl;
   final int durationSeconds;
   final String consultationId;
   final DateTime? consultationTime;
@@ -15,6 +16,7 @@ class ConsultationCompletionScreen extends ConsumerStatefulWidget {
     super.key,
     required this.expertName,
     required this.expertSpecialty,
+    this.expertAvatarUrl,
     required this.durationSeconds,
     required this.consultationId,
     this.consultationTime,
@@ -275,14 +277,11 @@ class _ConsultationCompletionScreenState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Avatar
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: _primary.withOpacity(0.1),
-            ),
-            child: const Icon(Icons.person, size: 32, color: _primary),
+          _Avatar(
+            avatarUrl: widget.expertAvatarUrl,
+            fallbackColor: _primary.withOpacity(0.1),
+            iconColor: _primary,
+            size: 56,
           ),
           const SizedBox(width: 16),
 
@@ -744,5 +743,41 @@ class _ConsultationCompletionScreenState
   String _formatDateTime(DateTime dt) {
     final pad = (int v) => v.toString().padLeft(2, '0');
     return '${pad(dt.day)}/${pad(dt.month)}/${dt.year} - ${pad(dt.hour)}:${pad(dt.minute)}';
+  }
+
+  
+}
+
+class _Avatar extends StatelessWidget {
+  final String? avatarUrl;
+  final Color fallbackColor;
+  final Color iconColor;
+  final double size;
+
+  const _Avatar({
+    this.avatarUrl,
+    required this.fallbackColor,
+    required this.iconColor,
+    this.size = 52,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final url = (avatarUrl ?? '').trim();
+    final hasAvatar = url.isNotEmpty;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: fallbackColor,
+        image: hasAvatar
+            ? DecorationImage(image: NetworkImage(url), fit: BoxFit.cover)
+            : null,
+      ),
+      child: hasAvatar
+          ? null
+          : Icon(Icons.person, size: size * 0.55, color: iconColor),
+    );
   }
 }

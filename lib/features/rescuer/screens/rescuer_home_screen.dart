@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -94,6 +95,10 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
   int _selectedIndex = 0;
   final AudioPlayer _snakeCatchingAudioPlayer = AudioPlayer();
   final AudioPlayer _sosAudioPlayer = AudioPlayer();
+  int _snakeCatchingAlertPlays = 0;
+  StreamSubscription<void>? _snakeCatchingCompleteSub;
+  int _sosAlertPlays = 0;
+  StreamSubscription<void>? _sosCompleteSub;
 
   final List<Widget> _screens = [
     const _HomeTab(),
@@ -359,18 +364,15 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _modalInfoRow(
-                              Icons.assignment_turned_in_rounded,
-                              const Color(0xFF28A745),
                               'Trạng thái',
                               'Đã được phân công',
                             ),
                             if (assignedAtText != null) ...[
                               const Divider(height: 16, thickness: 0.5),
                               _modalInfoRow(
-                                Icons.schedule_rounded,
-                                const Color(0xFF666666),
                                 'Thời gian phân công',
                                 assignedAtText,
                               ),
@@ -527,10 +529,30 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
   Future<void> _playSnakeCatchingAlert() async {
     // Sound — requires assets/sounds/snake_alert.mp3 (see assets/sounds/README.md)
     try {
-      // Reset player state before playing to avoid stuck state
+      // Reset player state and play up to 3 times (no infinite loop)
       await _snakeCatchingAudioPlayer.stop();
       await _snakeCatchingAudioPlayer.setVolume(1.0);
-      await _snakeCatchingAudioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _snakeCatchingAudioPlayer.setReleaseMode(ReleaseMode.stop);
+      // Cancel any existing subscription
+      await _snakeCatchingCompleteSub?.cancel();
+      _snakeCatchingAlertPlays = 0;
+      _snakeCatchingCompleteSub = _snakeCatchingAudioPlayer.onPlayerComplete
+          .listen((_) async {
+            _snakeCatchingAlertPlays++;
+            if (_snakeCatchingAlertPlays < 3) {
+              // replay
+              await _snakeCatchingAudioPlayer.seek(Duration.zero);
+              await _snakeCatchingAudioPlayer.play(
+                AssetSource('sounds/snake_alert.mp3'),
+              );
+            } else {
+              // reached max plays — stop and cancel subscription
+              await _snakeCatchingAudioPlayer.stop();
+              await _snakeCatchingCompleteSub?.cancel();
+              _snakeCatchingCompleteSub = null;
+            }
+          });
+      // Start first play
       await _snakeCatchingAudioPlayer.play(
         AssetSource('sounds/snake_alert.mp3'),
       );
@@ -551,6 +573,9 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
   void _stopSnakeCatchingAlert() {
     try {
       _snakeCatchingAudioPlayer.stop();
+      _snakeCatchingCompleteSub?.cancel();
+      _snakeCatchingCompleteSub = null;
+      _snakeCatchingAlertPlays = 0;
     } catch (_) {}
     try {
       Vibration.cancel();
@@ -561,9 +586,23 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
   Future<void> _playSnakebiteIncidentAlert() async {
     // Sound — requires assets/sounds/sos_alert.mp3
     try {
+      // play up to 3 times and avoid infinite loop
       await _sosAudioPlayer.stop();
       await _sosAudioPlayer.setVolume(1.0);
-      await _sosAudioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _sosAudioPlayer.setReleaseMode(ReleaseMode.stop);
+      await _sosCompleteSub?.cancel();
+      _sosAlertPlays = 0;
+      _sosCompleteSub = _sosAudioPlayer.onPlayerComplete.listen((_) async {
+        _sosAlertPlays++;
+        if (_sosAlertPlays < 3) {
+          await _sosAudioPlayer.seek(Duration.zero);
+          await _sosAudioPlayer.play(AssetSource('sounds/sos_alert.mp3'));
+        } else {
+          await _sosAudioPlayer.stop();
+          await _sosCompleteSub?.cancel();
+          _sosCompleteSub = null;
+        }
+      });
       await _sosAudioPlayer.play(AssetSource('sounds/sos_alert.mp3'));
     } catch (e) {
       debugPrint('⚠️ Could not play SOS alert sound: $e');
@@ -582,6 +621,9 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
   void _stopSnakebiteIncidentAlert() {
     try {
       _sosAudioPlayer.stop();
+      _sosCompleteSub?.cancel();
+      _sosCompleteSub = null;
+      _sosAlertPlays = 0;
     } catch (_) {}
     try {
       Vibration.cancel();
@@ -590,52 +632,36 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
 
   /// Labeled info row widget used inside the snake catching modal
   Widget _modalInfoRow(
-    IconData icon,
-    Color iconColor,
-    String label,
-    String value,
-  ) {
-    return Row(
+  String label,
+  String value,
+) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(6),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            color: Color(0xFF999999),
+            fontWeight: FontWeight.w500,
           ),
-          child: Icon(icon, size: 15, color: iconColor),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF999999),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF333333),
-                  fontWeight: FontWeight.w500,
-                  height: 1.3,
-                ),
-              ),
-            ],
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14, // tăng nhẹ cho dễ đọc
+            color: Color(0xFF333333),
+            fontWeight: FontWeight.w500,
+            height: 1.3,
           ),
         ),
       ],
-    );
-  }
+    ),
+  );
+}
 
   /// Show emergency alert modal - works across all tabs
   void _showEmergencyAlert(dynamic request) {
@@ -797,8 +823,54 @@ class _HomeTabState extends ConsumerState<_HomeTab>
       });
 
       debugPrint('👤 Rescuer ID loaded: $_rescuerId');
+
+      // Check if auto-online is enabled and activate rescue mode
+      if (mounted) {
+        await _autoGoOnlineIfEnabled();
+      }
     } catch (e) {
       debugPrint('❌ Error loading rescuer ID: $e');
+    }
+  }
+
+  Future<void> _autoGoOnlineIfEnabled() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final autoOnline = prefs.getBool('rescuer_autoOnline') ?? true;
+
+      if (!autoOnline || _rescuerId == null) {
+        debugPrint('ℹ️ Auto-online disabled or rescuer ID not available');
+        return;
+      }
+
+      debugPrint('🟢 Auto-online enabled - checking GPS and activating...');
+
+      // Check GPS readiness first
+      final gpsResult = await ref.read(locationManagerProvider).checkGpsReady();
+
+      if (gpsResult != GpsCheckResult.ready) {
+        debugPrint('⚠️ GPS not ready: $gpsResult');
+        return;
+      }
+
+      // GPS OK - start rescue mode
+      final rescueModeState = ref.read(rescueModeProvider);
+      if (!rescueModeState.isActive) {
+        await ref
+            .read(rescueModeProvider.notifier)
+            .startRescueMode(_rescuerId!);
+
+        // Start location tracking
+        await ref.read(locationManagerProvider).startTracking(_rescuerId!);
+
+        setState(() {
+          _isOnline = true;
+        });
+
+        debugPrint('✅ Auto-online activated successfully');
+      }
+    } catch (e) {
+      debugPrint('❌ Error in auto-online: $e');
     }
   }
 
@@ -1628,11 +1700,6 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                             if (startDt != null) ...[
                               Row(
                                 children: [
-                                  const Icon(
-                                    Icons.play_arrow,
-                                    size: 14,
-                                    color: Color(0xFF555555),
-                                  ),
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: Text(
@@ -1650,11 +1717,6 @@ class _HomeTabState extends ConsumerState<_HomeTab>
                             if (endDt != null) ...[
                               Row(
                                 children: [
-                                  const Icon(
-                                    Icons.stop,
-                                    size: 14,
-                                    color: Color(0xFF555555),
-                                  ),
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: Text(

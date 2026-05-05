@@ -15,12 +15,14 @@ class ExpertProfileScreen extends ConsumerStatefulWidget {
   const ExpertProfileScreen({super.key, this.onGoToHistory});
 
   @override
-  ConsumerState<ExpertProfileScreen> createState() => _ExpertProfileScreenState();
+  ConsumerState<ExpertProfileScreen> createState() =>
+      _ExpertProfileScreenState();
 }
 
 class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
   WalletInfo? _walletInfo;
   bool _isLoadingWallet = true;
+  bool _isRefreshingWallet = false;
   Timer? _walletRefreshTimer;
   ExpertProfile? _profile;
 
@@ -29,12 +31,17 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
     super.initState();
     _loadProfile();
     _loadWallet();
-    _walletRefreshTimer = Timer.periodic(const Duration(minutes: 3), (_) => _loadWallet());
+    _walletRefreshTimer = Timer.periodic(
+      const Duration(minutes: 3),
+      (_) => _loadWallet(),
+    );
   }
 
   Future<void> _loadProfile() async {
     try {
-      final profile = await ref.read(expertProfileRepositoryProvider).getMyProfile();
+      final profile = await ref
+          .read(expertProfileRepositoryProvider)
+          .getMyProfile();
       if (mounted) {
         setState(() {
           _profile = profile;
@@ -52,15 +59,35 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
   Future<void> _loadWallet() async {
     try {
       final wallet = await ref.read(walletRepositoryProvider).getWalletInfo();
-      if (mounted) setState(() { _walletInfo = wallet; _isLoadingWallet = false; });
+      if (mounted)
+        setState(() {
+          _walletInfo = wallet;
+          _isLoadingWallet = false;
+        });
     } catch (_) {
       if (mounted) setState(() => _isLoadingWallet = false);
     }
   }
 
+  Future<void> _refreshWalletOnTap() async {
+    if (_isRefreshingWallet) return;
+    setState(() => _isRefreshingWallet = true);
+    try {
+      final wallet = await ref.read(walletRepositoryProvider).getWalletInfo();
+      if (mounted)
+        setState(() {
+          _walletInfo = wallet;
+          _isRefreshingWallet = false;
+        });
+    } catch (_) {
+      if (mounted) setState(() => _isRefreshingWallet = false);
+    }
+  }
+
   String _formatBalance(double amount) {
-    final f = amount.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+    final f = amount
+        .toStringAsFixed(0)
+        .replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
     return '$f đ';
   }
 
@@ -107,7 +134,10 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
                 // Wallet Card
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _buildWalletCard(),
+                  child: GestureDetector(
+                    onTap: _refreshWalletOnTap,
+                    child: _buildWalletCard(),
+                  ),
                 ),
                 const SizedBox(height: 20),
 
@@ -135,10 +165,7 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
                             builder: (_) => const PaymentHistoryScreen(
                               themeColor: Color(0xFF6C47C2),
                               title: 'Quản Lý Doanh Thu',
-                              filterTypes: [
-                                'consultation',
-                                'system',
-                              ],
+                              filterTypes: ['consultation', 'system'],
                             ),
                           ),
                         ),
@@ -161,14 +188,6 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
                       ),
                       const SizedBox(height: 12),
                       _buildMenuItem(
-                        icon: Icons.psychology_alt,
-                        title: 'Chuyên Môn & Lĩnh Vực',
-                        onTap: () {
-                          context.pushNamed('expert_specialties');
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _buildMenuItem(
                         icon: Icons.calendar_month,
                         title: 'Cài Đặt Lịch Làm Việc',
                         onTap: () {
@@ -181,14 +200,6 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
                         title: 'Xem Xét AI Nhận Diện',
                         onTap: () {
                           context.pushNamed('expert_ai_review_queue');
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _buildMenuItem(
-                        icon: Icons.settings,
-                        title: 'Cài Đặt',
-                        onTap: () {
-                          context.pushNamed('expert_settings');
                         },
                       ),
                     ],
@@ -224,47 +235,56 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(children: [
-            Icon(Icons.account_balance_wallet, color: Colors.white70, size: 20),
-            SizedBox(width: 8),
-            Text('Ví SnakeAidPay',
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white)),
-          ]),
+          const Text(
+            'Ví SnakeAidPay',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
           const SizedBox(height: 16),
-          const Text('Số dư',
-              style: TextStyle(fontSize: 14, color: Colors.white70)),
+          const Text(
+            'Số dư',
+            style: TextStyle(fontSize: 14, color: Colors.white70),
+          ),
           const SizedBox(height: 4),
-          if (_isLoadingWallet)
+          if (_isLoadingWallet || _isRefreshingWallet)
             const SizedBox(
               height: 40,
               child: Center(
                 child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white54)),
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white54,
+                  ),
+                ),
               ),
             )
           else
-            Text(_formatBalance(_walletInfo?.balance ?? 0),
-                style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white)),
+            Text(
+              _formatBalance(_walletInfo?.balance ?? 0),
+              style: const TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
           const SizedBox(height: 20),
           Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const WithdrawMoneyScreen(
-                                themeColor: Color(0xFF6C47C2),
-                              ))),
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const WithdrawMoneyScreen(
+                        themeColor: Color(0xFF6C47C2),
+                      ),
+                    ),
+                  ),
                   icon: const Icon(Icons.remove_circle_outline, size: 20),
                   label: const Text('Rút tiền'),
                   style: OutlinedButton.styleFrom(
@@ -272,26 +292,32 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
                     side: const BorderSide(color: Colors.white, width: 2),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ),
               const SizedBox(width: 10),
               OutlinedButton(
                 onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const WalletHistoryScreen(
-                              themeColor: Color(0xFF6C47C2),
-                              showTopup: false,
-                            ))),
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const WalletHistoryScreen(
+                      themeColor: Color(0xFF6C47C2),
+                      showTopup: false,
+                    ),
+                  ),
+                ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
                   side: const BorderSide(color: Colors.white70, width: 1.5),
                   padding: const EdgeInsets.symmetric(
-                      vertical: 12, horizontal: 14),
+                    vertical: 12,
+                    horizontal: 14,
+                  ),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 child: const Icon(Icons.history, size: 20),
               ),
@@ -328,10 +354,7 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: const Color(0xFF6C47C2).withOpacity(0.1),
-                  border: Border.all(
-                    color: Colors.white,
-                    width: 4,
-                  ),
+                  border: Border.all(color: Colors.white, width: 4),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.1),
@@ -366,10 +389,7 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF6C47C2),
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white,
-                      width: 2,
-                    ),
+                    border: Border.all(color: Colors.white, width: 2),
                   ),
                   child: const Icon(
                     Icons.photo_camera,
@@ -392,7 +412,7 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          
+
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
@@ -411,9 +431,7 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    (_profile?.isActive ?? false)
-                        ? Icons.check
-                        : Icons.close,
+                    (_profile?.isActive ?? false) ? Icons.check : Icons.close,
                     size: 12,
                     color: Colors.white,
                   ),
@@ -438,37 +456,63 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
           const SizedBox(height: 16),
 
           // Điểm uy tín
-          if (_profile?.reputationPoints != null) ...[  
+          if (_profile?.reputationPoints != null) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
-                    color: _reputationColor(_profile?.reputationStatus).withOpacity(0.08),
+                    color: _reputationColor(
+                      _profile?.reputationStatus,
+                    ).withOpacity(0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _reputationColor(_profile?.reputationStatus).withOpacity(0.3)),
+                    border: Border.all(
+                      color: _reputationColor(
+                        _profile?.reputationStatus,
+                      ).withOpacity(0.3),
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.workspace_premium, size: 16, color: _reputationColor(_profile?.reputationStatus)),
+                      Icon(
+                        Icons.workspace_premium,
+                        size: 16,
+                        color: _reputationColor(_profile?.reputationStatus),
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         '${_profile!.reputationPoints} điểm uy tín',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _reputationColor(_profile?.reputationStatus)),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: _reputationColor(_profile?.reputationStatus),
+                        ),
                       ),
-                      if (_profile?.reputationStatus != null) ...[  
+                      if (_profile?.reputationStatus != null) ...[
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: _reputationColor(_profile?.reputationStatus),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            _translateReputationStatus(_profile!.reputationStatus!),
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                            _translateReputationStatus(
+                              _profile!.reputationStatus!,
+                            ),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ],
@@ -482,81 +526,80 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
 
           // Consultation Fees
           if (_profile?.scheduledConsultationFee != null ||
-              _profile?.emergencyConsultationFee != null) ...
-            [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6C47C2).withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    if (_profile?.scheduledConsultationFee != null)
-                      Expanded(
-                        child: Column(
-                          children: [
-                            const Text(
-                              'Tư vấn hẹn',
-                              style: TextStyle(
-                                  fontSize: 12, color: Color(0xFF888888)),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${_profile!.scheduledConsultationFee!.toStringAsFixed(0)}đ',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF6C47C2),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    if (_profile?.scheduledConsultationFee != null &&
-                        _profile?.emergencyConsultationFee != null)
-                      Container(
-                        width: 1,
-                        height: 32,
-                        color: const Color(0xFFDDDDDD),
-                      ),
-                    if (_profile?.emergencyConsultationFee != null)
-                      Expanded(
-                        child: Column(
-                          children: [
-                            const Text(
-                              'Tư vấn khẩn',
-                              style: TextStyle(
-                                  fontSize: 12, color: Color(0xFF888888)),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${_profile!.emergencyConsultationFee!.toStringAsFixed(0)}đ',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF6C47C2),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
+              _profile?.emergencyConsultationFee != null) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6C47C2).withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(height: 12),
-            ],
+              child: Row(
+                children: [
+                  if (_profile?.scheduledConsultationFee != null)
+                    Expanded(
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Tư vấn hẹn',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF888888),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${_profile!.scheduledConsultationFee!.toStringAsFixed(0)}đ',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF6C47C2),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (_profile?.scheduledConsultationFee != null &&
+                      _profile?.emergencyConsultationFee != null)
+                    Container(
+                      width: 1,
+                      height: 32,
+                      color: const Color(0xFFDDDDDD),
+                    ),
+                  if (_profile?.emergencyConsultationFee != null)
+                    Expanded(
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Tư vấn khẩn',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF888888),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${_profile!.emergencyConsultationFee!.toStringAsFixed(0)}đ',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF6C47C2),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
 
           // Rating
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.star,
-                color: Color(0xFFFFA500),
-                size: 20,
-              ),
+              const Icon(Icons.star, color: Color(0xFFFFA500), size: 20),
               const SizedBox(width: 6),
               Text(
                 _profile?.rating?.toStringAsFixed(1) ?? '-',
@@ -569,10 +612,7 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
               const SizedBox(width: 4),
               Text(
                 '(${_profile?.ratingCount ?? 0} đánh giá)',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
               ),
             ],
           ),
@@ -582,11 +622,7 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.calendar_month,
-                size: 16,
-                color: Colors.grey[400],
-              ),
+              Icon(Icons.calendar_month, size: 16, color: Colors.grey[400]),
               const SizedBox(width: 6),
               Text(
                 _profile?.createdAt != null
@@ -608,7 +644,9 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
             height: 44,
             child: OutlinedButton(
               onPressed: () {
-                context.pushNamed('expert_edit_profile').then((_) => _loadProfile());
+                context
+                    .pushNamed('expert_edit_profile')
+                    .then((_) => _loadProfile());
               },
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Color(0xFF6C47C2), width: 1.5),
@@ -635,23 +673,34 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
 
   Color _reputationColor(String? status) {
     switch (status?.toLowerCase()) {
-      case 'excellent': return const Color(0xFFFFB300);
-      case 'good': return const Color(0xFF10B981);
-      case 'fair': return const Color(0xFFFF8800);
+      case 'excellent':
+        return const Color(0xFFFFB300);
+      case 'good':
+        return const Color(0xFF10B981);
+      case 'fair':
+        return const Color(0xFFFF8800);
       case 'poor':
-      case 'bad': return const Color(0xFFE53935);
-      default: return const Color(0xFF9E9E9E);
+      case 'bad':
+        return const Color(0xFFE53935);
+      default:
+        return const Color(0xFF9E9E9E);
     }
   }
 
   String _translateReputationStatus(String status) {
     switch (status.toLowerCase()) {
-      case 'excellent': return 'Xuất Sắc';
-      case 'good': return 'Tốt';
-      case 'fair': return 'Trung Bình';
-      case 'poor': return 'Kém';
-      case 'bad': return 'Xấu';
-      default: return status;
+      case 'excellent':
+        return 'Xuất Sắc';
+      case 'good':
+        return 'Tốt';
+      case 'fair':
+        return 'Trung Bình';
+      case 'poor':
+        return 'Kém';
+      case 'bad':
+        return 'Xấu';
+      default:
+        return status;
     }
   }
 
@@ -687,11 +736,7 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
                   color: const Color(0xFF6C47C2).withOpacity(0.05),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  icon,
-                  color: const Color(0xFF6C47C2),
-                  size: 22,
-                ),
+                child: Icon(icon, color: const Color(0xFF6C47C2), size: 22),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -704,16 +749,11 @@ class _ExpertProfileScreenState extends ConsumerState<ExpertProfileScreen> {
                   ),
                 ),
               ),
-              Icon(
-                Icons.chevron_right,
-                color: Colors.grey[300],
-                size: 24,
-              ),
+              Icon(Icons.chevron_right, color: Colors.grey[300], size: 24),
             ],
           ),
         ),
       ),
     );
   }
-
 }

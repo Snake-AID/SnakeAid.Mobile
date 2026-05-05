@@ -4,6 +4,8 @@ enum ConsultationBookingStatus {
   confirmed,      // Đã xác nhận
   completed,      // Đã hoàn thành
   cancelled,      // Đã hủy
+  expertAbsent,   // Chuyên gia vắng mặt
+  expertAbsentHandled, // Đã hoàn tiền
 }
 
 /// Response DTO for a consultation booking
@@ -14,6 +16,7 @@ class ConsultationBookingResponse {
   final String expertId;
   final String expertName;
   final String? expertAvatarUrl;
+  final String? userAvatarUrl;
   final String? expertSpecialty;
   final String consultationType; // "Scheduled" | "Instant"
   final DateTime scheduledTime;
@@ -39,6 +42,7 @@ class ConsultationBookingResponse {
     required this.expertId,
     required this.expertName,
     this.expertAvatarUrl,
+    this.userAvatarUrl,
     this.expertSpecialty,
     required this.consultationType,
     required this.scheduledTime,
@@ -92,6 +96,7 @@ class ConsultationBookingResponse {
       expertId: (json['expertId'] ?? '').toString(),
       expertName: (json['expertName'] as String?) ?? 'Chuyên gia',
       expertAvatarUrl: json['expertAvatarUrl'] as String?,
+      userAvatarUrl: json['userAvatarUrl'] as String?,
       expertSpecialty: (json['expertSpecialty'] ?? json['specialization']) as String?,
       consultationType: (json['consultationType'] as String?) ?? 'Scheduled',
       scheduledTime: slotStart ??
@@ -131,6 +136,10 @@ class ConsultationBookingResponse {
         return ConsultationBookingStatus.completed;
       case 'Cancelled':
         return ConsultationBookingStatus.cancelled;
+      case 'ExpertAbsent':
+        return ConsultationBookingStatus.expertAbsent;
+      case 'ExpertAbsentHandled':
+        return ConsultationBookingStatus.expertAbsentHandled;
       default:
         return ConsultationBookingStatus.confirmed;
     }

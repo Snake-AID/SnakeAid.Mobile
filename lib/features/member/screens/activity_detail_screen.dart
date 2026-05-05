@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -74,6 +75,28 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   StreamSubscription<PaymentDeepLinkEvent>? _deepLinkSub;
   int? _lastHandledDeepLinkEventId;
 
+  bool _isWalletPayment(wallet_tx.TransactionInfo tx) {
+    return tx.paymentMethod.trim().toLowerCase() == 'wallet';
+  }
+
+  bool _isConfirmedCatchingDeposit(
+    wallet_tx.TransactionInfo tx, {
+    int? pendingOrderCode,
+  }) {
+    if (!tx.matchesTransactionType('CatchingDeposit')) return false;
+
+    if (tx.isPaid) return true;
+
+    // Wallet transactions are completed immediately and may come back without
+    // an explicit "status" in list responses.
+    if (_isWalletPayment(tx) && tx.hasExternalTransactionId) return true;
+
+    // PayOS is confirmed when order prefix matches and external id is present.
+    return tx.isPayOsPayment &&
+        tx.matchesPrefix('CATCHING-', pendingOrderCode) &&
+        tx.hasExternalTransactionId;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -131,70 +154,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
               event.orderCode == _pendingFinalPayOsContext!.orderCode)) {
         _pendingFinalPayOsContext = null;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Bạn đã hủy thanh toán. Vui lòng thử lại khi cần.'),
-          backgroundColor: Color(0xFFFF8F00),
-        ),
-      );
-    }
-  }
-
-  Future<void> _verifyPendingDepositPayOs(PaymentDeepLinkEvent event) async {
-    final pendingContext = _pendingDepositPayOsContext;
-    if (pendingContext == null) return;
-
-    final verifier = ref.read(payOsPaymentVerifierProvider);
-    final result = await verifier.verify(context: pendingContext, event: event);
-
-    if (!mounted) return;
-    if (result.status == PayOsVerificationStatus.confirmed) {
-      setState(() {
-        _transaction = result.transaction;
-        _depositPaid = true;
-        _pendingDepositPayOsContext = null;
-      });
-      _paymentTimer?.cancel();
-      await _silentRefresh();
-      return;
-    }
-
-    if (result.status == PayOsVerificationStatus.mismatch) {
-      setState(() {
-        _pendingDepositPayOsContext = null;
-      });
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(result.message)));
-    }
-  }
-
-  Future<void> _verifyPendingFinalPayOs(PaymentDeepLinkEvent event) async {
-    final pendingContext = _pendingFinalPayOsContext;
-    if (pendingContext == null) return;
-
-    final verifier = ref.read(payOsPaymentVerifierProvider);
-    final result = await verifier.verify(context: pendingContext, event: event);
-
-    if (!mounted) return;
-    if (result.status == PayOsVerificationStatus.confirmed) {
-      setState(() {
-        _finalTransaction = result.transaction;
-        _pendingFinalPayOsContext = null;
-        _hasTransferredToRescuer = true;
-      });
-      _finalPaymentTimer?.cancel();
-      await _silentRefresh();
+      ).showSnackBar(const SnackBar(content: Text('Thanh toán đã bị huỷ')));
       return;
-    }
-
-    if (result.status == PayOsVerificationStatus.mismatch) {
-      setState(() {
-        _pendingFinalPayOsContext = null;
-      });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(result.message)));
     }
   }
 
@@ -226,10 +189,15 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       if (mounted && response.data != null) {
         setState(() {
           _request = response.data;
-          _isLoading = false;
           // Mission only exists after deposit is confirmed — use as proxy for paid state
           if (response.data!.mission != null) _depositPaid = true;
         });
+
+        // Re-sync deposit state from transactions by ReferenceId to persist across reopen.
+        await _syncDepositPaymentByReferenceId();
+
+        if (!mounted) return;
+        setState(() => _isLoading = false);
 
         // Load species details for each species in the request
         _loadSpeciesDetails();
@@ -303,6 +271,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           if (response.data!.mission != null) _depositPaid = true;
         });
 
+        // Keep deposit state accurate even after reopening app/screen.
+        await _syncDepositPaymentByReferenceId();
+
         // Load any new species details
         _loadSpeciesDetails();
 
@@ -337,17 +308,12 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       final repo = ref.read(wallet_tx.transactionRepositoryProvider);
       final tx = await repo.getTransactionById(tid);
       if (!mounted) return;
-      final txIsDeposit =
-          tx != null && tx.matchesTransactionType('CatchingDeposit');
       final isConfirmedDeposit =
-          txIsDeposit &&
-          (tx.isPaid ||
-              (tx.isPayOsPayment &&
-                  tx.matchesPrefix(
-                    'CATCHING-',
-                    _pendingDepositPayOsContext?.orderCode,
-                  ) &&
-                  tx.hasExternalTransactionId));
+          tx != null &&
+          _isConfirmedCatchingDeposit(
+            tx,
+            pendingOrderCode: _pendingDepositPayOsContext?.orderCode,
+          );
       setState(() {
         _transaction = tx;
         _isCheckingPayment = false;
@@ -372,6 +338,39 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       }
     } catch (_) {
       if (mounted) setState(() => _isCheckingPayment = false);
+    }
+  }
+
+  /// Sync round-1 deposit by querying transactions with ReferenceId (request id).
+  /// This ensures paid state persists when re-entering the detail screen.
+  Future<void> _syncDepositPaymentByReferenceId() async {
+    final requestId = _request?.id ?? widget.requestId;
+    if (requestId.isEmpty) return;
+    try {
+      final repo = ref.read(wallet_tx.transactionRepositoryProvider);
+      final txs = await repo.getTransactions(
+        referenceId: requestId,
+        pageSize: 100,
+      );
+
+      final deposits = txs
+          .where((t) => t.matchesTransactionType('CatchingDeposit'))
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      final latestDeposit = deposits.isNotEmpty ? deposits.first : null;
+        final isConfirmedDeposit =
+          latestDeposit != null && _isConfirmedCatchingDeposit(latestDeposit);
+
+      if (!mounted) return;
+      final paidFromMission = _request?.mission != null;
+      setState(() {
+        _transaction = latestDeposit;
+        _depositTransactionId = latestDeposit?.id;
+        _depositPaid = paidFromMission || isConfirmedDeposit;
+      });
+    } catch (e) {
+      debugPrint('⚠️ _syncDepositPaymentByReferenceId error: $e');
     }
   }
 
@@ -1367,6 +1366,93 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     } catch (_) {}
   }
 
+  /// Verify a pending PayOS deposit/payment when a deep-link event arrives.
+  Future<void> _verifyPendingDepositPayOs(PaymentDeepLinkEvent event) async {
+    final pendingContext = _pendingDepositPayOsContext;
+    if (pendingContext == null) return;
+
+    final verifier = ref.read(payOsPaymentVerifierProvider);
+    final result = await verifier.verify(context: pendingContext, event: event);
+
+    if (!mounted) return;
+
+    if (result.status == PayOsVerificationStatus.confirmed) {
+      setState(() {
+        _transaction = result.transaction;
+        _pendingDepositPayOsContext = null;
+        _depositPaid = true;
+      });
+      _paymentTimer?.cancel();
+      await _silentRefresh();
+      return;
+    }
+
+    if (result.status == PayOsVerificationStatus.cancelled) {
+      setState(() {
+        _pendingDepositPayOsContext = null;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Thanh toán bị hủy')));
+      return;
+    }
+
+    if (result.status == PayOsVerificationStatus.mismatch ||
+        result.status == PayOsVerificationStatus.notFound) {
+      setState(() {
+        _pendingDepositPayOsContext = null;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result.message)));
+      return;
+    }
+    // pendingBackendConfirmation -> leave pending and let polling handle it
+  }
+
+  Future<void> _verifyPendingFinalPayOs(PaymentDeepLinkEvent event) async {
+    final pendingContext = _pendingFinalPayOsContext;
+    if (pendingContext == null) return;
+
+    final verifier = ref.read(payOsPaymentVerifierProvider);
+    final result = await verifier.verify(context: pendingContext, event: event);
+
+    if (!mounted) return;
+
+    if (result.status == PayOsVerificationStatus.confirmed) {
+      setState(() {
+        _finalTransaction = result.transaction;
+        _pendingFinalPayOsContext = null;
+        _hasTransferredToRescuer = true;
+      });
+      _finalPaymentTimer?.cancel();
+      await _silentRefresh();
+      return;
+    }
+
+    if (result.status == PayOsVerificationStatus.cancelled) {
+      setState(() {
+        _pendingFinalPayOsContext = null;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Thanh toán bị hủy')));
+      return;
+    }
+
+    if (result.status == PayOsVerificationStatus.mismatch ||
+        result.status == PayOsVerificationStatus.notFound) {
+      setState(() {
+        _pendingFinalPayOsContext = null;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result.message)));
+      return;
+    }
+    // pendingBackendConfirmation -> leave pending and let polling handle it
+  }
+
   /// Create PayOS final payment link (CatchingPayment) and open checkout
   Future<void> _openFinalPayment() async {
     if (_request == null) return;
@@ -1446,7 +1532,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           : _request != null
           ? _buildDetailView()
           : _buildNotFoundView(),
-      bottomSheet: _request != null ? _buildStickyFooter(_request!) : null,
+      bottomSheet: (!_isLoading && _request != null)
+          ? _buildStickyFooter(_request!)
+          : null,
     );
   }
 
@@ -1640,11 +1728,11 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     ],
                   ),
                 ),
-
                 // Info Content
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildInfoRow(
                         Icons.access_time,
@@ -1670,6 +1758,28 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                         maxLines: 3,
                       ),
 
+                      if (request.additionalDetails != null &&
+                          request.additionalDetails!.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _buildInfoRow(
+                          Icons.edit_location,
+                          'Ghi chú địa chỉ',
+                          request.additionalDetails!,
+                          maxLines: 5,
+                        ),
+                      ],
+
+                      if (request.notes != null &&
+                          request.notes!.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _buildInfoRow(
+                          Icons.info_outline,
+                          'Thông tin bổ sung',
+                          request.notes!,
+                          maxLines: 5,
+                        ),
+                      ],
+
                       if (request.distanceKm != null) ...[
                         const SizedBox(height: 12),
                         _buildInfoRow(
@@ -1677,17 +1787,6 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                           'Khoảng cách',
                           '${request.distanceKm!.toStringAsFixed(1)} km',
                           valueColor: const Color(0xFF2196F3),
-                        ),
-                      ],
-
-                      if (request.preferredTime != null) ...[
-                        const SizedBox(height: 12),
-                        _buildInfoRow(
-                          Icons.schedule,
-                          'Thời gian mong muốn',
-                          DateFormat(
-                            'HH:mm',
-                          ).format(request.preferredTime!.toLocal()),
                         ),
                       ],
 
@@ -1855,103 +1954,6 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
             ),
           ],
 
-          // Additional Details
-          if (request.additionalDetails != null &&
-              request.additionalDetails!.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0F8FF),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFF2196F3).withOpacity(0.3),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        color: Color(0xFF2196F3),
-                        size: 20,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Ghi Chú Địa Chỉ',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2196F3),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    request.additionalDetails!,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      height: 1.5,
-                      color: Color(0xFF333333),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          // Notes
-          if (request.notes != null && request.notes!.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF3E0),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFFFF9800).withOpacity(0.3),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: Color(0xFFFF9800),
-                        size: 20,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Thông Tin Bổ Sung',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFFFF9800),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    request.notes!,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      height: 1.5,
-                      color: Color(0xFF333333),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
           const SizedBox(height: 24),
 
           // ── Feedback card (Paid / Completed) ─────────────────────
@@ -1961,58 +1963,148 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
             _buildFeedbackCard(request),
 
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: const Color(0xFFFAFCFA),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE6E8EC)),
+                border: Border.all(color: const Color(0xFFDDEBDD)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 18,
+                    color: const Color(0xFF228B22).withOpacity(0.06),
+                    blurRadius: 16,
                     offset: const Offset(0, 6),
                   ),
                 ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.support_agent,
-                        color: Color(0xFF228B22),
-                        size: 20,
-                      ),
-                      SizedBox(width: 10),
                       Expanded(
-                        child: Text(
-                          'Hỗ trợ khách hàng',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1F2937),
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Expanded(
+                                  child: Text(
+                                    'Hỗ trợ khách hàng',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF1F2937),
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF228B22).withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: const Text(
+                                    '24/7',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF228B22),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Nếu bạn cần hỗ trợ, tra cứu hoặc phản ánh về yêu cầu này, hãy liên hệ tổng đài để được phản hồi sớm nhất.',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                height: 1.55,
+                                color: Color(0xFF475569),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 10),
-                  Text(
-                    'Nếu bạn có bất cứ thắc mắc hoặc báo cáo về yêu cầu này hãy liên hệ tổng đài 0787171699 để được phản hồi sớm nhất.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      height: 1.6,
-                      color: Color(0xFF475569),
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE5EFE5)),
+                    ),
+                    child: Row(
+                      children: [                      
+                        const Expanded(
+                          child: Text(
+                            'Hotline: 0787171699',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF1F2937),
+                            ),
+                          ),
+                        ),
+                        OutlinedButton(
+                          onPressed: () async {
+                            final uri = Uri(scheme: 'tel', path: '0787171699');
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri);
+                            }
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF228B22),
+                            side: const BorderSide(color: Color(0xFF228B22)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text(
+                            'Gọi ngay',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
           ),
+
+          const SizedBox(height: 12),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Divider(
+              height: 1,
+              thickness: 1,
+              color: const Color(0xFFE7F0E7),
+            ),
+          ),
+
+          const SizedBox(height: 12),
 
           const SizedBox(height: 32),
         ],
@@ -2354,12 +2446,6 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(
-                            Icons.account_balance_wallet,
-                            size: 18,
-                            color: Color(0xFF228B22),
-                          ),
-                          const SizedBox(width: 10),
                           const Text(
                             'Phương thức',
                             style: TextStyle(
@@ -2392,12 +2478,6 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(
-                            Icons.access_time,
-                            size: 18,
-                            color: Color(0xFF888888),
-                          ),
-                          const SizedBox(width: 10),
                           const Text(
                             'Thời gian',
                             style: TextStyle(
@@ -2613,7 +2693,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           ),
 
           // Phone call button
-          if (phone != null && phone.isNotEmpty)
+          if (phone != null && phone.isNotEmpty && request.status.toLowerCase() != 'completed')
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: SizedBox(
@@ -2728,9 +2808,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 // ── Deposit amount (round 1) ──
                 if (amount != null) ...[
                   _buildPayRow(
-                    'Phí di chuyển (đang thanh toán):',
+                    'Phí di chuyển:',
                     _formatCurrency(amount),
-                    icon: Icons.directions_car,
                     valueColor: const Color(0xFF28A745),
                   ),
                   if (request.distanceKm != null)
@@ -2945,7 +3024,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       Icon(Icons.refresh, size: 12, color: Color(0xFF999999)),
                       SizedBox(width: 4),
                       Text(
-                        'Tự động kiểm tra mỗi 5 giây',
+                        'Tự động kiểm tra',
                         style: TextStyle(
                           fontSize: 11,
                           color: Color(0xFF999999),
@@ -3083,14 +3162,20 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(
-                        Icons.verified,
-                        color: Color(0xFF28A745),
-                        size: 16,
+                      Expanded(
+                        child: Text(
+                          'Đã thanh toán',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF28A745),
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Đã thanh toán ${_formatCurrency(travelFee)}',
+                        _formatCurrency(travelFee),
+                        textAlign: TextAlign.right,
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -3150,30 +3235,38 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     _formatCurrency(snakeFee),
                     icon: Icons.pest_control,
                   ),
-                  ...(mission?.missionDetails ?? []).map(
-                    (d) => Padding(
-                      padding: const EdgeInsets.only(top: 4, left: 28),
+                  ...(mission?.missionDetails ?? []).map((d) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 6, left: 12),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            '${d.snakeSpeciesName} × ${d.quantity}',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF888888),
+                          Expanded(
+                            child: Text(
+                              '${d.snakeSpeciesName} × ${d.quantity}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF888888),
+                              ),
                             ),
                           ),
-                          Text(
-                            _formatCurrency(d.price),
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF888888),
+                          const SizedBox(width: 12),
+                          Flexible(
+                            child: Text(
+                              _formatCurrency(d.price),
+                              textAlign: TextAlign.right,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF888888),
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ),
+                    );
+                  }),
                 ],
 
                 // Environment fee
@@ -3428,10 +3521,6 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   }) {
     return Row(
       children: [
-        if (icon != null) ...[
-          Icon(icon, size: 16, color: const Color(0xFF6C757D)),
-          const SizedBox(width: 8),
-        ],
         Expanded(
           child: Text(
             label,
@@ -3473,35 +3562,26 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     Color? valueColor,
     int maxLines = 2,
   }) {
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: const Color(0xFF228B22)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                maxLines: maxLines,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 15,
-                  color: valueColor ?? const Color(0xFF333333),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            color: Colors.grey[600],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          maxLines: maxLines,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 15,
+            color: valueColor ?? const Color(0xFF333333),
+            fontWeight: FontWeight.w600,
           ),
         ),
       ],
@@ -4799,7 +4879,7 @@ class _PaymentMethodSheetState extends State<_PaymentMethodSheet> {
                   Text(
                     widget.isFinalPayment
                         ? 'Thanh toán dịch vụ'
-                        : 'Thanh toán đặt cọc',
+                        : 'Thanh toán phí di chuyển',
                     style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
@@ -4890,38 +4970,16 @@ class _PaymentMethodSheetState extends State<_PaymentMethodSheet> {
                         height: 1.4,
                       ),
                       children: [
-                        const TextSpan(
+                        TextSpan(
                           text: 'Chính sách thanh toán',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Color(0xFFFF8F00),
                           ),
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () => _showPaymentTermsDialog(context),
                         ),
-                        const TextSpan(
-                          text:
-                              '. Xin lưu ý: Mọi khoản thanh toán (bao gồm phí di chuyển và phí dịch vụ) ',
-                        ),
-                        const TextSpan(
-                          text: 'sẽ KHÔNG được hoàn lại',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFD32F2F),
-                          ),
-                        ),
-                        const TextSpan(
-                          text:
-                              ' dưới bất kỳ hình thức nào. Đây là chính sách nhằm bảo vệ quyền lợi cho đội ngũ cứu hộ của hệ thống.',
-                        ),
-                        if (!widget.isFinalPayment)
-                          const TextSpan(
-                            text:
-                                '\n\n*Đặc quyền bảo vệ:* Nếu chuyên viên đến hiện trường nhưng không phát hiện hoặc không bắt được rắn, quý khách sẽ KHÔNG phải thanh toán chi phí dịch vụ cho Đợt 2.',
-                            style: TextStyle(
-                              fontStyle: FontStyle.italic,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFFE65100),
-                            ),
-                          ),
+                        const TextSpan(text: '.'),
                       ],
                     ),
                   ),
@@ -5258,6 +5316,208 @@ class _PaymentMethodSheetState extends State<_PaymentMethodSheet> {
               fontSize: 11,
               color: Color(0xFF1565C0),
               fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPaymentTermsDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.8,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header - full-width professional style
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 18,
+                  horizontal: 20,
+                ),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                  border: Border.all(color: const Color(0xFF196619)),
+                ),
+                child: const Center(
+                  child: Text(
+                    'Chính Sách Thanh Toán',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              // Content
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Vui lòng đọc kỹ các điều khoản sau đây trước khi thanh toán:',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF6B7280),
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      _buildPolicyBullet(
+                        Icons.info_outline,
+                        'Xin lưu ý: Các khoản thanh toán (bao gồm phí di chuyển và phí dịch vụ) sẽ không được hoàn lại trong trường hợp khách hàng tự huỷ yêu cầu.',
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Trong một số trường hợp:',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF374151),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildSubBullet(
+                        'Nếu hệ thống hoặc nhân viên huỷ yêu cầu, tiền đặt cọc sẽ được hoàn lại.',
+                      ),
+                      _buildSubBullet(
+                        'Nếu cứu hộ viên không thể tiếp tục nhiệm vụ, hệ thống sẽ sắp xếp người thay thế. Trường hợp không thể sắp xếp, yêu cầu sẽ được xử lý theo quy định.',
+                      ),
+                      const SizedBox(height: 16),
+                      _buildPolicyBullet(
+                        Icons.shield,
+                        'Đặc quyền bảo vệ: Nếu chuyên viên đến hiện trường nhưng không phát hiện hoặc không bắt được rắn, quý khách không cần thanh toán chi phí dịch vụ cho yêu cầu này.',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Actions
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(24),
+                  ),
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF228B22),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Đã hiểu',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPolicyBullet(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: const Color(0xFF228B22).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 16, color: const Color(0xFF228B22)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF374151),
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubBullet(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, left: 44),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '• ',
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF6B7280),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF6B7280),
+                height: 1.5,
+              ),
             ),
           ),
         ],

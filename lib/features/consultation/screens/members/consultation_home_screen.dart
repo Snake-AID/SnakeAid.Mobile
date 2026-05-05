@@ -16,6 +16,8 @@ enum ConsultationStatus {
   pendingPayment, // Chờ thanh toán
   completed, // Đã hoàn thành
   cancelled, // Đã hủy
+  expertAbsent, // Chuyên gia vắng mặt
+  expertAbsentHandled, // Đã hoàn tiền
 }
 
 /// Internal UI model for a consultation card
@@ -64,9 +66,12 @@ class _ConsultationItem {
       uiStatus = ConsultationStatus.completed;
     } else if (c.status == MyConsultationStatus.cancelled ||
         c.status == MyConsultationStatus.userAbsent ||
-        c.status == MyConsultationStatus.expertAbsent ||
         c.status == MyConsultationStatus.allAbsent) {
       uiStatus = ConsultationStatus.cancelled;
+    } else if (c.status == MyConsultationStatus.expertAbsent) {
+      uiStatus = ConsultationStatus.expertAbsent;
+    } else if (c.status == MyConsultationStatus.expertAbsentHandled) {
+      uiStatus = ConsultationStatus.expertAbsentHandled;
     } else if (c.status == MyConsultationStatus.scheduled) {
       uiStatus = scheduledAt.isAfter(now)
           ? ConsultationStatus.upcoming
@@ -90,7 +95,7 @@ class _ConsultationItem {
       expertId: c.expertId,
       expertName: c.expertName,
       expertSpecialty: '',
-      expertAvatarUrl: null,
+      expertAvatarUrl: c.expertAvatarUrl,
       scheduledTime: scheduledAt,
       status: uiStatus,
       serviceType: serviceType,
@@ -209,7 +214,9 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
           .where(
             (c) =>
                 c.status == ConsultationStatus.completed ||
-                c.status == ConsultationStatus.cancelled,
+                c.status == ConsultationStatus.cancelled ||
+                c.status == ConsultationStatus.expertAbsent ||
+                c.status == ConsultationStatus.expertAbsentHandled,
           )
           .toList()
         ..sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
@@ -309,11 +316,39 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
     try {
       final nextPage = _historyCurrentPage + 1;
       final repo = ref.read(consultationRepositoryProvider);
-      final nextConsultations = await repo.getMyConsultations(
-        status: 'Completed',
-        pageNumber: nextPage,
-        pageSize: _historyPageSize,
-      );
+      final results = await Future.wait([
+        repo.getMyConsultations(
+          status: 'Completed',
+          pageNumber: nextPage,
+          pageSize: _historyPageSize,
+        ),
+        repo.getMyConsultations(
+          status: 'Cancelled',
+          pageNumber: nextPage,
+          pageSize: _historyPageSize,
+        ),
+        repo.getMyConsultations(
+          status: 'UserAbsent',
+          pageNumber: nextPage,
+          pageSize: _historyPageSize,
+        ),
+        repo.getMyConsultations(
+          status: 'ExpertAbsent',
+          pageNumber: nextPage,
+          pageSize: _historyPageSize,
+        ),
+        repo.getMyConsultations(
+          status: 'ExpertAbsentHandled',
+          pageNumber: nextPage,
+          pageSize: _historyPageSize,
+        ),
+        repo.getMyConsultations(
+          status: 'AllAbsent',
+          pageNumber: nextPage,
+          pageSize: _historyPageSize,
+        ),
+      ]);
+      final nextConsultations = results.expand((items) => items).toList();
 
       if (!mounted) return;
 
@@ -346,7 +381,9 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
       setState(() {
         _historyItems = merged;
         _historyCurrentPage = nextPage;
-        _hasMoreHistory = mapped.length >= _historyPageSize;
+        _hasMoreHistory = results.any(
+          (items) => items.length >= _historyPageSize,
+        );
         _isLoadingMoreHistory = false;
       });
     } catch (_) {
@@ -940,6 +977,9 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
 
   Widget _buildHistoryCard(BuildContext context, _ConsultationItem item) {
     final isCancelled = item.status == ConsultationStatus.cancelled;
+    final isExpertAbsent = item.status == ConsultationStatus.expertAbsent;
+    final isExpertAbsentHandled =
+        item.status == ConsultationStatus.expertAbsentHandled;
     final isEmergencyType = item.serviceType.toLowerCase().contains('khẩn');
     final typeLabel = isEmergencyType ? 'Khẩn Cấp' : 'Đặt Lịch';
 
@@ -1023,7 +1063,13 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
             const SizedBox(height: 8),
             _buildDetailRow(
               Icons.payments_outlined,
-              isCancelled ? 'Đã hoàn tiền' : _formatFee(item.feeCost),
+              isExpertAbsentHandled
+                  ? 'Đã hoàn tiền'
+                  : (isExpertAbsent
+                      ? 'Đang chờ hoàn tiền'
+                      : (isCancelled
+                          ? 'Đã hoàn tiền'
+                          : _formatFee(item.feeCost))),
             ),
 
             // Rating (nếu đã hoàn thành và có đánh giá)
@@ -1073,7 +1119,8 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
 
                 // Đặt lại (nếu đã hủy hoặc đã hoàn thành)
                 const SizedBox(width: 10),
-                if (!isCancelled && item.rating == null)
+                if (item.status == ConsultationStatus.completed &&
+                    item.rating == null)
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () {
@@ -1094,6 +1141,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                             builder: (_) => ConsultationCompletionScreen(
                               expertName: item.expertName,
                               expertSpecialty: item.expertSpecialty,
+                              expertAvatarUrl: item.expertAvatarUrl,
                               durationSeconds: 1800,
                               consultationId: consultationId,
                               consultationTime: item.scheduledTime,
@@ -1120,7 +1168,8 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                       ),
                     ),
                   )
-                else if (!isCancelled && item.rating != null)
+                else if (item.status == ConsultationStatus.completed &&
+                    item.rating != null)
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1139,7 +1188,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                       ),
                     ),
                   )
-                else if (isCancelled)
+                else
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () => context.push('/expert-list'),
@@ -1195,6 +1244,8 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
   // ─── Shared Widgets ────────────────────────────────────────────────────────
 
   Widget _buildAvatar(_ConsultationItem item, {bool greyed = false}) {
+    final avatarUrl = (item.expertAvatarUrl ?? '').trim();
+    final hasAvatar = avatarUrl.isNotEmpty;
     return Container(
       width: 52,
       height: 52,
@@ -1203,12 +1254,22 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
         color: greyed
             ? const Color(0xFFE5E7EB)
             : const Color(0xFF228B22).withOpacity(0.1),
+        image: hasAvatar
+            ? DecorationImage(
+                image: NetworkImage(avatarUrl),
+                fit: BoxFit.cover,
+              )
+            : null,
       ),
-      child: Icon(
-        Icons.person,
-        size: 28,
-        color: greyed ? const Color(0xFF9CA3AF) : const Color(0xFF228B22),
-      ),
+      child: hasAvatar
+          ? null
+          : Icon(
+              Icons.person,
+              size: 28,
+              color: greyed
+                  ? const Color(0xFF9CA3AF)
+                  : const Color(0xFF228B22),
+            ),
     );
   }
 
@@ -1242,6 +1303,16 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
         bgColor = const Color(0xFFEF4444).withOpacity(0.12);
         textColor = const Color(0xFFEF4444);
         label = 'Đã hủy';
+        break;
+      case ConsultationStatus.expertAbsent:
+        bgColor = const Color(0xFFF59E0B).withOpacity(0.12);
+        textColor = const Color(0xFFF59E0B);
+        label = 'Chuyên gia vắng mặt';
+        break;
+      case ConsultationStatus.expertAbsentHandled:
+        bgColor = const Color(0xFF16A34A).withOpacity(0.12);
+        textColor = const Color(0xFF16A34A);
+        label = 'Đã hoàn tiền';
         break;
     }
 
@@ -1388,6 +1459,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
   void _viewDetail(BuildContext context, _ConsultationItem item) {
     Color statusColor;
     String statusLabel;
+    String? statusNote;
     switch (item.status) {
       case ConsultationStatus.active:
         statusColor = const Color(0xFF228B22);
@@ -1409,6 +1481,18 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
         statusColor = const Color(0xFFEF4444);
         statusLabel = 'Đã hủy';
         break;
+      case ConsultationStatus.expertAbsent:
+        statusColor = const Color(0xFFF59E0B);
+        statusLabel = 'Chuyên gia vắng mặt';
+        statusNote =
+            'Báo cáo đã được gửi đến admin. Sau khi được phê duyệt, tiền sẽ được hoàn về ví của bạn.';
+        break;
+      case ConsultationStatus.expertAbsentHandled:
+        statusColor = const Color(0xFF16A34A);
+        statusLabel = 'Đã hoàn tiền';
+        statusNote =
+            'Admin đã xác nhận và hoàn tiền vào ví của bạn. Bạn có thể kiểm tra trong lịch sử giao dịch.';
+        break;
     }
 
     Navigator.of(context).push(
@@ -1417,11 +1501,13 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
           consultationId: item.consultationId,
           expertName: item.expertName,
           expertSpecialty: item.expertSpecialty,
+          expertAvatarUrl: item.expertAvatarUrl,
           serviceType: item.serviceType,
           scheduledTime: item.scheduledTime,
           feeCost: item.feeCost,
           statusLabel: statusLabel,
           statusColor: statusColor,
+          statusNote: statusNote,
           rating: item.rating,
           problemDescription: item.problemDescription,
           customerReport: item.customerReport,

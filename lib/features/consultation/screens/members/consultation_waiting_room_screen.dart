@@ -290,10 +290,18 @@ class _ConsultationWaitingRoomScreenState
         customerReport: report,
       );
 
+      try {
+        await repo.endConsultation(widget.consultationId);
+      } catch (_) {
+        // Ignore end-call failures for expert-absent flow.
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Đã gửi báo cáo chuyên gia vắng mặt.'),
+          content: Text(
+            'Báo cáo đã được gửi đến admin. Sau khi được phê duyệt, tiền sẽ được hoàn về ví của bạn.',
+          ),
           backgroundColor: Color(0xFF228B22),
           behavior: SnackBarBehavior.floating,
         ),

@@ -49,6 +49,11 @@ import 'package:snakeaid_mobile/features/expert/screens/expert_certificate_form_
 import 'package:snakeaid_mobile/features/expert/screens/expert_specialties_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_feedback_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/expert_working_hours_screen.dart';
+import 'package:snakeaid_mobile/features/expert/screens/expert_user_guide_screen.dart';
+import 'package:snakeaid_mobile/features/expert/screens/expert_faq_screen.dart';
+import 'package:snakeaid_mobile/features/expert/screens/expert_contact_support_screen.dart';
+import 'package:snakeaid_mobile/features/expert/screens/expert_terms_screen.dart';
+import 'package:snakeaid_mobile/features/expert/screens/expert_privacy_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/ai_recognition_queue_screen.dart';
 import 'package:snakeaid_mobile/features/expert/screens/ai_recognition_review_screen.dart';
 import 'package:snakeaid_mobile/features/rescuer/screens/rescuer_home_screen.dart';
@@ -265,6 +270,34 @@ final router = GoRouter(
       name: 'expert_feedback',
       builder: (context, state) => const ExpertFeedbackScreen(),
     ),
+
+    // Expert Support Screens
+    GoRoute(
+      path: '/expert-user-guide',
+      name: 'expert_user_guide',
+      builder: (context, state) => const ExpertUserGuideScreen(),
+    ),
+    GoRoute(
+      path: '/expert-faq',
+      name: 'expert_faq',
+      builder: (context, state) => const ExpertFaqScreen(),
+    ),
+    GoRoute(
+      path: '/expert-terms',
+      name: 'expert_terms',
+      builder: (context, state) => const ExpertTermsScreen(),
+    ),
+    GoRoute(
+      path: '/expert-contact-support',
+      name: 'expert_contact_support',
+      builder: (context, state) => const ExpertContactSupportScreen(),
+    ),
+    GoRoute(
+      path: '/expert-privacy',
+      name: 'expert_privacy',
+      builder: (context, state) => const ExpertPrivacyScreen(),
+    ),
+
     // Note: Expert consultation and emergency routes will be added here
     // as the expert workflow screens are implemented
 
@@ -619,6 +652,7 @@ final router = GoRouter(
         return ConsultationCompletionScreen(
           expertName: extra?['expertName'] as String? ?? 'Chuyên Gia',
           expertSpecialty: extra?['expertSpecialty'] as String? ?? '',
+          expertAvatarUrl: extra?['expertAvatarUrl'] as String?,
           durationSeconds: extra?['durationSeconds'] as int? ?? 0,
           consultationId: extra?['consultationId'] as String? ?? '',
           consultationTime: extra?['consultationTime'] as DateTime?,

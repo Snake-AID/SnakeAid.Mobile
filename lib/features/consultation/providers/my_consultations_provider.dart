@@ -79,6 +79,11 @@ class MyConsultationsNotifier extends StateNotifier<MyConsultationsState> {
           pageSize: 10,
         ),
         _repository.getMyConsultations(
+          status: 'ExpertAbsentHandled',
+          pageNumber: 1,
+          pageSize: 10,
+        ),
+        _repository.getMyConsultations(
           status: 'AllAbsent',
           pageNumber: 1,
           pageSize: 10,
@@ -96,6 +101,7 @@ class MyConsultationsNotifier extends StateNotifier<MyConsultationsState> {
           ...results[4],
           ...results[5],
           ...results[6],
+          ...results[7],
         ])
           c.consultationId: c,
       };

@@ -24,6 +24,7 @@ class _ExpertConsultationCompletionScreenState
 
   bool _isSyncingSessionData = false;
   late String _patientName;
+  String? _patientAvatarUrl;
   late int _durationSeconds;
   late int _feeCost;
   DateTime? _sessionTime;
@@ -38,6 +39,7 @@ class _ExpertConsultationCompletionScreenState
         (widget.data['patientName'] as String?)?.trim().isNotEmpty == true
         ? (widget.data['patientName'] as String).trim()
         : 'Bệnh nhân';
+    _patientAvatarUrl = widget.data['patientAvatarUrl'] as String?;
     _durationSeconds = _toInt(widget.data['durationSeconds']);
     _feeCost = _toInt(widget.data['feeCost']);
     _sessionTime = widget.data['sessionTime'] as DateTime?;
@@ -101,6 +103,10 @@ class _ExpertConsultationCompletionScreenState
       setState(() {
         if (resolvedName.isNotEmpty) {
           _patientName = resolvedName;
+        }
+        final resolvedAvatar = (booking.userAvatarUrl ?? '').trim();
+        if (resolvedAvatar.isNotEmpty) {
+          _patientAvatarUrl = resolvedAvatar;
         }
         if (booking.feeCost > 0) {
           _feeCost = booking.feeCost;
@@ -262,16 +268,26 @@ class _ExpertConsultationCompletionScreenState
                                     decoration: BoxDecoration(
                                       color: _purple.withOpacity(0.1),
                                       shape: BoxShape.circle,
+                                      image: (_patientAvatarUrl ?? '').trim().isEmpty
+                                          ? null
+                                          : DecorationImage(
+                                              image: NetworkImage(
+                                                _patientAvatarUrl!.trim(),
+                                              ),
+                                              fit: BoxFit.cover,
+                                            ),
                                       border: Border.all(
                                         color: _purple.withOpacity(0.2),
                                         width: 2,
                                       ),
                                     ),
-                                    child: const Icon(
-                                      Icons.person,
-                                      color: _purple,
-                                      size: 30,
-                                    ),
+                                    child: (_patientAvatarUrl ?? '').trim().isEmpty
+                                        ? const Icon(
+                                            Icons.person,
+                                            color: _purple,
+                                            size: 30,
+                                          )
+                                        : null,
                                   ),
                                   Positioned(
                                     bottom: 0,

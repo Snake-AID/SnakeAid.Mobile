@@ -1,39 +1,63 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../auth/repository/auth_repository.dart';
+import 'rescuer_user_guide_screen.dart';
+import 'rescuer_contact_support_screen.dart';
+import 'rescuer_faq_screen.dart';
 
 class RescuerSettingsScreen extends ConsumerStatefulWidget {
   const RescuerSettingsScreen({super.key});
 
   @override
-  ConsumerState<RescuerSettingsScreen> createState() => _RescuerSettingsScreenState();
+  ConsumerState<RescuerSettingsScreen> createState() =>
+      _RescuerSettingsScreenState();
 }
 
 class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
   // Work Mode Settings
   bool _autoOnline = true;
-  bool _autoAcceptNearby = false;
-  double _requestRadius = 20.0;
-  int _maxConcurrentRequests = 3;
-  bool _workHoursOnly = false;
 
   // Notification Settings
   bool _pushNotifications = true;
-  bool _customerMessages = true;
-  bool _expertMessages = false;
-  bool _paymentNotifications = true;
-  bool _equipmentReminders = true;
-  bool _reviewNotifications = false;
+  bool _sosReadAloud = true;
+  bool _catchingReadAloud = true;
   bool _vibration = true;
-  final String _notificationSound = 'Urgent';
+  final String _notificationSound = 'Nam';
 
-  // Map Settings
-  final String _mapProvider = 'Google Maps';
-  bool _showTraffic = true;
-  bool _avoidHighways = false;
-  bool _avoidTollRoads = true;
-  final String _voiceLanguage = 'Tiếng Việt';
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _autoOnline = prefs.getBool('rescuer_autoOnline') ?? true;
+      _pushNotifications = prefs.getBool('rescuer_pushNotifications') ?? true;
+      _sosReadAloud = prefs.getBool('rescuer_sosReadAloud') ?? true;
+      _catchingReadAloud = prefs.getBool('rescuer_catchingReadAloud') ?? true;
+      _vibration = prefs.getBool('rescuer_vibration') ?? true;
+    });
+  }
+
+  Future<void> _saveSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('rescuer_autoOnline', _autoOnline);
+    await prefs.setBool('rescuer_pushNotifications', _pushNotifications);
+    await prefs.setBool('rescuer_sosReadAloud', _sosReadAloud);
+    await prefs.setBool('rescuer_catchingReadAloud', _catchingReadAloud);
+    await prefs.setBool('rescuer_vibration', _vibration);
+  }
+
+  Future<void> _setSettingAndSave(void Function() updateState) async {
+    setState(() {
+      updateState();
+    });
+    await _saveSettings();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,13 +83,9 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _buildAccountSection(),
-          const SizedBox(height: 16),
           _buildWorkModeSection(),
           const SizedBox(height: 16),
           _buildNotificationSection(),
-          const SizedBox(height: 16),
-          _buildMapSection(),
           const SizedBox(height: 16),
           _buildSupportSection(),
           const SizedBox(height: 24),
@@ -141,13 +161,13 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
                   children: [
                     const Text(
                       'Trạng thái',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Color(0xFF666666),
-                      ),
+                      style: TextStyle(fontSize: 15, color: Color(0xFF666666)),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF28A745).withOpacity(0.15),
                         borderRadius: BorderRadius.circular(20),
@@ -179,10 +199,7 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
         children: [
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 15,
-              color: Color(0xFF666666),
-            ),
+            style: const TextStyle(fontSize: 15, color: Color(0xFF666666)),
           ),
           Row(
             children: [
@@ -235,125 +252,7 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
               _buildSwitchRow(
                 'Chế độ Online tự động khi mở app',
                 _autoOnline,
-                (value) => setState(() => _autoOnline = value),
-              ),
-              const Divider(height: 1, color: Color(0xFFF0F0F0)),
-              _buildSwitchRow(
-                'Tự động chấp nhận yêu cầu gần (<1km)',
-                _autoAcceptNearby,
-                (value) => setState(() => _autoAcceptNearby = value),
-              ),
-              const Divider(height: 1, color: Color(0xFFF0F0F0)),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Bán kính nhận yêu cầu',
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: Color(0xFF231A0F),
-                          ),
-                        ),
-                        Text(
-                          '${_requestRadius.toInt()}km',
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFFFF8800),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    SliderTheme(
-                      data: SliderThemeData(
-                        trackHeight: 8,
-                        activeTrackColor: const Color(0xFFFF8800),
-                        inactiveTrackColor: const Color(0xFFE5E5E5),
-                        thumbColor: const Color(0xFFFF8800),
-                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
-                        overlayColor: const Color(0xFFFF8800).withOpacity(0.2),
-                      ),
-                      child: Slider(
-                        value: _requestRadius,
-                        min: 5,
-                        max: 50,
-                        divisions: 9,
-                        onChanged: (value) => setState(() => _requestRadius = value),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1, color: Color(0xFFF0F0F0)),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Số yêu cầu tối đa cùng lúc',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Color(0xFF231A0F),
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        IconButton(
-                          onPressed: _maxConcurrentRequests > 1
-                              ? () => setState(() => _maxConcurrentRequests--)
-                              : null,
-                          icon: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF5F5F5),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: const Icon(Icons.remove, size: 18, color: Color(0xFF666666)),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 32,
-                          child: Text(
-                            '$_maxConcurrentRequests',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF231A0F),
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: _maxConcurrentRequests < 10
-                              ? () => setState(() => _maxConcurrentRequests++)
-                              : null,
-                          icon: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF5F5F5),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: const Icon(Icons.add, size: 18, color: Color(0xFF666666)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1, color: Color(0xFFF0F0F0)),
-              _buildSwitchRow(
-                'Chỉ nhận yêu cầu trong giờ làm việc',
-                _workHoursOnly,
-                (value) => setState(() => _workHoursOnly = value),
+                (value) => _setSettingAndSave(() => _autoOnline = value),
               ),
             ],
           ),
@@ -394,107 +293,28 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
               _buildSwitchRow(
                 'Thông báo đẩy',
                 _pushNotifications,
-                (value) => setState(() => _pushNotifications = value),
-              ),
-              const Divider(height: 1, color: Color(0xFFF0F0F0)),
-              _buildLockedRow('Yêu cầu cứu hộ mới'),
-              const Divider(height: 1, color: Color(0xFFF0F0F0)),
-              _buildLockedRow('SOS khẩn cấp', hasRedDot: true),
-              const Divider(height: 1, color: Color(0xFFF0F0F0)),
-              _buildSwitchRow(
-                'Tin nhắn từ khách hàng',
-                _customerMessages,
-                (value) => setState(() => _customerMessages = value),
+                (value) => _setSettingAndSave(() => _pushNotifications = value),
               ),
               const Divider(height: 1, color: Color(0xFFF0F0F0)),
               _buildSwitchRow(
-                'Tin nhắn từ chuyên gia',
-                _expertMessages,
-                (value) => setState(() => _expertMessages = value),
+                'Âm thanh đọc yêu cầu rắn cắn',
+                _sosReadAloud,
+                (value) => _setSettingAndSave(() => _sosReadAloud = value),
               ),
               const Divider(height: 1, color: Color(0xFFF0F0F0)),
               _buildSwitchRow(
-                'Thanh toán & thu nhập',
-                _paymentNotifications,
-                (value) => setState(() => _paymentNotifications = value),
+                'Âm thanh đọc yêu cầu bắt rắn',
+                _catchingReadAloud,
+                (value) => _setSettingAndSave(() => _catchingReadAloud = value),
               ),
               const Divider(height: 1, color: Color(0xFFF0F0F0)),
-              _buildSwitchRow(
-                'Nhắc nhở bảo dưỡng thiết bị',
-                _equipmentReminders,
-                (value) => setState(() => _equipmentReminders = value),
-              ),
-              const Divider(height: 1, color: Color(0xFFF0F0F0)),
-              _buildSwitchRow(
-                'Đánh giá mới',
-                _reviewNotifications,
-                (value) => setState(() => _reviewNotifications = value),
-              ),
-              const Divider(height: 1, color: Color(0xFFF0F0F0)),
-              _buildDropdownRow('Âm thanh', _notificationSound),
+              _buildDropdownRow('Giọng nói', _notificationSound),
               const Divider(height: 1, color: Color(0xFFF0F0F0)),
               _buildSwitchRow(
                 'Rung',
                 _vibration,
-                (value) => setState(() => _vibration = value),
+                (value) => _setSettingAndSave(() => _vibration = value),
               ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMapSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          child: Text(
-            'Bản Đồ & Điều Hướng',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF231A0F),
-            ),
-          ),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              _buildDropdownRow('Bản đồ', _mapProvider),
-              const Divider(height: 1, color: Color(0xFFF0F0F0)),
-              _buildSwitchRow(
-                'Hiển thị giao thông real-time',
-                _showTraffic,
-                (value) => setState(() => _showTraffic = value),
-              ),
-              const Divider(height: 1, color: Color(0xFFF0F0F0)),
-              _buildSwitchRow(
-                'Tránh đường cao tốc',
-                _avoidHighways,
-                (value) => setState(() => _avoidHighways = value),
-              ),
-              const Divider(height: 1, color: Color(0xFFF0F0F0)),
-              _buildSwitchRow(
-                'Tránh đường thu phí',
-                _avoidTollRoads,
-                (value) => setState(() => _avoidTollRoads = value),
-              ),
-              const Divider(height: 1, color: Color(0xFFF0F0F0)),
-              _buildDropdownRow('Giọng nói', _voiceLanguage),
             ],
           ),
         ),
@@ -531,13 +351,30 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
           ),
           child: Column(
             children: [
-              _buildNavigationRow('Hướng dẫn sử dụng', () {}),
+              _buildNavigationRow('Hướng dẫn sử dụng', () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const RescuerUserGuideScreen(),
+                  ),
+                );
+              }),
               const Divider(height: 1, color: Color(0xFFF0F0F0)),
-              _buildNavigationRow('Liên hệ hỗ trợ', () {}),
+              _buildNavigationRow('Liên hệ hỗ trợ', () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const RescuerContactSupportScreen(),
+                  ),
+                );
+              }),
               const Divider(height: 1, color: Color(0xFFF0F0F0)),
-              _buildNavigationRow('Báo cáo sự cố', () {}),
-              const Divider(height: 1, color: Color(0xFFF0F0F0)),
-              _buildNavigationRow('Câu hỏi thường gặp', () {}),
+              _buildNavigationRow('Câu hỏi thường gặp', () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const RescuerFaqScreen()),
+                );
+              }),
             ],
           ),
         ),
@@ -558,63 +395,14 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
             style: OutlinedButton.styleFrom(
               foregroundColor: const Color(0xFFFF8800),
               side: const BorderSide(color: Color(0xFFFF8800), width: 2),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               padding: const EdgeInsets.symmetric(vertical: 16),
               backgroundColor: Colors.transparent,
             ),
             child: const Text(
               'Đăng Xuất',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        // Tạm ngừng hoạt động Button
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton(
-            onPressed: () {
-              // Show pause confirmation dialog
-            },
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF666666),
-              side: const BorderSide(color: Color(0xFFCCCCCC), width: 2),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              backgroundColor: Colors.transparent,
-            ),
-            child: const Text(
-              'Tạm ngừng hoạt động',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        // Xóa tài khoản Button
-        SizedBox(
-          width: double.infinity,
-          child: TextButton(
-            onPressed: () {
-              // Show delete account warning dialog
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFFDC3545),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              backgroundColor: Colors.transparent,
-            ),
-            child: const Text(
-              'Xóa tài khoản',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -631,50 +419,18 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
     return Column(
       children: [
         const Text(
-          'SnakeAid Rescuer v1.0.2 (Build 2025.12.10)',
-          style: TextStyle(
-            fontSize: 12,
-            color: Color(0xFF999999),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TextButton(
-              onPressed: () {},
-              child: const Text(
-                'Đánh giá ứng dụng',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF007AFF),
-                ),
-              ),
-            ),
-            const Text(
-              '|',
-              style: TextStyle(
-                fontSize: 12,
-                color: Color(0xFFCCCCCC),
-              ),
-            ),
-            TextButton(
-              onPressed: () {},
-              child: const Text(
-                'Chia sẻ',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF007AFF),
-                ),
-              ),
-            ),
-          ],
+          'SnakeAid Rescuer v1.0.0 (Build 2025.12.25)',
+          style: TextStyle(fontSize: 12, color: Color(0xFF999999)),
         ),
       ],
     );
   }
 
-  Widget _buildSwitchRow(String label, bool value, ValueChanged<bool> onChanged) {
+  Widget _buildSwitchRow(
+    String label,
+    bool value,
+    ValueChanged<bool> onChanged,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
@@ -683,10 +439,7 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
-                fontSize: 15,
-                color: Color(0xFF231A0F),
-              ),
+              style: const TextStyle(fontSize: 15, color: Color(0xFF231A0F)),
             ),
           ),
           const SizedBox(width: 16),
@@ -756,10 +509,7 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
         children: [
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 15,
-              color: Color(0xFF231A0F),
-            ),
+            style: const TextStyle(fontSize: 15, color: Color(0xFF231A0F)),
           ),
           Row(
             children: [
@@ -772,10 +522,7 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
                 ),
               ),
               const SizedBox(width: 4),
-              const Icon(
-                Icons.arrow_drop_down,
-                color: Color(0xFF666666),
-              ),
+              const Icon(Icons.arrow_drop_down, color: Color(0xFF666666)),
             ],
           ),
         ],
@@ -793,15 +540,9 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
           children: [
             Text(
               label,
-              style: const TextStyle(
-                fontSize: 15,
-                color: Color(0xFF231A0F),
-              ),
+              style: const TextStyle(fontSize: 15, color: Color(0xFF231A0F)),
             ),
-            const Icon(
-              Icons.chevron_right,
-              color: Color(0xFF999999),
-            ),
+            const Icon(Icons.chevron_right, color: Color(0xFF999999)),
           ],
         ),
       ),
@@ -813,9 +554,7 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Đăng xuất',
           style: TextStyle(
@@ -825,10 +564,7 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
         ),
         content: const Text(
           'Bạn có chắc muốn đăng xuất khỏi tài khoản?',
-          style: TextStyle(
-            fontSize: 14,
-            color: Color(0xFF666666),
-          ),
+          style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
         ),
         actions: [
           TextButton(
@@ -843,33 +579,31 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
               // Lấy navigator và router trước khi async operations
               final navigator = Navigator.of(context);
               final router = GoRouter.of(context);
-              
+
               // Đóng dialog xác nhận
               navigator.pop();
-              
+
               // Show loading
               showDialog(
                 context: context,
                 barrierDismissible: false,
                 builder: (loadingContext) => const Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xFFFF8800),
-                  ),
+                  child: CircularProgressIndicator(color: Color(0xFFFF8800)),
                 ),
               );
-              
+
               try {
                 // Call logout API
                 final authRepository = ref.read(authRepositoryProvider);
                 await authRepository.logout();
-                
+
                 // Navigate sử dụng router đã lấy trước đó
                 router.go('/role-selection');
               } catch (e) {
                 // Close loading dialog nếu có lỗi
                 if (mounted) {
                   navigator.pop();
-                  
+
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(e.toString().replaceAll('Exception: ', '')),
