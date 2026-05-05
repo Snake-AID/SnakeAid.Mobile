@@ -480,7 +480,7 @@ class _EmergencyTrackingScreenState
 
     // 🚨 Rescuer accepts → update state in place (no screen transition needed)
     _missionHubSubscriptions.add(
-      svc.rescuerAcceptedStream.listen((data) {
+      svc.rescuerAcceptedStream.listen((data) async {
         if (!mounted) return;
         debugPrint(
           '🚨 TrackingScreen: RescuerAccepted – updating rescuer state',
@@ -489,6 +489,14 @@ class _EmergencyTrackingScreenState
           _effectiveMissionId = data.missionId;
           _effectiveRescuerId = data.rescuerId;
         });
+
+        final incidentId =
+            widget.incidentId ?? ref.read(activeIncidentProvider).incident?.id;
+        if (incidentId != null) {
+          await ref
+              .read(detailedIncidentProvider.notifier)
+              .loadDetailedIncident(incidentId, forceRefresh: true);
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('🚑 Đã tìm thấy đội cứu hộ! Đang trên đường đến...'),
@@ -626,7 +634,7 @@ class _EmergencyTrackingScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '🚫 Đội cứu hộ đã hủy nhiệm vụ${reason.isNotEmpty ? ": $reason" : ""}. Đang tìm đội cứu hộ khác...',
+              'Đội cứu hộ đã hủy nhiệm vụ${reason.isNotEmpty ? ": $reason" : ""}. Đang tìm đội cứu hộ khác...',
             ),
             backgroundColor: const Color(0xFFFF9800),
             duration: const Duration(seconds: 5),
@@ -1204,11 +1212,10 @@ class _EmergencyTrackingScreenState
     String? selectedReason;
 
     final reasons = <Map<String, String>>[
-      {'value': 'location_unreachable', 'label': 'Không thể đến vị trí'},
-      {'value': 'resolved_by_self', 'label': 'Đã tự xử lý xong'},
-      {'value': 'not_needed', 'label': 'Không cần cứu hộ nữa'},
-      {'value': 'wrong_location', 'label': 'Nhập sai địa điểm'},
-      {'value': 'other', 'label': 'Lý do khác'},
+      {'value': 'Đã tự xử lý xong', 'label': 'Đã tự xử lý xong'},
+      {'value': 'Không cần cứu hộ nữa', 'label': 'Không cần cứu hộ nữa'},
+      {'value': 'Nhập sai địa điểm', 'label': 'Nhập sai địa điểm'},
+      {'value': 'Lý do khác', 'label': 'Lý do khác'},
     ];
 
     final result = await showDialog<String>(
@@ -1682,30 +1689,62 @@ class _EmergencyTrackingScreenState
   // ── Bottom sheet sections ─────────────────────────────────────────────────
 
   Widget _buildRescuerInfoRow() {
+    final incident = ref.watch(detailedIncidentProvider).incident;
+    final rescuer = incident?.assignedRescuer;
+    final rescuerName = rescuer?.account?.fullName?.trim();
+    final avatarUrl = rescuer?.account?.avatarUrl;
+    final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
+
     return Row(
       children: [
-        Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: const Color(0xFF228B22),
-            border: Border.all(color: const Color(0xFFF3F4F6), width: 2),
+        if (hasAvatar)
+          ClipOval(
+            child: Image.network(
+              avatarUrl,
+              width: 52,
+              height: 52,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF228B22),
+                  border: Border.all(color: const Color(0xFFF3F4F6), width: 2),
+                ),
+                child: const Icon(
+                  Icons.medical_services,
+                  color: Colors.white,
+                  size: 26,
+                ),
+              ),
+            ),
+          )
+        else
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF228B22),
+              border: Border.all(color: const Color(0xFFF3F4F6), width: 2),
+            ),
+            child: const Icon(
+              Icons.medical_services,
+              color: Colors.white,
+              size: 26,
+            ),
           ),
-          child: const Icon(
-            Icons.medical_services,
-            color: Colors.white,
-            size: 26,
-          ),
-        ),
         const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Đội cứu hộ',
-                style: TextStyle(
+              Text(
+                (rescuerName != null && rescuerName.isNotEmpty)
+                    ? rescuerName
+                    : 'Đội cứu hộ',
+                style: const TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF191910),

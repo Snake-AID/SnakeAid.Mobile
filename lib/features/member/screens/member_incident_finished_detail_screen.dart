@@ -1797,7 +1797,8 @@ class _MemberIncidentFinishedDetailScreenState
   Widget _buildStatusOverview(DetailedIncidentData incident) {
     final occurredAt = incident.incidentOccurredAt ?? DateTime.now();
     final elapsed = DateTime.now().difference(occurredAt);
-    final hours = elapsed.inHours;
+    final days = elapsed.inDays;
+    final hours = elapsed.inHours % 24;
     final minutes = elapsed.inMinutes % 60;
 
     final isFinished = incident.status == IncidentStatus.finished;
@@ -1830,9 +1831,11 @@ class _MemberIncidentFinishedDetailScreenState
         ? Icons.directions_run_rounded
         : Icons.local_hospital_rounded;
 
-    final elapsedText = hours > 0
-        ? 'Đã xảy ra $hours giờ $minutes phút trước'
-        : 'Đã xảy ra $minutes phút trước';
+    final elapsedText = days > 0
+        ? 'Đã xảy ra $days ngày $hours giờ trước'
+        : (hours > 0
+              ? 'Đã xảy ra $hours giờ $minutes phút trước'
+              : 'Đã xảy ra $minutes phút trước');
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -1980,6 +1983,7 @@ class _MemberIncidentFinishedDetailScreenState
   }
 
   Widget _buildIncidentInfoCard(DetailedIncidentData incident) {
+    final mission = incident.activeMission;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
@@ -2026,13 +2030,11 @@ class _MemberIncidentFinishedDetailScreenState
             child: Column(
               children: [
                 _infoRowIcon(
-                  Icons.medical_services_outlined,
                   'Mức độ',
                   incident.severityText,
                   const Color(0xFFDC3545),
                 ),
                 _infoRowIcon(
-                  Icons.access_time,
                   'Thời gian',
                   DateFormat('dd/MM/yyyy  HH:mm').format(
                     (incident.incidentOccurredAt ?? DateTime.now()).toLocal(),
@@ -2040,13 +2042,11 @@ class _MemberIncidentFinishedDetailScreenState
                   const Color(0xFF2196F3),
                 ),
                 _infoRowIcon(
-                  Icons.location_on,
                   'Địa chỉ',
                   incident.address ?? 'Chưa có',
                   const Color(0xFF228B22),
                 ),
                 _infoRowIcon(
-                  Icons.gps_fixed,
                   'Tọa độ',
                   '${incident.locationCoordinates.latitude.toStringAsFixed(6)}, '
                       '${incident.locationCoordinates.longitude.toStringAsFixed(6)}',
@@ -2054,18 +2054,28 @@ class _MemberIncidentFinishedDetailScreenState
                 ),
                 if (incident.symptomsReport?.isNotEmpty ?? false)
                   _infoRowIcon(
-                    Icons.healing,
                     'Triệu chứng',
                     incident.symptomsReport!
                         .map((e) => e.symptomName)
-                        .join(', '),
+                        .join('; '),
                     const Color(0xFFFF9800),
                   ),
                 if (incident.identifiedSnakeSpecies != null)
                   _infoRowIcon(
-                    Icons.pest_control,
                     'Loài rắn',
                     incident.identifiedSnakeSpecies!.commonName,
+                    const Color(0xFF7B1FA2),
+                  ),
+                if (mission != null)
+                  _infoRowIcon(
+                    'Cần nhập viện',
+                    mission.requiresHospitalization == true ? 'Có' : 'Không',
+                    const Color(0xFF7B1FA2),
+                  ),
+                if (mission?.hospital != null)
+                  _infoRowIcon(
+                    'Bệnh viện chuyển đến',
+                    mission!.hospital?.hospitalName ?? 'Chưa có',
                     const Color(0xFF7B1FA2),
                   ),
               ],
@@ -2630,19 +2640,19 @@ class _MemberIncidentFinishedDetailScreenState
     );
   }
 
-  Widget _infoRowIcon(IconData icon, String label, String value, Color color) {
+  Widget _infoRowIcon(String label, String value, Color color) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(6),
+            width: 2,
+            height: 24,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(6),
+              color: color,
+              borderRadius: BorderRadius.circular(2),
             ),
-            child: Icon(icon, size: 14, color: color),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -2657,7 +2667,7 @@ class _MemberIncidentFinishedDetailScreenState
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 1),
+                const SizedBox(height: 4),
                 Text(
                   value,
                   style: const TextStyle(

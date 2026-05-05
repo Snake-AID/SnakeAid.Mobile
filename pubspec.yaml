@@ -99,6 +99,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.10.0
 
   # Linting
   flutter_lints: ^5.0.0
@@ -125,6 +126,11 @@ flutter:
     - assets/sounds/
     - .env
 
+# flutter_launcher_icons configuration (root-level)
+flutter_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/logo/snakeaid_logo.png"
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 
