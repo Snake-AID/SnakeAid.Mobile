@@ -80,22 +80,24 @@ class _MemberHomeScreenState extends ConsumerState<MemberHomeScreen>
           String? city = address['city'] ?? address['state'] ?? address['province'] ?? address['town'];
           if (city != null) {
             final normalized = city.toLowerCase();
-            final isSupported = normalized.contains('hồ chí minh') ||
-                                normalized.contains('ho chi minh') ||
-                                normalized.contains('bình dương') ||
-                                normalized.contains('binh duong') ||
-                                normalized.contains('thủ đức') ||
-                                normalized.contains('thu duc') ||
-                                normalized.contains('vũng tàu') ||
-                                normalized.contains('vung tau');
+            final isHcmGroup = normalized.contains('hồ chí minh') ||
+                               normalized.contains('ho chi minh') ||
+                               normalized.contains('bình dương') ||
+                               normalized.contains('binh duong') ||
+                               normalized.contains('thủ đức') ||
+                               normalized.contains('thu duc') ||
+                               normalized.contains('vũng tàu') ||
+                               normalized.contains('vung tau');
 
-            final isNotSupportedHCM = normalized.contains('đồng nai') ||
-                                normalized.contains('dong nai');
+            final isDongNai = normalized.contains('đồng nai') ||
+                              normalized.contains('dong nai');
             
-            // Gộp chung hiển thị là "Thành phố Hồ Chí Minh" cho các khu vực lân cận
-            if (isSupported) {
+            final isSupported = isHcmGroup || isDongNai;
+            
+            // Gộp chung hiển thị cho HCM và các khu vực lân cận, giữ nguyên Đồng Nai
+            if (isHcmGroup) {
               city = 'TP.HCM';
-            } else if (isNotSupportedHCM) {
+            } else if (isDongNai) {
               city = 'Đồng Nai';
             }
             
