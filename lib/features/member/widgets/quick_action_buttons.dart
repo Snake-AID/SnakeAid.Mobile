@@ -4,15 +4,33 @@ import 'package:flutter/material.dart';
 class QuickActionButtons extends StatelessWidget {
   final VoidCallback onCameraPressed;
   final VoidCallback onConsultationPressed;
+  final bool isLocationSupported;
 
   const QuickActionButtons({
     super.key,
     required this.onCameraPressed,
     required this.onConsultationPressed,
+    this.isLocationSupported = true,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (!isLocationSupported) {
+      return _buildModernCard(
+        onTap: onConsultationPressed,
+        backgroundColor: Colors.white,
+        icon: Icons.support_agent_rounded,
+        iconBackgroundColor: const Color(0xFF228B22).withOpacity(0.1),
+        iconColor: const Color(0xFF228B22),
+        title: 'Tư vấn Chuyên gia',
+        titleColor: const Color(0xFF228B22),
+        subtitle: 'Kết nối ngay với chuyên gia rắn',
+        subtitleColor: Colors.grey[600]!,
+        shadowColor: Colors.black.withOpacity(0.05),
+        borderColor: Colors.grey[200],
+      );
+    }
+
     return Row(
       children: [
         // AI Camera Button (Primary Action)
