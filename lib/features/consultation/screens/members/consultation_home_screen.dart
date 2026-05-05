@@ -35,6 +35,7 @@ class _ConsultationItem {
   final String expertSpecialty;
   final String? expertAvatarUrl;
   final DateTime scheduledTime;
+  final int scheduledDurationSeconds;
   final DateTime? requestedAt;
   final DateTime? respondedAt;
   final ConsultationStatus status;
@@ -57,6 +58,7 @@ class _ConsultationItem {
     required this.expertSpecialty,
     this.expertAvatarUrl,
     required this.scheduledTime,
+    required this.scheduledDurationSeconds,
     this.requestedAt,
     this.respondedAt,
     required this.status,
@@ -75,6 +77,12 @@ class _ConsultationItem {
   factory _ConsultationItem.fromConsultation(MyConsultationResponse c) {
     final now = DateTime.now();
     final scheduledAt = c.startTime ?? c.slotStartTime ?? DateTime.now();
+    final slotStart = c.slotStartTime ?? c.startTime;
+    final slotEnd = c.slotEndTime ?? c.endTime;
+    final scheduledDurationSeconds =
+      (slotStart != null && slotEnd != null)
+        ? slotEnd.difference(slotStart).inSeconds
+        : 1800;
 
     final ConsultationStatus uiStatus;
     if (c.status == MyConsultationStatus.completed) {
@@ -115,6 +123,7 @@ class _ConsultationItem {
       expertSpecialty: '',
       expertAvatarUrl: c.expertAvatarUrl,
       scheduledTime: scheduledAt,
+      scheduledDurationSeconds: scheduledDurationSeconds,
       requestedAt: null,
       respondedAt: null,
       status: uiStatus,
@@ -148,6 +157,7 @@ class _ConsultationItem {
       expertSpecialty: '',
       expertAvatarUrl: instant.expertAvatarUrl,
       scheduledTime: happenedAt,
+      scheduledDurationSeconds: 1800,
       requestedAt: instant.requestedAt,
       respondedAt: instant.respondedAt,
       status: status,
@@ -220,6 +230,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
         expertSpecialty: item.expertSpecialty,
         expertAvatarUrl: item.expertAvatarUrl,
         scheduledTime: item.scheduledTime,
+        scheduledDurationSeconds: item.scheduledDurationSeconds,
         requestedAt: item.requestedAt,
         respondedAt: item.respondedAt,
         status: item.status,
@@ -301,6 +312,10 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
             expertSpecialty: b.expertSpecialty ?? '',
             expertAvatarUrl: b.expertAvatarUrl,
             scheduledTime: b.scheduledTime,
+            scheduledDurationSeconds:
+                (b.slotStartTime != null && b.slotEndTime != null)
+                    ? b.slotEndTime!.difference(b.slotStartTime!).inSeconds
+                    : 1800,
             requestedAt: null,
             respondedAt: null,
             status: b.status == ConsultationBookingStatus.pendingPayment
@@ -398,6 +413,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
       expertSpecialty: item.expertSpecialty,
       expertAvatarUrl: item.expertAvatarUrl,
       scheduledTime: item.scheduledTime,
+      scheduledDurationSeconds: item.scheduledDurationSeconds,
       requestedAt: item.requestedAt,
       respondedAt: item.respondedAt,
       status: item.status,
@@ -635,26 +651,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
               textAlign: TextAlign.center,
             ),
           ),
-          // Nút lịch sử thanh toán
-          InkWell(
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Lịch sử thanh toán - Đang phát triển'),
-                ),
-              );
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.receipt_long_outlined,
-                color: Color(0xFF1F2937),
-              ),
-            ),
-          ),
+          const SizedBox(width: 40, height: 40),
         ],
       ),
     );
@@ -1497,7 +1494,12 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
 
   Widget _buildAvatar(_ConsultationItem item, {bool greyed = false}) {
     final avatarUrl = (item.expertAvatarUrl ?? '').trim();
-    final hasAvatar = avatarUrl.isNotEmpty;
+    final displayName = item.expertName.trim();
+    final fallbackUrl = displayName.isNotEmpty
+        ? 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(displayName)}&background=228B22&color=fff&size=200'
+        : '';
+    final resolvedUrl = avatarUrl.isNotEmpty ? avatarUrl : fallbackUrl;
+    final hasAvatar = resolvedUrl.isNotEmpty;
     return Container(
       width: 52,
       height: 52,
@@ -1508,7 +1510,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
             : const Color(0xFF228B22).withOpacity(0.1),
         image: hasAvatar
             ? DecorationImage(
-                image: NetworkImage(avatarUrl),
+                image: NetworkImage(resolvedUrl),
                 fit: BoxFit.cover,
               )
             : null,
@@ -1805,6 +1807,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
         'expertSpecialty': item.expertSpecialty,
         'canReportExpertAbsent': item.canReportExpertAbsent,
         'scheduledStartAtMs': item.scheduledTime.millisecondsSinceEpoch,
+        'scheduledDurationSeconds': item.scheduledDurationSeconds,
       },
     );
   }

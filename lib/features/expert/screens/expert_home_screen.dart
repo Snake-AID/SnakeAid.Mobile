@@ -2580,6 +2580,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
         'userId': c.userId,
         'expertId': c.expertId,
         'patientName': c.patientName,
+        'patientAvatarUrl': c.patientAvatarUrl,
         'patientPhone': c.patientPhone,
         'consultationType': c.consultationType,
         'snakeSuspect': c.snakeSuspect,
@@ -2973,9 +2974,18 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
     );
   }
 
-  Widget _buildPatientAvatar(String? avatarUrl, {double size = 40}) {
+  Widget _buildPatientAvatar(
+    String? avatarUrl, {
+    required String displayName,
+    double size = 40,
+  }) {
     final url = (avatarUrl ?? '').trim();
-    final hasAvatar = url.isNotEmpty;
+    final name = displayName.trim();
+    final fallbackUrl = name.isNotEmpty
+        ? 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}&background=6C47C2&color=fff&size=200'
+        : '';
+    final resolvedUrl = url.isNotEmpty ? url : fallbackUrl;
+    final hasAvatar = resolvedUrl.isNotEmpty;
     return Container(
       width: size,
       height: size,
@@ -2983,7 +2993,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
         shape: BoxShape.circle,
         color: _purple.withOpacity(0.08),
         image: hasAvatar
-            ? DecorationImage(image: NetworkImage(url), fit: BoxFit.cover)
+            ? DecorationImage(image: NetworkImage(resolvedUrl), fit: BoxFit.cover)
             : null,
       ),
       child: hasAvatar
@@ -3115,6 +3125,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                                 children: [
                                   _buildPatientAvatar(
                                     c.patientAvatarUrl,
+                                    displayName: c.patientName,
                                     size: 36,
                                   ),
                                   const SizedBox(width: 8),
@@ -3152,28 +3163,6 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                                 ),
                             ],
                           ),
-                        ),
-                        // Snake image placeholder
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: c.hasSnakeImage
-                                ? const Color(0xFFDC3545).withOpacity(0.08)
-                                : Colors.grey[100],
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: c.hasSnakeImage
-                              ? const Icon(
-                                  Icons.dangerous,
-                                  color: Color(0xFFDC3545),
-                                  size: 28,
-                                )
-                              : const Icon(
-                                  Icons.image_not_supported,
-                                  color: Color(0xFFCCCCCC),
-                                  size: 24,
-                                ),
                         ),
                       ],
                     ),
@@ -3461,7 +3450,11 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
         children: [
           Row(
             children: [
-              _buildPatientAvatar(item.patientAvatarUrl, size: 44),
+              _buildPatientAvatar(
+                item.patientAvatarUrl,
+                displayName: item.patientName,
+                size: 44,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -3677,7 +3670,11 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
         children: [
           Row(
             children: [
-              _buildPatientAvatar(instant.userAvatarUrl, size: 44),
+              _buildPatientAvatar(
+                instant.userAvatarUrl,
+                displayName: instant.userName,
+                size: 44,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

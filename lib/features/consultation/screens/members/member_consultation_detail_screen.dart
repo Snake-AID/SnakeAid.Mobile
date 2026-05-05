@@ -65,6 +65,7 @@ class MemberConsultationDetailScreen extends StatelessWidget {
               children: [
                 _Avatar(
                   avatarUrl: expertAvatarUrl,
+                  displayName: expertName,
                   fallbackColor: _primary.withOpacity(0.1),
                   iconColor: _primary,
                 ),
@@ -334,11 +335,13 @@ class _SectionCard extends StatelessWidget {
 
 class _Avatar extends StatelessWidget {
   final String? avatarUrl;
+  final String? displayName;
   final Color fallbackColor;
   final Color iconColor;
 
   const _Avatar({
     this.avatarUrl,
+    this.displayName,
     required this.fallbackColor,
     required this.iconColor,
   });
@@ -346,7 +349,12 @@ class _Avatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final url = (avatarUrl ?? '').trim();
-    final hasAvatar = url.isNotEmpty;
+    final name = (displayName ?? '').trim();
+    final fallbackUrl = name.isNotEmpty
+        ? 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}&background=228B22&color=fff&size=200'
+        : '';
+    final resolvedUrl = url.isNotEmpty ? url : fallbackUrl;
+    final hasAvatar = resolvedUrl.isNotEmpty;
     return Container(
       width: 52,
       height: 52,
@@ -354,7 +362,10 @@ class _Avatar extends StatelessWidget {
         shape: BoxShape.circle,
         color: fallbackColor,
         image: hasAvatar
-            ? DecorationImage(image: NetworkImage(url), fit: BoxFit.cover)
+            ? DecorationImage(
+                image: NetworkImage(resolvedUrl),
+                fit: BoxFit.cover,
+              )
             : null,
       ),
       child: hasAvatar ? null : Icon(Icons.person, color: iconColor),
