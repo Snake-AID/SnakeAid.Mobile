@@ -150,6 +150,47 @@ class _ExpertUserGuideScreenState extends ConsumerState<ExpertUserGuideScreen> {
     ),
   ];
 
+  final List<GuideStep> withdrawalSteps = [
+    GuideStep(
+      number: 1,
+      title: 'Truy cập Quản lý thu nhập',
+      description: 'Mở tab "Cá nhân" và chọn mục "Quản lý thu nhập".',
+      details: [
+        'Bạn sẽ thấy số dư khả dụng trong ví SnakeAidPay',
+        'Kiểm tra lịch sử các phiên tư vấn đã được quyết toán',
+      ],
+    ),
+    GuideStep(
+      number: 2,
+      title: 'Chọn Rút tiền',
+      description: 'Nhấn vào nút "Rút tiền" trên màn hình quản lý.',
+      details: [
+        'Nhập số tiền bạn muốn rút (tối thiểu 50,000đ)',
+        'Đảm bảo số dư trong ví đủ để thực hiện lệnh',
+      ],
+    ),
+    GuideStep(
+      number: 3,
+      title: 'Nhập thông tin ngân hàng',
+      description: 'Cung cấp thông tin tài khoản nhận tiền chính xác.',
+      details: [
+        'Chọn ngân hàng từ danh sách hỗ trợ',
+        'Nhập số tài khoản và tên chủ tài khoản (viết hoa không dấu)',
+      ],
+    ),
+    GuideStep(
+      number: 4,
+      title: 'Xác nhận và chờ xử lý',
+      description: 'Kiểm tra lại thông tin và xác nhận lệnh rút tiền.',
+      details: [
+        'Lệnh sẽ được gửi tới bộ phận kế toán',
+        'Tiền sẽ được chuyển vào tài khoản trong vòng 1-3 ngày làm việc',
+      ],
+    ),
+  ];
+
+  int? _expandedWithdrawalStep;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -223,6 +264,32 @@ class _ExpertUserGuideScreenState extends ConsumerState<ExpertUserGuideScreen> {
                         _expandedScheduledStep = _expandedScheduledStep == index
                             ? null
                             : index;
+                      });
+                    },
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 32),
+
+            // SECTION 3: Withdrawal
+            _buildSectionHeader(
+              'Hướng dẫn rút tiền',
+              description: 'Quy trình nhận thu nhập từ hệ thống',
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: List.generate(
+                  withdrawalSteps.length,
+                  (index) => _buildExpandableStep(
+                    step: withdrawalSteps[index],
+                    isExpanded: _expandedWithdrawalStep == index,
+                    onTap: () {
+                      setState(() {
+                        _expandedWithdrawalStep =
+                            _expandedWithdrawalStep == index ? null : index;
                       });
                     },
                   ),

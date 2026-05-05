@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../auth/repository/auth_repository.dart';
+import 'member_contact_support_screen.dart';
+import 'member_faq_screen.dart';
 /// Settings Screen - App settings and preferences
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -234,6 +236,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: 'Quy định giao dịch, nạp/rút tiền',
             onTap: _showPaymentPolicy,
           ),
+          const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFEEEEEE)),
+          _buildPolicyItem(
+            icon: Icons.help_outline_rounded,
+            iconColor: const Color(0xFF673AB7),
+            title: 'Câu hỏi thường gặp',
+            subtitle: 'Giải đáp thắc mắc phổ biến',
+            onTap: _showFaq,
+          ),
+          const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFEEEEEE)),
+          _buildPolicyItem(
+            icon: Icons.support_agent_rounded,
+            iconColor: const Color(0xFFE91E63),
+            title: 'Liên hệ hỗ trợ',
+            subtitle: 'Gửi yêu cầu trợ giúp trực tiếp',
+            onTap: _showContactSupport,
+          ),
         ],
       ),
     );
@@ -433,6 +451,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showFaq() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const MemberFaqScreen()),
+    );
+  }
+
+  void _showContactSupport() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const MemberContactSupportScreen()),
     );
   }
 
