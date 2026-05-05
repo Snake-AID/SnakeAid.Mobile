@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../auth/repository/auth_repository.dart';
+import 'expert_payment_screen.dart';
 
 /// Expert Settings Screen - Minimalist design with only essential settings
 class ExpertSettingsScreen extends ConsumerStatefulWidget {
@@ -139,6 +140,20 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
                   subtitle: 'Nhận trợ giúp nhanh chóng từ đội Expert',
                   onTap: () {
                     context.pushNamed('expert_contact_support');
+                  },
+                ),
+                const Divider(height: 1),
+                _buildSupportLink(
+                  icon: Icons.account_balance_wallet_outlined,
+                  title: 'Chính sách thanh toán',
+                  subtitle: 'Quy định về chi trả và rút tiền',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ExpertPaymentScreen(),
+                      ),
+                    );
                   },
                 ),
                 const Divider(height: 1),

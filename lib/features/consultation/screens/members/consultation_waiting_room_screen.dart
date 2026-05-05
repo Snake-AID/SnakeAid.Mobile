@@ -13,6 +13,8 @@ class ConsultationWaitingRoomScreen extends ConsumerStatefulWidget {
   final bool canReportExpertAbsent;
   /// Scheduled start time (epoch ms) used for StartTime business rule.
   final int? scheduledStartAtMs;
+  /// Scheduled duration used to render the schedule time range.
+  final int scheduledDurationSeconds;
   /// true khi quay lại từ cuộc gọi đã kết thúc → hiện nút "Xác nhận hoàn thành"
   final bool showCompleteButton;
   final int durationSeconds;
@@ -28,6 +30,7 @@ class ConsultationWaitingRoomScreen extends ConsumerStatefulWidget {
     required this.expertSpecialty,
     this.canReportExpertAbsent = false,
     this.scheduledStartAtMs,
+    this.scheduledDurationSeconds = 1800,
     this.showCompleteButton = false,
     this.durationSeconds = 0,
     this.initialMicOn = true,
@@ -138,8 +141,11 @@ class _ConsultationWaitingRoomScreenState
       extra: {
         'expertName': widget.expertName,
         'expertSpecialty': widget.expertSpecialty,
+        'canReportExpertAbsent': widget.canReportExpertAbsent,
         'initialMicOn': _isMicOn,
         'initialCameraOn': _isCameraOn,
+        'scheduledStartAtMs': widget.scheduledStartAtMs,
+        'scheduledDurationSeconds': widget.scheduledDurationSeconds,
         'livekitToken': livekitResult.token,
         'wsUrl': livekitResult.wsUrl,
       },
@@ -150,36 +156,95 @@ class _ConsultationWaitingRoomScreenState
     // Show confirmation dialog first
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Kết Thúc Tư Vấn?',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        content: const Text(
-          'Bạn có chắc chắn muốn kết thúc buổi tư vấn này không?\nSau khi kết thúc, bạn sẽ không thể quay lại cuộc gọi.',
-          style: TextStyle(fontSize: 15),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.rectangle,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 10,
+                offset: Offset(0, 10),
               ),
-            ),
-            child: const Text(
-              'Kết Thúc',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
+            ],
           ),
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Kết Thúc Tư Vấn?',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF160D1B),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Bạn có chắc chắn muốn kết thúc buổi tư vấn này không? Sau khi kết thúc, bạn sẽ không thể quay lại cuộc gọi.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Color(0xFF6B7280),
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 28),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      child: Text(
+                        'Hủy',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Kết Thúc',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
 
@@ -228,57 +293,16 @@ class _ConsultationWaitingRoomScreenState
   Future<void> _showReportExpertAbsentDialog() async {
     if (_isReportingAbsent) return;
 
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
+    final result = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text(
-            'Báo Cáo Chuyên Gia Vắng Mặt',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Vui lòng mô tả ngắn gọn để hệ thống xác minh và xử lý.',
-                style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                minLines: 3,
-                maxLines: 6,
-                maxLength: 2000,
-                decoration: InputDecoration(
-                  hintText: 'Ví dụ: Đã đến giờ hẹn nhưng chuyên gia chưa vào phòng tư vấn.',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Hủy'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, controller.text),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Gửi báo cáo'),
-            ),
-          ],
-        );
+        return const _ReportExpertAbsentModalContent();
       },
     );
 
+    // Only process result after sheet is completely closed and controller disposed
     final report = (result ?? '').trim();
     if (report.isEmpty || !mounted) return;
 
@@ -622,7 +646,7 @@ class _ConsultationWaitingRoomScreenState
                               size: 16, color: Color(0xFF6B7280)),
                           const SizedBox(width: 4),
                           Text(
-                            'Lịch: ${_formatTimeRange(widget.scheduledStartAtMs, widget.durationSeconds)}',
+                            'Lịch: ${_formatTimeRange(widget.scheduledStartAtMs, widget.scheduledDurationSeconds)}',
                             style: const TextStyle(
                                 fontSize: 13,
                                 color: Color(0xFF6B7280),
@@ -796,5 +820,303 @@ class _ConsultationWaitingRoomScreenState
     final m2 = end.minute.toString().padLeft(2, '0');
     
     return '$h1:$m1 - $h2:$m2';
+  }
+}
+
+/// Separate widget to avoid StatefulBuilder lifecycle issues
+class _ReportExpertAbsentModalContent extends StatefulWidget {
+  const _ReportExpertAbsentModalContent();
+
+  @override
+  State<_ReportExpertAbsentModalContent> createState() =>
+      _ReportExpertAbsentModalContentState();
+}
+
+class _ReportExpertAbsentModalContentState
+    extends State<_ReportExpertAbsentModalContent> {
+  late TextEditingController _controller;
+  late bool _isFilled;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+    _isFilled = _controller.text.trim().isNotEmpty;
+    _controller.addListener(_onTextChanged);
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_onTextChanged);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onTextChanged() {
+    final newFilled = _controller.text.trim().isNotEmpty;
+    if (_isFilled != newFilled) {
+      setState(() => _isFilled = newFilled);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.86,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.max,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 18,
+              ),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.16),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.report_problem_outlined,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Báo cáo chuyên gia vắng mặt',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Gửi thông tin để hệ thống xác minh và xử lý nhanh hơn.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.white70,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: const Color(0xFFBBF7D0),
+                        ),
+                      ),
+                      child: const Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 18,
+                            color: Color(0xFF228B22),
+                          ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Mô tả ngắn gọn tình huống, ví dụ: đã đến giờ hẹn nhưng chuyên gia chưa vào phòng tư vấn.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF374151),
+                                height: 1.45,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Nội dung báo cáo',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _controller,
+                      minLines: 5,
+                      maxLines: 8,
+                      maxLength: 2000,
+                      decoration: InputDecoration(
+                        hintText:
+                            'Ví dụ: Đã đến giờ hẹn nhưng chuyên gia chưa vào phòng tư vấn.',
+                        hintStyle: TextStyle(
+                          color: Colors.grey.shade500,
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF9FAFB),
+                        contentPadding:
+                            const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE5E7EB),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE5E7EB),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF228B22),
+                            width: 1.6,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.shield_outlined,
+                          size: 16,
+                          color: Color(0xFF6B7280),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Thông tin sẽ được gửi đến admin để kiểm tra và xử lý.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                border: Border(
+                  top: BorderSide(color: Colors.grey.shade200),
+                ),
+              ),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: _isFilled
+                          ? () => Navigator.pop(
+                                context,
+                                _controller.text.trim(),
+                              )
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF228B22),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: Colors.grey.shade300,
+                        disabledForegroundColor: Colors.white70,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Gửi báo cáo',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.grey.shade700,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Hủy',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

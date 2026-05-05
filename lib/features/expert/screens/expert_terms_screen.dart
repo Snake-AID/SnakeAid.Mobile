@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/expert_services_and_terms_provider.dart';
 
 /// Expert Terms Screen - Terms of service for experts
 class ExpertTermsScreen extends ConsumerWidget {
@@ -45,7 +46,6 @@ class ExpertTermsScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: const [
-                
                   Text(
                     'Điều Khoản & Điều Kiện',
                     style: TextStyle(
@@ -85,7 +85,7 @@ class ExpertTermsScreen extends ConsumerWidget {
             _buildSection(
               title: '4. Giá Dịch Vụ',
               content:
-                  'Bạn có quyền thiết lập giá tư vấn của mình. Nền tảng sẽ thu phí hoa hồng 10% trên mỗi giao dịch. Ví dụ: Nếu bạn tính giá 100,000 VNĐ, bạn sẽ nhận 90,000 VNĐ. Các thay đổi giá sẽ có hiệu lực trong vòng 24 giờ.',
+                  'Bạn có quyền thiết lập giá tư vấn của mình. Nền tảng sẽ thu phí hoa hồng 20% trên mỗi giao dịch. Ví dụ: Nếu bạn tính giá 100,000 VNĐ, bạn sẽ nhận 90,000 VNĐ. Các thay đổi giá sẽ có hiệu lực trong vòng 24 giờ.',
             ),
             _buildSection(
               title: '5. Thanh Toán',
@@ -119,7 +119,10 @@ class ExpertTermsScreen extends ConsumerWidget {
             ),
             Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 margin: const EdgeInsets.only(top: 8),
                 decoration: BoxDecoration(
                   color: const Color(0xFF6C47C2).withOpacity(0.08),

@@ -6,6 +6,7 @@ import '../../auth/repository/auth_repository.dart';
 import 'rescuer_user_guide_screen.dart';
 import 'rescuer_contact_support_screen.dart';
 import 'rescuer_faq_screen.dart';
+import 'rescuer_privacy_screen.dart';
 
 class RescuerSettingsScreen extends ConsumerStatefulWidget {
   const RescuerSettingsScreen({super.key});
@@ -373,6 +374,15 @@ class _RescuerSettingsScreenState extends ConsumerState<RescuerSettingsScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const RescuerFaqScreen()),
+                );
+              }),
+              const Divider(height: 1, color: Color(0xFFF0F0F0)),
+              _buildNavigationRow('Chính sách bảo mật', () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const RescuerPrivacyScreen(),
+                  ),
                 );
               }),
             ],

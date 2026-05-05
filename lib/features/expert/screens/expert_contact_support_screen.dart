@@ -1,15 +1,78 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../snake_catching/repository/system_settings_repository.dart';
+import '../providers/expert_services_and_terms_provider.dart';
 
-class ExpertContactSupportScreen extends StatefulWidget {
+class ExpertContactSupportScreen extends ConsumerStatefulWidget {
   const ExpertContactSupportScreen({super.key});
 
   @override
-  State<ExpertContactSupportScreen> createState() =>
+  ConsumerState<ExpertContactSupportScreen> createState() =>
       _ExpertContactSupportScreenState();
 }
 
-class _ExpertContactSupportScreenState extends State<ExpertContactSupportScreen> {
+class _ExpertContactSupportScreenState
+    extends ConsumerState<ExpertContactSupportScreen> {
+  String? _latitude;
+  String? _longitude;
+  bool _isLoadingMap = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCenterLocation();
+  }
+
+  Future<void> _fetchCenterLocation() async {
+    try {
+      final repo = ref.read(systemSettingsRepositoryProvider);
+      final settings = await repo.getSystemSettings();
+      if (mounted) {
+        setState(() {
+          _latitude = settings
+              .firstWhere((s) => s.settingKey == 'Center:Latitude')
+              .value;
+          _longitude = settings
+              .firstWhere((s) => s.settingKey == 'Center:Longitude')
+              .value;
+          _isLoadingMap = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingMap = false);
+      }
+    }
+  }
+
+  Future<void> _openMap() async {
+    if (_latitude == null || _longitude == null) return;
+    final url = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$_latitude,$_longitude',
+    );
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Không thể mở bản đồ'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   Future<void> _callHotline() async {
     const phoneNumber = 'tel:0787171699';
     final uri = Uri.parse(phoneNumber);
@@ -161,6 +224,8 @@ class _ExpertContactSupportScreenState extends State<ExpertContactSupportScreen>
                 'Hỗ Trợ',
                 'Vấn đề kỹ thuật, thanh toán, yêu cầu chuyên gia',
               ),
+              const SizedBox(height: 12),
+              _buildMapCard(),
               const SizedBox(height: 60),
             ],
           ),
@@ -219,6 +284,84 @@ class _ExpertContactSupportScreenState extends State<ExpertContactSupportScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMapCard() {
+    if (_isLoadingMap) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(
+          child: CircularProgressIndicator(color: Color(0xFF6C47C2)),
+        ),
+      );
+    }
+    if (_latitude == null || _longitude == null) return const SizedBox();
+
+    return GestureDetector(
+      onTap: _openMap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: const Color(0xFF6C47C2).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.location_on_rounded,
+                color: Color(0xFF6C47C2),
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Địa chỉ trung tâm',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF2D2D2D),
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Xem trên Google Map',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF6C47C2),
+                      fontWeight: FontWeight.w500,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 16,
+              color: Color(0xFF6C47C2),
+            ),
+          ],
+        ),
       ),
     );
   }

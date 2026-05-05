@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/consultation_booking_response.dart';
 import '../../models/my_consultation_response.dart';
+import '../../models/consultation_history_union_response.dart';
 import '../../repository/consultation_repository.dart';
 import 'consultation_completion_screen.dart';
 import 'member_consultation_detail_screen.dart';
@@ -18,17 +19,25 @@ enum ConsultationStatus {
   cancelled, // Đã hủy
   expertAbsent, // Chuyên gia vắng mặt
   expertAbsentHandled, // Đã hoàn tiền
+  instantDeclined, // Tư vấn ngay bị từ chối
+  instantExpired, // Tư vấn ngay hết hạn
 }
 
 /// Internal UI model for a consultation card
 class _ConsultationItem {
+  final ConsultationHistoryKind kind;
   final String id; // bookingId — dùng cho highlight, display
   final String? consultationId; // consultationId thật — dùng cho LiveKit token
+  final String? instantRequestId;
+  final InstantRequestStatus? instantStatus;
   final String expertId;
   final String expertName;
   final String expertSpecialty;
   final String? expertAvatarUrl;
   final DateTime scheduledTime;
+  final int scheduledDurationSeconds;
+  final DateTime? requestedAt;
+  final DateTime? respondedAt;
   final ConsultationStatus status;
   final String serviceType;
   final int feeCost;
@@ -39,13 +48,19 @@ class _ConsultationItem {
   final bool canReportExpertAbsent;
 
   const _ConsultationItem({
+    required this.kind,
     required this.id,
     this.consultationId,
+    this.instantRequestId,
+    this.instantStatus,
     required this.expertId,
     required this.expertName,
     required this.expertSpecialty,
     this.expertAvatarUrl,
     required this.scheduledTime,
+    required this.scheduledDurationSeconds,
+    this.requestedAt,
+    this.respondedAt,
     required this.status,
     required this.serviceType,
     required this.feeCost,
@@ -56,10 +71,18 @@ class _ConsultationItem {
     this.canReportExpertAbsent = false,
   });
 
+  bool get isInstant => kind == ConsultationHistoryKind.instant;
+
   /// Map from API my-consultation response to UI model
   factory _ConsultationItem.fromConsultation(MyConsultationResponse c) {
     final now = DateTime.now();
     final scheduledAt = c.startTime ?? c.slotStartTime ?? DateTime.now();
+    final slotStart = c.slotStartTime ?? c.startTime;
+    final slotEnd = c.slotEndTime ?? c.endTime;
+    final scheduledDurationSeconds =
+      (slotStart != null && slotEnd != null)
+        ? slotEnd.difference(slotStart).inSeconds
+        : 1800;
 
     final ConsultationStatus uiStatus;
     if (c.status == MyConsultationStatus.completed) {
@@ -88,15 +111,21 @@ class _ConsultationItem {
         : 'Tư vấn đặt lịch';
 
     return _ConsultationItem(
+      kind: ConsultationHistoryKind.consultation,
       id: (c.bookingId != null && c.bookingId!.isNotEmpty)
           ? c.bookingId!
           : c.consultationId,
       consultationId: c.consultationId,
+      instantRequestId: null,
+      instantStatus: null,
       expertId: c.expertId,
       expertName: c.expertName,
       expertSpecialty: '',
       expertAvatarUrl: c.expertAvatarUrl,
       scheduledTime: scheduledAt,
+      scheduledDurationSeconds: scheduledDurationSeconds,
+      requestedAt: null,
+      respondedAt: null,
       status: uiStatus,
       serviceType: serviceType,
       feeCost: fee,
@@ -105,6 +134,40 @@ class _ConsultationItem {
       customerReport: c.customerReport,
       customerReportSubmittedAt: c.customerReportSubmittedAt,
       canReportExpertAbsent: c.type == MyConsultationType.scheduled,
+    );
+  }
+
+  factory _ConsultationItem.fromInstant(
+    MemberInstantConsultationHistory instant,
+  ) {
+    final happenedAt =
+        instant.respondedAt ?? instant.requestedAt ?? DateTime.now();
+    final status = instant.requestStatus == InstantRequestStatus.declinedByExpert
+        ? ConsultationStatus.instantDeclined
+        : ConsultationStatus.instantExpired;
+
+    return _ConsultationItem(
+      kind: ConsultationHistoryKind.instant,
+      id: instant.instantRequestId,
+      consultationId: null,
+      instantRequestId: instant.instantRequestId,
+      instantStatus: instant.requestStatus,
+      expertId: instant.expertId,
+      expertName: instant.expertName,
+      expertSpecialty: '',
+      expertAvatarUrl: instant.expertAvatarUrl,
+      scheduledTime: happenedAt,
+      scheduledDurationSeconds: 1800,
+      requestedAt: instant.requestedAt,
+      respondedAt: instant.respondedAt,
+      status: status,
+      serviceType: 'Tư vấn khẩn cấp',
+      feeCost: 0,
+      rating: null,
+      problemDescription: null,
+      customerReport: null,
+      customerReportSubmittedAt: null,
+      canReportExpertAbsent: false,
     );
   }
 }
@@ -144,9 +207,9 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
   // ── Member history paging ────────────────────────────────────────────────
   List<_ConsultationItem> _historyItems = [];
   int _historyCurrentPage = 1;
+  bool _isHistoryLoading = false;
   bool _isLoadingMoreHistory = false;
   bool _hasMoreHistory = true;
-  String _historyFirstPageKey = '';
 
   /// Derive UI item list from provider bookings
   List<_ConsultationItem> _toItems(
@@ -157,13 +220,19 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
       final item = _ConsultationItem.fromConsultation(c);
       final rating = ratingByConsultationId[c.consultationId];
       return _ConsultationItem(
+        kind: item.kind,
         id: item.id,
         consultationId: item.consultationId,
+        instantRequestId: item.instantRequestId,
+        instantStatus: item.instantStatus,
         expertId: item.expertId,
         expertName: item.expertName,
         expertSpecialty: item.expertSpecialty,
         expertAvatarUrl: item.expertAvatarUrl,
         scheduledTime: item.scheduledTime,
+        scheduledDurationSeconds: item.scheduledDurationSeconds,
+        requestedAt: item.requestedAt,
+        respondedAt: item.respondedAt,
         status: item.status,
         serviceType: item.serviceType,
         feeCost: item.feeCost,
@@ -233,13 +302,22 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
         )
         .map(
           (b) => _ConsultationItem(
+            kind: ConsultationHistoryKind.consultation,
             id: b.id,
             consultationId: b.consultationId,
+            instantRequestId: null,
+            instantStatus: null,
             expertId: b.expertId,
             expertName: b.expertName,
             expertSpecialty: b.expertSpecialty ?? '',
             expertAvatarUrl: b.expertAvatarUrl,
             scheduledTime: b.scheduledTime,
+            scheduledDurationSeconds:
+                (b.slotStartTime != null && b.slotEndTime != null)
+                    ? b.slotEndTime!.difference(b.slotStartTime!).inSeconds
+                    : 1800,
+            requestedAt: null,
+            respondedAt: null,
             status: b.status == ConsultationBookingStatus.pendingPayment
                 ? ConsultationStatus.pendingPayment
                 : (b.scheduledTime.isAfter(now)
@@ -251,6 +329,8 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
             feeCost: b.feeCost,
             rating: b.rating,
             problemDescription: b.problemDescription,
+            customerReport: null,
+            customerReportSubmittedAt: null,
             canReportExpertAbsent: b.consultationType == 'Scheduled',
           ),
         )
@@ -283,6 +363,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(myConsultationsProvider.notifier).loadConsultations();
       ref.read(consultationBookingsProvider.notifier).loadBookings();
+      _loadHistoryFirstPage();
 
       // Nếu có buổi tư vấn vừa được tạo, highlight nó khi danh sách load xong
       if (widget.highlightedId != null) {
@@ -306,7 +387,106 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
     await Future.wait([
       ref.read(myConsultationsProvider.notifier).loadConsultations(),
       ref.read(consultationBookingsProvider.notifier).loadBookings(),
+      _loadHistoryFirstPage(),
     ]);
+  }
+
+  bool _isHistoryStatus(ConsultationStatus status) {
+    return status == ConsultationStatus.completed ||
+        status == ConsultationStatus.cancelled ||
+        status == ConsultationStatus.expertAbsent ||
+        status == ConsultationStatus.expertAbsentHandled;
+  }
+
+  _ConsultationItem _withRating(
+    _ConsultationItem item,
+    double? rating,
+  ) {
+    return _ConsultationItem(
+      kind: item.kind,
+      id: item.id,
+      consultationId: item.consultationId,
+      instantRequestId: item.instantRequestId,
+      instantStatus: item.instantStatus,
+      expertId: item.expertId,
+      expertName: item.expertName,
+      expertSpecialty: item.expertSpecialty,
+      expertAvatarUrl: item.expertAvatarUrl,
+      scheduledTime: item.scheduledTime,
+      scheduledDurationSeconds: item.scheduledDurationSeconds,
+      requestedAt: item.requestedAt,
+      respondedAt: item.respondedAt,
+      status: item.status,
+      serviceType: item.serviceType,
+      feeCost: item.feeCost,
+      rating: rating,
+      problemDescription: item.problemDescription,
+      customerReport: item.customerReport,
+      customerReportSubmittedAt: item.customerReportSubmittedAt,
+      canReportExpertAbsent: item.canReportExpertAbsent,
+    );
+  }
+
+  List<_ConsultationItem> _mapHistoryItems(
+    List<MemberConsultationHistoryUnion> entries,
+    Map<String, double> ratingByConsultationId,
+  ) {
+    final items = <_ConsultationItem>[];
+    for (final entry in entries) {
+      if (entry.kind == ConsultationHistoryKind.instant) {
+        final instant = MemberInstantConsultationHistory.fromJson(entry.raw);
+        if (instant.requestStatus == InstantRequestStatus.unknown) continue;
+        items.add(_ConsultationItem.fromInstant(instant));
+        continue;
+      }
+
+      final consultation = MyConsultationResponse.fromJson(entry.raw);
+      final item = _ConsultationItem.fromConsultation(consultation);
+      if (!_isHistoryStatus(item.status)) continue;
+
+      final rating = ratingByConsultationId[consultation.consultationId];
+      items.add(_withRating(item, rating));
+    }
+
+    items.sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
+    return items;
+  }
+
+  Future<void> _loadHistoryFirstPage() async {
+    if (!mounted) return;
+    setState(() {
+      _isHistoryLoading = true;
+      _historyItems = [];
+      _historyCurrentPage = 1;
+      _hasMoreHistory = true;
+      _isLoadingMoreHistory = false;
+    });
+
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      final result = await repo.getMyConsultationHistory(
+        pageNumber: 1,
+        pageSize: _historyPageSize,
+      );
+      if (!mounted) return;
+
+      final reviews = ref.read(myConsultationsProvider).reviewsByConsultationId;
+      final ratingByConsultationId = <String, double>{
+        for (final entry in reviews.entries)
+          if (entry.value != null) entry.key: entry.value!.rating.toDouble(),
+      };
+      final mapped = _mapHistoryItems(result.items, ratingByConsultationId);
+
+      setState(() {
+        _historyItems = mapped;
+        _historyCurrentPage = 1;
+        _hasMoreHistory = result.meta.hasNextPage;
+        _isHistoryLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isHistoryLoading = false);
+    }
   }
 
   Future<void> _loadMoreHistory() async {
@@ -316,39 +496,10 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
     try {
       final nextPage = _historyCurrentPage + 1;
       final repo = ref.read(consultationRepositoryProvider);
-      final results = await Future.wait([
-        repo.getMyConsultations(
-          status: 'Completed',
-          pageNumber: nextPage,
-          pageSize: _historyPageSize,
-        ),
-        repo.getMyConsultations(
-          status: 'Cancelled',
-          pageNumber: nextPage,
-          pageSize: _historyPageSize,
-        ),
-        repo.getMyConsultations(
-          status: 'UserAbsent',
-          pageNumber: nextPage,
-          pageSize: _historyPageSize,
-        ),
-        repo.getMyConsultations(
-          status: 'ExpertAbsent',
-          pageNumber: nextPage,
-          pageSize: _historyPageSize,
-        ),
-        repo.getMyConsultations(
-          status: 'ExpertAbsentHandled',
-          pageNumber: nextPage,
-          pageSize: _historyPageSize,
-        ),
-        repo.getMyConsultations(
-          status: 'AllAbsent',
-          pageNumber: nextPage,
-          pageSize: _historyPageSize,
-        ),
-      ]);
-      final nextConsultations = results.expand((items) => items).toList();
+      final result = await repo.getMyConsultationHistory(
+        pageNumber: nextPage,
+        pageSize: _historyPageSize,
+      );
 
       if (!mounted) return;
 
@@ -357,16 +508,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
         for (final entry in reviews.entries)
           if (entry.value != null) entry.key: entry.value!.rating.toDouble(),
       };
-
-      final mapped = _historyList(nextConsultations, ratingByConsultationId);
-
-      if (mapped.isEmpty) {
-        setState(() {
-          _isLoadingMoreHistory = false;
-          _hasMoreHistory = false;
-        });
-        return;
-      }
+      final mapped = _mapHistoryItems(result.items, ratingByConsultationId);
 
       final dedup = <String, _ConsultationItem>{
         for (final item in _historyItems) item.id: item,
@@ -381,9 +523,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
       setState(() {
         _historyItems = merged;
         _historyCurrentPage = nextPage;
-        _hasMoreHistory = results.any(
-          (items) => items.length >= _historyPageSize,
-        );
+        _hasMoreHistory = result.meta.hasNextPage;
         _isLoadingMoreHistory = false;
       });
     } catch (_) {
@@ -414,25 +554,31 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
     final pendingFromLegacyBookings = _bookingFallbackItems(
       bookingsState.bookings,
     );
-    final upcomingById = <String, _ConsultationItem>{
-      for (final item in [...ongoingFromNewApi, ...pendingFromLegacyBookings])
-        item.id: item,
-    };
+    final upcomingById = <String, _ConsultationItem>{};
+    for (final item in [...ongoingFromNewApi, ...pendingFromLegacyBookings]) {
+      final existing = upcomingById[item.id];
+      if (existing == null) {
+        upcomingById[item.id] = item;
+        continue;
+      }
+
+      final existingAvatar = (existing.expertAvatarUrl ?? '').trim();
+      final nextAvatar = (item.expertAvatarUrl ?? '').trim();
+      if (existingAvatar.isNotEmpty && nextAvatar.isEmpty) {
+        continue;
+      }
+
+      upcomingById[item.id] = item;
+    }
     final upcoming = upcomingById.values.toList()
       ..sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
-    final history = _historyList(
-      consultationsState.completed,
-      ratingByConsultationId,
-    );
-
-    final firstPageKey = history.map((e) => e.id).join('|');
-    if (firstPageKey != _historyFirstPageKey) {
-      _historyFirstPageKey = firstPageKey;
-      _historyItems = history;
-      _historyCurrentPage = 1;
-      _hasMoreHistory = history.length >= _historyPageSize;
-      _isLoadingMoreHistory = false;
-    }
+    final history = _historyItems
+        .map((item) => _withRating(
+              item,
+              ratingByConsultationId[item.consultationId],
+            ))
+        .toList()
+      ..sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
 
     return Scaffold(
       backgroundColor: Colors.white, // Changed to match AppBar and status bar
@@ -462,8 +608,8 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                           _buildUpcomingTab(context, upcoming),
                           _buildHistoryTab(
                             context,
-                            _historyItems,
-                            isLoading: consultationsState.isLoading,
+                            history,
+                            isLoading: _isHistoryLoading,
                           ),
                         ],
                       ),
@@ -517,26 +663,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
               textAlign: TextAlign.center,
             ),
           ),
-          // Nút lịch sử thanh toán
-          InkWell(
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Lịch sử thanh toán - Đang phát triển'),
-                ),
-              );
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.receipt_long_outlined,
-                color: Color(0xFF1F2937),
-              ),
-            ),
-          ),
+          const SizedBox(width: 40, height: 40),
         ],
       ),
     );
@@ -976,6 +1103,10 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
   }
 
   Widget _buildHistoryCard(BuildContext context, _ConsultationItem item) {
+    if (item.isInstant) {
+      return _buildInstantHistoryCard(context, item);
+    }
+
     final isCancelled = item.status == ConsultationStatus.cancelled;
     final isExpertAbsent = item.status == ConsultationStatus.expertAbsent;
     final isExpertAbsentHandled =
@@ -1241,11 +1372,146 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
     );
   }
 
+  Widget _buildInstantHistoryCard(
+    BuildContext context,
+    _ConsultationItem item,
+  ) {
+    final isDeclined = item.status == ConsultationStatus.instantDeclined;
+    final statusLabel =
+        isDeclined ? 'Chuyên gia từ chối' : 'Hết hạn chờ phản hồi';
+    final statusColor =
+        isDeclined ? const Color(0xFFEF4444) : const Color(0xFFF59E0B);
+    final timeLabel = item.respondedAt ?? item.requestedAt ?? item.scheduledTime;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _buildAvatar(item, greyed: true),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.expertName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1F2937),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'Khẩn Cấp',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFDC2626),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    statusLabel,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: statusColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            const Divider(color: Color(0xFFF3F4F6), height: 1),
+            const SizedBox(height: 14),
+            _buildDetailRow(
+              Icons.schedule_outlined,
+              _formatPastTime(timeLabel),
+            ),
+            const SizedBox(height: 8),
+            _buildDetailRow(
+              Icons.info_outline,
+              isDeclined
+                  ? 'Chuyên gia đã từ chối yêu cầu tư vấn ngay.'
+                  : 'Yêu cầu tư vấn ngay đã hết hạn chờ phản hồi.',
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 40,
+              child: ElevatedButton.icon(
+                onPressed: () => context.push('/expert-list'),
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text(
+                  'Đặt Lại',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF228B22),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ─── Shared Widgets ────────────────────────────────────────────────────────
 
   Widget _buildAvatar(_ConsultationItem item, {bool greyed = false}) {
     final avatarUrl = (item.expertAvatarUrl ?? '').trim();
-    final hasAvatar = avatarUrl.isNotEmpty;
+    final displayName = item.expertName.trim();
+    final fallbackUrl = displayName.isNotEmpty
+        ? 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(displayName)}&background=228B22&color=fff&size=200'
+        : '';
+    final resolvedUrl = avatarUrl.isNotEmpty ? avatarUrl : fallbackUrl;
+    final hasAvatar = resolvedUrl.isNotEmpty;
     return Container(
       width: 52,
       height: 52,
@@ -1256,7 +1522,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
             : const Color(0xFF228B22).withOpacity(0.1),
         image: hasAvatar
             ? DecorationImage(
-                image: NetworkImage(avatarUrl),
+                image: NetworkImage(resolvedUrl),
                 fit: BoxFit.cover,
               )
             : null,
@@ -1313,6 +1579,16 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
         bgColor = const Color(0xFF16A34A).withOpacity(0.12);
         textColor = const Color(0xFF16A34A);
         label = 'Đã hoàn tiền';
+        break;
+      case ConsultationStatus.instantDeclined:
+        bgColor = const Color(0xFFEF4444).withOpacity(0.12);
+        textColor = const Color(0xFFEF4444);
+        label = 'Chuyên gia từ chối';
+        break;
+      case ConsultationStatus.instantExpired:
+        bgColor = const Color(0xFFF59E0B).withOpacity(0.12);
+        textColor = const Color(0xFFF59E0B);
+        label = 'Hết hạn chờ phản hồi';
         break;
     }
 
@@ -1457,6 +1733,15 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
   }
 
   void _viewDetail(BuildContext context, _ConsultationItem item) {
+    if (item.isInstant) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Yêu cầu tư vấn ngay không có trang chi tiết.'),
+        ),
+      );
+      return;
+    }
+
     Color statusColor;
     String statusLabel;
     String? statusNote;
@@ -1493,6 +1778,14 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
         statusNote =
             'Admin đã xác nhận và hoàn tiền vào ví của bạn. Bạn có thể kiểm tra trong lịch sử giao dịch.';
         break;
+      case ConsultationStatus.instantDeclined:
+        statusColor = const Color(0xFFEF4444);
+        statusLabel = 'Chuyên gia từ chối';
+        break;
+      case ConsultationStatus.instantExpired:
+        statusColor = const Color(0xFFF59E0B);
+        statusLabel = 'Hết hạn chờ phản hồi';
+        break;
     }
 
     Navigator.of(context).push(
@@ -1526,6 +1819,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
         'expertSpecialty': item.expertSpecialty,
         'canReportExpertAbsent': item.canReportExpertAbsent,
         'scheduledStartAtMs': item.scheduledTime.millisecondsSinceEpoch,
+        'scheduledDurationSeconds': item.scheduledDurationSeconds,
       },
     );
   }

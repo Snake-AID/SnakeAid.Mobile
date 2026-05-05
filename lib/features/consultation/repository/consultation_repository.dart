@@ -15,6 +15,7 @@ import '../models/consultation_review_response.dart';
 import '../models/emergency_consultation_request.dart';
 import '../models/consultation_payment_response.dart';
 import '../models/consultation_message_history_response.dart';
+import '../models/consultation_history_union_response.dart';
 
 /// Provider for ConsultationRepository
 final consultationRepositoryProvider = Provider<ConsultationRepository>((ref) {
@@ -544,6 +545,79 @@ class ConsultationRepository {
     }
   }
 
+  /// Get consultation history for current user (union: consultation + instant).
+  ///
+  /// API: `GET /api/users/me/consultations`
+  Future<PagedHistoryResponse<MemberConsultationHistoryUnion>>
+      getMyConsultationHistory({
+    String? status,
+    String? type,
+    int pageNumber = 1,
+    int pageSize = 10,
+  }) async {
+    try {
+      debugPrint(
+        '📋 Fetching my consultation history: status=$status, type=$type, page=$pageNumber, size=$pageSize',
+      );
+      final query = <String, dynamic>{
+        'pageNumber': pageNumber,
+        'pageSize': pageSize,
+      };
+      if (status != null && status.isNotEmpty) {
+        query['status'] = status;
+      }
+      if (type != null && type.isNotEmpty) {
+        query['type'] = type;
+      }
+
+      final response = await httpService.get(
+        '/api/users/me/consultations',
+        queryParameters: query,
+      );
+
+      final body = response.data as Map<String, dynamic>;
+      if (body['is_success'] == true && body['data'] != null) {
+        final data = body['data'] as Map<String, dynamic>;
+        return PagedHistoryResponse.fromJson(
+          data,
+          MemberConsultationHistoryUnion.fromJson,
+        );
+      }
+
+      return const PagedHistoryResponse(
+        items: [],
+        meta: ConsultationHistoryMeta(
+          currentPage: 1,
+          pageSize: 10,
+          totalItems: 0,
+          totalPages: 1,
+        ),
+      );
+    } on DioException catch (e) {
+      debugPrint('❌ Failed to fetch consultation history: ${e.message}');
+      return const PagedHistoryResponse(
+        items: [],
+        meta: ConsultationHistoryMeta(
+          currentPage: 1,
+          pageSize: 10,
+          totalItems: 0,
+          totalPages: 1,
+        ),
+      );
+    } catch (e) {
+      debugPrint('❌ Unexpected error fetching consultation history: $e');
+      return const PagedHistoryResponse(
+        items: [],
+        meta: ConsultationHistoryMeta(
+          currentPage: 1,
+          pageSize: 10,
+          totalItems: 0,
+          totalPages: 1,
+        ),
+      );
+    }
+  }
+
   /// Create a new consultation booking
   ///
   /// API: `POST /api/consultations/scheduled`
@@ -1011,22 +1085,71 @@ class ConsultationRepository {
     int pageNumber = 1,
     int pageSize = 10,
   }) async {
-    final response = await httpService.get(
-      '/api/consultations/$consultationId/messages-history',
-      queryParameters: {
-        'pageNumber': pageNumber,
-        'pageSize': pageSize,
-      },
-    );
-
-    final body = response.data as Map<String, dynamic>;
-    if (body['is_success'] == true && body['data'] is Map<String, dynamic>) {
-      return ConsultationMessageHistoryResponse.fromJson(
-        body['data'] as Map<String, dynamic>,
+    try {
+      final response = await httpService.get(
+        '/api/consultations/$consultationId/messages-history',
+        queryParameters: {
+          'pageNumber': pageNumber,
+          'pageSize': pageSize,
+        },
       );
-    }
 
-    throw Exception(body['message'] ?? 'Không thể tải lịch sử tin nhắn');
+      final body = response.data as Map<String, dynamic>;
+      if (body['is_success'] == true && body['data'] is Map<String, dynamic>) {
+        return ConsultationMessageHistoryResponse.fromJson(
+          body['data'] as Map<String, dynamic>,
+        );
+      }
+
+      final message = body['message']?.toString().toLowerCase() ?? '';
+      if (message.contains('không có') ||
+          message.contains('khong co') ||
+          message.contains('no message') ||
+          message.contains('not found') ||
+          message.contains('terminal consultations') ||
+          message.contains('available only for terminal consultations') ||
+          message.contains('current status is scheduled')) {
+        return const ConsultationMessageHistoryResponse(
+          items: [],
+          meta: ConsultationMessageHistoryMeta(
+            totalPages: 1,
+            totalItems: 0,
+            currentPage: 1,
+            pageSize: 10,
+          ),
+        );
+      }
+
+      throw Exception(body['message'] ?? 'Không thể tải lịch sử tin nhắn');
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      final responseData = e.response?.data;
+      final message = responseData is Map<String, dynamic>
+          ? responseData['message']?.toString().toLowerCase() ?? ''
+          : e.message?.toLowerCase() ?? '';
+
+      if (statusCode == 404 ||
+          statusCode == 204 ||
+          message.contains('không có') ||
+          message.contains('khong co') ||
+          message.contains('no message') ||
+          message.contains('not found') ||
+          message.contains('terminal consultations') ||
+          message.contains('available only for terminal consultations') ||
+          message.contains('current status is scheduled')) {
+        return const ConsultationMessageHistoryResponse(
+          items: [],
+          meta: ConsultationMessageHistoryMeta(
+            totalPages: 1,
+            totalItems: 0,
+            currentPage: 1,
+            pageSize: 10,
+          ),
+        );
+      }
+
+      rethrow;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1476,6 +1599,79 @@ class ConsultationRepository {
     } catch (e) {
       debugPrint('❌ Unexpected error fetching expert bookings: $e');
       return [];
+    }
+  }
+
+  /// Get consultation history for current expert (union: consultation + instant).
+  ///
+  /// API: `GET /api/experts/me/consultations`
+  Future<PagedHistoryResponse<ExpertConsultationHistoryUnion>>
+      getExpertConsultationHistory({
+    String? status,
+    String? type,
+    int pageNumber = 1,
+    int pageSize = 10,
+  }) async {
+    try {
+      debugPrint(
+        '📋 Fetching expert consultation history: status=$status, type=$type, page=$pageNumber, size=$pageSize',
+      );
+      final query = <String, dynamic>{
+        'pageNumber': pageNumber,
+        'pageSize': pageSize,
+      };
+      if (status != null && status.isNotEmpty) {
+        query['status'] = status;
+      }
+      if (type != null && type.isNotEmpty) {
+        query['type'] = type;
+      }
+
+      final response = await httpService.get(
+        '/api/experts/me/consultations',
+        queryParameters: query,
+      );
+
+      final body = response.data as Map<String, dynamic>;
+      if (body['is_success'] == true && body['data'] != null) {
+        final data = body['data'] as Map<String, dynamic>;
+        return PagedHistoryResponse.fromJson(
+          data,
+          ExpertConsultationHistoryUnion.fromJson,
+        );
+      }
+
+      return const PagedHistoryResponse(
+        items: [],
+        meta: ConsultationHistoryMeta(
+          currentPage: 1,
+          pageSize: 10,
+          totalItems: 0,
+          totalPages: 1,
+        ),
+      );
+    } on DioException catch (e) {
+      debugPrint('❌ Failed to fetch expert consultation history: ${e.message}');
+      return const PagedHistoryResponse(
+        items: [],
+        meta: ConsultationHistoryMeta(
+          currentPage: 1,
+          pageSize: 10,
+          totalItems: 0,
+          totalPages: 1,
+        ),
+      );
+    } catch (e) {
+      debugPrint('❌ Unexpected error fetching expert consultation history: $e');
+      return const PagedHistoryResponse(
+        items: [],
+        meta: ConsultationHistoryMeta(
+          currentPage: 1,
+          pageSize: 10,
+          totalItems: 0,
+          totalPages: 1,
+        ),
+      );
     }
   }
 }

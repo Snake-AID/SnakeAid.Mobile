@@ -1,18 +1,112 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class RescuerContactSupportScreen extends StatefulWidget {
+import '../providers/rescuer_services_and_terms_provider.dart';
+import '../../snake_catching/repository/system_settings_repository.dart';
+
+class RescuerContactSupportScreen extends ConsumerStatefulWidget {
   const RescuerContactSupportScreen({super.key});
 
   @override
-  State<RescuerContactSupportScreen> createState() =>
+  ConsumerState<RescuerContactSupportScreen> createState() =>
       _RescuerContactSupportScreenState();
 }
 
 class _RescuerContactSupportScreenState
-    extends State<RescuerContactSupportScreen> {
+    extends ConsumerState<RescuerContactSupportScreen> {
+  String? _latitude;
+  String? _longitude;
+  String _hotline = '0787171699';
+  String _workingHours = 'Từ 6:00 AM đến 11:00 PM (hàng ngày)';
+  String _responseTime = 'Bình thường trong 2-3 phút';
+  String _supportScope = 'Vấn đề kỹ thuật, thanh toán, yêu cầu';
+  bool _isLoadingMap = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCenterLocation();
+  }
+
+  Future<void> _fetchCenterLocation() async {
+    String? latitude;
+    String? longitude;
+
+    try {
+      final repo = ref.read(systemSettingsRepositoryProvider);
+      final settings = await repo.getSystemSettings();
+
+      latitude = settings
+          .firstWhere((s) => s.settingKey == 'Center:Latitude')
+          .value;
+      longitude = settings
+          .firstWhere((s) => s.settingKey == 'Center:Longitude')
+          .value;
+    } catch (_) {}
+
+    try {
+      final terms = await ref.read(rescuerServicesAndTermsProvider.future);
+      final support = terms.support;
+      if (mounted) {
+        setState(() {
+          if (support != null) {
+            if (support.hotline.trim().isNotEmpty) {
+              _hotline = support.hotline.trim();
+            }
+            if (support.workingHours.trim().isNotEmpty) {
+              _workingHours = support.workingHours.trim();
+            }
+            if (support.responseTime.trim().isNotEmpty) {
+              _responseTime = support.responseTime.trim();
+            }
+            if (support.supportScope.trim().isNotEmpty) {
+              _supportScope = support.supportScope.trim();
+            }
+          }
+        });
+      }
+    } catch (_) {}
+
+    if (mounted) {
+      setState(() {
+        _latitude = latitude;
+        _longitude = longitude;
+        _isLoadingMap = false;
+      });
+    }
+  }
+
+  Future<void> _openMap() async {
+    if (_latitude == null || _longitude == null) return;
+    final url = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$_latitude,$_longitude',
+    );
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Không thể mở bản đồ'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   Future<void> _callHotline() async {
-    const phoneNumber = 'tel:0787171699';
+    final cleanPhone = _hotline.replaceAll(RegExp(r'\s+'), '');
+    final phoneNumber = 'tel:$cleanPhone';
     try {
       if (await canLaunchUrl(Uri.parse(phoneNumber))) {
         await launchUrl(Uri.parse(phoneNumber));
@@ -129,13 +223,22 @@ class _RescuerContactSupportScreenState
                             elevation: 8,
                           ),
                           child: const Text(
-                            'Gọi: 0787171699',
+                            'Gọi Hotline',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.5,
                             ),
                           ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _hotline,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
                         ),
                       ),
                     ],
@@ -147,20 +250,22 @@ class _RescuerContactSupportScreenState
               _buildInfoCard(
                 Icons.schedule_rounded,
                 'Thời Gian Hỗ Trợ',
-                'Từ 6:00 AM đến 11:00 PM (hàng ngày)',
+                _workingHours,
               ),
               const SizedBox(height: 12),
               _buildInfoCard(
                 Icons.call_rounded,
                 'Thời Gian Phản Hồi',
-                'Bình thường trong 2-3 phút',
+                _responseTime,
               ),
               const SizedBox(height: 12),
               _buildInfoCard(
                 Icons.check_circle_rounded,
                 'Hỗ Trợ',
-                'Vấn đề kỹ thuật, thanh toán, yêu cầu',
+                _supportScope,
               ),
+              const SizedBox(height: 12),
+              _buildMapCard(),
               const SizedBox(height: 60),
             ],
           ),
@@ -219,6 +324,84 @@ class _RescuerContactSupportScreenState
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMapCard() {
+    if (_isLoadingMap) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(
+          child: CircularProgressIndicator(color: Color(0xFFFF6B35)),
+        ),
+      );
+    }
+    if (_latitude == null || _longitude == null) return const SizedBox();
+
+    return GestureDetector(
+      onTap: _openMap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF6B35).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.location_on_rounded,
+                color: Color(0xFFFF6B35),
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Địa chỉ trung tâm',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF231A0F),
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Xem trên Google Map',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFFFF6B35),
+                      fontWeight: FontWeight.w500,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 16,
+              color: Color(0xFFFF6B35),
+            ),
+          ],
+        ),
       ),
     );
   }

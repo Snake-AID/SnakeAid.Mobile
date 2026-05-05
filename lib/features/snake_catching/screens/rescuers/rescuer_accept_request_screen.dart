@@ -8,6 +8,8 @@ import '../../repository/snake_catching_repository.dart';
 import '../../repository/snake_species_repository.dart';
 import '../../repository/transaction_repository.dart';
 import 'rescuer_en_route_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../emergency/providers/rescuer_emergency_provider.dart';
 
 /// Màn hình sau khi tài xế chấp nhận đơn — chờ khách hàng thanh toán
 class RescuerAcceptRequestScreen extends ConsumerStatefulWidget {
@@ -1699,6 +1701,16 @@ class _RescuerAcceptRequestScreenState
 
       await repo.abortMission(missionId, reason);
       _pollingTimer?.cancel();
+      
+      // Tắt và bật lại rescue mode để refresh trạng thái của rescuer với server
+      final prefs = await SharedPreferences.getInstance();
+      final rescuerId = prefs.getString('user_id');
+      if (rescuerId != null && rescuerId.isNotEmpty) {
+        await ref.read(rescueModeProvider.notifier).stopRescueMode();
+        await Future.delayed(const Duration(milliseconds: 300));
+        await ref.read(rescueModeProvider.notifier).startRescueMode(rescuerId);
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

@@ -25,7 +25,7 @@ class CommunityAlertMapScreen extends ConsumerStatefulWidget {
 class _CommunityAlertMapScreenState
     extends ConsumerState<CommunityAlertMapScreen> {
   static const _defaultCenter = LatLng(16.047, 108.206); // Đà Nẵng
-  static const _defaultZoom = 12.0;
+  static const _defaultZoom = 11.0;
 
   final MapController _mapController = MapController();
   LatLng _center = _defaultCenter;
@@ -60,16 +60,47 @@ class _CommunityAlertMapScreenState
       _isLoading = true;
       _error = null;
     });
-    // Fetch location and reports concurrently
-    final results = await Future.wait([_tryGetLocation(), _fetchReports()]);
-    final position = results[0] as Position?;
-    if (position != null && mounted) {
-      setState(() => _center = LatLng(position.latitude, position.longitude));
-      _mapController.move(_center, _defaultZoom);
+
+    // 1. Phản hồi nhanh: Lấy vị trí đã biết gần nhất để không hiển thị sai thành phố
+    _tryGetLastKnownLocation().then((pos) {
+      if (pos != null && mounted) {
+        setState(() => _center = LatLng(pos.latitude, pos.longitude));
+        try {
+          _mapController.move(_center, _defaultZoom);
+        } catch (_) {}
+      }
+    });
+
+    // 2. Fetch dữ liệu reports và cập nhật vị trí hiện tại chính xác (chạy ngầm)
+    await Future.wait([
+      _fetchReports(),
+      _tryGetCurrentLocation().then((pos) {
+        if (pos != null && mounted) {
+          setState(() => _center = LatLng(pos.latitude, pos.longitude));
+          try {
+            _mapController.move(_center, _defaultZoom);
+          } catch (_) {}
+        }
+      }),
+    ]);
+  }
+
+  Future<Position?> _tryGetLastKnownLocation() async {
+    try {
+      bool enabled = await Geolocator.isLocationServiceEnabled();
+      if (!enabled) return null;
+      LocationPermission perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        return null;
+      }
+      return await Geolocator.getLastKnownPosition();
+    } catch (_) {
+      return null;
     }
   }
 
-  Future<Position?> _tryGetLocation() async {
+  Future<Position?> _tryGetCurrentLocation() async {
     try {
       bool enabled = await Geolocator.isLocationServiceEnabled();
       if (!enabled) return null;
@@ -78,12 +109,13 @@ class _CommunityAlertMapScreenState
         perm = await Geolocator.requestPermission();
       }
       if (perm == LocationPermission.denied ||
-          perm == LocationPermission.deniedForever)
+          perm == LocationPermission.deniedForever) {
         return null;
+      }
       return await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 6),
+          accuracy: LocationAccuracy.low,
+          timeLimit: Duration(seconds: 10),
         ),
       );
     } catch (_) {
@@ -459,12 +491,15 @@ class _CommunityAlertMapScreenState
                   color: Colors.white,
                   iconColor: const Color(0xFF1B5E20),
                   onTap: () async {
-                    final pos = await _tryGetLocation();
-                    if (pos != null) {
-                      _mapController.move(
-                        LatLng(pos.latitude, pos.longitude),
-                        15,
-                      );
+                    // Cập nhật nhanh với last known
+                    Position? pos = await _tryGetLastKnownLocation();
+                    if (pos != null && mounted) {
+                      _mapController.move(LatLng(pos.latitude, pos.longitude), 15);
+                    }
+                    // Cập nhật chính xác
+                    pos = await _tryGetCurrentLocation();
+                    if (pos != null && mounted) {
+                      _mapController.move(LatLng(pos.latitude, pos.longitude), 15);
                     }
                   },
                 ),
