@@ -4910,7 +4910,7 @@ class _PaymentMethodSheetState extends State<_PaymentMethodSheet> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  widget.isFinalPayment ? 'Đợt 2 — Dịch vụ' : 'Đợt 1 — Đặt cọc',
+                  widget.isFinalPayment ? 'Đợt 2 — Dịch vụ' : 'Đợt 1 — Phí di chuyển',
                   style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFF555555),
