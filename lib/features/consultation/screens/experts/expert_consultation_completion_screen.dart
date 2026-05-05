@@ -562,16 +562,6 @@ class _ExpertConsultationCompletionScreenState
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  _isSyncingSessionData
-                      ? 'Đang đồng bộ dữ liệu phiên vừa tư vấn...'
-                      : 'Bạn có thể xem lại phiên tư vấn trong Lịch Sử bất kỳ lúc nào.',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFFAAAAAA),
-                  ),
-                ),
               ],
             ),
           ),
