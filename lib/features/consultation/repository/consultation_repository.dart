@@ -15,6 +15,7 @@ import '../models/consultation_review_response.dart';
 import '../models/emergency_consultation_request.dart';
 import '../models/consultation_payment_response.dart';
 import '../models/consultation_message_history_response.dart';
+import '../models/consultation_history_union_response.dart';
 
 /// Provider for ConsultationRepository
 final consultationRepositoryProvider = Provider<ConsultationRepository>((ref) {
@@ -541,6 +542,79 @@ class ConsultationRepository {
     } catch (e) {
       debugPrint('❌ Unexpected error fetching consultations: $e');
       return [];
+    }
+  }
+
+  /// Get consultation history for current user (union: consultation + instant).
+  ///
+  /// API: `GET /api/users/me/consultations`
+  Future<PagedHistoryResponse<MemberConsultationHistoryUnion>>
+      getMyConsultationHistory({
+    String? status,
+    String? type,
+    int pageNumber = 1,
+    int pageSize = 10,
+  }) async {
+    try {
+      debugPrint(
+        '📋 Fetching my consultation history: status=$status, type=$type, page=$pageNumber, size=$pageSize',
+      );
+      final query = <String, dynamic>{
+        'pageNumber': pageNumber,
+        'pageSize': pageSize,
+      };
+      if (status != null && status.isNotEmpty) {
+        query['status'] = status;
+      }
+      if (type != null && type.isNotEmpty) {
+        query['type'] = type;
+      }
+
+      final response = await httpService.get(
+        '/api/users/me/consultations',
+        queryParameters: query,
+      );
+
+      final body = response.data as Map<String, dynamic>;
+      if (body['is_success'] == true && body['data'] != null) {
+        final data = body['data'] as Map<String, dynamic>;
+        return PagedHistoryResponse.fromJson(
+          data,
+          MemberConsultationHistoryUnion.fromJson,
+        );
+      }
+
+      return const PagedHistoryResponse(
+        items: [],
+        meta: ConsultationHistoryMeta(
+          currentPage: 1,
+          pageSize: 10,
+          totalItems: 0,
+          totalPages: 1,
+        ),
+      );
+    } on DioException catch (e) {
+      debugPrint('❌ Failed to fetch consultation history: ${e.message}');
+      return const PagedHistoryResponse(
+        items: [],
+        meta: ConsultationHistoryMeta(
+          currentPage: 1,
+          pageSize: 10,
+          totalItems: 0,
+          totalPages: 1,
+        ),
+      );
+    } catch (e) {
+      debugPrint('❌ Unexpected error fetching consultation history: $e');
+      return const PagedHistoryResponse(
+        items: [],
+        meta: ConsultationHistoryMeta(
+          currentPage: 1,
+          pageSize: 10,
+          totalItems: 0,
+          totalPages: 1,
+        ),
+      );
     }
   }
 
@@ -1476,6 +1550,79 @@ class ConsultationRepository {
     } catch (e) {
       debugPrint('❌ Unexpected error fetching expert bookings: $e');
       return [];
+    }
+  }
+
+  /// Get consultation history for current expert (union: consultation + instant).
+  ///
+  /// API: `GET /api/experts/me/consultations`
+  Future<PagedHistoryResponse<ExpertConsultationHistoryUnion>>
+      getExpertConsultationHistory({
+    String? status,
+    String? type,
+    int pageNumber = 1,
+    int pageSize = 10,
+  }) async {
+    try {
+      debugPrint(
+        '📋 Fetching expert consultation history: status=$status, type=$type, page=$pageNumber, size=$pageSize',
+      );
+      final query = <String, dynamic>{
+        'pageNumber': pageNumber,
+        'pageSize': pageSize,
+      };
+      if (status != null && status.isNotEmpty) {
+        query['status'] = status;
+      }
+      if (type != null && type.isNotEmpty) {
+        query['type'] = type;
+      }
+
+      final response = await httpService.get(
+        '/api/experts/me/consultations',
+        queryParameters: query,
+      );
+
+      final body = response.data as Map<String, dynamic>;
+      if (body['is_success'] == true && body['data'] != null) {
+        final data = body['data'] as Map<String, dynamic>;
+        return PagedHistoryResponse.fromJson(
+          data,
+          ExpertConsultationHistoryUnion.fromJson,
+        );
+      }
+
+      return const PagedHistoryResponse(
+        items: [],
+        meta: ConsultationHistoryMeta(
+          currentPage: 1,
+          pageSize: 10,
+          totalItems: 0,
+          totalPages: 1,
+        ),
+      );
+    } on DioException catch (e) {
+      debugPrint('❌ Failed to fetch expert consultation history: ${e.message}');
+      return const PagedHistoryResponse(
+        items: [],
+        meta: ConsultationHistoryMeta(
+          currentPage: 1,
+          pageSize: 10,
+          totalItems: 0,
+          totalPages: 1,
+        ),
+      );
+    } catch (e) {
+      debugPrint('❌ Unexpected error fetching expert consultation history: $e');
+      return const PagedHistoryResponse(
+        items: [],
+        meta: ConsultationHistoryMeta(
+          currentPage: 1,
+          pageSize: 10,
+          totalItems: 0,
+          totalPages: 1,
+        ),
+      );
     }
   }
 }
