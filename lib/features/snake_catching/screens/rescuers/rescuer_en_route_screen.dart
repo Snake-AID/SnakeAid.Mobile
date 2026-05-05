@@ -11,6 +11,8 @@ import '../../models/snake_species.dart';
 import '../../repository/snake_catching_repository.dart';
 import '../../repository/snake_species_repository.dart';
 import 'rescuer_tracking_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../emergency/providers/rescuer_emergency_provider.dart';
 
 /// Màn hình di chuyển đến khách hàng  bản đồ thực với OSRM routing
 class RescuerEnRouteScreen extends ConsumerStatefulWidget {
@@ -974,6 +976,16 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
       await repo.abortMission(widget.missionId, reason);
       _positionSub?.cancel();
       _routeRefreshTimer?.cancel();
+      
+      // Tắt và bật lại rescue mode để refresh trạng thái của rescuer với server
+      final prefs = await SharedPreferences.getInstance();
+      final rescuerId = prefs.getString('user_id');
+      if (rescuerId != null && rescuerId.isNotEmpty) {
+        await ref.read(rescueModeProvider.notifier).stopRescueMode();
+        await Future.delayed(const Duration(milliseconds: 300));
+        await ref.read(rescueModeProvider.notifier).startRescueMode(rescuerId);
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
