@@ -11,6 +11,7 @@ import '../../providers/snake_location_provider.dart'
 import '../../repository/snake_species_repository.dart';
 import '../../repository/snake_catching_repository.dart';
 import '../../widgets/location_picker_dialog.dart';
+import '../../widgets/pricing_bottom_sheet.dart';
 import '../../../emergency/models/snake_detection_response.dart';
 
 /// Screen for members to submit detailed snake report with photos
@@ -510,6 +511,29 @@ class _SnakeReportDetailScreenState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Nút Tham khảo giá
+              GestureDetector(
+                onTap: _showPricingBottomSheet,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.info_outline, size: 18, color: Colors.blue[700]),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Tham khảo bảng giá dịch vụ bắt rắn',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.blue[700],
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               SizedBox(
                 height: 56,
                 child: ElevatedButton(
@@ -3459,6 +3483,20 @@ class _SnakeReportDetailScreenState
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showPricingBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.8,
+        minChildSize: 0.5,
+        maxChildSize: 0.9,
+        builder: (_, controller) => PricingBottomSheet(scrollController: controller),
       ),
     );
   }

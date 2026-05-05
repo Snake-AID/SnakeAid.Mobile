@@ -443,7 +443,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           _buildPolicySection(
             '2. Phí dịch vụ chuyên gia',
-            'Phí dịch vụ cuối cùng được tính toán tự động dựa trên:\n• Mức độ nguy hiểm của loài rắn\n• Thời gian xử lý\n• Quãng đường di chuyển của chuyên gia',
+            'Phí dịch vụ cuối cùng được tính toán tự động dựa trên giá của chuyên gia đưa ra',
           ),
           _buildPolicySection(
             '3. Nạp và Rút tiền',
