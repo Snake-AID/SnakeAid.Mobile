@@ -293,6 +293,7 @@ class _ExpertConsultationDetailScreenState
                     children: [
                       _Avatar(
                         avatarUrl: patientAvatarUrl,
+                        displayName: patientName,
                         fallbackColor: _purple.withOpacity(0.12),
                         iconColor: _purple,
                         size: 56,
@@ -845,12 +846,14 @@ class _SectionCard extends StatelessWidget {
 
 class _Avatar extends StatelessWidget {
   final String? avatarUrl;
+  final String? displayName;
   final Color fallbackColor;
   final Color iconColor;
   final double size;
 
   const _Avatar({
     this.avatarUrl,
+    this.displayName,
     required this.fallbackColor,
     required this.iconColor,
     this.size = 52,
@@ -859,7 +862,12 @@ class _Avatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final url = (avatarUrl ?? '').trim();
-    final hasAvatar = url.isNotEmpty;
+    final name = (displayName ?? '').trim();
+    final fallbackUrl = name.isNotEmpty
+        ? 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}&background=6C47C2&color=fff&size=200'
+        : '';
+    final resolvedUrl = url.isNotEmpty ? url : fallbackUrl;
+    final hasAvatar = resolvedUrl.isNotEmpty;
     return Container(
       width: size,
       height: size,
@@ -867,7 +875,10 @@ class _Avatar extends StatelessWidget {
         shape: BoxShape.circle,
         color: fallbackColor,
         image: hasAvatar
-            ? DecorationImage(image: NetworkImage(url), fit: BoxFit.cover)
+            ? DecorationImage(
+                image: NetworkImage(resolvedUrl),
+                fit: BoxFit.cover,
+              )
             : null,
       ),
       child: hasAvatar

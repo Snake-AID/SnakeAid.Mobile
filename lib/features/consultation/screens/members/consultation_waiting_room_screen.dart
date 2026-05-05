@@ -13,6 +13,8 @@ class ConsultationWaitingRoomScreen extends ConsumerStatefulWidget {
   final bool canReportExpertAbsent;
   /// Scheduled start time (epoch ms) used for StartTime business rule.
   final int? scheduledStartAtMs;
+  /// Scheduled duration used to render the schedule time range.
+  final int scheduledDurationSeconds;
   /// true khi quay lại từ cuộc gọi đã kết thúc → hiện nút "Xác nhận hoàn thành"
   final bool showCompleteButton;
   final int durationSeconds;
@@ -28,6 +30,7 @@ class ConsultationWaitingRoomScreen extends ConsumerStatefulWidget {
     required this.expertSpecialty,
     this.canReportExpertAbsent = false,
     this.scheduledStartAtMs,
+    this.scheduledDurationSeconds = 1800,
     this.showCompleteButton = false,
     this.durationSeconds = 0,
     this.initialMicOn = true,
@@ -138,8 +141,11 @@ class _ConsultationWaitingRoomScreenState
       extra: {
         'expertName': widget.expertName,
         'expertSpecialty': widget.expertSpecialty,
+        'canReportExpertAbsent': widget.canReportExpertAbsent,
         'initialMicOn': _isMicOn,
         'initialCameraOn': _isCameraOn,
+        'scheduledStartAtMs': widget.scheduledStartAtMs,
+        'scheduledDurationSeconds': widget.scheduledDurationSeconds,
         'livekitToken': livekitResult.token,
         'wsUrl': livekitResult.wsUrl,
       },
@@ -640,7 +646,7 @@ class _ConsultationWaitingRoomScreenState
                               size: 16, color: Color(0xFF6B7280)),
                           const SizedBox(width: 4),
                           Text(
-                            'Lịch: ${_formatTimeRange(widget.scheduledStartAtMs, widget.durationSeconds)}',
+                            'Lịch: ${_formatTimeRange(widget.scheduledStartAtMs, widget.scheduledDurationSeconds)}',
                             style: const TextStyle(
                                 fontSize: 13,
                                 color: Color(0xFF6B7280),

@@ -11,6 +11,8 @@ import 'expert_profile_screen.dart';
 import 'expert_withdraw_money_screen.dart';
 import '../../consultation/repository/consultation_repository.dart';
 import '../../consultation/models/consultation_booking_response.dart';
+import '../../consultation/models/consultation_history_union_response.dart';
+import '../../consultation/models/my_consultation_response.dart';
 import '../../blog/providers/blog_provider.dart';
 import '../../blog/models/blog_model.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -121,6 +123,69 @@ _ExpertConsultation _bookingToExpertConsultation(
     questions: null,
     grossPrice: b.grossPrice,
     netPrice: b.netPrice,
+  );
+}
+
+_ExpertConsultation _historyToExpertConsultation(
+  ExpertConsultationHistoryResponse h,
+) {
+  final scheduled = h.startTime ?? h.endTime ?? DateTime.now();
+  final slotStartTime = h.startTime;
+  final slotEndTime = h.endTime;
+
+  final _ExpertConsultationStatus status;
+  switch (h.status) {
+    case MyConsultationStatus.completed:
+      status = _ExpertConsultationStatus.completed;
+      break;
+    case MyConsultationStatus.expertAbsent:
+      status = _ExpertConsultationStatus.expertAbsent;
+      break;
+    case MyConsultationStatus.expertAbsentHandled:
+      status = _ExpertConsultationStatus.expertAbsentHandled;
+      break;
+    case MyConsultationStatus.cancelled:
+    case MyConsultationStatus.userAbsent:
+    case MyConsultationStatus.allAbsent:
+      status = _ExpertConsultationStatus.cancelled;
+      break;
+    default:
+      status = _ExpertConsultationStatus.cancelled;
+  }
+
+  return _ExpertConsultation(
+    id: h.consultationId,
+    bookingId: h.consultationId,
+    consultationId: h.consultationId,
+    roomId: h.roomId,
+    userId: h.userId,
+    expertId: '',
+    patientName: h.userName,
+    patientAvatarUrl: h.userAvatarUrl,
+    patientPhone: '',
+    consultationType:
+        h.type == MyConsultationType.emergency ? 'Khẩn Cấp' : 'Đặt Lịch',
+    snakeSuspect: '',
+    hasSnakeImage: false,
+    scheduledTime: scheduled,
+    bookedAt: null,
+    paymentDeadline: null,
+    slotStartTime: slotStartTime,
+    slotEndTime: slotEndTime,
+    status: status,
+    feeCost: h.grossPrice?.toInt() ?? 0,
+    rating: null,
+    durationSeconds: slotEndTime != null && slotStartTime != null
+        ? slotEndTime.difference(slotStartTime).inSeconds
+        : null,
+    durationMinutes: slotEndTime != null && slotStartTime != null
+        ? slotEndTime.difference(slotStartTime).inMinutes
+        : 45,
+    consultationMethod: 'video',
+    problemDescription: null,
+    questions: null,
+    grossPrice: h.grossPrice?.toInt(),
+    netPrice: h.netPrice?.toInt(),
   );
 }
 
@@ -2285,6 +2350,23 @@ class _ExpertConsultation {
   });
 }
 
+class _ExpertHistoryEntry {
+  final DateTime sortTime;
+  final _ExpertConsultation? consultation;
+  final ExpertInstantConsultationHistory? instant;
+
+  const _ExpertHistoryEntry({
+    required this.sortTime,
+    this.consultation,
+    this.instant,
+  });
+
+  bool get isInstant => instant != null;
+
+  String get id =>
+      isInstant ? instant!.instantRequestId : (consultation?.id ?? '');
+}
+
 class _ConsultationsTab extends ConsumerStatefulWidget {
   final int initialTab;
 
@@ -2303,6 +2385,11 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
   static const Color _purple = Color(0xFF6C47C2);
 
   List<_ExpertConsultation> _consultations = [];
+  List<_ExpertHistoryEntry> _historyEntries = [];
+  int _historyPage = 1;
+  bool _hasMoreHistory = true;
+  bool _isHistoryLoading = false;
+  bool _isLoadingMoreHistory = false;
   String? _cancellingBookingId;
 
   List<_ExpertConsultation> _consultationsForDay(DateTime day) {
@@ -2356,6 +2443,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
     // Reload data mỗi khi vào màn hình
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadConsultations();
+      _loadHistory(reset: true);
     });
   }
 
@@ -2363,6 +2451,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
   void reload() {
     if (mounted) {
       _loadConsultations();
+      _loadHistory(reset: true);
     }
   }
 
@@ -2389,6 +2478,96 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
     }
   }
 
+  bool _isHistoryStatus(_ExpertConsultationStatus status) {
+    return status == _ExpertConsultationStatus.completed ||
+        status == _ExpertConsultationStatus.cancelled ||
+        status == _ExpertConsultationStatus.expertAbsent ||
+        status == _ExpertConsultationStatus.expertAbsentHandled;
+  }
+
+  List<_ExpertHistoryEntry> _mapHistoryEntries(
+    List<ExpertConsultationHistoryUnion> entries,
+  ) {
+    final items = <_ExpertHistoryEntry>[];
+
+    for (final entry in entries) {
+      if (entry.kind == ConsultationHistoryKind.instant) {
+        final instant =
+            ExpertInstantConsultationHistory.fromJson(entry.raw);
+        if (instant.requestStatus == InstantRequestStatus.unknown) continue;
+        final sortTime =
+            instant.respondedAt ?? instant.requestedAt ?? DateTime.now();
+        items.add(
+          _ExpertHistoryEntry(sortTime: sortTime, instant: instant),
+        );
+        continue;
+      }
+
+      final consultation =
+          ExpertConsultationHistoryResponse.fromJson(entry.raw);
+      final mapped = _historyToExpertConsultation(consultation);
+      if (!_isHistoryStatus(mapped.status)) continue;
+      items.add(
+        _ExpertHistoryEntry(sortTime: mapped.scheduledTime, consultation: mapped),
+      );
+    }
+
+    items.sort((a, b) => b.sortTime.compareTo(a.sortTime));
+    return items;
+  }
+
+  Future<void> _loadHistory({bool reset = false}) async {
+    if (!mounted) return;
+    if (reset) {
+      setState(() {
+        _isHistoryLoading = true;
+        _historyEntries = [];
+        _historyPage = 1;
+        _hasMoreHistory = true;
+        _isLoadingMoreHistory = false;
+      });
+    } else if (_isLoadingMoreHistory || !_hasMoreHistory) {
+      return;
+    }
+
+    final nextPage = reset ? 1 : _historyPage + 1;
+    if (!reset) setState(() => _isLoadingMoreHistory = true);
+
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      final result = await repo.getExpertConsultationHistory(
+        pageNumber: nextPage,
+        pageSize: 10,
+      );
+
+      if (!mounted) return;
+      final mapped = _mapHistoryEntries(result.items);
+      final dedup = <String, _ExpertHistoryEntry>{
+        for (final item in _historyEntries) item.id: item,
+      };
+      for (final item in mapped) {
+        dedup[item.id] = item;
+      }
+
+      final merged = dedup.values.toList()
+        ..sort((a, b) => b.sortTime.compareTo(a.sortTime));
+
+      setState(() {
+        _historyEntries = merged;
+        _historyPage = nextPage;
+        _hasMoreHistory = result.meta.hasNextPage;
+        _isHistoryLoading = false;
+        _isLoadingMoreHistory = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isHistoryLoading = false;
+        _isLoadingMoreHistory = false;
+      });
+    }
+  }
+
   // Navigate to detail screen
   Future<void> _openDetail(BuildContext context, _ExpertConsultation c) async {
     final result = await context.push(
@@ -2401,6 +2580,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
         'userId': c.userId,
         'expertId': c.expertId,
         'patientName': c.patientName,
+        'patientAvatarUrl': c.patientAvatarUrl,
         'patientPhone': c.patientPhone,
         'consultationType': c.consultationType,
         'snakeSuspect': c.snakeSuspect,
@@ -2794,9 +2974,18 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
     );
   }
 
-  Widget _buildPatientAvatar(String? avatarUrl, {double size = 40}) {
+  Widget _buildPatientAvatar(
+    String? avatarUrl, {
+    required String displayName,
+    double size = 40,
+  }) {
     final url = (avatarUrl ?? '').trim();
-    final hasAvatar = url.isNotEmpty;
+    final name = displayName.trim();
+    final fallbackUrl = name.isNotEmpty
+        ? 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}&background=6C47C2&color=fff&size=200'
+        : '';
+    final resolvedUrl = url.isNotEmpty ? url : fallbackUrl;
+    final hasAvatar = resolvedUrl.isNotEmpty;
     return Container(
       width: size,
       height: size,
@@ -2804,7 +2993,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
         shape: BoxShape.circle,
         color: _purple.withOpacity(0.08),
         image: hasAvatar
-            ? DecorationImage(image: NetworkImage(url), fit: BoxFit.cover)
+            ? DecorationImage(image: NetworkImage(resolvedUrl), fit: BoxFit.cover)
             : null,
       ),
       child: hasAvatar
@@ -2936,6 +3125,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                                 children: [
                                   _buildPatientAvatar(
                                     c.patientAvatarUrl,
+                                    displayName: c.patientName,
                                     size: 36,
                                   ),
                                   const SizedBox(width: 8),
@@ -2973,28 +3163,6 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                                 ),
                             ],
                           ),
-                        ),
-                        // Snake image placeholder
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: c.hasSnakeImage
-                                ? const Color(0xFFDC3545).withOpacity(0.08)
-                                : Colors.grey[100],
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: c.hasSnakeImage
-                              ? const Icon(
-                                  Icons.dangerous,
-                                  color: Color(0xFFDC3545),
-                                  size: 28,
-                                )
-                              : const Icon(
-                                  Icons.image_not_supported,
-                                  color: Color(0xFFCCCCCC),
-                                  size: 24,
-                                ),
                         ),
                       ],
                     ),
@@ -3173,8 +3341,17 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
   // ── History tab ───────────────────────────────────────────────────────────
 
   Widget _buildHistoryTab(BuildContext context) {
-    final list = _historyList;
+    final list = _historyEntries;
     if (list.isEmpty) {
+      if (_isHistoryLoading) {
+        return const Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        );
+      }
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -3190,12 +3367,39 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
       );
     }
     return RefreshIndicator(
-      onRefresh: _loadConsultations,
-      child: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: list.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (_, i) => _buildHistoryCard(context, list[i]),
+      onRefresh: () => _loadHistory(reset: true),
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification.metrics.pixels >=
+              notification.metrics.maxScrollExtent - 160) {
+            _loadHistory();
+          }
+          return false;
+        },
+        child: ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: list.length + (_isLoadingMoreHistory ? 1 : 0),
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (_, i) {
+            if (i >= list.length) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              );
+            }
+            final entry = list[i];
+            if (entry.isInstant) {
+              return _buildInstantHistoryCard(context, entry.instant!);
+            }
+            return _buildHistoryCard(context, entry.consultation!);
+          },
+        ),
       ),
     );
   }
@@ -3246,7 +3450,11 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
         children: [
           Row(
             children: [
-              _buildPatientAvatar(item.patientAvatarUrl, size: 44),
+              _buildPatientAvatar(
+                item.patientAvatarUrl,
+                displayName: item.patientName,
+                size: 44,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -3421,6 +3629,115 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                     ),
                   ),
                 ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInstantHistoryCard(
+    BuildContext context,
+    ExpertInstantConsultationHistory instant,
+  ) {
+    final isDeclined =
+        instant.requestStatus == InstantRequestStatus.declinedByExpert;
+    final statusLabel = isDeclined ? 'Đã từ chối' : 'Hết hạn';
+    final statusColor =
+        isDeclined ? const Color(0xFFEF4444) : const Color(0xFFF59E0B);
+    final timeLabel =
+        instant.respondedAt ?? instant.requestedAt ?? DateTime.now();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border(
+          left: BorderSide(color: statusColor, width: 4),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _buildPatientAvatar(
+                instant.userAvatarUrl,
+                displayName: instant.userName,
+                size: 44,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          instant.userName,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2D2D2D),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            statusLabel,
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: statusColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _formatFullDateTime(timeLabel),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF999999),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildHistoryMetaChip(
+                icon: Icons.flash_on_outlined,
+                label: 'Loại',
+                value: 'Khẩn cấp',
+              ),
+              _buildHistoryMetaChip(
+                icon: Icons.info_outline,
+                label: 'Trạng thái',
+                value: statusLabel,
               ),
             ],
           ),

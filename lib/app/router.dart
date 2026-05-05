@@ -521,6 +521,8 @@ final router = GoRouter(
           canReportExpertAbsent:
               extra?['canReportExpertAbsent'] as bool? ?? false,
           scheduledStartAtMs: extra?['scheduledStartAtMs'] as int?,
+          scheduledDurationSeconds:
+              extra?['scheduledDurationSeconds'] as int? ?? 1800,
           showCompleteButton: extra?['showCompleteButton'] as bool? ?? false,
           durationSeconds: extra?['durationSeconds'] as int? ?? 0,
           initialMicOn: extra?['initialMicOn'] as bool? ?? true,
@@ -542,6 +544,11 @@ final router = GoRouter(
         final initialCameraOn = extra?['initialCameraOn'] as bool? ?? true;
         final afterCallRoute = extra?['afterCallRoute'] as String?;
         final isExpertMode = extra?['isExpertMode'] as bool? ?? false;
+        final scheduledStartAtMs = extra?['scheduledStartAtMs'] as int?;
+        final scheduledDurationSeconds =
+            extra?['scheduledDurationSeconds'] as int?;
+        final canReportExpertAbsent =
+            extra?['canReportExpertAbsent'] as bool? ?? false;
         return VideoConsultationScreen(
           consultationId: id,
           expertName: expertName,
@@ -549,6 +556,9 @@ final router = GoRouter(
           initialMicOn: initialMicOn,
           initialCameraOn: initialCameraOn,
           afterCallRoute: afterCallRoute,
+          scheduledStartAtMs: scheduledStartAtMs,
+          scheduledDurationSeconds: scheduledDurationSeconds,
+          canReportExpertAbsent: canReportExpertAbsent,
           isExpertMode: isExpertMode,
           livekitToken: extra?['livekitToken'] as String? ?? '',
           wsUrl: extra?['wsUrl'] as String? ?? '',

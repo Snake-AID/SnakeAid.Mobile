@@ -31,6 +31,14 @@ class VideoConsultationScreen extends ConsumerStatefulWidget {
   /// Route to go to after ending the call (null = use default member waiting room)
   final String? afterCallRoute;
 
+  /// Allow report expert absent when returning to waiting room
+  final bool canReportExpertAbsent;
+
+  /// Scheduled start time (epoch ms) for waiting room time label
+  final int? scheduledStartAtMs;
+  /// Scheduled duration (seconds) for waiting room time label
+  final int? scheduledDurationSeconds;
+
   /// LiveKit JWT token received from backend
   final String livekitToken;
 
@@ -46,8 +54,11 @@ class VideoConsultationScreen extends ConsumerStatefulWidget {
     this.initialMicOn = true,
     this.initialCameraOn = true,
     this.afterCallRoute,
+    this.canReportExpertAbsent = false,
     this.livekitToken = '',
     this.wsUrl = '',
+    this.scheduledStartAtMs,
+    this.scheduledDurationSeconds,
   });
 
   @override
@@ -517,8 +528,10 @@ class _VideoConsultationScreenState
                   'expertSpecialty': widget.expertSpecialty,
                   'durationSeconds': _secondsElapsed,
                   'showCompleteButton': true,
-                  'canReportExpertAbsent': true,
+                  'canReportExpertAbsent': widget.canReportExpertAbsent,
                   'initialMicOn': _isMicOn,
+                  'scheduledStartAtMs': widget.scheduledStartAtMs,
+                  'scheduledDurationSeconds': widget.scheduledDurationSeconds,
                   'initialCameraOn': _isCameraOn,
                 },
               );
