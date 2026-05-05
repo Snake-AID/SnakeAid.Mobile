@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../repository/consultation_repository.dart';
 import '../../../../core/services/consultation_chat_signalr_service.dart';
+import '../../models/consultation_history_union_response.dart';
 
 /// Phòng chờ tư vấn video dành cho chuyên gia
 /// Hiển thị trước/sau buổi tư vấn, chờ bệnh nhân tham gia
@@ -60,6 +61,8 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
   ConsultationChatSignalRService? _chatService;
   StreamSubscription<ConsultationCallEndedEvent>? _consultationCallEndedSub;
   bool _isHandlingEndEvent = false;
+  Timer? _statusPollTimer;
+  bool _isCheckingStatus = false;
 
   @override
   void initState() {
@@ -93,6 +96,63 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
 
     // Initialize SignalR listener for end-consultation events
     _initSignalR();
+    _checkConsultationStatus();
+    _startStatusPolling();
+  }
+
+  void _startStatusPolling() {
+    _statusPollTimer?.cancel();
+    _statusPollTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+      _checkConsultationStatus(silent: true);
+    });
+  }
+
+  Future<void> _checkConsultationStatus({bool silent = false}) async {
+    if (!mounted || _isCheckingStatus || _isHandlingEndEvent) return;
+    _isCheckingStatus = true;
+    try {
+      final repo = ref.read(consultationRepositoryProvider);
+      final result = await repo.getExpertConsultationHistory(
+        pageNumber: 1,
+        pageSize: 20,
+      );
+
+      ExpertConsultationHistoryResponse? matched;
+      for (final entry in result.items) {
+        if (entry.kind != ConsultationHistoryKind.consultation) continue;
+        final detail = ExpertConsultationHistoryResponse.fromJson(entry.raw);
+        if (detail.consultationId == widget.consultationId) {
+          matched = detail;
+          break;
+        }
+      }
+
+      if (matched == null) return;
+
+      const terminalStatuses = {
+        'completed',
+        'cancelled',
+        'userAbsent',
+        'expertAbsent',
+        'expertAbsentHandled',
+        'allAbsent',
+      };
+      final isTerminal = terminalStatuses.contains(matched.status.name);
+      if (!isTerminal) return;
+
+      if (!silent && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Phiên tư vấn đã kết thúc.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+
+      _handleConsultationEnded('completed');
+    } finally {
+      _isCheckingStatus = false;
+    }
   }
 
   void _initSignalR() async {
@@ -149,6 +209,7 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
     for (final c in _dotControllers) c.dispose();
     _consultationCallEndedSub?.cancel();
     _chatService?.dispose();
+    _statusPollTimer?.cancel();
     super.dispose();
   }
 
@@ -160,6 +221,8 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
 
   Future<void> _enterRoom() async {
     if (_isJoining) return;
+    await _checkConsultationStatus();
+    if (!mounted || _isHandlingEndEvent) return;
     setState(() => _isJoining = true);
 
     ({String token, String wsUrl})? livekitResult;

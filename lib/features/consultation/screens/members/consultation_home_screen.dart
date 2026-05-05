@@ -554,10 +554,22 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
     final pendingFromLegacyBookings = _bookingFallbackItems(
       bookingsState.bookings,
     );
-    final upcomingById = <String, _ConsultationItem>{
-      for (final item in [...ongoingFromNewApi, ...pendingFromLegacyBookings])
-        item.id: item,
-    };
+    final upcomingById = <String, _ConsultationItem>{};
+    for (final item in [...ongoingFromNewApi, ...pendingFromLegacyBookings]) {
+      final existing = upcomingById[item.id];
+      if (existing == null) {
+        upcomingById[item.id] = item;
+        continue;
+      }
+
+      final existingAvatar = (existing.expertAvatarUrl ?? '').trim();
+      final nextAvatar = (item.expertAvatarUrl ?? '').trim();
+      if (existingAvatar.isNotEmpty && nextAvatar.isEmpty) {
+        continue;
+      }
+
+      upcomingById[item.id] = item;
+    }
     final upcoming = upcomingById.values.toList()
       ..sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
     final history = _historyItems
