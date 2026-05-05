@@ -102,6 +102,72 @@ class MissionCompletedData {
   }
 }
 
+/// Data model for incident false alarm event
+class IncidentFalseAlarmData {
+  final String incidentId;
+  final String? reason;
+  final DateTime updatedAt;
+
+  const IncidentFalseAlarmData({
+    required this.incidentId,
+    this.reason,
+    required this.updatedAt,
+  });
+
+  factory IncidentFalseAlarmData.fromJson(Map<String, dynamic> json) {
+    return IncidentFalseAlarmData(
+      incidentId:
+          json['IncidentId'] as String? ?? json['incidentId'] as String? ?? '',
+      reason: json['Reason'] as String? ?? json['reason'] as String?,
+      updatedAt: json['UpdatedAt'] != null
+          ? DateTime.parse(json['UpdatedAt'] as String)
+          : (json['updatedAt'] != null
+                ? DateTime.parse(json['updatedAt'] as String)
+                : DateTime.now()),
+    );
+  }
+}
+
+/// Data model for hospital handover accepted event
+class HospitalHandoverAcceptedData {
+  final String incidentId;
+  final String hospitalName;
+  final String? hospitalPhone;
+  final String? operatorNote;
+  final String? suggestedClientAction;
+  final DateTime updatedAt;
+
+  const HospitalHandoverAcceptedData({
+    required this.incidentId,
+    required this.hospitalName,
+    this.hospitalPhone,
+    this.operatorNote,
+    this.suggestedClientAction,
+    required this.updatedAt,
+  });
+
+  factory HospitalHandoverAcceptedData.fromJson(Map<String, dynamic> json) {
+    return HospitalHandoverAcceptedData(
+      incidentId:
+          json['IncidentId'] as String? ?? json['incidentId'] as String? ?? '',
+      hospitalName: json['HospitalName'] as String? ??
+          json['hospitalName'] as String? ??
+          '',
+      hospitalPhone: json['HospitalPhone'] as String? ??
+          json['hospitalPhone'] as String?,
+      operatorNote: json['OperatorNote'] as String? ??
+          json['operatorNote'] as String?,
+      suggestedClientAction: json['SuggestedClientAction'] as String? ??
+          json['suggestedClientAction'] as String?,
+      updatedAt: json['UpdatedAt'] != null
+          ? DateTime.parse(json['UpdatedAt'] as String)
+          : (json['updatedAt'] != null
+                ? DateTime.parse(json['updatedAt'] as String)
+                : DateTime.now()),
+    );
+  }
+}
+
 /// SignalR Service for Member – MissionHub
 ///
 /// Connects to `/hubs/mission?incidentId=<id>` after SOS is created.
@@ -135,6 +201,10 @@ class MissionHubService {
   final _missionAbortedController = StreamController<String>.broadcast();
   final _sessionExpiredController = StreamController<void>.broadcast();
   final _missionStartedController = StreamController<void>.broadcast();
+  final _incidentFalseAlarmController =
+      StreamController<IncidentFalseAlarmData>.broadcast();
+  final _hospitalHandoverAcceptedController =
+      StreamController<HospitalHandoverAcceptedData>.broadcast();
   final _connectionStateController =
       StreamController<HubConnectionState>.broadcast();
 
@@ -154,6 +224,10 @@ class MissionHubService {
   Stream<String> get missionAbortedStream =>
       _missionAbortedController.stream;
   Stream<void> get sessionExpiredStream => _sessionExpiredController.stream;
+  Stream<IncidentFalseAlarmData> get incidentFalseAlarmStream =>
+      _incidentFalseAlarmController.stream;
+  Stream<HospitalHandoverAcceptedData> get hospitalHandoverAcceptedStream =>
+      _hospitalHandoverAcceptedController.stream;
   Stream<HubConnectionState> get connectionStateStream =>
       _connectionStateController.stream;
 
@@ -395,6 +469,36 @@ class MissionHubService {
         debugPrint('❌ Error parsing SessionExpired: $e');
       }
     });
+
+    // 🚫 Incident marked as false alarm
+    _hubConnection!.on('IncidentFalseAlarm', (arguments) {
+      try {
+        debugPrint('🚫 IncidentFalseAlarm');
+        if (arguments == null || arguments.isEmpty) return;
+        final data = arguments[0] as Map<String, dynamic>;
+        final event = IncidentFalseAlarmData.fromJson(data);
+        debugPrint('   IncidentId: ${event.incidentId}');
+        debugPrint('   Reason: ${event.reason ?? ""}');
+        _incidentFalseAlarmController.add(event);
+      } catch (e) {
+        debugPrint('❌ Error parsing IncidentFalseAlarm: $e');
+      }
+    });
+
+    // 🏥 Hospital handover accepted
+    _hubConnection!.on('HospitalHandoverAccepted', (arguments) {
+      try {
+        debugPrint('🏥 HospitalHandoverAccepted');
+        if (arguments == null || arguments.isEmpty) return;
+        final data = arguments[0] as Map<String, dynamic>;
+        final event = HospitalHandoverAcceptedData.fromJson(data);
+        debugPrint('   IncidentId: ${event.incidentId}');
+        debugPrint('   Hospital: ${event.hospitalName}');
+        _hospitalHandoverAcceptedController.add(event);
+      } catch (e) {
+        debugPrint('❌ Error parsing HospitalHandoverAccepted: $e');
+      }
+    });
   }
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -462,6 +566,8 @@ class MissionHubService {
     _missionAbortedController.close();
     _sessionExpiredController.close();
     _missionStartedController.close();
+    _incidentFalseAlarmController.close();
+    _hospitalHandoverAcceptedController.close();
     _connectionStateController.close();
   }
 }

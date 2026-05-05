@@ -2076,6 +2076,15 @@ class _MemberIncidentFinishedDetailScreenState
                     'Bệnh viện chuyển đến',
                     mission!.hospital?.hospitalName ?? 'Chưa có',
                   ),
+                if (incident.operatorNotes != null &&
+                    incident.operatorNotes!.isNotEmpty)
+                  _infoRowIcon(
+                    'Ghi chú của điều phối viên',
+                    incident.operatorNotes!,
+                  ),
+                if (incident.cancellationReason != null &&
+                    incident.cancellationReason!.isNotEmpty)
+                  _infoRowIcon('Lý do hủy', incident.cancellationReason!),
               ],
             ),
           ),

@@ -90,6 +90,7 @@ class DetailedIncidentData {
   final String? cancellationReason;
   final int severityLevel;
   final DateTime? incidentOccurredAt;
+  final String? operatorNotes;
 
   // Rescue attempts tracking (legacy; now handled by dispatch center)
   final int totalRescueAttempts;
@@ -128,6 +129,7 @@ class DetailedIncidentData {
     required this.feedbacks,
     this.identifiedSnakeSpecies,
     this.identificationContext,
+    this.operatorNotes,
   });
 
   factory DetailedIncidentData.fromJson(Map<String, dynamic> json) {
@@ -182,6 +184,7 @@ class DetailedIncidentData {
               ?.map((e) => FeedbackItem.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+      operatorNotes: json['operatorNotes'],
     );
   }
 
@@ -205,6 +208,7 @@ class DetailedIncidentData {
     'rescueMissionMedia': rescueMissionMedia.map((m) => m.toJson()).toList(),
     'identifiedSnake': identifiedSnakeSpecies?.toJson(),
     'identificationContext': identificationContext?.toJson(),
+    'operatorNotes': operatorNotes,
   };
 
   /// Check if rescuer is assigned
