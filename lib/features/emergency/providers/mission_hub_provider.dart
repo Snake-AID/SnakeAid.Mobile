@@ -123,6 +123,12 @@ class MissionStatus {
   final bool missionCancelled;
   final String? cancellationReason;
   final bool sessionExpired;
+  final bool incidentFalseAlarm;
+  final String? incidentFalseAlarmReason;
+  final bool hospitalHandoverAccepted;
+  final String? hospitalName;
+  final String? hospitalPhone;
+  final String? hospitalOperatorNote;
 
   const MissionStatus({
     this.incidentId,
@@ -137,6 +143,12 @@ class MissionStatus {
     this.missionCancelled = false,
     this.cancellationReason,
     this.sessionExpired = false,
+    this.incidentFalseAlarm = false,
+    this.incidentFalseAlarmReason,
+    this.hospitalHandoverAccepted = false,
+    this.hospitalName,
+    this.hospitalPhone,
+    this.hospitalOperatorNote,
   });
 
   bool get hasRescuer => missionId != null && rescuerId != null;
@@ -154,6 +166,12 @@ class MissionStatus {
     bool? missionCancelled,
     String? cancellationReason,
     bool? sessionExpired,
+    bool? incidentFalseAlarm,
+    String? incidentFalseAlarmReason,
+    bool? hospitalHandoverAccepted,
+    String? hospitalName,
+    String? hospitalPhone,
+    String? hospitalOperatorNote,
   }) {
     return MissionStatus(
       incidentId: incidentId ?? this.incidentId,
@@ -169,6 +187,14 @@ class MissionStatus {
       missionCancelled: missionCancelled ?? this.missionCancelled,
       cancellationReason: cancellationReason ?? this.cancellationReason,
       sessionExpired: sessionExpired ?? this.sessionExpired,
+      incidentFalseAlarm: incidentFalseAlarm ?? this.incidentFalseAlarm,
+      incidentFalseAlarmReason:
+          incidentFalseAlarmReason ?? this.incidentFalseAlarmReason,
+      hospitalHandoverAccepted:
+          hospitalHandoverAccepted ?? this.hospitalHandoverAccepted,
+      hospitalName: hospitalName ?? this.hospitalName,
+      hospitalPhone: hospitalPhone ?? this.hospitalPhone,
+      hospitalOperatorNote: hospitalOperatorNote ?? this.hospitalOperatorNote,
     );
   }
 }
@@ -237,6 +263,26 @@ class MissionStatusNotifier extends StateNotifier<MissionStatus> {
     _subscriptions.add(
       _service.sessionExpiredStream.listen((_) {
         state = state.copyWith(sessionExpired: true);
+      }),
+    );
+
+    _subscriptions.add(
+      _service.incidentFalseAlarmStream.listen((data) {
+        state = state.copyWith(
+          incidentFalseAlarm: true,
+          incidentFalseAlarmReason: data.reason ?? '',
+        );
+      }),
+    );
+
+    _subscriptions.add(
+      _service.hospitalHandoverAcceptedStream.listen((data) {
+        state = state.copyWith(
+          hospitalHandoverAccepted: true,
+          hospitalName: data.hospitalName,
+          hospitalPhone: data.hospitalPhone,
+          hospitalOperatorNote: data.operatorNote,
+        );
       }),
     );
   }

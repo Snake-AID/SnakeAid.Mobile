@@ -2078,6 +2078,12 @@ class _MemberIncidentFinishedDetailScreenState
                     mission!.hospital?.hospitalName ?? 'Chưa có',
                     const Color(0xFF7B1FA2),
                   ),
+                if (incident.operatorNotes != null)
+                  _infoRowIcon(
+                    'Ghi chú của điều phối viên',
+                    incident.operatorNotes!,
+                    const Color(0xFF7B1FA2),
+                  ),
               ],
             ),
           ),

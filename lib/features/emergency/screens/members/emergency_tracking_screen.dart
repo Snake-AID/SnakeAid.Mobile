@@ -89,6 +89,7 @@ class _EmergencyTrackingScreenState
 
   // ── MissionHub subscriptions ──────────────────────────────────────────────
   final List<StreamSubscription> _missionHubSubscriptions = [];
+  bool _isTerminating = false;
 
   // ── ETA / distance display ────────────────────────────────────────────────
   double? _distanceKm;
@@ -645,6 +646,111 @@ class _EmergencyTrackingScreenState
           '✅ [TrackingScreen] Reset to searching state after rescuer abort',
         );
       }),
+    );
+
+    // 🚫 Incident false alarm
+    _missionHubSubscriptions.add(
+      svc.incidentFalseAlarmStream.listen((data) async {
+        if (!mounted) return;
+        final reasonText =
+            (data.reason == null || data.reason!.trim().isEmpty)
+                ? 'Điều phối viên đã xác nhận đây là báo động giả. Ca SOS đã được đóng.'
+                : 'Điều phối viên đã xác nhận đây là báo động giả. Lý do: ${data.reason}';
+        await _terminateToHome(message: reasonText);
+      }),
+    );
+
+    // 🏥 Hospital handover accepted
+    _missionHubSubscriptions.add(
+      svc.hospitalHandoverAcceptedStream.listen((data) async {
+        if (!mounted) return;
+        await _showHospitalHandoverAcceptedDialog(data);
+      }),
+    );
+  }
+
+  Future<void> _terminateToHome({required String message}) async {
+    if (_isTerminating) return;
+    _isTerminating = true;
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: const Color(0xFFDC3545),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+
+    await ref.read(missionHubConnectionProvider.notifier).disconnect();
+    ref.read(missionStatusProvider.notifier).reset();
+    ref.read(activeMissionProvider.notifier).clearActiveMission();
+    await ref.read(activeIncidentProvider.notifier).clearActiveIncident();
+
+    if (!mounted) return;
+    context.goNamed('member_home');
+  }
+
+  Future<void> _showHospitalHandoverAcceptedDialog(
+    HospitalHandoverAcceptedData data,
+  ) async {
+    if (_isTerminating) return;
+
+    final phoneText =
+        (data.hospitalPhone != null && data.hospitalPhone!.trim().isNotEmpty)
+            ? ' (${data.hospitalPhone})'
+            : '';
+    final noteText =
+        (data.operatorNote != null && data.operatorNote!.trim().isNotEmpty)
+            ? '\nGhi chú: ${data.operatorNote}'
+            : '';
+
+    final message =
+        'Điều phối viên đã chuyển ca của bạn cho ${data.hospitalName}$phoneText.$noteText';
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: const [
+              Icon(Icons.local_hospital, color: Color(0xFF2E7D32), size: 24),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Bệnh viện đã tiếp nhận',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(fontSize: 14),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF6B35),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('Xác nhận'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted) return;
+    await _terminateToHome(
+      message: 'Ca SOS đã được chuyển cho bệnh viện tiếp nhận.',
     );
   }
 
