@@ -43,8 +43,9 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
     _titleCtrl = TextEditingController(text: b?.title ?? '');
     _thumbnailCtrl = TextEditingController(text: b?.thumbnailUrl ?? '');
     _contentCtrl = TextEditingController(text: b?.content ?? '');
-    _readingTimeCtrl =
-        TextEditingController(text: b?.readingTime.toString() ?? '5');
+    _readingTimeCtrl = TextEditingController(
+      text: b?.readingTime.toString() ?? '5',
+    );
     _category = b?.category ?? BlogCategory.snakeKnowledge;
     _selectedTags = b != null ? {...b.tags} : {};
   }
@@ -66,8 +67,9 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
     final start = sel.isValid ? sel.start : text.length;
     final end = sel.isValid ? sel.end : text.length;
     final selected = text.substring(start, end);
-    final inserted =
-        after != null ? '$before$selected$after' : '$before$selected';
+    final inserted = after != null
+        ? '$before$selected$after'
+        : '$before$selected';
     final newText = text.replaceRange(start, end, inserted);
     // Place cursor between markers when no selection was present
     final cursorOffset = (after != null && selected.isEmpty)
@@ -91,9 +93,11 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(next.isSaving
-                ? 'Đã lưu bản nháp'
-                : 'Bài viết đã được gửi để duyệt'),
+            content: Text(
+              next.isSaving
+                  ? 'Đã lưu bản nháp'
+                  : 'Bài viết đã được gửi để duyệt',
+            ),
             backgroundColor: _purple,
           ),
         );
@@ -109,7 +113,9 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
         backgroundColor: _purple,
         foregroundColor: Colors.white,
         title: Text(
-          _isPublished ? 'Xem bài viết' : (_isEditing ? 'Chỉnh sửa bài viết' : 'Viết bài mới'),
+          _isPublished
+              ? 'Xem bài viết'
+              : (_isEditing ? 'Chỉnh sửa bài viết' : 'Viết bài mới'),
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         elevation: 0,
@@ -129,16 +135,18 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.orange.shade300),
                 ),
-                child: const Row(children: [
-                  Icon(Icons.lock_outline, color: Colors.orange, size: 18),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Bài viết đã được đăng. Không thể chỉnh sửa.',
-                      style: TextStyle(color: Colors.orange, fontSize: 13),
+                child: const Row(
+                  children: [
+                    Icon(Icons.lock_outline, color: Colors.orange, size: 18),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Bài viết đã được đăng. Không thể chỉnh sửa.',
+                        style: TextStyle(color: Colors.orange, fontSize: 13),
+                      ),
                     ),
-                  ),
-                ]),
+                  ],
+                ),
               ),
 
             // Error banner
@@ -152,8 +160,7 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
                 ),
                 child: Text(
                   formState.error!,
-                  style:
-                      const TextStyle(color: Colors.red, fontSize: 13),
+                  style: const TextStyle(color: Colors.red, fontSize: 13),
                 ),
               ),
 
@@ -163,8 +170,9 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
               hint: 'Nhập tiêu đề bài viết',
               maxLines: 2,
               readOnly: _isReadOnly,
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Vui lòng nhập tiêu đề' : null,
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Vui lòng nhập tiêu đề'
+                  : null,
             ),
             const SizedBox(height: 16),
 
@@ -174,8 +182,9 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
               hint: 'https://...',
               keyboardType: TextInputType.url,
               readOnly: _isReadOnly,
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Vui lòng nhập URL ảnh bìa' : null,
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Vui lòng nhập URL ảnh bìa'
+                  : null,
             ),
             const SizedBox(height: 16),
 
@@ -192,8 +201,11 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
                     height: 80,
                     color: Colors.grey[200],
                     child: const Center(
-                        child: Text('Không tải được ảnh',
-                            style: TextStyle(color: Colors.grey))),
+                      child: Text(
+                        'Không tải được ảnh',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -262,8 +274,9 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
                                 thumbnailUrl: _thumbnailCtrl.text.trim(),
                                 category: _category,
                                 tags: _selectedTags.toList(),
-                                readingTime:
-                                    int.parse(_readingTimeCtrl.text.trim()),
+                                readingTime: int.parse(
+                                  _readingTimeCtrl.text.trim(),
+                                ),
                               );
                             },
                       icon: formState.isSaving
@@ -271,8 +284,9 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
                               width: 16,
                               height: 16,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Color(0xFF6C47C2)),
+                                strokeWidth: 2,
+                                color: Color(0xFF6C47C2),
+                              ),
                             )
                           : const Icon(Icons.save_outlined),
                       label: const Text('Lưu'),
@@ -281,59 +295,66 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
                         side: const BorderSide(color: _purple),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                   ),
 
                   // Đăng bài — only for new blog OR draft blog
-                  if (!_isEditing || _isDraft) ...([
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton.icon(
-                        onPressed: isBusy
-                            ? null
-                            : () async {
-                                if (_isDraft) {
-                                  // Draft: PATCH status only, no content change
-                                  await notifier.promoteToApproval(
-                                      widget.existingBlog!.id);
-                                } else {
-                                  // New blog: POST with PendingApproval
-                                  if (!_formKey.currentState!.validate())
-                                    return;
-                                  await notifier.submitForApproval(
-                                    existingId: widget.existingBlog?.id,
-                                    title: _titleCtrl.text.trim(),
-                                    content: _contentCtrl.text.trim(),
-                                    thumbnailUrl: _thumbnailCtrl.text.trim(),
-                                    category: _category,
-                                    tags: _selectedTags.toList(),
-                                    readingTime:
-                                        int.parse(_readingTimeCtrl.text.trim()),
-                                  );
-                                }
-                              },
-                        icon: formState.isSubmitting
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white),
-                              )
-                            : const Icon(Icons.send),
-                        label: const Text('Đăng bài'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _purple,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
+                  if (!_isEditing || _isDraft)
+                    ...([
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton.icon(
+                          onPressed: isBusy
+                              ? null
+                              : () async {
+                                  if (_isDraft) {
+                                    // Draft: PATCH status only, no content change
+                                    await notifier.promoteToApproval(
+                                      widget.existingBlog!.id,
+                                    );
+                                  } else {
+                                    // New blog: POST with PendingApproval
+                                    if (!_formKey.currentState!.validate())
+                                      return;
+                                    await notifier.submitForApproval(
+                                      existingId: widget.existingBlog?.id,
+                                      title: _titleCtrl.text.trim(),
+                                      content: _contentCtrl.text.trim(),
+                                      thumbnailUrl: _thumbnailCtrl.text.trim(),
+                                      category: _category,
+                                      tags: _selectedTags.toList(),
+                                      readingTime: int.parse(
+                                        _readingTimeCtrl.text.trim(),
+                                      ),
+                                    );
+                                  }
+                                },
+                          icon: formState.isSubmitting
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.send),
+                          label: const Text('Đăng bài'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _purple,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ]),
+                    ]),
                 ],
               ),
             ),
@@ -356,20 +377,24 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
         // ── Tab switcher ────────────────────────────────────────────────────
         Row(
           children: [
-            Expanded(child: _TabButton(
-              label: 'Soạn thảo',
-              icon: Icons.edit_outlined,
-              active: !_isPreviewMode,
-              isLeft: true,
-              onTap: () => setState(() => _isPreviewMode = false),
-            )),
-            Expanded(child: _TabButton(
-              label: 'Xem trước',
-              icon: Icons.visibility_outlined,
-              active: _isPreviewMode,
-              isLeft: false,
-              onTap: () => setState(() => _isPreviewMode = true),
-            )),
+            Expanded(
+              child: _TabButton(
+                label: 'Soạn thảo',
+                icon: Icons.edit_outlined,
+                active: !_isPreviewMode,
+                isLeft: true,
+                onTap: () => setState(() => _isPreviewMode = false),
+              ),
+            ),
+            Expanded(
+              child: _TabButton(
+                label: 'Xem trước',
+                icon: Icons.visibility_outlined,
+                active: _isPreviewMode,
+                isLeft: false,
+                onTap: () => setState(() => _isPreviewMode = true),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 8),
@@ -405,8 +430,9 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
             keyboardType: TextInputType.multiline,
             readOnly: _isReadOnly,
             onChanged: (_) => setState(() {}),
-            validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'Vui lòng nhập nội dung' : null,
+            validator: (v) => (v == null || v.trim().isEmpty)
+                ? 'Vui lòng nhập nội dung'
+                : null,
             style: const TextStyle(
               fontFamily: 'monospace',
               fontSize: 13.5,
@@ -416,7 +442,10 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
               hintText:
                   '## Tiêu đề bài viết\n\nNội dung đoạn văn...\n\n> ⚠️ Callout cảnh báo\n> ✅ Callout thành công\n> 💡 Mẹo / thông tin\n\n![Mô tả ảnh](https://url-ảnh)',
               hintStyle: TextStyle(
-                  color: Colors.grey[400], fontSize: 12.5, height: 1.6),
+                color: Colors.grey[400],
+                fontSize: 12.5,
+                height: 1.6,
+              ),
               filled: true,
               fillColor: Colors.white,
               contentPadding: const EdgeInsets.all(14),
@@ -424,13 +453,14 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
               enabledBorder: border,
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: Color(0xFF6C47C2), width: 1.5),
+                borderSide: const BorderSide(
+                  color: Color(0xFF6C47C2),
+                  width: 1.5,
+                ),
               ),
               errorBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: Colors.red, width: 1.5),
+                borderSide: const BorderSide(color: Colors.red, width: 1.5),
               ),
             ),
           ),
@@ -452,63 +482,75 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
         child: Row(
           children: [
             _ToolbarBtn(
-                label: 'B',
-                tooltip: 'In đậm',
-                bold: true,
-                onTap: () => _insertAtCursor('**', after: '**')),
+              label: 'B',
+              tooltip: 'In đậm',
+              bold: true,
+              onTap: () => _insertAtCursor('**', after: '**'),
+            ),
             _ToolbarBtn(
-                label: 'I',
-                tooltip: 'In nghiêng',
-                italic: true,
-                onTap: () => _insertAtCursor('*', after: '*')),
+              label: 'I',
+              tooltip: 'In nghiêng',
+              italic: true,
+              onTap: () => _insertAtCursor('*', after: '*'),
+            ),
             const _ToolbarDivider(),
             _ToolbarBtn(
-                label: 'H2',
-                tooltip: 'Tiêu đề lớn',
-                onTap: () => _insertAtCursor('\n## ')),
+              label: 'H2',
+              tooltip: 'Tiêu đề lớn',
+              onTap: () => _insertAtCursor('\n## '),
+            ),
             _ToolbarBtn(
-                label: 'H3',
-                tooltip: 'Tiêu đề nhỏ',
-                onTap: () => _insertAtCursor('\n### ')),
+              label: 'H3',
+              tooltip: 'Tiêu đề nhỏ',
+              onTap: () => _insertAtCursor('\n### '),
+            ),
             _ToolbarBtn(
-                label: '—',
-                tooltip: 'Đường kẻ ngang',
-                onTap: () => _insertAtCursor('\n\n---\n\n')),
+              label: '—',
+              tooltip: 'Đường kẻ ngang',
+              onTap: () => _insertAtCursor('\n\n---\n\n'),
+            ),
             const _ToolbarDivider(),
             _ToolbarBtn(
-                label: '⚠️',
-                tooltip: 'Callout cảnh báo',
-                onTap: () => _insertAtCursor('\n> ⚠️ ')),
+              label: '⚠️',
+              tooltip: 'Callout cảnh báo',
+              onTap: () => _insertAtCursor('\n> ⚠️ '),
+            ),
             _ToolbarBtn(
-                label: '✅',
-                tooltip: 'Callout thành công',
-                onTap: () => _insertAtCursor('\n> ✅ ')),
+              label: '✅',
+              tooltip: 'Callout thành công',
+              onTap: () => _insertAtCursor('\n> ✅ '),
+            ),
             _ToolbarBtn(
-                label: '💡',
-                tooltip: 'Callout mẹo / thông tin',
-                onTap: () => _insertAtCursor('\n> 💡 ')),
+              label: '💡',
+              tooltip: 'Callout mẹo / thông tin',
+              onTap: () => _insertAtCursor('\n> 💡 '),
+            ),
             _ToolbarBtn(
-                label: '🚫',
-                tooltip: 'Callout nguy hiểm',
-                onTap: () => _insertAtCursor('\n> 🚫 ')),
+              label: '🚫',
+              tooltip: 'Callout nguy hiểm',
+              onTap: () => _insertAtCursor('\n> 🚫 '),
+            ),
             _ToolbarBtn(
-                label: 'ℹ️',
-                tooltip: 'Callout thông tin',
-                onTap: () => _insertAtCursor('\n> ℹ️ ')),
+              label: 'ℹ️',
+              tooltip: 'Callout thông tin',
+              onTap: () => _insertAtCursor('\n> ℹ️ '),
+            ),
             const _ToolbarDivider(),
             _ToolbarBtn(
-                label: '🖼️',
-                tooltip: 'Chèn ảnh',
-                onTap: () =>
-                    _insertAtCursor('\n![Mô tả ảnh](', after: ')\n')),
+              label: '🖼️',
+              tooltip: 'Chèn ảnh',
+              onTap: () => _insertAtCursor('\n![Mô tả ảnh](', after: ')\n'),
+            ),
             _ToolbarBtn(
-                label: '• ',
-                tooltip: 'Danh sách bullet',
-                onTap: () => _insertAtCursor('\n- ')),
+              label: '• ',
+              tooltip: 'Danh sách bullet',
+              onTap: () => _insertAtCursor('\n- '),
+            ),
             _ToolbarBtn(
-                label: '1.',
-                tooltip: 'Danh sách số',
-                onTap: () => _insertAtCursor('\n1. ')),
+              label: '1.',
+              tooltip: 'Danh sách số',
+              onTap: () => _insertAtCursor('\n1. '),
+            ),
           ],
         ),
       ),
@@ -535,8 +577,10 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
         hintStyle: TextStyle(color: Colors.grey[400]),
         filled: true,
         fillColor: Colors.white,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Colors.transparent),
@@ -547,13 +591,11 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide:
-              const BorderSide(color: Color(0xFF6C47C2), width: 1.5),
+          borderSide: const BorderSide(color: Color(0xFF6C47C2), width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide:
-              const BorderSide(color: Colors.red, width: 1.5),
+          borderSide: const BorderSide(color: Colors.red, width: 1.5),
         ),
       ),
     );
@@ -571,14 +613,18 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
         child: DropdownButton<BlogCategory>(
           value: _category,
           isExpanded: true,
-          onChanged: _isReadOnly ? null : (v) {
-            if (v != null) setState(() => _category = v);
-          },
+          onChanged: _isReadOnly
+              ? null
+              : (v) {
+                  if (v != null) setState(() => _category = v);
+                },
           items: BlogCategory.values
-              .map((c) => DropdownMenuItem(
-                    value: c,
-                    child: Text(blogCategoryLabel(c)),
-                  ))
+              .map(
+                (c) => DropdownMenuItem(
+                  value: c,
+                  child: Text(blogCategoryLabel(c)),
+                ),
+              )
               .toList(),
         ),
       ),
@@ -594,23 +640,22 @@ class _ExpertBlogFormScreenState extends ConsumerState<ExpertBlogFormScreen> {
         return FilterChip(
           label: Text(blogTagLabel(tag)),
           selected: selected,
-          onSelected: _isReadOnly ? null : (v) {
-            setState(() {
-              if (v) {
-                _selectedTags.add(tag);
-              } else {
-                _selectedTags.remove(tag);
-              }
-            });
-          },
+          onSelected: _isReadOnly
+              ? null
+              : (v) {
+                  setState(() {
+                    if (v) {
+                      _selectedTags.add(tag);
+                    } else {
+                      _selectedTags.remove(tag);
+                    }
+                  });
+                },
           selectedColor: const Color(0xFF6C47C2).withOpacity(0.15),
           checkmarkColor: const Color(0xFF6C47C2),
           labelStyle: TextStyle(
-            color: selected
-                ? const Color(0xFF6C47C2)
-                : Colors.grey[700],
-            fontWeight:
-                selected ? FontWeight.bold : FontWeight.normal,
+            color: selected ? const Color(0xFF6C47C2) : Colors.grey[700],
+            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
           ),
         );
       }).toList(),
@@ -656,9 +701,11 @@ class _TabButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon,
-                size: 15,
-                color: active ? Colors.white : Colors.grey[600]),
+            Icon(
+              icon,
+              size: 15,
+              color: active ? Colors.white : Colors.grey[600],
+            ),
             const SizedBox(width: 5),
             Text(
               label,

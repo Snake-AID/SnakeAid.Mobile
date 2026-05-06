@@ -21,11 +21,13 @@ class SnakeFirstAidModel {
       guidelineId: json['guidelineId'] as String?,
       guidelineName: (json['guidelineName'] ?? '') as String,
       content: FirstAidContent.fromJson(
-          json['content'] as Map<String, dynamic>? ?? {}),
+        json['content'] as Map<String, dynamic>? ?? {},
+      ),
       source: json['source'] as String?,
       identifiedSnake: json['identifiedSnake'] != null
           ? SnakeSpeciesSummary.fromJson(
-              json['identifiedSnake'] as Map<String, dynamic>)
+              json['identifiedSnake'] as Map<String, dynamic>,
+            )
           : null,
       warnings: (json['warnings'] as List<dynamic>? ?? [])
           .map((e) => e.toString())

@@ -16,7 +16,7 @@ enum _UploadState { uploading, done, failed }
 class RescuerTrackingScreen extends ConsumerStatefulWidget {
   final SnakeCatchingRequestData requestData;
   final String missionId;
-  
+
   const RescuerTrackingScreen({
     super.key,
     required this.requestData,
@@ -24,7 +24,8 @@ class RescuerTrackingScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<RescuerTrackingScreen> createState() => _RescuerTrackingScreenState();
+  ConsumerState<RescuerTrackingScreen> createState() =>
+      _RescuerTrackingScreenState();
 }
 
 class _RescuerTrackingScreenState extends ConsumerState<RescuerTrackingScreen> {
@@ -40,7 +41,8 @@ class _RescuerTrackingScreenState extends ConsumerState<RescuerTrackingScreen> {
   final Map<int, _UploadState> _reportUploadStates = {};
 
   // At least one photo successfully uploaded (Flow 1 only)
-  bool get _hasUploadedPhoto => _uploadStates.values.any((s) => s == _UploadState.done);
+  bool get _hasUploadedPhoto =>
+      _uploadStates.values.any((s) => s == _UploadState.done);
 
   SnakeSpecies? _species;
   bool _isLoadingSpecies = true;
@@ -61,8 +63,14 @@ class _RescuerTrackingScreenState extends ConsumerState<RescuerTrackingScreen> {
     }
     try {
       final repo = ref.read(snakeSpeciesRepositoryProvider);
-      final species = await repo.getSnakeSpeciesById(speciesDetail.snakeSpeciesId);
-      if (mounted) setState(() { _species = species; _isLoadingSpecies = false; });
+      final species = await repo.getSnakeSpeciesById(
+        speciesDetail.snakeSpeciesId,
+      );
+      if (mounted)
+        setState(() {
+          _species = species;
+          _isLoadingSpecies = false;
+        });
     } catch (e) {
       debugPrint('⚠️ Failed to load species: $e');
       if (mounted) setState(() => _isLoadingSpecies = false);
@@ -76,83 +84,83 @@ class _RescuerTrackingScreenState extends ConsumerState<RescuerTrackingScreen> {
   }
 
   void _showSuccessDialog() {
-  showDialog(
-    context: context,
-    barrierDismissible: false, // Bắt buộc nhấn nút để đóng
-    builder: (ctx) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 10),
-          // Icon Checkmark với vòng tròn xanh
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: const Color(0xFF28A745).withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.check_circle_rounded,
-              color: Color(0xFF28A745),
-              size: 60,
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Gửi Báo Cáo Thành Công',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF333333),
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Thông tin của bạn đã được hệ thống ghi nhận. Yêu cầu đã hoàn thành!',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFF666666),
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.of(ctx).pop(); // Đóng pop-up thành công
-                // Quay về màn hình chính sau khi báo cáo xong
-                Navigator.of(context).popUntil((route) => route.isFirst);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF6B35), // Màu cam dự án
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Bắt buộc nhấn nút để đóng
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 10),
+            // Icon Checkmark với vòng tròn xanh
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: const Color(0xFF28A745).withOpacity(0.1),
+                shape: BoxShape.circle,
               ),
-              child: const Text(
-                'Về trang chủ',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
+              child: const Icon(
+                Icons.check_circle_rounded,
+                color: Color(0xFF28A745),
+                size: 60,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 24),
+            const Text(
+              'Gửi Báo Cáo Thành Công',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF333333),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Thông tin của bạn đã được hệ thống ghi nhận. Yêu cầu đã hoàn thành!',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Color(0xFF666666),
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop(); // Đóng pop-up thành công
+                  // Quay về màn hình chính sau khi báo cáo xong
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF6B35), // Màu cam dự án
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  'Về trang chủ',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
-Future<void> _openUncompleteDialog() async {
+  Future<void> _openUncompleteDialog() async {
     // State riêng của dialog — hoàn toàn độc lập với flow chính
     final reasonController = TextEditingController();
     // Dùng list/map local được truyền vào StatefulBuilder để tránh share state
@@ -199,12 +207,20 @@ Future<void> _openUncompleteDialog() async {
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          final uploadedCount = dialogUploadStates.values.where((s) => s == _UploadState.done).length;
+          final uploadedCount = dialogUploadStates.values
+              .where((s) => s == _UploadState.done)
+              .length;
           final bool isCustomReason = selectedReason == 'Lý do khác';
-          final bool canConfirm = selectedReason != null && uploadedCount > 0 && (!isCustomReason || reasonController.text.trim().isNotEmpty);
+          final bool canConfirm =
+              selectedReason != null &&
+              uploadedCount > 0 &&
+              (!isCustomReason || reasonController.text.trim().isNotEmpty);
 
           return Dialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 24,
+            ),
             backgroundColor: Colors.transparent,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 460),
@@ -275,7 +291,9 @@ Future<void> _openUncompleteDialog() async {
                               width: 36,
                               height: 36,
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFF6B35).withOpacity(0.12),
+                                color: const Color(
+                                  0xFFFF6B35,
+                                ).withOpacity(0.12),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: const Icon(
@@ -301,7 +319,7 @@ Future<void> _openUncompleteDialog() async {
                                   Text(
                                     uploadedCount > 0
                                         ? 'Đã tải lên $uploadedCount/${dialogPhotos.length} ảnh'
-                                          : 'Bắt buộc: cần ít nhất 1 ảnh bằng chứng',
+                                        : 'Bắt buộc: cần ít nhất 1 ảnh bằng chứng',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       color: Color(0xFF7A6A61),
@@ -320,35 +338,56 @@ Future<void> _openUncompleteDialog() async {
                           child: SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             child: Row(
-                              children: dialogPhotos.asMap().entries.map((entry) {
+                              children: dialogPhotos.asMap().entries.map((
+                                entry,
+                              ) {
                                 final index = entry.key;
-                                final state = dialogUploadStates[index] ?? _UploadState.uploading;
+                                final state =
+                                    dialogUploadStates[index] ??
+                                    _UploadState.uploading;
                                 return Padding(
                                   padding: const EdgeInsets.only(right: 10),
                                   child: Stack(
                                     children: [
                                       ClipRRect(
                                         borderRadius: BorderRadius.circular(14),
-                                        child: Image.file(entry.value, width: 92, height: 92, fit: BoxFit.cover),
+                                        child: Image.file(
+                                          entry.value,
+                                          width: 92,
+                                          height: 92,
+                                          fit: BoxFit.cover,
+                                        ),
                                       ),
                                       Positioned(
                                         bottom: 6,
                                         right: 6,
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 7,
+                                            vertical: 3,
+                                          ),
                                           decoration: BoxDecoration(
                                             color: state == _UploadState.done
                                                 ? Colors.green.shade700
-                                                : state == _UploadState.uploading
-                                                    ? Colors.black54
-                                                    : Colors.red.shade700,
-                                            borderRadius: BorderRadius.circular(999),
+                                                : state ==
+                                                      _UploadState.uploading
+                                                ? Colors.black54
+                                                : Colors.red.shade700,
+                                            borderRadius: BorderRadius.circular(
+                                              999,
+                                            ),
                                           ),
                                           child: Text(
                                             state == _UploadState.done
                                                 ? 'OK'
-                                                : (state == _UploadState.uploading ? 'Đang tải' : 'Lỗi'),
-                                            style: const TextStyle(fontSize: 10, color: Colors.white),
+                                                : (state ==
+                                                          _UploadState.uploading
+                                                      ? 'Đang tải'
+                                                      : 'Lỗi'),
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.white,
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -365,7 +404,10 @@ Future<void> _openUncompleteDialog() async {
                         onPressed: () async {
                           await captureForReport(setDialogState);
                         },
-                        icon: const Icon(Icons.add_a_photo, color: Color(0xFFFF6B35)),
+                        icon: const Icon(
+                          Icons.add_a_photo,
+                          color: Color(0xFFFF6B35),
+                        ),
                         label: const Text(
                           'Chụp ảnh bằng chứng (tùy chọn)',
                           style: TextStyle(
@@ -376,7 +418,9 @@ Future<void> _openUncompleteDialog() async {
                         style: TextButton.styleFrom(
                           backgroundColor: const Color(0xFFFFF3EE),
                           minimumSize: const Size(double.infinity, 46),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 18),
@@ -405,17 +449,25 @@ Future<void> _openUncompleteDialog() async {
                                 }
                               });
                             },
-                            selectedColor: const Color(0xFFFF6B35).withOpacity(0.14),
+                            selectedColor: const Color(
+                              0xFFFF6B35,
+                            ).withOpacity(0.14),
                             backgroundColor: const Color(0xFFF7F7F7),
                             labelStyle: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: selected ? const Color(0xFFFF6B35) : const Color(0xFF555555),
+                              color: selected
+                                  ? const Color(0xFFFF6B35)
+                                  : const Color(0xFF555555),
                             ),
                             side: BorderSide(
-                              color: selected ? const Color(0xFFFF6B35) : const Color(0xFFE5E5E5),
+                              color: selected
+                                  ? const Color(0xFFFF6B35)
+                                  : const Color(0xFFE5E5E5),
                             ),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(999),
+                            ),
                           );
                         }).toList(),
                       ),
@@ -427,19 +479,27 @@ Future<void> _openUncompleteDialog() async {
                           onChanged: (_) => setDialogState(() {}),
                           decoration: InputDecoration(
                             hintText: 'Nhập lý do cụ thể...',
-                            hintStyle: const TextStyle(color: Color(0xFF9A9A9A)),
+                            hintStyle: const TextStyle(
+                              color: Color(0xFF9A9A9A),
+                            ),
                             filled: true,
                             fillColor: const Color(0xFFF7F7F7),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
                             ),
                             focusedBorder: const OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(14)),
+                              borderRadius: BorderRadius.all(
+                                Radius.circular(14),
+                              ),
                               borderSide: BorderSide(color: Color(0xFFFF6B35)),
                             ),
                           ),
@@ -449,14 +509,21 @@ Future<void> _openUncompleteDialog() async {
                         const SizedBox(height: 10),
                         const Text(
                           'Hãy chọn một lý do để tiếp tục.',
-                          style: TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF888888),
+                          ),
                         ),
                       ],
                       if (uploadedCount == 0) ...[
                         const SizedBox(height: 10),
                         const Text(
                           'Bạn cần tải lên ít nhất 1 ảnh bằng chứng trước khi gửi báo cáo.',
-                          style: TextStyle(fontSize: 12, color: Color(0xFFB26A00), height: 1.4),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFFB26A00),
+                            height: 1.4,
+                          ),
                         ),
                       ],
                       const SizedBox(height: 20),
@@ -467,11 +534,20 @@ Future<void> _openUncompleteDialog() async {
                               onPressed: () => Navigator.of(ctx).pop(),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: const Color(0xFF666666),
-                                side: const BorderSide(color: Color(0xFFE2E2E2)),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                side: const BorderSide(
+                                  color: Color(0xFFE2E2E2),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
                               ),
-                              child: const Text('Hủy', style: TextStyle(fontWeight: FontWeight.w700)),
+                              child: const Text(
+                                'Hủy',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -479,7 +555,8 @@ Future<void> _openUncompleteDialog() async {
                             child: ElevatedButton(
                               onPressed: canConfirm
                                   ? () {
-                                      final reason = selectedReason == 'Lý do khác'
+                                      final reason =
+                                          selectedReason == 'Lý do khác'
                                           ? reasonController.text.trim()
                                           : selectedReason!;
                                       Navigator.of(ctx).pop(reason);
@@ -487,13 +564,22 @@ Future<void> _openUncompleteDialog() async {
                                   : null,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFFF6B35),
-                                disabledBackgroundColor: const Color(0xFFF0C9B7),
+                                disabledBackgroundColor: const Color(
+                                  0xFFF0C9B7,
+                                ),
                                 foregroundColor: Colors.white,
                                 elevation: 0,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
                               ),
-                              child: const Text('Gửi báo cáo', style: TextStyle(fontWeight: FontWeight.w800)),
+                              child: const Text(
+                                'Gửi báo cáo',
+                                style: TextStyle(fontWeight: FontWeight.w800),
+                              ),
                             ),
                           ),
                         ],
@@ -525,7 +611,7 @@ Future<void> _openUncompleteDialog() async {
     try {
       final repo = ref.read(snakeCatchingRepositoryProvider);
       await repo.uncompleteMission(widget.missionId, reason);
-      
+
       // Tắt và bật lại rescue mode để refresh trạng thái của rescuer với server
       final prefs = await SharedPreferences.getInstance();
       final rescuerId = prefs.getString('user_id');
@@ -587,7 +673,9 @@ Future<void> _openUncompleteDialog() async {
           setState(() => _uploadStates[index] = _UploadState.failed);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Tải ảnh thất bại. Nhấn ’Thử lại’ trên ảnh để upload lại.'),
+              content: const Text(
+                'Tải ảnh thất bại. Nhấn ’Thử lại’ trên ảnh để upload lại.',
+              ),
               backgroundColor: const Color(0xFFDC3545),
               action: SnackBarAction(
                 label: 'OK',
@@ -600,9 +688,9 @@ Future<void> _openUncompleteDialog() async {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi chụp ảnh: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Lỗi chụp ảnh: $e')));
       }
     }
   }
@@ -616,9 +704,15 @@ Future<void> _openUncompleteDialog() async {
     try {
       final repo = ref.read(snakeCatchingRepositoryProvider);
       if (forReportFlow) {
-        await repo.uploadRequestEvidence(widget.requestData.id, _capturedPhotos[index]);
+        await repo.uploadRequestEvidence(
+          widget.requestData.id,
+          _capturedPhotos[index],
+        );
       } else {
-        await repo.uploadMissionEvidence(widget.missionId, _capturedPhotos[index]);
+        await repo.uploadMissionEvidence(
+          widget.missionId,
+          _capturedPhotos[index],
+        );
       }
       if (mounted) setState(() => _uploadStates[index] = _UploadState.done);
     } catch (e) {
@@ -686,25 +780,25 @@ Future<void> _openUncompleteDialog() async {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 8),
-                
+
                 // Snake Info Banner
                 _buildSnakeInfoBanner(),
-                
+
                 // Safety Reminders
                 _buildSafetyReminders(),
-                
+
                 // Photo Documentation
                 _buildPhotoDocumentation(),
-                
+
                 // Notes Section
                 _buildNotesSection(),
-                
-                // Emergency Section                
+
+                // Emergency Section
                 const SizedBox(height: 100),
               ],
             ),
           ),
-          
+
           // Fixed Bottom Button
           _buildBottomButton(),
         ],
@@ -774,8 +868,11 @@ Future<void> _openUncompleteDialog() async {
                   ? Image.network(
                       imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          const Icon(Icons.image, size: 32, color: Color(0xFFCCCCCC)),
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.image,
+                        size: 32,
+                        color: Color(0xFFCCCCCC),
+                      ),
                     )
                   : const Icon(Icons.image, size: 32, color: Color(0xFFCCCCCC)),
             ),
@@ -812,7 +909,10 @@ Future<void> _openUncompleteDialog() async {
                   spacing: 8,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: dangerColor,
                         borderRadius: BorderRadius.circular(4),
@@ -872,28 +972,35 @@ Future<void> _openUncompleteDialog() async {
                 ),
                 const SizedBox(height: 12),
                 ...[
-                  'Giữ khoảng cách an toàn tối thiểu.',
-                  'Sử dụng dụng cụ bắt rắn chuyên dụng.',
-                  'Luôn di chuyển chậm và nhẹ nhàng.',
-                  'Không bao giờ quay lưng về phía rắn.',
-                ].map((item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('• ', style: TextStyle(color: Color(0xFF666666))),
-                      Expanded(
-                        child: Text(
-                          item,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF666666),
-                          ),
+                      'Giữ khoảng cách an toàn tối thiểu.',
+                      'Sử dụng dụng cụ bắt rắn chuyên dụng.',
+                      'Luôn di chuyển chậm và nhẹ nhàng.',
+                      'Không bao giờ quay lưng về phía rắn.',
+                    ]
+                    .map(
+                      (item) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '• ',
+                              style: TextStyle(color: Color(0xFF666666)),
+                            ),
+                            Expanded(
+                              child: Text(
+                                item,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF666666),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                )).toList(),
+                    )
+                    .toList(),
               ],
             ),
           ),
@@ -903,8 +1010,12 @@ Future<void> _openUncompleteDialog() async {
   }
 
   Widget _buildPhotoDocumentation() {
-    final uploadedCount = _uploadStates.values.where((s) => s == _UploadState.done).length;
-    final uploadingCount = _uploadStates.values.where((s) => s == _UploadState.uploading).length;
+    final uploadedCount = _uploadStates.values
+        .where((s) => s == _UploadState.done)
+        .length;
+    final uploadingCount = _uploadStates.values
+        .where((s) => s == _UploadState.uploading)
+        .length;
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -923,15 +1034,15 @@ Future<void> _openUncompleteDialog() async {
               const SizedBox(width: 4),
               const Text(
                 '*Bắt buộc',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFFDC3545),
-                ),
+                style: TextStyle(fontSize: 14, color: Color(0xFFDC3545)),
               ),
               const Spacer(),
               if (_capturedPhotos.isNotEmpty)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: uploadedCount > 0
                         ? const Color(0xFF28A745).withOpacity(0.12)
@@ -954,7 +1065,7 @@ Future<void> _openUncompleteDialog() async {
             ],
           ),
           const SizedBox(height: 12),
-          
+
           // Camera Button
           InkWell(
             onTap: _capturePhoto,
@@ -971,24 +1082,17 @@ Future<void> _openUncompleteDialog() async {
               ),
               child: const Column(
                 children: [
-                  Icon(
-                    Icons.photo_camera,
-                    size: 36,
-                    color: Color(0xFF999999),
-                  ),
+                  Icon(Icons.photo_camera, size: 36, color: Color(0xFF999999)),
                   SizedBox(height: 8),
                   Text(
                     'Chụp ảnh rắn sau khi bắt',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF999999),
-                    ),
+                    style: TextStyle(fontSize: 14, color: Color(0xFF999999)),
                   ),
                 ],
               ),
             ),
           ),
-          
+
           // Photo Grid
           if (_capturedPhotos.isNotEmpty) ...[
             const SizedBox(height: 16),
@@ -997,7 +1101,9 @@ Future<void> _openUncompleteDialog() async {
               child: Row(
                 children: _capturedPhotos.asMap().entries.map((entry) {
                   return Padding(
-                    padding: EdgeInsets.only(right: entry.key < _capturedPhotos.length - 1 ? 12 : 0),
+                    padding: EdgeInsets.only(
+                      right: entry.key < _capturedPhotos.length - 1 ? 12 : 0,
+                    ),
                     child: _buildPhotoThumbnail(entry.value, entry.key),
                   );
                 }).toList(),
@@ -1045,45 +1151,53 @@ Future<void> _openUncompleteDialog() async {
                       ),
                     )
                   : uploadState == _UploadState.failed
-                      ? GestureDetector(
-                          key: const ValueKey('failed'),
-                          onTap: () => _retryUpload(index),
-                          child: Container(
-                            color: Colors.black54,
-                            child: const Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.refresh, color: Colors.white, size: 22),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    'Thử lại',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
+                  ? GestureDetector(
+                      key: const ValueKey('failed'),
+                      onTap: () => _retryUpload(index),
+                      child: Container(
+                        color: Colors.black54,
+                        child: const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.refresh,
+                                color: Colors.white,
+                                size: 22,
                               ),
-                            ),
-                          ),
-                        )
-                      : // done — small green tick in corner
-                      Align(
-                          key: const ValueKey('done'),
-                          alignment: Alignment.bottomRight,
-                          child: Container(
-                            margin: const EdgeInsets.all(4),
-                            width: 20,
-                            height: 20,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF28A745),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.check, color: Colors.white, size: 13),
+                              SizedBox(height: 2),
+                              Text(
+                                'Thử lại',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
+                      ),
+                    )
+                  : // done — small green tick in corner
+                    Align(
+                      key: const ValueKey('done'),
+                      alignment: Alignment.bottomRight,
+                      child: Container(
+                        margin: const EdgeInsets.all(4),
+                        width: 20,
+                        height: 20,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF28A745),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check,
+                          color: Colors.white,
+                          size: 13,
+                        ),
+                      ),
+                    ),
             ),
           ),
         ),
@@ -1099,8 +1213,10 @@ Future<void> _openUncompleteDialog() async {
                 // Rebuild uploadStates with shifted indices
                 final newStates = <int, _UploadState>{};
                 _uploadStates.forEach((k, v) {
-                  if (k < index) newStates[k] = v;
-                  else if (k > index) newStates[k - 1] = v;
+                  if (k < index)
+                    newStates[k] = v;
+                  else if (k > index)
+                    newStates[k - 1] = v;
                 });
                 _uploadStates
                   ..clear()
@@ -1173,11 +1289,7 @@ Future<void> _openUncompleteDialog() async {
                     color: Color(0xFF2196F3),
                     borderRadius: BorderRadius.all(Radius.circular(8)),
                   ),
-                  child: const Icon(
-                    Icons.mic,
-                    color: Colors.white,
-                    size: 20,
-                  ),
+                  child: const Icon(Icons.mic, color: Colors.white, size: 20),
                 ),
               ),
             ],
@@ -1185,7 +1297,11 @@ Future<void> _openUncompleteDialog() async {
           const SizedBox(height: 8),
           const Text(
             'Ghi chú này cũng sẽ được dùng làm lý do khi báo cáo chưa hoàn thành nhiệm vụ.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF777777), height: 1.4),
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFF777777),
+              height: 1.4,
+            ),
           ),
         ],
       ),
@@ -1220,19 +1336,24 @@ Future<void> _openUncompleteDialog() async {
                     ? () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (context) => RescuerResultConfirmationScreen(
-                              requestData: widget.requestData,
-                              missionId: widget.missionId,
-                              capturedPhotos: _capturedPhotos,
-                              notes: _notesController.text,
-                            ),
+                            builder: (context) =>
+                                RescuerResultConfirmationScreen(
+                                  requestData: widget.requestData,
+                                  missionId: widget.missionId,
+                                  capturedPhotos: _capturedPhotos,
+                                  notes: _notesController.text,
+                                ),
                           ),
                         );
                       }
                     : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _hasUploadedPhoto ? const Color(0xFFFF6B35) : const Color(0xFFDDDDDD),
-                  foregroundColor: _hasUploadedPhoto ? Colors.white : const Color(0xFF999999),
+                  backgroundColor: _hasUploadedPhoto
+                      ? const Color(0xFFFF6B35)
+                      : const Color(0xFFDDDDDD),
+                  foregroundColor: _hasUploadedPhoto
+                      ? Colors.white
+                      : const Color(0xFF999999),
                   elevation: 0,
                   disabledBackgroundColor: const Color(0xFFDDDDDD),
                   disabledForegroundColor: const Color(0xFF999999),
@@ -1249,7 +1370,9 @@ Future<void> _openUncompleteDialog() async {
                         child: Icon(Icons.lock, size: 20),
                       ),
                     Text(
-                      _hasUploadedPhoto ? 'Hoàn thành bắt rắn' : 'Cần ít nhất 1 ảnh',
+                      _hasUploadedPhoto
+                          ? 'Hoàn thành bắt rắn'
+                          : 'Cần ít nhất 1 ảnh',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -1268,10 +1391,7 @@ Future<void> _openUncompleteDialog() async {
                 style: OutlinedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: const Color(0xFFFF6B35),
-                  side: const BorderSide(
-                    color: Color(0xFFFF6B35),
-                    width: 1.5,
-                  ),
+                  side: const BorderSide(color: Color(0xFFFF6B35), width: 1.5),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),

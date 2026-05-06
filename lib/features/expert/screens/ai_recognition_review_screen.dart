@@ -36,12 +36,17 @@ class _AiRecognitionReviewScreenState
 
   Future<void> _handleVerify() async {
     if (_selectedSpecies == null) {
-      _showSnackBar('Vui lòng chọn loài rắn chính xác để xác nhận.', isError: true);
+      _showSnackBar(
+        'Vui lòng chọn loài rắn chính xác để xác nhận.',
+        isError: true,
+      );
       return;
     }
     setState(() => _isSubmitting = true);
     try {
-      await ref.read(aiRecognitionReviewRepositoryProvider).verify(
+      await ref
+          .read(aiRecognitionReviewRepositoryProvider)
+          .verify(
             recognitionResultId: widget.recognitionResultId,
             correctedSpeciesId: _selectedSpecies!.id,
             expertNotes: _notesController.text.trim().isEmpty
@@ -49,9 +54,9 @@ class _AiRecognitionReviewScreenState
                 : _notesController.text.trim(),
           );
       // Refresh queue to remove processed item
-      ref.read(aiReviewQueueProvider.notifier).removeItem(
-            widget.recognitionResultId,
-          );
+      ref
+          .read(aiReviewQueueProvider.notifier)
+          .removeItem(widget.recognitionResultId);
       ref.read(aiReviewHistoryProvider.notifier).load(refresh: true);
       if (mounted) {
         _showSnackBar('Đã xác nhận loài rắn thành công!');
@@ -75,15 +80,17 @@ class _AiRecognitionReviewScreenState
     if (!confirmed) return;
     setState(() => _isSubmitting = true);
     try {
-      await ref.read(aiRecognitionReviewRepositoryProvider).reject(
+      await ref
+          .read(aiRecognitionReviewRepositoryProvider)
+          .reject(
             recognitionResultId: widget.recognitionResultId,
             expertNotes: _notesController.text.trim().isEmpty
                 ? null
                 : _notesController.text.trim(),
           );
-      ref.read(aiReviewQueueProvider.notifier).removeItem(
-            widget.recognitionResultId,
-          );
+      ref
+          .read(aiReviewQueueProvider.notifier)
+          .removeItem(widget.recognitionResultId);
       ref.read(aiReviewHistoryProvider.notifier).load(refresh: true);
       if (mounted) {
         _showSnackBar('Đã từ chối ảnh.');
@@ -107,7 +114,8 @@ class _AiRecognitionReviewScreenState
           context: context,
           builder: (ctx) => AlertDialog(
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
+              borderRadius: BorderRadius.circular(16),
+            ),
             title: const Text(
               'Từ chối ảnh?',
               style: TextStyle(fontWeight: FontWeight.w700),
@@ -120,8 +128,10 @@ class _AiRecognitionReviewScreenState
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Huỷ',
-                    style: TextStyle(color: Color(0xFF6B7280))),
+                child: const Text(
+                  'Huỷ',
+                  style: TextStyle(color: Color(0xFF6B7280)),
+                ),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(ctx, true),
@@ -129,7 +139,8 @@ class _AiRecognitionReviewScreenState
                   backgroundColor: const Color(0xFFEF4444),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 child: const Text('Từ chối'),
               ),
@@ -143,11 +154,11 @@ class _AiRecognitionReviewScreenState
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor:
-            isError ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+        backgroundColor: isError
+            ? const Color(0xFFEF4444)
+            : const Color(0xFF10B981),
         behavior: SnackBarBehavior.floating,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         margin: const EdgeInsets.all(16),
       ),
     );
@@ -173,8 +184,9 @@ class _AiRecognitionReviewScreenState
 
   @override
   Widget build(BuildContext context) {
-    final detailAsync =
-        ref.watch(aiReviewDetailProvider(widget.recognitionResultId));
+    final detailAsync = ref.watch(
+      aiReviewDetailProvider(widget.recognitionResultId),
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F6F8),
@@ -221,20 +233,21 @@ class _AiRecognitionReviewScreenState
             Text(
               error.replaceFirst('Exception: ', ''),
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 14, color: Color(0xFF6B7280)),
+              style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: () => ref.invalidate(
-                  aiReviewDetailProvider(widget.recognitionResultId)),
+                aiReviewDetailProvider(widget.recognitionResultId),
+              ),
               icon: const Icon(Icons.refresh, size: 18),
               label: const Text('Thử lại'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF10B981),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
           ],
@@ -243,7 +256,10 @@ class _AiRecognitionReviewScreenState
     );
   }
 
-  Widget _buildBody(BuildContext context, AIRecognitionReviewDetailResponse detail) {
+  Widget _buildBody(
+    BuildContext context,
+    AIRecognitionReviewDetailResponse detail,
+  ) {
     return Stack(
       children: [
         SingleChildScrollView(
@@ -265,7 +281,8 @@ class _AiRecognitionReviewScreenState
                     // Species detail (if mapped)
                     if (detail.aiResult.detectedSpecies != null)
                       _buildDetectedSpeciesCard(
-                          detail.aiResult.detectedSpecies!),
+                        detail.aiResult.detectedSpecies!,
+                      ),
                     if (detail.aiResult.detectedSpecies != null)
                       const SizedBox(height: 16),
                     // Expert action section
@@ -278,12 +295,7 @@ class _AiRecognitionReviewScreenState
           ),
         ),
         // Bottom action bar
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: _buildActionBar(),
-        ),
+        Positioned(bottom: 0, left: 0, right: 0, child: _buildActionBar()),
       ],
     );
   }
@@ -297,8 +309,12 @@ class _AiRecognitionReviewScreenState
       color: const Color(0xFF1F2937),
       child: url.isEmpty
           ? const Center(
-              child: Icon(Icons.image_outlined,
-                  color: Color(0xFF4B5563), size: 56))
+              child: Icon(
+                Icons.image_outlined,
+                color: Color(0xFF4B5563),
+                size: 56,
+              ),
+            )
           : Image.network(
               url,
               width: double.infinity,
@@ -312,7 +328,7 @@ class _AiRecognitionReviewScreenState
                     child: CircularProgressIndicator(
                       value: progress.expectedTotalBytes != null
                           ? progress.cumulativeBytesLoaded /
-                              progress.expectedTotalBytes!
+                                progress.expectedTotalBytes!
                           : null,
                       color: const Color(0xFF10B981),
                     ),
@@ -320,8 +336,11 @@ class _AiRecognitionReviewScreenState
                 );
               },
               errorBuilder: (_, __, ___) => const Center(
-                child: Icon(Icons.broken_image,
-                    color: Color(0xFF4B5563), size: 56),
+                child: Icon(
+                  Icons.broken_image,
+                  color: Color(0xFF4B5563),
+                  size: 56,
+                ),
               ),
             ),
     );
@@ -348,8 +367,11 @@ class _AiRecognitionReviewScreenState
                   color: const Color(0xFF10B981).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.precision_manufacturing,
-                    color: Color(0xFF10B981), size: 20),
+                child: const Icon(
+                  Icons.precision_manufacturing,
+                  color: Color(0xFF10B981),
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               const Text(
@@ -364,18 +386,23 @@ class _AiRecognitionReviewScreenState
           ),
           const SizedBox(height: 16),
           // YOLO class name
-          _buildInfoRow('Lớp phân loại (YOLO)',
-              ai.yoloClassName.isEmpty ? '—' : ai.yoloClassName),
+          _buildInfoRow(
+            'Lớp phân loại (YOLO)',
+            ai.yoloClassName.isEmpty ? '—' : ai.yoloClassName,
+          ),
           const SizedBox(height: 12),
           // Confidence
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Độ tin cậy',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF6B7280))),
+              const Text(
+                'Độ tin cậy',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF6B7280),
+                ),
+              ),
               Text(
                 '$confPct%',
                 style: TextStyle(
@@ -400,8 +427,7 @@ class _AiRecognitionReviewScreenState
           // Confidence label
           Center(
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
                 color: confColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
@@ -418,10 +444,7 @@ class _AiRecognitionReviewScreenState
           ),
           const SizedBox(height: 12),
           // Mapped status
-          _buildInfoRow(
-            'Đã ánh xạ loài',
-            ai.isMapped ? 'Có' : 'Chưa ánh xạ',
-          ),
+          _buildInfoRow('Đã ánh xạ loài', ai.isMapped ? 'Có' : 'Chưa ánh xạ'),
         ],
       ),
     );
@@ -445,8 +468,11 @@ class _AiRecognitionReviewScreenState
                   color: const Color(0xFFF59E0B).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.info_outline,
-                    color: Color(0xFFF59E0B), size: 20),
+                child: const Icon(
+                  Icons.info_outline,
+                  color: Color(0xFFF59E0B),
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               const Text(
@@ -478,17 +504,22 @@ class _AiRecognitionReviewScreenState
           _buildInfoRow('Tên khoa học', species.scientificName),
           if (species.primaryVenomType != null) ...[
             const SizedBox(height: 8),
-            _buildInfoRow('Loại độc tố',
-                _venomTypeLabel(species.primaryVenomType!)),
+            _buildInfoRow(
+              'Loại độc tố',
+              _venomTypeLabel(species.primaryVenomType!),
+            ),
           ],
           const SizedBox(height: 8),
           Row(
             children: [
-              const Text('Mức độ nguy hiểm',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF6B7280))),
+              const Text(
+                'Mức độ nguy hiểm',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF6B7280),
+                ),
+              ),
               const Spacer(),
               _RiskLevelBadge(riskLevel: species.riskLevel),
             ],
@@ -501,9 +532,10 @@ class _AiRecognitionReviewScreenState
             Text(
               species.identificationSummary!,
               style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF6B7280),
-                  height: 1.5),
+                fontSize: 13,
+                color: Color(0xFF6B7280),
+                height: 1.5,
+              ),
             ),
           ],
         ],
@@ -529,8 +561,11 @@ class _AiRecognitionReviewScreenState
                   color: const Color(0xFF6C47C2).withOpacity(0.08),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.edit_note,
-                    color: Color(0xFF6C47C2), size: 20),
+                child: const Icon(
+                  Icons.edit_note,
+                  color: Color(0xFF6C47C2),
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               const Text(
@@ -580,9 +615,11 @@ class _AiRecognitionReviewScreenState
                         width: 36,
                         height: 36,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            const Icon(Icons.image_outlined,
-                                color: Color(0xFF9CA3AF), size: 20),
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.image_outlined,
+                          color: Color(0xFF9CA3AF),
+                          size: 20,
+                        ),
                       ),
                     )
                   else
@@ -593,8 +630,11 @@ class _AiRecognitionReviewScreenState
                         color: const Color(0xFFE5E7EB),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: const Icon(Icons.pets,
-                          color: Color(0xFF9CA3AF), size: 20),
+                      child: const Icon(
+                        Icons.pets,
+                        color: Color(0xFF9CA3AF),
+                        size: 20,
+                      ),
                     ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -612,8 +652,7 @@ class _AiRecognitionReviewScreenState
                       ),
                     ),
                   ),
-                  const Icon(Icons.arrow_drop_down,
-                      color: Color(0xFF6B7280)),
+                  const Icon(Icons.arrow_drop_down, color: Color(0xFF6B7280)),
                 ],
               ),
             ),
@@ -623,9 +662,10 @@ class _AiRecognitionReviewScreenState
             Text(
               _selectedSpecies!.scientificName,
               style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF10B981),
-                  fontStyle: FontStyle.italic),
+                fontSize: 12,
+                color: Color(0xFF10B981),
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ],
 
@@ -646,10 +686,11 @@ class _AiRecognitionReviewScreenState
             maxLines: 3,
             style: const TextStyle(fontSize: 14, color: Color(0xFF131018)),
             decoration: InputDecoration(
-              hintText:
-                  'Ví dụ: Đặc điểm nhận dạng phù hợp với loài...',
+              hintText: 'Ví dụ: Đặc điểm nhận dạng phù hợp với loài...',
               hintStyle: const TextStyle(
-                  fontSize: 13, color: Color(0xFFBBBBC0)),
+                fontSize: 13,
+                color: Color(0xFFBBBBC0),
+              ),
               filled: true,
               fillColor: const Color(0xFFF9FAFB),
               contentPadding: const EdgeInsets.all(14),
@@ -664,7 +705,9 @@ class _AiRecognitionReviewScreenState
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(
-                    color: Color(0xFF10B981), width: 1.5),
+                  color: Color(0xFF10B981),
+                  width: 1.5,
+                ),
               ),
             ),
           ),
@@ -677,13 +720,17 @@ class _AiRecognitionReviewScreenState
               color: const Color(0xFFF59E0B).withOpacity(0.08),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                  color: const Color(0xFFF59E0B).withOpacity(0.3)),
+                color: const Color(0xFFF59E0B).withOpacity(0.3),
+              ),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.info_outline,
-                    color: Color(0xFFF59E0B), size: 16),
+                const Icon(
+                  Icons.info_outline,
+                  color: Color(0xFFF59E0B),
+                  size: 16,
+                ),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
@@ -710,7 +757,11 @@ class _AiRecognitionReviewScreenState
   Widget _buildActionBar() {
     return Container(
       padding: EdgeInsets.fromLTRB(
-          16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
+        16,
+        12,
+        16,
+        MediaQuery.of(context).padding.bottom + 12,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -798,18 +849,20 @@ class _AiRecognitionReviewScreenState
           child: Text(
             label,
             style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF6B7280)),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF6B7280),
+            ),
           ),
         ),
         Expanded(
           child: Text(
             value,
             style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF131018)),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF131018),
+            ),
           ),
         ),
       ],
@@ -893,11 +946,12 @@ class _SpeciesPickerSheetState extends ConsumerState<_SpeciesPickerSheet> {
               autofocus: true,
               style: const TextStyle(fontSize: 14),
               decoration: InputDecoration(
-                prefixIcon:
-                    const Icon(Icons.search, color: Color(0xFF9CA3AF)),
+                prefixIcon: const Icon(Icons.search, color: Color(0xFF9CA3AF)),
                 hintText: 'Tìm theo tên thường gọi hoặc tên khoa học...',
                 hintStyle: const TextStyle(
-                    fontSize: 13, color: Color(0xFFBBBBC0)),
+                  fontSize: 13,
+                  color: Color(0xFFBBBBC0),
+                ),
                 filled: true,
                 fillColor: const Color(0xFFF3F4F6),
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -928,8 +982,9 @@ class _SpeciesPickerSheetState extends ConsumerState<_SpeciesPickerSheet> {
                     : species.where((s) {
                         return s.commonName.toLowerCase().contains(q) ||
                             s.scientificName.toLowerCase().contains(q) ||
-                            s.alternativeNames
-                                .any((n) => n.toLowerCase().contains(q));
+                            s.alternativeNames.any(
+                              (n) => n.toLowerCase().contains(q),
+                            );
                       }).toList();
 
                 if (filtered.isEmpty) {
@@ -937,7 +992,9 @@ class _SpeciesPickerSheetState extends ConsumerState<_SpeciesPickerSheet> {
                     child: Text(
                       'Không tìm thấy loài nào cho "$_searchQuery"',
                       style: const TextStyle(
-                          color: Color(0xFF6B7280), fontSize: 13),
+                        color: Color(0xFF6B7280),
+                        fontSize: 13,
+                      ),
                     ),
                   );
                 }
@@ -949,11 +1006,12 @@ class _SpeciesPickerSheetState extends ConsumerState<_SpeciesPickerSheet> {
                       const Divider(height: 1, color: Color(0xFFF3F4F6)),
                   itemBuilder: (ctx, i) {
                     final s = filtered[i];
-                    final isSelected =
-                        widget.initialSelected?.id == s.id;
+                    final isSelected = widget.initialSelected?.id == s.id;
                     return ListTile(
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 4, vertical: 6),
+                        horizontal: 4,
+                        vertical: 6,
+                      ),
                       leading: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: s.imageUrl != null && s.imageUrl!.isNotEmpty
@@ -986,8 +1044,11 @@ class _SpeciesPickerSheetState extends ConsumerState<_SpeciesPickerSheet> {
                         ),
                       ),
                       trailing: isSelected
-                          ? const Icon(Icons.check_circle,
-                              color: Color(0xFF10B981), size: 22)
+                          ? const Icon(
+                              Icons.check_circle,
+                              color: Color(0xFF10B981),
+                              size: 22,
+                            )
                           : _venomBadge(s.isVenomous),
                       onTap: () {
                         widget.onSelected(s);
@@ -1009,8 +1070,7 @@ class _SpeciesPickerSheetState extends ConsumerState<_SpeciesPickerSheet> {
       width: 48,
       height: 48,
       color: const Color(0xFFF3F4F6),
-      child: const Icon(Icons.pets,
-          color: Color(0xFFD1D5DB), size: 24),
+      child: const Icon(Icons.pets, color: Color(0xFFD1D5DB), size: 24),
     );
   }
 
@@ -1028,9 +1088,7 @@ class _SpeciesPickerSheetState extends ConsumerState<_SpeciesPickerSheet> {
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w600,
-          color: isVenomous
-              ? const Color(0xFFEF4444)
-              : const Color(0xFF10B981),
+          color: isVenomous ? const Color(0xFFEF4444) : const Color(0xFF10B981),
         ),
       ),
     );
@@ -1050,8 +1108,8 @@ class _RiskLevelBadge extends StatelessWidget {
     final color = riskLevel >= 8
         ? const Color(0xFFEF4444)
         : riskLevel >= 5
-            ? const Color(0xFFF59E0B)
-            : const Color(0xFF10B981);
+        ? const Color(0xFFF59E0B)
+        : const Color(0xFF10B981);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -1061,7 +1119,10 @@ class _RiskLevelBadge extends StatelessWidget {
       child: Text(
         '${riskLevel.toStringAsFixed(1)} / 10',
         style: TextStyle(
-            fontSize: 12, fontWeight: FontWeight.w700, color: color),
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
       ),
     );
   }

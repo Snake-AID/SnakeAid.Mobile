@@ -7,12 +7,19 @@ class RescuerIncomeManagementScreen extends StatefulWidget {
   const RescuerIncomeManagementScreen({super.key});
 
   @override
-  State<RescuerIncomeManagementScreen> createState() => _RescuerIncomeManagementScreenState();
+  State<RescuerIncomeManagementScreen> createState() =>
+      _RescuerIncomeManagementScreenState();
 }
 
-class _RescuerIncomeManagementScreenState extends State<RescuerIncomeManagementScreen> {
+class _RescuerIncomeManagementScreenState
+    extends State<RescuerIncomeManagementScreen> {
   int _selectedPeriod = 0;
-  final List<String> _periods = ['Tuần này', 'Tháng này', 'Tháng trước', 'Năm nay'];
+  final List<String> _periods = [
+    'Tuần này',
+    'Tháng này',
+    'Tháng trước',
+    'Năm nay',
+  ];
 
   // Mock data for chart
   final List<Map<String, dynamic>> _chartData = [
@@ -56,15 +63,20 @@ class _RescuerIncomeManagementScreenState extends State<RescuerIncomeManagementS
 
   PreferredSizeWidget _buildAppBar() {
     final canPop = Navigator.of(context).canPop();
-    
+
     return AppBar(
       backgroundColor: const Color(0xFFF8F7F5),
       elevation: 0,
       centerTitle: true,
-      leading: canPop ? IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF1D150C)),
-        onPressed: () => context.pop(),
-      ) : null,
+      leading: canPop
+          ? IconButton(
+              icon: const Icon(
+                Icons.arrow_back_ios_new,
+                color: Color(0xFF1D150C),
+              ),
+              onPressed: () => context.pop(),
+            )
+          : null,
       automaticallyImplyLeading: canPop,
       title: const Text(
         'Quản Lý Thu Nhập',
@@ -110,10 +122,7 @@ class _RescuerIncomeManagementScreenState extends State<RescuerIncomeManagementS
         children: [
           const Text(
             'Số dư khả dụng',
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFF999999),
-            ),
+            style: TextStyle(fontSize: 14, color: Color(0xFF999999)),
           ),
           const SizedBox(height: 8),
           const Text(
@@ -267,8 +276,9 @@ class _RescuerIncomeManagementScreenState extends State<RescuerIncomeManagementS
                               width: double.infinity,
                               height: 140 * (data['value'] as double),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFF8800)
-                                    .withOpacity((data['value'] as double) == 1.0 ? 1.0 : 0.8),
+                                color: const Color(0xFFFF8800).withOpacity(
+                                  (data['value'] as double) == 1.0 ? 1.0 : 0.8,
+                                ),
                                 borderRadius: const BorderRadius.vertical(
                                   top: Radius.circular(4),
                                 ),
@@ -315,11 +325,19 @@ class _RescuerIncomeManagementScreenState extends State<RescuerIncomeManagementS
         children: [
           _buildBreakdownRow('Tổng thu nhập', '4,250,000 VNĐ', '100%'),
           const SizedBox(height: 12),
-          _buildBreakdownRow('Phí nền tảng (10%)', '-425,000 VNĐ', null,
-              isNegative: true),
+          _buildBreakdownRow(
+            'Phí nền tảng (10%)',
+            '-425,000 VNĐ',
+            null,
+            isNegative: true,
+          ),
           const SizedBox(height: 12),
-          _buildBreakdownRow('Chia sẻ Expert', '-212,500 VNĐ', null,
-              isWarning: true),
+          _buildBreakdownRow(
+            'Chia sẻ Expert',
+            '-212,500 VNĐ',
+            null,
+            isWarning: true,
+          ),
           const Divider(height: 32),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -347,27 +365,26 @@ class _RescuerIncomeManagementScreenState extends State<RescuerIncomeManagementS
     );
   }
 
-  Widget _buildBreakdownRow(String label, String value, String? percentage,
-      {bool isNegative = false, bool isWarning = false}) {
+  Widget _buildBreakdownRow(
+    String label,
+    String value,
+    String? percentage, {
+    bool isNegative = false,
+    bool isWarning = false,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Color(0xFF666666),
-          ),
+          style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
         ),
         Row(
           children: [
             if (percentage != null)
               Text(
                 percentage,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF999999),
-                ),
+                style: const TextStyle(fontSize: 12, color: Color(0xFF999999)),
               ),
             if (percentage != null) const SizedBox(width: 8),
             Text(
@@ -378,8 +395,8 @@ class _RescuerIncomeManagementScreenState extends State<RescuerIncomeManagementS
                 color: isNegative
                     ? const Color(0xFFEF4444)
                     : isWarning
-                        ? const Color(0xFFF59E0B)
-                        : const Color(0xFF1D150C),
+                    ? const Color(0xFFF59E0B)
+                    : const Color(0xFF1D150C),
               ),
             ),
           ],
@@ -408,10 +425,7 @@ class _RescuerIncomeManagementScreenState extends State<RescuerIncomeManagementS
                 onPressed: () {},
                 child: const Text(
                   'Xem tất cả',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFFFF8800),
-                  ),
+                  style: TextStyle(fontSize: 14, color: Color(0xFFFF8800)),
                 ),
               ),
             ],
@@ -475,10 +489,7 @@ class _RescuerIncomeManagementScreenState extends State<RescuerIncomeManagementS
               ),
               Text(
                 time,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF999999),
-                ),
+                style: const TextStyle(fontSize: 12, color: Color(0xFF999999)),
               ),
             ],
           ),
@@ -504,7 +515,10 @@ class _RescuerIncomeManagementScreenState extends State<RescuerIncomeManagementS
                 ),
                 const SizedBox(height: 4),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF10B981).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
@@ -541,10 +555,7 @@ class _RescuerIncomeManagementScreenState extends State<RescuerIncomeManagementS
                 ),
                 child: const Text(
                   'Xem HĐ',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF2563EB),
-                  ),
+                  style: TextStyle(fontSize: 12, color: Color(0xFF2563EB)),
                 ),
               ),
             ],
@@ -581,15 +592,30 @@ class _RescuerIncomeManagementScreenState extends State<RescuerIncomeManagementS
             ),
           ),
           const SizedBox(height: 16),
-          _buildWithdrawalRow('10 Thg 12, 2023', 'Vietcombank', '2,500,000 VNĐ', 'Hoàn tất'),
+          _buildWithdrawalRow(
+            '10 Thg 12, 2023',
+            'Vietcombank',
+            '2,500,000 VNĐ',
+            'Hoàn tất',
+          ),
           const SizedBox(height: 12),
-          _buildWithdrawalRow('01 Thg 12, 2023', 'Vietcombank', '1,800,000 VNĐ', 'Hoàn tất'),
+          _buildWithdrawalRow(
+            '01 Thg 12, 2023',
+            'Vietcombank',
+            '1,800,000 VNĐ',
+            'Hoàn tất',
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildWithdrawalRow(String date, String bank, String amount, String status) {
+  Widget _buildWithdrawalRow(
+    String date,
+    String bank,
+    String amount,
+    String status,
+  ) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -606,10 +632,7 @@ class _RescuerIncomeManagementScreenState extends State<RescuerIncomeManagementS
             ),
             Text(
               bank,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF999999),
-              ),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF999999)),
             ),
           ],
         ),
@@ -650,11 +673,7 @@ class _RescuerIncomeManagementScreenState extends State<RescuerIncomeManagementS
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.account_balance,
-            color: Color(0xFF2563EB),
-            size: 32,
-          ),
+          const Icon(Icons.account_balance, color: Color(0xFF2563EB), size: 32),
           const SizedBox(width: 16),
           const Expanded(
             child: Column(
@@ -670,28 +689,18 @@ class _RescuerIncomeManagementScreenState extends State<RescuerIncomeManagementS
                 ),
                 Text(
                   '**** **** **** 3456',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF999999),
-                  ),
+                  style: TextStyle(fontSize: 14, color: Color(0xFF999999)),
                 ),
               ],
             ),
           ),
-          const Icon(
-            Icons.verified,
-            color: Color(0xFF10B981),
-            size: 20,
-          ),
+          const Icon(Icons.verified, color: Color(0xFF10B981), size: 20),
           const SizedBox(width: 8),
           TextButton(
             onPressed: () {},
             child: const Text(
               'Thay đổi',
-              style: TextStyle(
-                fontSize: 14,
-                color: Color(0xFFFF8800),
-              ),
+              style: TextStyle(fontSize: 14, color: Color(0xFFFF8800)),
             ),
           ),
         ],
@@ -708,9 +717,7 @@ class _RescuerIncomeManagementScreenState extends State<RescuerIncomeManagementS
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: const Color(0xFFF8F7F5).withOpacity(0.95),
-          border: const Border(
-            top: BorderSide(color: Color(0xFFE5E5E5)),
-          ),
+          border: const Border(top: BorderSide(color: Color(0xFFE5E5E5))),
         ),
         child: SafeArea(
           top: false,
@@ -731,10 +738,7 @@ class _RescuerIncomeManagementScreenState extends State<RescuerIncomeManagementS
             ),
             child: const Text(
               'Rút Tiền',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),
         ),

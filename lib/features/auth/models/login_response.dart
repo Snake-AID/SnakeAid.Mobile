@@ -24,7 +24,8 @@ class LoginResponse {
   }
 
   @override
-  String toString() => 'LoginResponse(isSuccess: $isSuccess, message: $message)';
+  String toString() =>
+      'LoginResponse(isSuccess: $isSuccess, message: $message)';
 }
 
 /// Login data containing tokens and user info

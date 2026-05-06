@@ -20,7 +20,9 @@ class SymptomTrackingResponse {
       statusCode: json['status_code'] ?? 0,
       message: json['message'] ?? '',
       isSuccess: json['is_success'] ?? false,
-      data: json['data'] != null ? SymptomTrackingData.fromJson(json['data']) : null,
+      data: json['data'] != null
+          ? SymptomTrackingData.fromJson(json['data'])
+          : null,
       error: json['error'],
     );
   }

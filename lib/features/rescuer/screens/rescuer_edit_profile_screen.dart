@@ -12,10 +12,12 @@ class RescuerEditProfileScreen extends ConsumerStatefulWidget {
   const RescuerEditProfileScreen({super.key});
 
   @override
-  ConsumerState<RescuerEditProfileScreen> createState() => _RescuerEditProfileScreenState();
+  ConsumerState<RescuerEditProfileScreen> createState() =>
+      _RescuerEditProfileScreenState();
 }
 
-class _RescuerEditProfileScreenState extends ConsumerState<RescuerEditProfileScreen> {
+class _RescuerEditProfileScreenState
+    extends ConsumerState<RescuerEditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
 
   // Profile state
@@ -41,7 +43,9 @@ class _RescuerEditProfileScreenState extends ConsumerState<RescuerEditProfileScr
 
   Future<void> _loadProfile() async {
     try {
-      final profile = await ref.read(rescuerProfileRepositoryProvider).getMyProfile();
+      final profile = await ref
+          .read(rescuerProfileRepositoryProvider)
+          .getMyProfile();
       if (mounted && profile != null) {
         setState(() {
           _loadedProfile = profile;
@@ -68,21 +72,26 @@ class _RescuerEditProfileScreenState extends ConsumerState<RescuerEditProfileScr
 
   Future<void> _pickAndUploadAvatar() async {
     final picker = ImagePicker();
-    final xFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    final xFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
     if (xFile == null || !mounted) return;
     setState(() {
       _pickedImageFile = File(xFile.path);
       _isUploadingAvatar = true;
     });
     try {
-      final url = await ref.read(rescuerProfileRepositoryProvider).uploadAvatar(_pickedImageFile!);
+      final url = await ref
+          .read(rescuerProfileRepositoryProvider)
+          .uploadAvatar(_pickedImageFile!);
       if (mounted) setState(() => _newAvatarUrl = url);
     } catch (e) {
       if (mounted) {
         setState(() => _pickedImageFile = null);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Tải ảnh thất bại: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Tải ảnh thất bại: $e')));
       }
     } finally {
       if (mounted) setState(() => _isUploadingAvatar = false);
@@ -94,13 +103,15 @@ class _RescuerEditProfileScreenState extends ConsumerState<RescuerEditProfileScr
     if (_isSaving) return;
     setState(() => _isSaving = true);
     try {
-      await ref.read(rescuerProfileRepositoryProvider).updateMyProfile(
-        fullName: _fullNameController.text.trim(),
-        phoneNumber: _phoneController.text.trim().isEmpty
-            ? null
-            : _phoneController.text.trim(),
-        avatarUrl: _newAvatarUrl ?? _loadedProfile?.avatarUrl,
-      );
+      await ref
+          .read(rescuerProfileRepositoryProvider)
+          .updateMyProfile(
+            fullName: _fullNameController.text.trim(),
+            phoneNumber: _phoneController.text.trim().isEmpty
+                ? null
+                : _phoneController.text.trim(),
+            avatarUrl: _newAvatarUrl ?? _loadedProfile?.avatarUrl,
+          );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Đã lưu thay đổi thành công')),
@@ -109,9 +120,9 @@ class _RescuerEditProfileScreenState extends ConsumerState<RescuerEditProfileScr
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -139,10 +150,7 @@ class _RescuerEditProfileScreenState extends ConsumerState<RescuerEditProfileScr
               const SizedBox(height: 4),
               const Text(
                 'Chạm để thay đổi ảnh',
-                style: TextStyle(
-                  color: Color(0xFF999999),
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Color(0xFF999999), fontSize: 14),
               ),
               const SizedBox(height: 24),
               _buildPersonalInfoSection(),
@@ -201,27 +209,33 @@ class _RescuerEditProfileScreenState extends ConsumerState<RescuerEditProfileScr
             height: 128,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFFFF8800),
-                width: 2,
-              ),
+              border: Border.all(color: const Color(0xFFFF8800), width: 2),
             ),
             child: ClipOval(
               child: _pickedImageFile != null
                   ? Image.file(_pickedImageFile!, fit: BoxFit.cover)
-                  : (_newAvatarUrl ?? _loadedProfile?.avatarUrl)?.isNotEmpty == true
-                      ? Image.network(
-                          _newAvatarUrl ?? _loadedProfile!.avatarUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            color: const Color(0xFFFF8800).withOpacity(0.1),
-                            child: const Icon(Icons.person, size: 60, color: Color(0xFFFF8800)),
-                          ),
-                        )
-                      : Container(
-                          color: const Color(0xFFFF8800).withOpacity(0.1),
-                          child: const Icon(Icons.person, size: 60, color: Color(0xFFFF8800)),
+                  : (_newAvatarUrl ?? _loadedProfile?.avatarUrl)?.isNotEmpty ==
+                        true
+                  ? Image.network(
+                      _newAvatarUrl ?? _loadedProfile!.avatarUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: const Color(0xFFFF8800).withOpacity(0.1),
+                        child: const Icon(
+                          Icons.person,
+                          size: 60,
+                          color: Color(0xFFFF8800),
                         ),
+                      ),
+                    )
+                  : Container(
+                      color: const Color(0xFFFF8800).withOpacity(0.1),
+                      child: const Icon(
+                        Icons.person,
+                        size: 60,
+                        color: Color(0xFFFF8800),
+                      ),
+                    ),
             ),
           ),
           if (_isUploadingAvatar)
@@ -233,7 +247,10 @@ class _RescuerEditProfileScreenState extends ConsumerState<RescuerEditProfileScr
                     child: SizedBox(
                       width: 28,
                       height: 28,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
                     ),
                   ),
                 ),
@@ -266,11 +283,7 @@ class _RescuerEditProfileScreenState extends ConsumerState<RescuerEditProfileScr
                 color: Color(0xFFFF8800),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.verified,
-                color: Colors.white,
-                size: 16,
-              ),
+              child: const Icon(Icons.verified, color: Colors.white, size: 16),
             ),
           ),
         ],
@@ -293,7 +306,7 @@ class _RescuerEditProfileScreenState extends ConsumerState<RescuerEditProfileScr
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Full Name
           _buildTextField(
             label: 'Họ và Tên',
@@ -301,7 +314,7 @@ class _RescuerEditProfileScreenState extends ConsumerState<RescuerEditProfileScr
             required: true,
           ),
           const SizedBox(height: 16),
-          
+
           // Phone (Disabled)
           _buildDisabledField(
             label: 'Số Điện Thoại',
@@ -309,12 +322,9 @@ class _RescuerEditProfileScreenState extends ConsumerState<RescuerEditProfileScr
             verified: true,
           ),
           const SizedBox(height: 16),
-          
+
           // Email (read-only — not in PUT body)
-          _buildDisabledField(
-            label: 'Email',
-            value: _emailController.text,
-          ),
+          _buildDisabledField(label: 'Email', value: _emailController.text),
         ],
       ),
     );
@@ -340,11 +350,7 @@ class _RescuerEditProfileScreenState extends ConsumerState<RescuerEditProfileScr
                 color: Color(0xFF231A0F),
               ),
             ),
-            if (required)
-              const Text(
-                ' *',
-                style: TextStyle(color: Colors.red),
-              ),
+            if (required) const Text(' *', style: TextStyle(color: Colors.red)),
           ],
         ),
         const SizedBox(height: 8),
@@ -368,7 +374,10 @@ class _RescuerEditProfileScreenState extends ConsumerState<RescuerEditProfileScr
               borderRadius: BorderRadius.circular(28),
               borderSide: const BorderSide(color: Color(0xFFFF8800), width: 2),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
           ),
           validator: required
               ? (value) {
@@ -435,9 +444,7 @@ class _RescuerEditProfileScreenState extends ConsumerState<RescuerEditProfileScr
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFF8F7F5),
-        border: const Border(
-          top: BorderSide(color: Color(0xFFDDDDDD)),
-        ),
+        border: const Border(top: BorderSide(color: Color(0xFFDDDDDD))),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),

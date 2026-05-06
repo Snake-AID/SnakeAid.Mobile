@@ -30,10 +30,7 @@ class HealthHistoryDetailScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border(
-                bottom: BorderSide(
-                  color: const Color(0xFFDDDDDD),
-                  width: 1,
-                ),
+                bottom: BorderSide(color: const Color(0xFFDDDDDD), width: 1),
               ),
             ),
             child: SafeArea(
@@ -72,13 +69,12 @@ class HealthHistoryDetailScreen extends StatelessWidget {
                       top: 0,
                       bottom: 0,
                       child: IconButton(
-                        icon: const Icon(
-                          Icons.share,
-                          color: Color(0xFF333333),
-                        ),
+                        icon: const Icon(Icons.share, color: Color(0xFF333333)),
                         onPressed: () {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Chia sẻ - Đang phát triển')),
+                            const SnackBar(
+                              content: Text('Chia sẻ - Đang phát triển'),
+                            ),
                           );
                         },
                       ),
@@ -145,7 +141,8 @@ class HealthHistoryDetailScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     date,
@@ -298,7 +295,9 @@ class HealthHistoryDetailScreen extends StatelessWidget {
                                 height: 48,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: const Color(0xFF228B22).withOpacity(0.1),
+                                  color: const Color(
+                                    0xFF228B22,
+                                  ).withOpacity(0.1),
                                 ),
                                 child: Icon(
                                   Icons.person,
@@ -371,9 +370,7 @@ class HealthHistoryDetailScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: const Color(0xFFF6F8F6),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: const Color(0xFFDDDDDD),
-                            ),
+                            border: Border.all(color: const Color(0xFFDDDDDD)),
                           ),
                           child: const Text(
                             'Bệnh nhân đã được hướng dẫn sơ cứu qua video call trước khi đến bệnh viện. Rắn hổ mang được xác định qua AI. Điều trị kịp thời, không có biến chứng nghiêm trọng.',
@@ -434,19 +431,12 @@ class _InfoRow extends StatelessWidget {
     return Row(
       children: [
         if (icon != null) ...[
-          Icon(
-            icon,
-            size: 16,
-            color: const Color(0xFF666666),
-          ),
+          Icon(icon, size: 16, color: const Color(0xFF666666)),
           const SizedBox(width: 8),
         ],
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Color(0xFF666666),
-          ),
+          style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -589,11 +579,7 @@ class _TimelineCard extends StatelessWidget {
         ],
       ),
       child: Column(
-        children: events
-            .map(
-              (event) => _TimelineItem(event: event),
-            )
-            .toList(),
+        children: events.map((event) => _TimelineItem(event: event)).toList(),
       ),
     );
   }
@@ -619,11 +605,7 @@ class _TimelineItem extends StatelessWidget {
                 color: event.iconColor.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                event.icon,
-                size: 16,
-                color: event.iconColor,
-              ),
+              child: Icon(event.icon, size: 16, color: event.iconColor),
             ),
             if (!event.isLast)
               Container(
@@ -681,11 +663,7 @@ class InfoItem {
   final String value;
   final IconData icon;
 
-  InfoItem({
-    required this.label,
-    required this.value,
-    required this.icon,
-  });
+  InfoItem({required this.label, required this.value, required this.icon});
 }
 
 class _InfoCard extends StatelessWidget {
@@ -760,10 +738,7 @@ class _InfoCard extends StatelessWidget {
                   if (entry.key < items.length - 1)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Divider(
-                        height: 1,
-                        color: const Color(0xFFDDDDDD),
-                      ),
+                      child: Divider(height: 1, color: const Color(0xFFDDDDDD)),
                     ),
                 ],
               ),

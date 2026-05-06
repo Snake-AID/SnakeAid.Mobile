@@ -353,13 +353,12 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         pageSize: 100,
       );
 
-      final deposits = txs
-          .where((t) => t.matchesTransactionType('CatchingDeposit'))
-          .toList()
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final deposits =
+          txs.where((t) => t.matchesTransactionType('CatchingDeposit')).toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       final latestDeposit = deposits.isNotEmpty ? deposits.first : null;
-        final isConfirmedDeposit =
+      final isConfirmedDeposit =
           latestDeposit != null && _isConfirmedCatchingDeposit(latestDeposit);
 
       if (!mounted) return;
@@ -2007,7 +2006,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                                     vertical: 4,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF228B22).withOpacity(0.08),
+                                    color: const Color(
+                                      0xFF228B22,
+                                    ).withOpacity(0.08),
                                     borderRadius: BorderRadius.circular(999),
                                   ),
                                   child: const Text(
@@ -2048,7 +2049,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                       border: Border.all(color: const Color(0xFFE5EFE5)),
                     ),
                     child: Row(
-                      children: [                      
+                      children: [
                         const Expanded(
                           child: Text(
                             'Hotline: 0787171699',
@@ -2693,7 +2694,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           ),
 
           // Phone call button
-          if (phone != null && phone.isNotEmpty && request.status.toLowerCase() != 'completed')
+          if (phone != null &&
+              phone.isNotEmpty &&
+              request.status.toLowerCase() != 'completed')
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: SizedBox(
@@ -4910,7 +4913,9 @@ class _PaymentMethodSheetState extends State<_PaymentMethodSheet> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  widget.isFinalPayment ? 'Đợt 2 — Dịch vụ' : 'Đợt 1 — Phí di chuyển',
+                  widget.isFinalPayment
+                      ? 'Đợt 2 — Dịch vụ'
+                      : 'Đợt 1 — Phí di chuyển',
                   style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFF555555),

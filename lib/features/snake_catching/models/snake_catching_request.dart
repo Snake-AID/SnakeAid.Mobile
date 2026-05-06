@@ -27,7 +27,8 @@ class SnakeCatchingRequest {
       if (additionalDetails != null) 'additionalDetails': additionalDetails,
       if (notes != null) 'notes': notes,
       'snakeSpeciesList': snakeSpeciesList.map((e) => e.toJson()).toList(),
-      if (mediaIdList != null && mediaIdList!.isNotEmpty) 'mediaIdList': mediaIdList,
+      if (mediaIdList != null && mediaIdList!.isNotEmpty)
+        'mediaIdList': mediaIdList,
     };
   }
 }
@@ -37,16 +38,10 @@ class SnakeSpeciesItem {
   final int snakeSpeciesId;
   final int quantity;
 
-  SnakeSpeciesItem({
-    required this.snakeSpeciesId,
-    required this.quantity,
-  });
+  SnakeSpeciesItem({required this.snakeSpeciesId, required this.quantity});
 
   Map<String, dynamic> toJson() {
-    return {
-      'snakeSpeciesId': snakeSpeciesId,
-      'quantity': quantity,
-    };
+    return {'snakeSpeciesId': snakeSpeciesId, 'quantity': quantity};
   }
 }
 
@@ -71,8 +66,10 @@ class SnakeCatchingResponse {
       statusCode: json['status_code'] as int,
       message: json['message'] as String? ?? '',
       isSuccess: json['is_success'] as bool? ?? false,
-      data: json['data'] != null 
-          ? SnakeCatchingRequestData.fromJson(json['data'] as Map<String, dynamic>)
+      data: json['data'] != null
+          ? SnakeCatchingRequestData.fromJson(
+              json['data'] as Map<String, dynamic>,
+            )
           : null,
       error: json['error'] as String?,
     );
@@ -100,8 +97,13 @@ class SnakeCatchingListResponse {
       statusCode: json['status_code'] as int? ?? 200,
       message: json['message'] as String? ?? '',
       isSuccess: json['is_success'] as bool? ?? true,
-      data: (json['data'] as List<dynamic>?)
-              ?.map((e) => SnakeCatchingRequestData.fromJson(e as Map<String, dynamic>))
+      data:
+          (json['data'] as List<dynamic>?)
+              ?.map(
+                (e) => SnakeCatchingRequestData.fromJson(
+                  e as Map<String, dynamic>,
+                ),
+              )
               .toList() ??
           [],
       error: json['error'] as String?,
@@ -134,14 +136,14 @@ class AssignedRescuerInfo {
     final account = json['account'] as Map<String, dynamic>?;
     return AssignedRescuerInfo(
       accountId: json['accountId'] as String? ?? '',
-      fullName: (json['fullName'] as String?) ??
+      fullName:
+          (json['fullName'] as String?) ??
           (account?['fullName'] as String?) ??
           (json['userName'] as String?),
-      avatarUrl: (json['avatarUrl'] as String?) ??
-          (account?['avatarUrl'] as String?),
+      avatarUrl:
+          (json['avatarUrl'] as String?) ?? (account?['avatarUrl'] as String?),
       phoneNumber: json['phoneNumber'] as String?,
-      email: (json['email'] as String?) ??
-          (account?['email'] as String?),
+      email: (json['email'] as String?) ?? (account?['email'] as String?),
       rating: (json['rating'] as num?)?.toDouble(),
       ratingCount: json['ratingCount'] as int?,
     );
@@ -255,17 +257,21 @@ class SnakeCatchingRequestData {
       status: json['status'] as String? ?? 'Pending',
       priority: json['priority'] as String? ?? 'Normal',
       requestDate: DateTime.parse(json['requestDate'] as String),
-      preferredTime: json['preferredTime'] != null 
+      preferredTime: json['preferredTime'] != null
           ? DateTime.parse(json['preferredTime'] as String)
           : null,
-      assignedAt: json['assignedAt'] != null 
+      assignedAt: json['assignedAt'] != null
           ? DateTime.parse(json['assignedAt'] as String)
           : null,
       // Prefer top-level field; fall back to assignedRescuer.accountId
-      assignedRescuerId: (json['assignedRescuerId'] as String?) ??
-          (json['assignedRescuer'] as Map<String, dynamic>?)?['accountId'] as String?,
+      assignedRescuerId:
+          (json['assignedRescuerId'] as String?) ??
+          (json['assignedRescuer'] as Map<String, dynamic>?)?['accountId']
+              as String?,
       assignedRescuer: json['assignedRescuer'] != null
-          ? AssignedRescuerInfo.fromJson(json['assignedRescuer'] as Map<String, dynamic>)
+          ? AssignedRescuerInfo.fromJson(
+              json['assignedRescuer'] as Map<String, dynamic>,
+            )
           : null,
       estimatedPrice: (json['estimatedPrice'] as num?)?.toDouble(),
       distanceKm: (json['distanceKm'] as num?)?.toDouble(),
@@ -277,17 +283,24 @@ class SnakeCatchingRequestData {
       mission: json['mission'] != null
           ? MissionData.fromJson(json['mission'] as Map<String, dynamic>)
           : (json['missions'] as List<dynamic>?)?.isNotEmpty == true
-              ? MissionData.fromJson((json['missions'] as List<dynamic>).first as Map<String, dynamic>)
-              : null,
-      media: (json['media'] as List<dynamic>?)
+          ? MissionData.fromJson(
+              (json['missions'] as List<dynamic>).first as Map<String, dynamic>,
+            )
+          : null,
+      media:
+          (json['media'] as List<dynamic>?)
               ?.map((e) => RequestMedia.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      details: (json['details'] as List<dynamic>?)
-              ?.map((e) => SnakeSpeciesDetail.fromJson(e as Map<String, dynamic>))
+      details:
+          (json['details'] as List<dynamic>?)
+              ?.map(
+                (e) => SnakeSpeciesDetail.fromJson(e as Map<String, dynamic>),
+              )
               .toList() ??
           [],
-      feedbacks: (json['feedbacks'] as List<dynamic>?)
+      feedbacks:
+          (json['feedbacks'] as List<dynamic>?)
               ?.map((e) => FeedbackItem.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
@@ -300,10 +313,7 @@ class LocationCoordinates {
   final double latitude;
   final double longitude;
 
-  LocationCoordinates({
-    required this.latitude,
-    required this.longitude,
-  });
+  LocationCoordinates({required this.latitude, required this.longitude});
 
   factory LocationCoordinates.fromJson(Map<String, dynamic> json) {
     return LocationCoordinates(
@@ -338,7 +348,8 @@ class SnakeSpeciesDetail {
       snakeSpeciesId: json['snakeSpeciesId'] as int,
       quantity: json['quantity'] as int,
       snakeSpeciesName: json['snakeSpeciesName'] as String? ?? '',
-      snakeSpeciesScientificName: json['snakeSpeciesScientificName'] as String? ?? '',
+      snakeSpeciesScientificName:
+          json['snakeSpeciesScientificName'] as String? ?? '',
     );
   }
 }
@@ -375,7 +386,8 @@ class RequestUserInfo {
       phoneNumber: json['phoneNumber'] as String? ?? '',
       rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
       ratingCount: json['ratingCount'] as int? ?? 0,
-      emergencyContacts: (json['emergencyContacts'] as List<dynamic>?)
+      emergencyContacts:
+          (json['emergencyContacts'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           [],
@@ -480,10 +492,13 @@ class MissionData {
   final String rescuerId;
   final String snakeCatchingRequestId;
   final String status;
+
   /// Base service fee (e.g. 500 000 VNĐ) — platform's fixed charge
   final double? price;
+
   /// Travel/deposit fee already paid by customer in round 1
   final double? estimatedCost;
+
   /// Total round-2 payment = price + snakeFee + envFee
   final double? actualCost;
   final DateTime? startedAt;
@@ -493,6 +508,7 @@ class MissionData {
   final String? cancellationReason;
   final CatchingEnvironmentInfo? catchingEnvironment;
   final List<MissionDetailItem> missionDetails;
+
   /// Evidence photos uploaded during this mission
   final List<RequestMedia> media;
 
@@ -523,19 +539,31 @@ class MissionData {
       price: (json['price'] as num?)?.toDouble(),
       estimatedCost: (json['estimatedCost'] as num?)?.toDouble(),
       actualCost: (json['actualCost'] as num?)?.toDouble(),
-      startedAt: json['startedAt'] != null ? DateTime.parse(json['startedAt'] as String) : null,
-      arrivedAt: json['arrivedAt'] != null ? DateTime.parse(json['arrivedAt'] as String) : null,
-      completedAt: json['completedAt'] != null ? DateTime.parse(json['completedAt'] as String) : null,
+      startedAt: json['startedAt'] != null
+          ? DateTime.parse(json['startedAt'] as String)
+          : null,
+      arrivedAt: json['arrivedAt'] != null
+          ? DateTime.parse(json['arrivedAt'] as String)
+          : null,
+      completedAt: json['completedAt'] != null
+          ? DateTime.parse(json['completedAt'] as String)
+          : null,
       notes: json['notes'] as String?,
       cancellationReason: json['cancellationReason'] as String?,
       catchingEnvironment: json['catchingEnvironment'] != null
-          ? CatchingEnvironmentInfo.fromJson(json['catchingEnvironment'] as Map<String, dynamic>)
+          ? CatchingEnvironmentInfo.fromJson(
+              json['catchingEnvironment'] as Map<String, dynamic>,
+            )
           : null,
-      missionDetails: (json['missionDetails'] as List<dynamic>?)
-              ?.map((e) => MissionDetailItem.fromJson(e as Map<String, dynamic>))
+      missionDetails:
+          (json['missionDetails'] as List<dynamic>?)
+              ?.map(
+                (e) => MissionDetailItem.fromJson(e as Map<String, dynamic>),
+              )
               .toList() ??
           [],
-      media: (json['media'] as List<dynamic>?)
+      media:
+          (json['media'] as List<dynamic>?)
               ?.map((e) => RequestMedia.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
@@ -564,7 +592,8 @@ class RequestMedia {
       id: json['id'] as String? ?? '',
       // API may return 'mediaUrl' (rescuer uploads) or 'url' (member uploads)
       url: json['mediaUrl'] as String? ?? json['url'] as String? ?? '',
-      type: json['contentType'] as String? ?? json['type'] as String? ?? 'image',
+      type:
+          json['contentType'] as String? ?? json['type'] as String? ?? 'image',
       purpose: json['purpose'] as String?,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)

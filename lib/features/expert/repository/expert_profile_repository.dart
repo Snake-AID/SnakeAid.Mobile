@@ -5,7 +5,9 @@ import '../../../core/providers/http_provider.dart';
 import '../../../core/services/http_service.dart';
 import '../models/expert_profile.dart';
 
-final expertProfileRepositoryProvider = Provider<ExpertProfileRepository>((ref) {
+final expertProfileRepositoryProvider = Provider<ExpertProfileRepository>((
+  ref,
+) {
   final httpService = ref.watch(httpServiceProvider);
   return ExpertProfileRepository(httpService: httpService);
 });
@@ -14,7 +16,7 @@ class ExpertProfileRepository {
   final HttpService _httpService;
 
   ExpertProfileRepository({required HttpService httpService})
-      : _httpService = httpService;
+    : _httpService = httpService;
 
   /// GET /api/experts/me/profile
   Future<ExpertProfile> getMyProfile() async {

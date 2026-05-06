@@ -101,7 +101,9 @@ class MemberConsultationDetailScreen extends StatelessWidget {
                         alignment: Alignment.centerLeft,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 5),
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
                           decoration: BoxDecoration(
                             color: statusColor.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(20),
@@ -251,10 +253,7 @@ class MemberConsultationDetailScreen extends StatelessWidget {
                   : () {
                       context.push(
                         '/consultation-message-history/$consultationId',
-                        extra: {
-                          'title': expertName,
-                          'isExpertMode': false,
-                        },
+                        extra: {'title': expertName, 'isExpertMode': false},
                       );
                     },
               style: ElevatedButton.styleFrom(
@@ -284,9 +283,10 @@ class MemberConsultationDetailScreen extends StatelessWidget {
   }
 
   String _formatFee(int fee) {
-    final formatted = fee
-        .toString()
-        .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+    final formatted = fee.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
     return '$formatted VNĐ';
   }
 }

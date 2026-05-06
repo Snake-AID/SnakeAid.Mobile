@@ -10,6 +10,7 @@ class ExpertListState {
   final bool isLoading;
   final String? error;
   final String? selectedSpecialty;
+
   /// null = tất cả, true = chỉ online, false = chỉ offline
   final bool? isOnlineFilter;
   final String sortBy;
@@ -24,7 +25,7 @@ class ExpertListState {
     this.isLoading = false,
     this.error,
     this.selectedSpecialty,
-    this.isOnlineFilter,   // null = default (cả hai)
+    this.isOnlineFilter, // null = default (cả hai)
     this.sortBy = 'online', // Default: sort online lên trước (client-side)
     this.searchQuery = '',
     this.totalCount = 0,
@@ -56,10 +57,11 @@ class ExpertListState {
       selectedSpecialty: clearSpecialty
           ? null
           : (selectedSpecialty ?? this.selectedSpecialty),
-      isOnlineFilter:
-          clearIsOnlineFilter ? null : (isOnlineFilter ?? this.isOnlineFilter),
+      isOnlineFilter: clearIsOnlineFilter
+          ? null
+          : (isOnlineFilter ?? this.isOnlineFilter),
       sortBy: sortBy ?? this.sortBy,
-        searchQuery: searchQuery ?? this.searchQuery,
+      searchQuery: searchQuery ?? this.searchQuery,
       totalCount: totalCount ?? this.totalCount,
       onlineCount: onlineCount ?? this.onlineCount,
       specialties: specialties ?? this.specialties,
@@ -74,9 +76,9 @@ class ExpertListState {
 /// Provider for expert list state
 final expertListProvider =
     StateNotifierProvider<ExpertListNotifier, ExpertListState>((ref) {
-  final repository = ref.watch(consultationRepositoryProvider);
-  return ExpertListNotifier(repository);
-});
+      final repository = ref.watch(consultationRepositoryProvider);
+      return ExpertListNotifier(repository);
+    });
 
 /// Notifier for managing expert list state
 class ExpertListNotifier extends StateNotifier<ExpertListState> {
@@ -119,14 +121,15 @@ class ExpertListNotifier extends StateNotifier<ExpertListState> {
 
       final response = await _repository.getExperts(
         specialty: state.selectedSpecialty,
-        isOnlineFilter: state.isOnlineFilter, // null=tất cả, true=online, false=offline
+        isOnlineFilter:
+            state.isOnlineFilter, // null=tất cả, true=online, false=offline
         sortBy: apiSortBy,
         sortOrder: apiSortOrder,
       );
 
       if (response.isSuccess && response.data != null) {
         final experts = response.data!.experts;
-        
+
         debugPrint('✅ Loaded ${experts.length} experts');
 
         final mergedExperts = _applyRealtimePresenceToExperts(experts);
@@ -141,10 +144,7 @@ class ExpertListNotifier extends StateNotifier<ExpertListState> {
       } else {
         debugPrint('❌ Failed to load experts: ${response.message}');
 
-        state = state.copyWith(
-          isLoading: false,
-          error: response.message,
-        );
+        state = state.copyWith(isLoading: false, error: response.message);
       }
     } catch (e) {
       debugPrint('❌ Error loading experts: $e');
@@ -201,9 +201,7 @@ class ExpertListNotifier extends StateNotifier<ExpertListState> {
   /// Empty query => show full list (with current sort/filter state).
   void setSearchQuery(String query) {
     final normalizedQuery = query.trim();
-    state = state.copyWith(
-      searchQuery: normalizedQuery,
-    );
+    state = state.copyWith(searchQuery: normalizedQuery);
 
     // Recompute after state.searchQuery is updated so filtering uses latest text.
     state = state.copyWith(
@@ -297,9 +295,11 @@ class ExpertListNotifier extends StateNotifier<ExpertListState> {
   void applyOnlineExpertsSnapshot(Set<String> onlineExpertIds) {
     final normalized = onlineExpertIds.map((e) => e.toLowerCase()).toSet();
     final updatedExperts = state.experts
-        .map((expert) => expert.copyWith(
-              isOnline: _isExpertInOnlineSet(expert, normalized),
-            ))
+        .map(
+          (expert) => expert.copyWith(
+            isOnline: _isExpertInOnlineSet(expert, normalized),
+          ),
+        )
         .toList();
 
     state = state.copyWith(
@@ -315,13 +315,12 @@ class ExpertListNotifier extends StateNotifier<ExpertListState> {
     required bool isOnline,
   }) {
     final normalizedId = expertId.toLowerCase();
-    final updatedExperts = state.experts
-        .map((expert) {
-          final match = expert.id.toLowerCase() == normalizedId ||
-              expert.userId.toLowerCase() == normalizedId;
-          return match ? expert.copyWith(isOnline: isOnline) : expert;
-        })
-        .toList();
+    final updatedExperts = state.experts.map((expert) {
+      final match =
+          expert.id.toLowerCase() == normalizedId ||
+          expert.userId.toLowerCase() == normalizedId;
+      return match ? expert.copyWith(isOnline: isOnline) : expert;
+    }).toList();
 
     state = state.copyWith(
       experts: updatedExperts,
@@ -342,11 +341,14 @@ class ExpertListNotifier extends StateNotifier<ExpertListState> {
     };
 
     return experts
-        .map((expert) => expert.copyWith(
-              isOnline: knownOnlineById[expert.id.toLowerCase()] ??
-                  knownOnlineById[expert.userId.toLowerCase()] ??
-                  expert.isOnline,
-            ))
+        .map(
+          (expert) => expert.copyWith(
+            isOnline:
+                knownOnlineById[expert.id.toLowerCase()] ??
+                knownOnlineById[expert.userId.toLowerCase()] ??
+                expert.isOnline,
+          ),
+        )
         .toList();
   }
 

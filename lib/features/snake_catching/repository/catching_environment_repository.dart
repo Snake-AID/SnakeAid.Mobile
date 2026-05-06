@@ -6,10 +6,11 @@ import '../../../core/providers/http_provider.dart';
 import '../models/catching_environment.dart';
 
 /// Provider for CatchingEnvironmentRepository
-final catchingEnvironmentRepositoryProvider = Provider<CatchingEnvironmentRepository>((ref) {
-  final httpService = ref.watch(httpServiceProvider);
-  return CatchingEnvironmentRepository(httpService);
-});
+final catchingEnvironmentRepositoryProvider =
+    Provider<CatchingEnvironmentRepository>((ref) {
+      final httpService = ref.watch(httpServiceProvider);
+      return CatchingEnvironmentRepository(httpService);
+    });
 
 class CatchingEnvironmentRepository {
   final HttpService _httpService;
@@ -42,7 +43,9 @@ class CatchingEnvironmentRepository {
     } on DioException catch (e) {
       debugPrint('❌ DioException: ${e.message}');
       debugPrint('📥 Response: ${e.response?.data}');
-      throw Exception('Không thể tải danh sách môi trường bắt rắn. Vui lòng thử lại.');
+      throw Exception(
+        'Không thể tải danh sách môi trường bắt rắn. Vui lòng thử lại.',
+      );
     } catch (e) {
       debugPrint('❌ Exception: $e');
       throw Exception('Lỗi không xác định: $e');

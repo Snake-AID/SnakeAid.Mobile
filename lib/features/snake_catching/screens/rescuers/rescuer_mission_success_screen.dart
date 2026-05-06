@@ -34,13 +34,24 @@ class _RescuerMissionSuccessScreenState
   }
 
   Future<void> _fetchFreshData() async {
-    setState(() { _isLoading = true; _error = null; });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
     try {
       final repo = ref.read(snakeCatchingRepositoryProvider);
       final response = await repo.getRequestById(widget.requestData.id);
-      if (mounted) setState(() { _freshData = response.data; _isLoading = false; });
+      if (mounted)
+        setState(() {
+          _freshData = response.data;
+          _isLoading = false;
+        });
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString().replaceAll('Exception: ', ''); _isLoading = false; });
+      if (mounted)
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+          _isLoading = false;
+        });
     }
   }
 
@@ -72,10 +83,12 @@ class _RescuerMissionSuccessScreenState
   double get _rescuerBaseShare => _baseFee * 0.6;
 
   /// Rescuer total = base share (60%) + snake fee + travel fee + env fee
-  double get _rescuerTotal => _rescuerBaseShare + _snakeFee + _travelFee + _envFee;
+  double get _rescuerTotal =>
+      _rescuerBaseShare + _snakeFee + _travelFee + _envFee;
 
   /// Customer round-2 payment = actualCost from server (= base + snake + env, travel already paid)
-  double get _customerRound2 => _mission?.actualCost ?? (_baseFee + _snakeFee + _envFee);
+  double get _customerRound2 =>
+      _mission?.actualCost ?? (_baseFee + _snakeFee + _envFee);
 
   /// Evidence photo count — from mission.media (referenceType=SnakeCatchingMission)
   /// Falls back to request-level media if mission media is empty
@@ -114,11 +127,16 @@ class _RescuerMissionSuccessScreenState
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF343A40)),
-          onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+          onPressed: () =>
+              Navigator.of(context).popUntil((route) => route.isFirst),
         ),
         title: const Text(
           'Đơn đã hoàn thành',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF343A40)),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF343A40),
+          ),
         ),
         centerTitle: true,
         bottom: PreferredSize(
@@ -127,35 +145,37 @@ class _RescuerMissionSuccessScreenState
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF28A745)))
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF28A745)),
+            )
           : _error != null
-              ? _buildError()
-              : Column(
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            _buildCompletionHeader(),
-                            const SizedBox(height: 24),
-                            _buildPaymentStatusBadge(),
-                            const SizedBox(height: 24),
-                            _buildCustomerPaymentCard(),
-                            const SizedBox(height: 16),
-                            _buildMissionSummaryCard(),
-                            const SizedBox(height: 16),
-                            _buildCustomerFeedbackCard(),
-                            const SizedBox(height: 16),
-                            _buildInfoCard(),
-                            const SizedBox(height: 24),
-                          ],
-                        ),
-                      ),
+          ? _buildError()
+          : Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        _buildCompletionHeader(),
+                        const SizedBox(height: 24),
+                        _buildPaymentStatusBadge(),
+                        const SizedBox(height: 24),
+                        _buildCustomerPaymentCard(),
+                        const SizedBox(height: 16),
+                        _buildMissionSummaryCard(),
+                        const SizedBox(height: 16),
+                        _buildCustomerFeedbackCard(),
+                        const SizedBox(height: 16),
+                        _buildInfoCard(),
+                        const SizedBox(height: 24),
+                      ],
                     ),
-                    _buildBottomButton(context),
-                  ],
+                  ),
                 ),
+                _buildBottomButton(context),
+              ],
+            ),
     );
   }
 
@@ -166,15 +186,27 @@ class _RescuerMissionSuccessScreenState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 48),
+            const Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.orange,
+              size: 48,
+            ),
             const SizedBox(height: 12),
-            Text(_error!, textAlign: TextAlign.center,
-                style: const TextStyle(color: Color(0xFF666666))),
+            Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Color(0xFF666666)),
+            ),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _fetchFreshData,
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28A745)),
-              child: const Text('Thử lại', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF28A745),
+              ),
+              child: const Text(
+                'Thử lại',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         ),
@@ -183,14 +215,19 @@ class _RescuerMissionSuccessScreenState
   }
 
   Widget _buildCompletionHeader() {
-    final customerName = _data.user?.userName ?? _data.user?.email ?? 'Khách hàng';
+    final customerName =
+        _data.user?.userName ?? _data.user?.email ?? 'Khách hàng';
     return Column(
       children: [
         const Icon(Icons.check_circle, color: Color(0xFF28A745), size: 60),
         const SizedBox(height: 8),
         const Text(
           'Nhiệm vụ hoàn thành',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF28A745)),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF28A745),
+          ),
         ),
         const SizedBox(height: 12),
         Row(
@@ -228,7 +265,9 @@ class _RescuerMissionSuccessScreenState
           ),
           const SizedBox(width: 6),
           Text(
-            isPaid ? 'Khách hàng đã thanh toán' : 'Đang chờ khách hàng thanh toán',
+            isPaid
+                ? 'Khách hàng đã thanh toán'
+                : 'Đang chờ khách hàng thanh toán',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -246,8 +285,14 @@ class _RescuerMissionSuccessScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Chi phí khách hàng',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF343A40))),
+          const Text(
+            'Chi phí khách hàng',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF343A40),
+            ),
+          ),
           const Divider(height: 24, color: Color(0xFFE2E8F0)),
           // Round 1 — already paid
           _buildFeeRow(
@@ -265,18 +310,26 @@ class _RescuerMissionSuccessScreenState
             ),
           const Divider(height: 20, color: Color(0xFFE2E8F0)),
           // Round 2 breakdown
-          _buildFeeRow('Phí dịch vụ cơ bản:', '${_formatCurrency(_baseFee.toInt())} VNĐ'),
+          _buildFeeRow(
+            'Phí dịch vụ cơ bản:',
+            '${_formatCurrency(_baseFee.toInt())} VNĐ',
+          ),
           if (_snakeFee > 0) ...[
             const SizedBox(height: 8),
-            _buildFeeRow('Phí bắt rắn:', '${_formatCurrency(_snakeFee.toInt())} VNĐ'),
+            _buildFeeRow(
+              'Phí bắt rắn:',
+              '${_formatCurrency(_snakeFee.toInt())} VNĐ',
+            ),
             // per-species price detail
-            ...(_mission?.missionDetails ?? []).map((d) => Padding(
-                  padding: const EdgeInsets.only(top: 4, left: 12),
-                  child: _buildFeeRow(
-                    '· ${d.snakeSpeciesName} × ${d.quantity}:',
-                    '${_formatCurrency(d.price.toInt())} VNĐ',
-                  ),
-                )),
+            ...(_mission?.missionDetails ?? []).map(
+              (d) => Padding(
+                padding: const EdgeInsets.only(top: 4, left: 12),
+                child: _buildFeeRow(
+                  '· ${d.snakeSpeciesName} × ${d.quantity}:',
+                  '${_formatCurrency(d.price.toInt())} VNĐ',
+                ),
+              ),
+            ),
           ],
           if (_envFee > 0) ...[
             const SizedBox(height: 8),
@@ -289,16 +342,22 @@ class _RescuerMissionSuccessScreenState
           _buildFeeRow(
             'Cần thanh toán đợt 2:',
             '${_formatCurrency(_customerRound2.toInt())} VNĐ',
-            labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold,
-                color: Color(0xFFFF6B35)),
+            labelStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFFFF6B35),
+            ),
             valueColor: const Color(0xFFFF6B35),
           ),
           const Divider(height: 20, color: Color(0xFFE2E8F0)),
           _buildFeeRow(
             'Tổng chi phí:',
             '${_formatCurrency(_customerTotal.toInt())} VNĐ',
-            labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold,
-                color: Color(0xFF343A40)),
+            labelStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF343A40),
+            ),
             valueColor: const Color(0xFF343A40),
           ),
         ],
@@ -308,7 +367,9 @@ class _RescuerMissionSuccessScreenState
 
   Widget _buildMissionSummaryCard() {
     final snakeNames = _data.details.isNotEmpty
-        ? _data.details.map((d) => '${d.snakeSpeciesName} × ${d.quantity}').join(', ')
+        ? _data.details
+              .map((d) => '${d.snakeSpeciesName} × ${d.quantity}')
+              .join(', ')
         : '—';
 
     return _buildCard(
@@ -316,11 +377,17 @@ class _RescuerMissionSuccessScreenState
         children: [
           _buildSummaryRow(Icons.pest_control, 'Loài rắn: $snakeNames'),
           const SizedBox(height: 16),
-          _buildSummaryRow(Icons.hourglass_top, 'Thời gian thực hiện: $_missionDuration'),
+          _buildSummaryRow(
+            Icons.hourglass_top,
+            'Thời gian thực hiện: $_missionDuration',
+          ),
           const SizedBox(height: 16),
           _buildSummaryRow(Icons.location_on, _data.address),
           const SizedBox(height: 16),
-          _buildSummaryRow(Icons.photo_camera, '$_evidencePhotoCount ảnh đã ghi nhận'),
+          _buildSummaryRow(
+            Icons.photo_camera,
+            '$_evidencePhotoCount ảnh đã ghi nhận',
+          ),
         ],
       ),
     );
@@ -355,21 +422,30 @@ class _RescuerMissionSuccessScreenState
       decoration: BoxDecoration(
         color: const Color(0xFFF6F8F6),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, -2)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
         ],
       ),
       child: SizedBox(
         width: double.infinity,
         height: 56,
         child: OutlinedButton(
-          onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+          onPressed: () =>
+              Navigator.of(context).popUntil((route) => route.isFirst),
           style: OutlinedButton.styleFrom(
             foregroundColor: const Color(0xFFFD7E14),
             side: const BorderSide(color: Color(0xFFFD7E14), width: 2),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
-          child: const Text('Về Trang Chủ',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          child: const Text(
+            'Về Trang Chủ',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
         ),
       ),
     );
@@ -384,17 +460,18 @@ class _RescuerMissionSuccessScreenState
 
     // Tìm feedback mà member đã gửi cho rescuer (currentUser)
     final memberFeedback = _data.feedbacks
-        .where((f) =>
-            f.targetUserId == currentUser.id &&
-            f.raterId == _data.userId &&
-            f.referenceId == _data.id)
+        .where(
+          (f) =>
+              f.targetUserId == currentUser.id &&
+              f.raterId == _data.userId &&
+              f.referenceId == _data.id,
+        )
         .firstOrNull;
 
     if (memberFeedback == null) return const SizedBox.shrink();
 
-    final memberName = _data.user?.userName ??
-        _data.user?.account?.fullName ??
-        'Khách hàng';
+    final memberName =
+        _data.user?.userName ?? _data.user?.account?.fullName ?? 'Khách hàng';
     final memberAvatar = _data.user?.account?.avatarUrl;
 
     return _buildCard(
@@ -405,11 +482,16 @@ class _RescuerMissionSuccessScreenState
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundImage:
-                    memberAvatar != null ? NetworkImage(memberAvatar) : null,
+                backgroundImage: memberAvatar != null
+                    ? NetworkImage(memberAvatar)
+                    : null,
                 backgroundColor: const Color(0xFF0D6EFD).withOpacity(0.12),
                 child: memberAvatar == null
-                    ? const Icon(Icons.person, color: Color(0xFF0D6EFD), size: 20)
+                    ? const Icon(
+                        Icons.person,
+                        color: Color(0xFF0D6EFD),
+                        size: 20,
+                      )
                     : null,
               ),
               const SizedBox(width: 10),
@@ -420,13 +502,18 @@ class _RescuerMissionSuccessScreenState
                     const Text(
                       'Khách hàng đánh giá bạn',
                       style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF343A40)),
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF343A40),
+                      ),
                     ),
-                    Text(memberName,
-                        style: const TextStyle(
-                            fontSize: 12, color: Color(0xFF6C757D))),
+                    Text(
+                      memberName,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF6C757D),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -451,7 +538,7 @@ class _RescuerMissionSuccessScreenState
             ),
           ),
           if (memberFeedback.comments != null &&
-              memberFeedback.comments!.isNotEmpty) ...[  
+              memberFeedback.comments!.isNotEmpty) ...[
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
@@ -463,9 +550,10 @@ class _RescuerMissionSuccessScreenState
               child: Text(
                 '"${memberFeedback.comments!}"',
                 style: const TextStyle(
-                    fontSize: 13,
-                    fontStyle: FontStyle.italic,
-                    color: Color(0xFF6C757D)),
+                  fontSize: 13,
+                  fontStyle: FontStyle.italic,
+                  color: Color(0xFF6C757D),
+                ),
               ),
             ),
           ],
@@ -484,14 +572,20 @@ class _RescuerMissionSuccessScreenState
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: child,
     );
   }
 
-  Widget _buildFeeRow(String label, String value, {
+  Widget _buildFeeRow(
+    String label,
+    String value, {
     Color? valueColor,
     TextStyle? labelStyle,
   }) {
@@ -499,17 +593,25 @@ class _RescuerMissionSuccessScreenState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: Text(label,
-              style: labelStyle ??
-                  const TextStyle(fontSize: 14, color: Color(0xFF6C757D))),
+          child: Text(
+            label,
+            style:
+                labelStyle ??
+                const TextStyle(fontSize: 14, color: Color(0xFF6C757D)),
+          ),
         ),
         const SizedBox(width: 8),
-        Text(value,
-            textAlign: TextAlign.end,
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight: labelStyle != null ? FontWeight.bold : FontWeight.normal,
-                color: valueColor ?? const Color(0xFF6C757D))),
+        Text(
+          value,
+          textAlign: TextAlign.end,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: labelStyle != null
+                ? FontWeight.bold
+                : FontWeight.normal,
+            color: valueColor ?? const Color(0xFF6C757D),
+          ),
+        ),
       ],
     );
   }
@@ -518,15 +620,20 @@ class _RescuerMissionSuccessScreenState
     return Row(
       children: [
         Container(
-          width: 40, height: 40,
+          width: 40,
+          height: 40,
           decoration: const BoxDecoration(
-              color: Color(0xFFF1F5F9), shape: BoxShape.circle),
+            color: Color(0xFFF1F5F9),
+            shape: BoxShape.circle,
+          ),
           child: Icon(icon, color: const Color(0xFF6C757D), size: 20),
         ),
         const SizedBox(width: 16),
         Expanded(
-          child: Text(text,
-              style: const TextStyle(fontSize: 14, color: Color(0xFF343A40))),
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 14, color: Color(0xFF343A40)),
+          ),
         ),
       ],
     );

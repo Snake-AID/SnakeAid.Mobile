@@ -237,7 +237,8 @@ class _PaymentConfirmationScreenState
       if (isConfirmed) {
         result = const PayOsVerificationResult(
           status: PayOsVerificationStatus.confirmed,
-          message: 'Số dư ví đã được cập nhật sau khi PayOS xác nhận giao dịch.',
+          message:
+              'Số dư ví đã được cập nhật sau khi PayOS xác nhận giao dịch.',
         );
       } else {
         result = await verifier.verify(
@@ -485,7 +486,8 @@ class _PaymentConfirmationScreenState
       if (isConfirmed) {
         result = const PayOsVerificationResult(
           status: PayOsVerificationStatus.confirmed,
-          message: 'Số dư ví đã được cập nhật sau khi PayOS xác nhận giao dịch.',
+          message:
+              'Số dư ví đã được cập nhật sau khi PayOS xác nhận giao dịch.',
         );
       } else {
         result = await verifier.verify(
@@ -1515,7 +1517,9 @@ class _PaymentConfirmationScreenState
             decoration: BoxDecoration(
               color: const Color(0xFFFFF8E1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFFFB300).withOpacity(0.5)),
+              border: Border.all(
+                color: const Color(0xFFFFB300).withOpacity(0.5),
+              ),
             ),
             child: const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1551,7 +1555,8 @@ class _PaymentConfirmationScreenState
     required Widget child,
   }) {
     final isSelected = _selectedPaymentMethod == method;
-    final isLockedToOther = _lockedPaymentMethod != null && _lockedPaymentMethod != method;
+    final isLockedToOther =
+        _lockedPaymentMethod != null && _lockedPaymentMethod != method;
     final isEnabled = !isLockedToOther;
 
     return InkWell(
@@ -1579,7 +1584,9 @@ class _PaymentConfirmationScreenState
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: isSelected ? Border.all(color: _primaryColor, width: 2) : null,
+            border: isSelected
+                ? Border.all(color: _primaryColor, width: 2)
+                : null,
             boxShadow: [
               BoxShadow(
                 color: isSelected
@@ -1590,118 +1597,121 @@ class _PaymentConfirmationScreenState
               ),
             ],
           ),
-        child: Column(
-          children: [
-            // Card header
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                gradient: isEnabled ? headerGradient : LinearGradient(
-                  colors: [Colors.grey[400]!, Colors.grey[500]!],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+          child: Column(
+            children: [
+              // Card header
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
                 ),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
+                decoration: BoxDecoration(
+                  gradient: isEnabled
+                      ? headerGradient
+                      : LinearGradient(
+                          colors: [Colors.grey[400]!, Colors.grey[500]!],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    topRight: Radius.circular(16),
+                  ),
                 ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      icon,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (isSelected)
+                child: Row(
+                  children: [
                     Container(
-                      width: 24,
-                      height: 24,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white,
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(
-                        Icons.check,
-                        size: 16,
-                        color: isEnabled ? buttonColor : Colors.grey,
+                      child: Icon(icon, color: Colors.white, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                ],
-              ),
-            ),
-            // Card body
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  child,
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: (isSelected && _agreedToTerms && isEnabled)
-                          ? _handlePayment
-                          : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isEnabled ? buttonColor : Colors.grey[300],
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.grey[200],
-                        disabledForegroundColor: Colors.grey[400],
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                    if (isSelected)
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
                         ),
-                        elevation: 0,
+                        child: Icon(
+                          Icons.check,
+                          size: 16,
+                          color: isEnabled ? buttonColor : Colors.grey,
+                        ),
                       ),
-                      child: Text(
-                        method == PaymentMethod.snakeaidPay
-                            ? 'Thanh toán bằng ví'
-                            : 'Thanh toán qua PayOS',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
+                  ],
+                ),
+              ),
+              // Card body
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    child,
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: (isSelected && _agreedToTerms && isEnabled)
+                            ? _handlePayment
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isEnabled
+                              ? buttonColor
+                              : Colors.grey[300],
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: Colors.grey[200],
+                          disabledForegroundColor: Colors.grey[400],
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          method == PaymentMethod.snakeaidPay
+                              ? 'Thanh toán bằng ví'
+                              : 'Thanh toán qua PayOS',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         ),
       ),
     );
@@ -1709,7 +1719,8 @@ class _PaymentConfirmationScreenState
 
   /// Build SnakeAid Pay card content
   Widget _buildSnakeAidPayContent() {
-    final hasSufficientBalance = _walletBalance != null &&
+    final hasSufficientBalance =
+        _walletBalance != null &&
         _walletBalance! >= (int.tryParse(_getPriceAmount()) ?? 0);
 
     return Column(
@@ -1752,12 +1763,19 @@ class _PaymentConfirmationScreenState
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline, size: 14, color: Color(0xFFDC3545)),
+                const Icon(
+                  Icons.info_outline,
+                  size: 14,
+                  color: Color(0xFFDC3545),
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     'Số dư không đủ. Cần nạp thêm ${_formatPrice(((int.tryParse(_getPriceAmount()) ?? 0) - (_walletBalance?.toInt() ?? 0)).toString())}.',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFFDC3545)),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFFDC3545),
+                    ),
                   ),
                 ),
               ],
@@ -1788,9 +1806,7 @@ class _PaymentConfirmationScreenState
       decoration: BoxDecoration(
         color: const Color(0xFF1565C0).withOpacity(0.08),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: const Color(0xFF1565C0).withOpacity(0.3),
-        ),
+        border: Border.all(color: const Color(0xFF1565C0).withOpacity(0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1809,8 +1825,6 @@ class _PaymentConfirmationScreenState
       ),
     );
   }
-
-
 
   /// Build security info box
   Widget _buildSecurityInfo(ThemeData theme) {
@@ -1860,9 +1874,7 @@ class _PaymentConfirmationScreenState
               width: double.infinity,
               height: 48,
               child: FilledButton(
-                onPressed: _isPaymentLoading
-                    ? null
-                    : _showPaymentMethodsSheet,
+                onPressed: _isPaymentLoading ? null : _showPaymentMethodsSheet,
                 style: FilledButton.styleFrom(
                   backgroundColor: canProceed
                       ? _primaryColor
@@ -1962,10 +1974,10 @@ class _PaymentMethodsSheetState extends State<_PaymentMethodsSheet> {
   bool _agreedToTerms = false;
 
   String _fmt(double v) {
-    final s = v
-        .toInt()
-        .toString()
-        .replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+    final s = v.toInt().toString().replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
     return '$s đ';
   }
 
@@ -2245,7 +2257,8 @@ class _PaymentMethodsSheetState extends State<_PaymentMethodsSheet> {
                                 ),
                         ],
                       ),
-                      if (!hasSufficientBalance && widget.walletBalance != null) ...[
+                      if (!hasSufficientBalance &&
+                          widget.walletBalance != null) ...[
                         const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(

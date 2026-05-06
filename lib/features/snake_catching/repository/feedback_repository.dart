@@ -74,13 +74,13 @@ class FeedbackRequest {
   });
 
   Map<String, dynamic> toJson() => {
-        'targetUserId': targetUserId,
-        'referenceId': referenceId,
-        'type': type,
-        'rating': rating,
-        if (comments != null && comments!.isNotEmpty) 'comments': comments,
-        'targetUserRole': targetUserRole,
-      };
+    'targetUserId': targetUserId,
+    'referenceId': referenceId,
+    'type': type,
+    'rating': rating,
+    if (comments != null && comments!.isNotEmpty) 'comments': comments,
+    'targetUserRole': targetUserRole,
+  };
 }
 
 // ── Repository ────────────────────────────────────────────────────────────────
@@ -93,17 +93,16 @@ class FeedbackRepository {
   Future<FeedbackData> submitFeedback(FeedbackRequest request) async {
     try {
       final body = request.toJson();
-      final response = await _http.post(
-        '/api/feedback',
-        data: body,
-      );
+      final response = await _http.post('/api/feedback', data: body);
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = response.data['data'] ?? response.data;
         return FeedbackData.fromJson(data as Map<String, dynamic>);
       }
       throw Exception('Không thể gửi đánh giá (status ${response.statusCode})');
     } on DioException catch (e) {
-      debugPrint('❌ [FeedbackRepo] DioException status=${e.response?.statusCode}');
+      debugPrint(
+        '❌ [FeedbackRepo] DioException status=${e.response?.statusCode}',
+      );
       debugPrint('❌ [FeedbackRepo] response body=${e.response?.data}');
       debugPrint('❌ [FeedbackRepo] error=${e.message}');
       final msg = e.response?.data?['message'] as String?;

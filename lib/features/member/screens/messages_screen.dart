@@ -78,14 +78,14 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 children: [
                   // Header
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       border: Border(
-                        bottom: BorderSide(
-                          color: Color(0xFFE0E0E0),
-                          width: 1,
-                        ),
+                        bottom: BorderSide(color: Color(0xFFE0E0E0), width: 1),
                       ),
                     ),
                     child: Row(
@@ -103,7 +103,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
                           color: const Color(0xFF228B22),
                           onPressed: () {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Tạo cuộc trò chuyện mới')),
+                              const SnackBar(
+                                content: Text('Tạo cuộc trò chuyện mới'),
+                              ),
                             );
                           },
                         ),
@@ -176,7 +178,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
                       itemBuilder: (context, index) {
                         return MessageThreadCard(
                           thread: _filteredConversations[index],
-                          onTap: () => _openMessageDetail(_filteredConversations[index]),
+                          onTap: () =>
+                              _openMessageDetail(_filteredConversations[index]),
                         );
                       },
                     ),
@@ -201,7 +204,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
           color: isSelected ? const Color(0xFF228B22) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? const Color(0xFF228B22) : const Color(0xFFE0E0E0),
+            color: isSelected
+                ? const Color(0xFF228B22)
+                : const Color(0xFFE0E0E0),
           ),
         ),
         child: Text(
@@ -221,11 +226,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.chat_bubble_outline,
-            size: 80,
-            color: Colors.grey[300],
-          ),
+          Icon(Icons.chat_bubble_outline, size: 80, color: Colors.grey[300]),
           const SizedBox(height: 16),
           Text(
             'Chưa có tin nhắn',
@@ -238,10 +239,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
           const SizedBox(height: 8),
           Text(
             'Bắt đầu cuộc trò chuyện với chuyên gia',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
           ),
         ],
       ),
@@ -273,10 +271,7 @@ class MessageThreadCard extends StatelessWidget {
         decoration: const BoxDecoration(
           color: Colors.white,
           border: Border(
-            bottom: BorderSide(
-              color: Color(0xFFF0F0F0),
-              width: 1,
-            ),
+            bottom: BorderSide(color: Color(0xFFF0F0F0), width: 1),
           ),
         ),
         child: Row(
@@ -315,10 +310,7 @@ class MessageThreadCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: const Color(0xFF228B22),
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white,
-                          width: 2,
-                        ),
+                        border: Border.all(color: Colors.white, width: 2),
                       ),
                       child: const Icon(
                         Icons.verified,
@@ -439,7 +431,4 @@ class MessageThread {
   });
 }
 
-enum MessageStatus {
-  active,
-  archived,
-}
+enum MessageStatus { active, archived }

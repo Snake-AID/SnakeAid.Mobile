@@ -175,7 +175,10 @@ class SnakeCatchingRepository {
     try {
       final fileName = imageFile.path.split('/').last;
       final formData = FormData.fromMap({
-        'File': await MultipartFile.fromFile(imageFile.path, filename: fileName),
+        'File': await MultipartFile.fromFile(
+          imageFile.path,
+          filename: fileName,
+        ),
         'ReferenceId': requestId,
       });
 
@@ -236,10 +239,14 @@ class SnakeCatchingRepository {
       if (e.response?.statusCode == 404) {
         throw Exception('Không tìm thấy nhiệm vụ này.');
       } else if (e.response?.statusCode == 400) {
-        final message = e.response?.data['message'] ?? 'Không thể báo cáo chưa hoàn thành nhiệm vụ';
+        final message =
+            e.response?.data['message'] ??
+            'Không thể báo cáo chưa hoàn thành nhiệm vụ';
         throw Exception(message);
       }
-      throw Exception('Không thể báo cáo chưa hoàn thành nhiệm vụ. Vui lòng thử lại.');
+      throw Exception(
+        'Không thể báo cáo chưa hoàn thành nhiệm vụ. Vui lòng thử lại.',
+      );
     } catch (e) {
       throw Exception('Lỗi không xác định: $e');
     }

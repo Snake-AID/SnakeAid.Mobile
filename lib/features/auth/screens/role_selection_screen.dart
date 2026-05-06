@@ -51,7 +51,7 @@ class RoleSelectionScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Welcome Text
                   const Text(
                     'Chào mừng đến với',
@@ -62,7 +62,7 @@ class RoleSelectionScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  
+
                   // App Name - Đảm bảo màu #228B22
                   const Text(
                     'SnakeAid',
@@ -74,7 +74,7 @@ class RoleSelectionScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 32),
-                  
+
                   // Instruction Text
                   const Text(
                     'Bạn là ai?',
@@ -95,9 +95,9 @@ class RoleSelectionScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 48),
-              
+
               // Role Cards
               Expanded(
                 child: ListView(
@@ -108,14 +108,14 @@ class RoleSelectionScreen extends StatelessWidget {
                       onTap: () => _navigateToAuth(context, UserRole.member),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     _RoleCard(
                       role: UserRole.rescuer,
                       icon: Icons.local_hospital,
                       onTap: () => _navigateToAuth(context, UserRole.rescuer),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     _RoleCard(
                       role: UserRole.expert,
                       icon: Icons.verified,
@@ -170,7 +170,7 @@ class _RoleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final roleColor = _getRoleColor();
-    
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -179,10 +179,7 @@ class _RoleCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: const Color(0xFFE0E0E0),
-            width: 1.5,
-          ),
+          border: Border.all(color: const Color(0xFFE0E0E0), width: 1.5),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.04),
@@ -201,14 +198,10 @@ class _RoleCard extends StatelessWidget {
                 color: roleColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
-                icon,
-                size: 28,
-                color: roleColor,
-              ),
+              child: Icon(icon, size: 28, color: roleColor),
             ),
             const SizedBox(width: 16),
-            
+
             // Text Content
             Expanded(
               child: Column(
@@ -234,13 +227,9 @@ class _RoleCard extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             // Arrow Icon
-            Icon(
-              Icons.arrow_forward_ios,
-              size: 18,
-              color: roleColor,
-            ),
+            Icon(Icons.arrow_forward_ios, size: 18, color: roleColor),
           ],
         ),
       ),

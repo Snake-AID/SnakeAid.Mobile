@@ -5,7 +5,9 @@ import '../../../core/providers/http_provider.dart';
 import '../../../core/services/http_service.dart';
 import '../models/member_profile.dart';
 
-final memberProfileRepositoryProvider = Provider<MemberProfileRepository>((ref) {
+final memberProfileRepositoryProvider = Provider<MemberProfileRepository>((
+  ref,
+) {
   final httpService = ref.watch(httpServiceProvider);
   return MemberProfileRepository(httpService: httpService);
 });
@@ -14,7 +16,7 @@ class MemberProfileRepository {
   final HttpService _httpService;
 
   MemberProfileRepository({required HttpService httpService})
-      : _httpService = httpService;
+    : _httpService = httpService;
 
   /// GET /api/members/me/profile
   Future<MemberProfile> getMyProfile() async {

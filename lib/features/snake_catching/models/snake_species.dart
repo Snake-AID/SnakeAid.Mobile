@@ -44,8 +44,8 @@ class SnakeSpecies {
           : null,
       symptomsByTime: json['symptomsByTime'] != null
           ? (json['symptomsByTime'] as List<dynamic>)
-              .map((e) => SymptomByTime.fromJson(e))
-              .toList()
+                .map((e) => SymptomByTime.fromJson(e))
+                .toList()
           : null,
       riskLevel: (json['riskLevel'] as num).toDouble(),
       isVenomous: json['isVenomous'] as bool,
@@ -85,11 +85,13 @@ class SnakeIdentification {
 
   factory SnakeIdentification.fromJson(Map<String, dynamic> json) {
     return SnakeIdentification(
-      physicalTraits: (json['physicalTraits'] as List<dynamic>?)
+      physicalTraits:
+          (json['physicalTraits'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           [],
-      behaviors: (json['behaviors'] as List<dynamic>?)
+      behaviors:
+          (json['behaviors'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           [],
@@ -120,19 +122,14 @@ class SymptomByTime {
   factory SymptomByTime.fromJson(Map<String, dynamic> json) {
     return SymptomByTime(
       timeRange: json['timeRange'] as String,
-      signs: (json['signs'] as List<dynamic>?)
-              ?.map((e) => e as String)
-              .toList() ??
+      signs:
+          (json['signs'] as List<dynamic>?)?.map((e) => e as String).toList() ??
           [],
       isCritical: json['isCritical'] as bool? ?? false,
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'timeRange': timeRange,
-      'signs': signs,
-      'isCritical': isCritical,
-    };
+    return {'timeRange': timeRange, 'signs': signs, 'isCritical': isCritical};
   }
 }

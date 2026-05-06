@@ -5,22 +5,14 @@ import 'package:go_router/go_router.dart';
 class BottomNavBar extends StatelessWidget {
   final String currentRoute;
 
-  const BottomNavBar({
-    super.key,
-    required this.currentRoute,
-  });
+  const BottomNavBar({super.key, required this.currentRoute});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(
-            color: Colors.grey[200]!,
-            width: 1,
-          ),
-        ),
+        border: Border(top: BorderSide(color: Colors.grey[200]!, width: 1)),
       ),
       child: SafeArea(
         child: SizedBox(
@@ -41,7 +33,9 @@ class BottomNavBar extends StatelessWidget {
                 onTap: () {
                   // TODO: Navigate to hospital
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Bệnh viện - Đang phát triển')),
+                    const SnackBar(
+                      content: Text('Bệnh viện - Đang phát triển'),
+                    ),
                   );
                 },
               ),
@@ -96,10 +90,7 @@ class _NavItem extends StatelessWidget {
         decoration: BoxDecoration(
           border: isActive
               ? const Border(
-                  top: BorderSide(
-                    color: Color(0xFF228B22),
-                    width: 3,
-                  ),
+                  top: BorderSide(color: Color(0xFF228B22), width: 3),
                 )
               : null,
         ),

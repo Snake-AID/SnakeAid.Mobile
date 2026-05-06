@@ -36,7 +36,7 @@ class _RegistrationPendingScreenState
       if (hasVerified) {
         // Cập nhật state isVerified = true để vượt qua router guard
         await ref.read(authProvider.notifier).markUserAsVerified();
-        
+
         if (!mounted) return;
         // Nếu đã được duyệt -> Vào thẳng Home
         ScaffoldMessenger.of(context).showSnackBar(

@@ -13,7 +13,7 @@ class SnakeConfirmationScreen extends ConsumerStatefulWidget {
   final String? imageUrl;
   final List<IdentificationFeature> features;
   final int matchedFeaturesCount;
-  
+
   // Data for API call
   final int? snakeId;
   final List<int>? selectedOptionIds;
@@ -38,10 +38,12 @@ class SnakeConfirmationScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<SnakeConfirmationScreen> createState() => _SnakeConfirmationScreenState();
+  ConsumerState<SnakeConfirmationScreen> createState() =>
+      _SnakeConfirmationScreenState();
 }
 
-class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScreen> {
+class _SnakeConfirmationScreenState
+    extends ConsumerState<SnakeConfirmationScreen> {
   late List<bool> _selectedFeatures;
 
   @override
@@ -51,9 +53,10 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
     _selectedFeatures = widget.features.map((f) => f.isMatched).toList();
   }
 
-  int get _matchedCount => _selectedFeatures.where((selected) => selected).length;
+  int get _matchedCount =>
+      _selectedFeatures.where((selected) => selected).length;
   int get _totalFeatures => widget.features.length;
-  
+
   String get _confidenceLevel {
     final percentage = (_matchedCount / _totalFeatures) * 100;
     if (percentage >= 80) return 'Độ tin cậy cao';
@@ -84,7 +87,6 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
 
   @override
   Widget build(BuildContext context) {
-    
     return Scaffold(
       backgroundColor: const Color(0xFFF8F8F6),
       appBar: AppBar(
@@ -208,7 +210,7 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
                                 ),
                         ),
                         const SizedBox(height: 20),
-                        
+
                         // Snake Name
                         Text(
                           widget.snakeName,
@@ -220,7 +222,7 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 4),
-                        
+
                         // English Name
                         Text(
                           widget.englishName,
@@ -232,7 +234,7 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 2),
-                        
+
                         // Scientific Name
                         Text(
                           widget.scientificName,
@@ -244,17 +246,25 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 12),
-                        
+
                         // Poison Badge
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
-                            color: widget.isPoisonous ? const Color(0xFFDC3545) : const Color(0xFF28A745),
+                            color: widget.isPoisonous
+                                ? const Color(0xFFDC3545)
+                                : const Color(0xFF28A745),
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: (widget.isPoisonous ? const Color(0xFFDC3545) : const Color(0xFF28A745))
-                                    .withOpacity(0.2),
+                                color:
+                                    (widget.isPoisonous
+                                            ? const Color(0xFFDC3545)
+                                            : const Color(0xFF28A745))
+                                        .withOpacity(0.2),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
@@ -264,13 +274,17 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                widget.isPoisonous ? Icons.warning : Icons.shield,
+                                widget.isPoisonous
+                                    ? Icons.warning
+                                    : Icons.shield,
                                 color: Colors.white,
                                 size: 16,
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                widget.isPoisonous ? 'RẮN CỰC ĐỘC' : 'KHÔNG ĐỘC',
+                                widget.isPoisonous
+                                    ? 'RẮN CỰC ĐỘC'
+                                    : 'KHÔNG ĐỘC',
                                 style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
@@ -286,10 +300,7 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
                   ),
 
                   // Divider
-                  Container(
-                    height: 1,
-                    color: const Color(0xFFE0E0E0),
-                  ),
+                  Container(height: 1, color: const Color(0xFFE0E0E0)),
 
                   // Features Section
                   Container(
@@ -307,12 +318,15 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
                           ),
                         ),
                         const SizedBox(height: 12),
-                        
+
                         // Features List
                         ...List.generate(widget.features.length, (index) {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 12),
-                            child: _buildFeatureCard(widget.features[index], index),
+                            child: _buildFeatureCard(
+                              widget.features[index],
+                              index,
+                            ),
                           );
                         }),
                       ],
@@ -410,11 +424,17 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
                             ],
                           ),
                           const SizedBox(height: 12),
-                          _buildWarningItem('Nọc độc cực mạnh - có thể gây tử vong trong 30 phút'),
+                          _buildWarningItem(
+                            'Nọc độc cực mạnh - có thể gây tử vong trong 30 phút',
+                          ),
                           const SizedBox(height: 6),
-                          _buildWarningItem('Cần băng ép NGAY và đến bệnh viện khẩn cấp'),
+                          _buildWarningItem(
+                            'Cần băng ép NGAY và đến bệnh viện khẩn cấp',
+                          ),
                           const SizedBox(height: 6),
-                          _buildWarningItem('Huyết thanh kháng nọc có tại bệnh viện lớn'),
+                          _buildWarningItem(
+                            'Huyết thanh kháng nọc có tại bệnh viện lớn',
+                          ),
                         ],
                       ),
                     ),
@@ -453,7 +473,9 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
                         backgroundColor: const Color(0xFF228B22),
                         foregroundColor: Colors.white,
                         elevation: 2,
-                        shadowColor: const Color(0xFF228B22).withValues(alpha: 0.3),
+                        shadowColor: const Color(
+                          0xFF228B22,
+                        ).withValues(alpha: 0.3),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -469,7 +491,7 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
                     ),
                   ),
                   const SizedBox(height: 12),
-                  
+
                   // Secondary: Not Sure - Choose Another
                   SizedBox(
                     width: double.infinity,
@@ -478,7 +500,10 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
                       onPressed: () => context.pop(),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF666666),
-                        side: const BorderSide(color: Color(0xFFBDBDBD), width: 2),
+                        side: const BorderSide(
+                          color: Color(0xFFBDBDBD),
+                          width: 2,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -494,7 +519,7 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
                     ),
                   ),
                   const SizedBox(height: 12),
-                  
+
                   // Tertiary: Skip Identification - Go to Tracking
                   TextButton.icon(
                     onPressed: () {
@@ -520,10 +545,12 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
                             ElevatedButton(
                               onPressed: () {
                                 Navigator.pop(context); // Close dialog
-                                
+
                                 // Pop all screens back to Emergency Tracking (existing instance)
                                 // This preserves the tracking screen state without recreating it
-                                Navigator.of(context).popUntil((route) => route.isFirst);
+                                Navigator.of(
+                                  context,
+                                ).popUntil((route) => route.isFirst);
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFFF9800),
@@ -569,17 +596,23 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: widget.isPoisonous ? const Color(0xFFFEF2F2) : const Color(0xFFDCFCE7),
+              color: widget.isPoisonous
+                  ? const Color(0xFFFEF2F2)
+                  : const Color(0xFFDCFCE7),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: widget.isPoisonous ? const Color(0xFFFECDD3) : const Color(0xFFBBF7D0),
+                color: widget.isPoisonous
+                    ? const Color(0xFFFECDD3)
+                    : const Color(0xFFBBF7D0),
               ),
             ),
             child: Row(
               children: [
                 Icon(
                   widget.isPoisonous ? Icons.emergency : Icons.medical_services,
-                  color: widget.isPoisonous ? const Color(0xFFDC3545) : const Color(0xFF228B22),
+                  color: widget.isPoisonous
+                      ? const Color(0xFFDC3545)
+                      : const Color(0xFF228B22),
                   size: 24,
                 ),
                 const SizedBox(width: 12),
@@ -588,11 +621,15 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.isPoisonous ? 'CẢNH BÁO: RẮN ĐỘC' : 'Rắn không độc',
+                        widget.isPoisonous
+                            ? 'CẢNH BÁO: RẮN ĐỘC'
+                            : 'Rắn không độc',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: widget.isPoisonous ? const Color(0xFFDC3545) : const Color(0xFF228B22),
+                          color: widget.isPoisonous
+                              ? const Color(0xFFDC3545)
+                              : const Color(0xFF228B22),
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -642,7 +679,6 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
         widget.selectedOptionIds != null &&
         widget.matchScore != null &&
         widget.matchPercentage != null) {
-      
       // Show loading
       showDialog(
         context: context,
@@ -665,7 +701,7 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
         if (mounted) {
           // Close loading
           Navigator.pop(context);
-          
+
           // Navigate to first aid
           context.pushNamed(
             'first_aid_steps',
@@ -681,7 +717,7 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
         if (mounted) {
           // Close loading
           Navigator.pop(context);
-          
+
           // Show error
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -708,7 +744,7 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
 
   Widget _buildFeatureCard(IdentificationFeature feature, int index) {
     final isSelected = _selectedFeatures[index];
-    
+
     return InkWell(
       onTap: () {
         setState(() {
@@ -722,7 +758,9 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
           color: const Color(0xFFF8F8F6),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? const Color(0xFF228B22) : const Color(0xFFE0E0E0),
+            color: isSelected
+                ? const Color(0xFF228B22)
+                : const Color(0xFFE0E0E0),
             width: isSelected ? 1.5 : 1,
           ),
         ),
@@ -744,7 +782,7 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
               ),
             ),
             const SizedBox(width: 12),
-            
+
             // Content
             Expanded(
               child: Column(
@@ -770,7 +808,7 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
                 ],
               ),
             ),
-            
+
             // Check Icon
             const SizedBox(width: 8),
             Icon(
@@ -790,11 +828,7 @@ class _SnakeConfirmationScreenState extends ConsumerState<SnakeConfirmationScree
       children: [
         const Padding(
           padding: EdgeInsets.only(top: 2),
-          child: Icon(
-            Icons.circle,
-            size: 6,
-            color: Color(0xFFDC3545),
-          ),
+          child: Icon(Icons.circle, size: 6, color: Color(0xFFDC3545)),
         ),
         const SizedBox(width: 8),
         Expanded(

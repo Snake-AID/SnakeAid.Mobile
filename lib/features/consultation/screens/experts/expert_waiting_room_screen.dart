@@ -39,7 +39,8 @@ class ExpertWaitingRoomScreen extends ConsumerStatefulWidget {
       _ExpertWaitingRoomScreenState();
 }
 
-class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScreen>
+class _ExpertWaitingRoomScreenState
+    extends ConsumerState<ExpertWaitingRoomScreen>
     with TickerProviderStateMixin {
   static const Color _purple = Color(0xFF6C47C2);
   static const Color _enterColor = Color(0xFF22628C);
@@ -70,8 +71,7 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
     _isMicOn = widget.initialMicOn;
     _isCameraOn = widget.initialCameraOn;
 
-    _clockTimer = Timer.periodic(
-        const Duration(seconds: 1), (_) {
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _now = DateTime.now());
     });
 
@@ -83,16 +83,21 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
       ),
     );
     _dotAnims = _dotControllers
-        .map((c) => Tween<double>(begin: 0, end: -7).animate(
-              CurvedAnimation(parent: c, curve: Curves.easeInOut),
-            ))
+        .map(
+          (c) => Tween<double>(
+            begin: 0,
+            end: -7,
+          ).animate(CurvedAnimation(parent: c, curve: Curves.easeInOut)),
+        )
         .toList();
 
     _dotControllers[0].repeat(reverse: true);
-    Future.delayed(const Duration(milliseconds: 200),
-        () { if (mounted) _dotControllers[1].repeat(reverse: true); });
-    Future.delayed(const Duration(milliseconds: 400),
-        () { if (mounted) _dotControllers[2].repeat(reverse: true); });
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) _dotControllers[1].repeat(reverse: true);
+    });
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) _dotControllers[2].repeat(reverse: true);
+    });
 
     // Initialize SignalR listener for end-consultation events
     _initSignalR();
@@ -157,14 +162,18 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
 
   void _initSignalR() async {
     try {
-      final baseUrl = ref.read(consultationRepositoryProvider).httpService.baseUrl;
+      final baseUrl = ref
+          .read(consultationRepositoryProvider)
+          .httpService
+          .baseUrl;
       _chatService = ConsultationChatSignalRService(baseUrl: baseUrl);
 
-      _consultationCallEndedSub = _chatService!.consultationCallEndedStream.listen((event) {
-        if (event.consultationId == widget.consultationId) {
-          _handleConsultationEnded(event.reason);
-        }
-      });
+      _consultationCallEndedSub = _chatService!.consultationCallEndedStream
+          .listen((event) {
+            if (event.consultationId == widget.consultationId) {
+              _handleConsultationEnded(event.reason);
+            }
+          });
 
       await _chatService!.connect(widget.consultationId);
       debugPrint('🔔 Expert Waiting Room connected to SignalR');
@@ -235,8 +244,8 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
       final msg = e.toString().contains('403')
           ? 'Bạn không phải thành viên của phòng tư vấn này'
           : e.toString().contains('404')
-              ? 'Không tìm thấy buổi tư vấn'
-              : 'Không thể kết nối phòng, vui lòng thử lại';
+          ? 'Không tìm thấy buổi tư vấn'
+          : 'Không thể kết nối phòng, vui lòng thử lại';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(msg),
@@ -269,15 +278,18 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Rời phòng chờ?',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        content:
-            const Text('Bạn có chắc muốn rời khỏi phòng chờ không?'),
+        title: const Text(
+          'Rời phòng chờ?',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: const Text('Bạn có chắc muốn rời khỏi phòng chờ không?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Ở lại',
-                style: TextStyle(color: Color(0xFF999999))),
+            child: const Text(
+              'Ở lại',
+              style: TextStyle(color: Color(0xFF999999)),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
@@ -289,7 +301,8 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             child: const Text('Rời khỏi'),
           ),
@@ -379,14 +392,16 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
                             color: _purple.withOpacity(0.3),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.videocam,
-                              color: Colors.white70, size: 40),
+                          child: const Icon(
+                            Icons.videocam,
+                            color: Colors.white70,
+                            size: 40,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         const Text(
                           'Camera đang hoạt động',
-                          style: TextStyle(
-                              color: Colors.white60, fontSize: 13),
+                          style: TextStyle(color: Colors.white60, fontSize: 13),
                         ),
                       ],
                     )
@@ -400,14 +415,16 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
                             color: Colors.white.withOpacity(0.1),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.videocam_off,
-                              color: Colors.white38, size: 36),
+                          child: const Icon(
+                            Icons.videocam_off,
+                            color: Colors.white38,
+                            size: 36,
+                          ),
                         ),
                         const SizedBox(height: 10),
                         const Text(
                           'Camera đã tắt',
-                          style: TextStyle(
-                              color: Colors.white38, fontSize: 13),
+                          style: TextStyle(color: Colors.white38, fontSize: 13),
                         ),
                       ],
                     ),
@@ -422,7 +439,9 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
                 child: Center(
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black54,
                       borderRadius: BorderRadius.circular(20),
@@ -438,7 +457,9 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
                               child: Container(
                                 width: 7,
                                 height: 7,
-                                margin: const EdgeInsets.symmetric(horizontal: 3),
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 3,
+                                ),
                                 decoration: const BoxDecoration(
                                   color: Colors.white70,
                                   shape: BoxShape.circle,
@@ -458,8 +479,7 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
               top: 16,
               right: 16,
               child: GestureDetector(
-                onTap: () =>
-                    setState(() => _isFrontCamera = !_isFrontCamera),
+                onTap: () => setState(() => _isFrontCamera = !_isFrontCamera),
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -467,9 +487,7 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
-                    _isFrontCamera
-                        ? Icons.camera_front
-                        : Icons.camera_rear,
+                    _isFrontCamera ? Icons.camera_front : Icons.camera_rear,
                     color: Colors.white70,
                     size: 22,
                   ),
@@ -496,8 +514,7 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
                     icon: _isCameraOn ? Icons.videocam : Icons.videocam_off,
                     label: _isCameraOn ? 'Camera' : 'Tắt cam',
                     active: _isCameraOn,
-                    onTap: () =>
-                        setState(() => _isCameraOn = !_isCameraOn),
+                    onTap: () => setState(() => _isCameraOn = !_isCameraOn),
                   ),
                 ],
               ),
@@ -533,8 +550,7 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
           const SizedBox(height: 4),
           Text(
             label,
-            style: const TextStyle(
-                color: Colors.white70, fontSize: 11),
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
           ),
         ],
       ),
@@ -564,11 +580,9 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
             decoration: BoxDecoration(
               color: _purple.withOpacity(0.1),
               shape: BoxShape.circle,
-              border: Border.all(
-                  color: _purple.withOpacity(0.3), width: 2),
+              border: Border.all(color: _purple.withOpacity(0.3), width: 2),
             ),
-            child:
-                const Icon(Icons.person, color: _purple, size: 28),
+            child: const Icon(Icons.person, color: _purple, size: 28),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -598,7 +612,9 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 2),
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: widget.consultationType == 'Khẩn Cấp'
                             ? const Color(0xFFDC3545).withOpacity(0.1)
@@ -630,12 +646,14 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
               shape: BoxShape.circle,
             ),
             child: IconButton(
-              icon: const Icon(Icons.chat_bubble_outline,
-                  color: _purple, size: 18),
+              icon: const Icon(
+                Icons.chat_bubble_outline,
+                color: _purple,
+                size: 18,
+              ),
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Chat - Đang phát triển')),
+                  const SnackBar(content: Text('Chat - Đang phát triển')),
                 );
               },
               padding: EdgeInsets.zero,
@@ -660,7 +678,9 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                 : const Icon(Icons.video_call, size: 22),
             label: Text(
@@ -672,7 +692,8 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
           ),
         ),
@@ -686,16 +707,17 @@ class _ExpertWaitingRoomScreenState extends ConsumerState<ExpertWaitingRoomScree
             onPressed: _cancelCall,
             style: OutlinedButton.styleFrom(
               side: BorderSide(
-                  color: const Color(0xFFDC3545).withOpacity(0.6),
-                  width: 1.5),
+                color: const Color(0xFFDC3545).withOpacity(0.6),
+                width: 1.5,
+              ),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
+                borderRadius: BorderRadius.circular(14),
+              ),
               foregroundColor: const Color(0xFFDC3545),
             ),
             child: const Text(
               'Rời Phòng Chờ',
-              style:
-                  TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             ),
           ),
         ),

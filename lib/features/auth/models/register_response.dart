@@ -27,8 +27,8 @@ class RegisterResponse {
       fullName: json['fullName'] ?? '',
       phoneNumber: json['phoneNumber'],
       role: json['role'] ?? 0, // Default MEMBER = 0
-      createdAt: json['createdAt'] != null 
-          ? DateTime.parse(json['createdAt']) 
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'])
           : DateTime.now(),
       message: json['message'],
     );
@@ -48,6 +48,6 @@ class RegisterResponse {
   }
 
   @override
-  String toString() => 
+  String toString() =>
       'RegisterResponse(id: $id, email: $email, fullName: $fullName, role: $role)';
 }

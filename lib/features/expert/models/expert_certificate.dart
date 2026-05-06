@@ -50,10 +50,11 @@ class ExpertCertificate {
       expiryDate: _parseDate(json['expiryDate']),
       isVerified: json['verificationStatus'] == 'Verified',
       rejectionReason: json['rejectionReason'] as String?,
-      reportMediaFiles: ((json['media'] ?? json['reportMediaFiles']) as List<dynamic>? ?? [])
-          .whereType<Map<String, dynamic>>()
-          .map(ExpertCertificateMedia.fromJson)
-          .toList(),
+      reportMediaFiles:
+          ((json['media'] ?? json['reportMediaFiles']) as List<dynamic>? ?? [])
+              .whereType<Map<String, dynamic>>()
+              .map(ExpertCertificateMedia.fromJson)
+              .toList(),
     );
   }
 

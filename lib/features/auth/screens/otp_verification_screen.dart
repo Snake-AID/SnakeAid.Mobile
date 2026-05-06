@@ -12,7 +12,7 @@ class OtpVerificationScreen extends ConsumerStatefulWidget {
   final String email;
   final String roleRoute;
   final Color themeColor;
-  
+
   const OtpVerificationScreen({
     super.key,
     required this.email,
@@ -21,7 +21,8 @@ class OtpVerificationScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
+  ConsumerState<OtpVerificationScreen> createState() =>
+      _OtpVerificationScreenState();
 }
 
 class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
@@ -29,10 +30,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
     6,
     (index) => TextEditingController(),
   );
-  final List<FocusNode> _focusNodes = List.generate(
-    6,
-    (index) => FocusNode(),
-  );
+  final List<FocusNode> _focusNodes = List.generate(6, (index) => FocusNode());
 
   int _secondsRemaining = 59;
   Timer? _timer;
@@ -61,7 +59,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
     setState(() {
       _secondsRemaining = 59;
     });
-    
+
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_secondsRemaining > 0) {
         setState(() {
@@ -77,7 +75,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
     if (value.length == 1 && index < 5) {
       _focusNodes[index + 1].requestFocus();
     }
-    
+
     // Auto-submit when all 6 digits are entered
     if (value.length == 1 && index == 5) {
       // Check if all fields are filled
@@ -110,7 +108,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
 
   void _verifyOtp() async {
     final otpCode = _getOtpCode();
-    
+
     if (otpCode.length != 6) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -145,7 +143,9 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
           // Hiển thị thông báo thành công
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Xác thực thành công! Chào mừng ${response.authData?.user.fullName ?? "bạn"}'),
+              content: Text(
+                'Xác thực thành công! Chào mừng ${response.authData?.user.fullName ?? "bạn"}',
+              ),
               backgroundColor: widget.themeColor,
             ),
           );
@@ -211,7 +211,9 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Gửi OTP thất bại: ${e.toString().replaceAll("Exception: ", "")}'),
+            content: Text(
+              'Gửi OTP thất bại: ${e.toString().replaceAll("Exception: ", "")}',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -223,14 +225,14 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
     final email = widget.email;
     final atIndex = email.indexOf('@');
     if (atIndex <= 0) return email;
-    
+
     final username = email.substring(0, atIndex);
     final domain = email.substring(atIndex);
-    
+
     if (username.length <= 4) {
       return '${username[0]}***$domain';
     }
-    
+
     return '${username.substring(0, 4)}***$domain';
   }
 
@@ -302,10 +304,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                     // Description
                     const Text(
                       'Mã xác thực đã được gửi đến',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Color(0xFF666666),
-                      ),
+                      style: TextStyle(fontSize: 16, color: Color(0xFF666666)),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 4),
@@ -431,7 +430,9 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                               height: 24,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               ),
                             )
                           : const Text(

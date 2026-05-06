@@ -6,10 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class LocationPickerDialog extends StatefulWidget {
   final String? initialLocation;
 
-  const LocationPickerDialog({
-    super.key,
-    this.initialLocation,
-  });
+  const LocationPickerDialog({super.key, this.initialLocation});
 
   @override
   State<LocationPickerDialog> createState() => _LocationPickerDialogState();
@@ -18,7 +15,7 @@ class LocationPickerDialog extends StatefulWidget {
 class _LocationPickerDialogState extends State<LocationPickerDialog> {
   final _searchController = TextEditingController();
   final _dio = Dio();
-  
+
   List<LocationResult> _searchResults = [];
   bool _isSearching = false;
   bool _isGettingLocation = false;
@@ -54,12 +51,12 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
 
     try {
       List<LocationResult> results = [];
-      
+
       // Try providers in priority order:
       // 1. Goong.io (Vietnamese service - best for VN addresses)
       // 2. Nominatim (OpenStreetMap - free, good crowdsourced data)
       // 3. MapTiler (fallback)
-      
+
       // Try Goong.io first if API key is available
       final goongKey = dotenv.env['GOONG_API_KEY'];
       if (goongKey != null && goongKey.isNotEmpty) {
@@ -72,7 +69,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
           print('Goong.io failed: $e');
         }
       }
-      
+
       // If Goong didn't work or not configured, try Nominatim (OSM)
       if (results.isEmpty) {
         try {
@@ -84,7 +81,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
           print('Nominatim failed: $e');
         }
       }
-      
+
       // If still no results, try MapTiler as fallback
       if (results.isEmpty) {
         final maptilerKey = dotenv.env['MAPTILER_API_KEY'];
@@ -99,7 +96,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
           }
         }
       }
-      
+
       // If user typed an address with house number but no exact matches found,
       // create a custom result
       if (results.isEmpty || !_hasHouseNumber(results.first)) {
@@ -109,15 +106,15 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
           print('✓ Added custom result from user input');
         }
       }
-      
+
       setState(() {
         _searchResults = results;
         _isSearching = false;
         if (results.isEmpty) {
-          _errorMessage = 'Không tìm thấy địa chỉ. Vui lòng thử lại với địa chỉ khác.';
+          _errorMessage =
+              'Không tìm thấy địa chỉ. Vui lòng thử lại với địa chỉ khác.';
         }
       });
-      
     } catch (e) {
       setState(() {
         _errorMessage = 'Lỗi tìm kiếm địa chỉ: ${e.toString()}';
@@ -130,27 +127,24 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
   Future<List<LocationResult>> _searchGoong(String query, String apiKey) async {
     final response = await _dio.get(
       'https://rsapi.goong.io/geocode',
-      queryParameters: {
-        'address': query,
-        'api_key': apiKey,
-      },
+      queryParameters: {'address': query, 'api_key': apiKey},
     );
 
     if (response.statusCode == 200) {
       final results = response.data['results'] as List? ?? [];
-      
+
       if (results.isNotEmpty) {
         print('Goong.io response sample:');
         print('  formatted_address: ${results[0]['formatted_address']}');
         print('  compound: ${results[0]['compound']}');
       }
-      
+
       return results.take(10).map<LocationResult>((result) {
         final compound = result['compound'] as Map<String, dynamic>? ?? {};
         final geometry = result['geometry'] as Map<String, dynamic>? ?? {};
         final location = geometry['location'] as Map<String, dynamic>? ?? {};
         final addressComponents = result['address_components'] as List? ?? [];
-        
+
         // Extract house number from address components
         String? houseNumber;
         for (final component in addressComponents) {
@@ -160,7 +154,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
             break;
           }
         }
-        
+
         return LocationResult(
           houseNumber: houseNumber,
           streetName: compound['street'] as String? ?? '',
@@ -174,7 +168,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
         );
       }).toList();
     }
-    
+
     return [];
   }
 
@@ -199,21 +193,23 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
 
     if (response.statusCode == 200) {
       final results = response.data as List;
-      
+
       if (results.isNotEmpty) {
         print('Nominatim response sample:');
         print('  display_name: ${results[0]['display_name']}');
         print('  house_number: ${results[0]['address']?['house_number']}');
         print('  road: ${results[0]['address']?['road']}');
       }
-      
+
       return results.take(10).map<LocationResult>((result) {
         final address = result['address'] as Map<String, dynamic>? ?? {};
-        
+
         return LocationResult(
           houseNumber: address['house_number'] as String?,
           streetName: address['road'] as String? ?? '',
-          district: address['suburb'] as String? ?? address['municipality'] as String?,
+          district:
+              address['suburb'] as String? ??
+              address['municipality'] as String?,
           city: address['city'] as String? ?? address['province'] as String?,
           region: address['state'] as String?,
           country: address['country'] as String? ?? 'Việt Nam',
@@ -223,12 +219,15 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
         );
       }).toList();
     }
-    
+
     return [];
   }
 
   /// Search using MapTiler (fallback)
-  Future<List<LocationResult>> _searchMapTiler(String query, String apiKey) async {
+  Future<List<LocationResult>> _searchMapTiler(
+    String query,
+    String apiKey,
+  ) async {
     final response = await _dio.get(
       'https://api.maptiler.com/geocoding/$query.json',
       queryParameters: {
@@ -242,18 +241,18 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
 
     if (response.statusCode == 200) {
       final features = response.data['features'] as List;
-      
+
       if (features.isNotEmpty) {
         print('MapTiler response sample:');
         print('  place_name: ${features[0]['place_name']}');
         print('  address: ${features[0]['address']}');
       }
-      
+
       return features.map<LocationResult>((feature) {
         return _parseMapTilerResult(feature);
       }).toList();
     }
-    
+
     return [];
   }
 
@@ -267,7 +266,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
     if (numberMatch != null) {
       final houseNum = numberMatch.group(1)!;
       final streetPart = numberMatch.group(2)!;
-      
+
       return LocationResult(
         houseNumber: houseNum,
         streetName: streetPart,
@@ -280,7 +279,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
         longitude: 106.7009,
       );
     }
-    
+
     return null;
   }
 
@@ -288,21 +287,21 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
     // Extract basic info
     final text = feature['text'] as String? ?? '';
     final placeName = feature['place_name'] as String? ?? '';
-    
+
     // Extract house number if available
     final houseNumber = feature['address'] as String? ?? '';
-    
+
     // Extract context components (district, city, region, country)
     final context = feature['context'] as List? ?? [];
     String? district;
     String? city;
     String? region;
     String? country;
-    
+
     for (final item in context) {
       final id = item['id'] as String? ?? '';
       final itemText = item['text'] as String? ?? '';
-      
+
       if (id.startsWith('district')) {
         district = itemText;
       } else if (id.startsWith('place')) {
@@ -313,7 +312,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
         country = itemText;
       }
     }
-    
+
     return LocationResult(
       houseNumber: houseNumber.isEmpty ? null : houseNumber,
       streetName: text,
@@ -354,7 +353,6 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
 
       // Reverse geocoding with MapTiler
       await _reverseGeocode(position.latitude, position.longitude);
-
     } catch (e) {
       setState(() {
         _errorMessage = e.toString();
@@ -366,9 +364,9 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
   Future<void> _reverseGeocode(double lat, double lng) async {
     try {
       LocationResult? locationResult;
-      
+
       // Try providers in priority order for reverse geocoding
-      
+
       // Try Goong.io first
       final goongKey = dotenv.env['GOONG_API_KEY'];
       if (goongKey != null && goongKey.isNotEmpty) {
@@ -381,7 +379,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
           print('Goong.io reverse geocode failed: $e');
         }
       }
-      
+
       // Try Nominatim if Goong failed
       if (locationResult == null) {
         try {
@@ -393,13 +391,17 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
           print('Nominatim reverse geocode failed: $e');
         }
       }
-      
+
       // Try MapTiler as fallback
       if (locationResult == null) {
         final maptilerKey = dotenv.env['MAPTILER_API_KEY'];
         if (maptilerKey != null && maptilerKey.isNotEmpty) {
           try {
-            locationResult = await _reverseGeocodeMapTiler(lat, lng, maptilerKey);
+            locationResult = await _reverseGeocodeMapTiler(
+              lat,
+              lng,
+              maptilerKey,
+            );
             if (locationResult != null) {
               print('✓ Using MapTiler for reverse geocode');
             }
@@ -426,13 +428,14 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
     }
   }
 
-  Future<LocationResult?> _reverseGeocodeGoong(double lat, double lng, String apiKey) async {
+  Future<LocationResult?> _reverseGeocodeGoong(
+    double lat,
+    double lng,
+    String apiKey,
+  ) async {
     final response = await _dio.get(
       'https://rsapi.goong.io/geocode',
-      queryParameters: {
-        'latlng': '$lat,$lng',
-        'api_key': apiKey,
-      },
+      queryParameters: {'latlng': '$lat,$lng', 'api_key': apiKey},
     );
 
     if (response.statusCode == 200) {
@@ -443,7 +446,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
         final geometry = result['geometry'] as Map<String, dynamic>? ?? {};
         final location = geometry['location'] as Map<String, dynamic>? ?? {};
         final addressComponents = result['address_components'] as List? ?? [];
-        
+
         String? houseNumber;
         for (final component in addressComponents) {
           final types = component['types'] as List? ?? [];
@@ -452,7 +455,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
             break;
           }
         }
-        
+
         return LocationResult(
           houseNumber: houseNumber,
           streetName: compound['street'] as String? ?? '',
@@ -469,7 +472,10 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
     return null;
   }
 
-  Future<LocationResult?> _reverseGeocodeNominatim(double lat, double lng) async {
+  Future<LocationResult?> _reverseGeocodeNominatim(
+    double lat,
+    double lng,
+  ) async {
     final response = await _dio.get(
       'https://nominatim.openstreetmap.org/reverse',
       queryParameters: {
@@ -479,20 +485,17 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
         'addressdetails': '1',
         'accept-language': 'vi',
       },
-      options: Options(
-        headers: {
-          'User-Agent': 'SnakeAid Mobile App',
-        },
-      ),
+      options: Options(headers: {'User-Agent': 'SnakeAid Mobile App'}),
     );
 
     if (response.statusCode == 200) {
       final address = response.data['address'] as Map<String, dynamic>? ?? {};
-      
+
       return LocationResult(
         houseNumber: address['house_number'] as String?,
         streetName: address['road'] as String? ?? '',
-        district: address['suburb'] as String? ?? address['municipality'] as String?,
+        district:
+            address['suburb'] as String? ?? address['municipality'] as String?,
         city: address['city'] as String? ?? address['province'] as String?,
         region: address['state'] as String?,
         country: address['country'] as String? ?? 'Việt Nam',
@@ -504,13 +507,14 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
     return null;
   }
 
-  Future<LocationResult?> _reverseGeocodeMapTiler(double lat, double lng, String apiKey) async {
+  Future<LocationResult?> _reverseGeocodeMapTiler(
+    double lat,
+    double lng,
+    String apiKey,
+  ) async {
     final response = await _dio.get(
       'https://api.maptiler.com/geocoding/$lng,$lat.json',
-      queryParameters: {
-        'key': apiKey,
-        'language': 'vi',
-      },
+      queryParameters: {'key': apiKey, 'language': 'vi'},
     );
 
     if (response.statusCode == 200) {
@@ -525,9 +529,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Container(
         constraints: const BoxConstraints(maxHeight: 600),
         child: Column(
@@ -544,11 +546,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.location_on,
-                    color: Colors.white,
-                    size: 24,
-                  ),
+                  const Icon(Icons.location_on, color: Colors.white, size: 24),
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text(
@@ -562,10 +560,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
                   ),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(
-                      Icons.close,
-                      color: Colors.white,
-                    ),
+                    icon: const Icon(Icons.close, color: Colors.white),
                   ),
                 ],
               ),
@@ -610,12 +605,14 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
                     },
                   ),
                   const SizedBox(height: 12),
-                  
+
                   // Get current location button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: _isGettingLocation ? null : _getCurrentLocation,
+                      onPressed: _isGettingLocation
+                          ? null
+                          : _getCurrentLocation,
                       icon: _isGettingLocation
                           ? const SizedBox(
                               width: 16,
@@ -657,7 +654,11 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                    Icon(
+                      Icons.error_outline,
+                      color: Colors.red.shade700,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -677,77 +678,75 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
             // Results
             Expanded(
               child: _isSearching
-                  ? const Center(
-                      child: CircularProgressIndicator(),
-                    )
+                  ? const Center(child: CircularProgressIndicator())
                   : _searchResults.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(32),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.location_searching,
-                                  size: 64,
-                                  color: Colors.grey[300],
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Nhập địa chỉ cần tìm\nhoặc lấy vị trí hiện tại',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.location_searching,
+                              size: 64,
+                              color: Colors.grey[300],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Nhập địa chỉ cần tìm\nhoặc lấy vị trí hiện tại',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: _searchResults.length,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemBuilder: (context, index) {
+                        final result = _searchResults[index];
+                        return ListTile(
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDCFCE7),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.location_on,
+                              color: Color(0xFF228B22),
+                              size: 20,
                             ),
                           ),
-                        )
-                      : ListView.builder(
-                          itemCount: _searchResults.length,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemBuilder: (context, index) {
-                            final result = _searchResults[index];
-                            return ListTile(
-                              leading: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFDCFCE7),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.location_on,
-                                  color: Color(0xFF228B22),
-                                  size: 20,
-                                ),
-                              ),
-                              title: Text(
-                                result.getPrimaryAddress(),
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Text(
-                                result.getSecondaryAddress(),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              onTap: () {
-                                Navigator.of(context).pop(result);
-                              },
-                            );
+                          title: Text(
+                            result.getPrimaryAddress(),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            result.getSecondaryAddress(),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          onTap: () {
+                            Navigator.of(context).pop(result);
                           },
-                        ),
+                        );
+                      },
+                    ),
             ),
           ],
         ),
@@ -782,57 +781,57 @@ class LocationResult {
   // Get primary address line (house number + street + district)
   String getPrimaryAddress() {
     final parts = <String>[];
-    
+
     if (houseNumber != null && houseNumber!.isNotEmpty) {
       parts.add(houseNumber!);
     }
-    
+
     if (streetName.isNotEmpty) {
       parts.add(streetName);
     }
-    
+
     return parts.isNotEmpty ? parts.join(' ') : fullAddress;
   }
 
   // Get secondary address line (district, city, region)
   String getSecondaryAddress() {
     final parts = <String>[];
-    
+
     if (district != null && district!.isNotEmpty) {
       parts.add(district!);
     }
-    
+
     if (city != null && city!.isNotEmpty) {
       parts.add(city!);
     }
-    
+
     if (region != null && region!.isNotEmpty && region != city) {
       parts.add(region!);
     }
-    
+
     return parts.isNotEmpty ? parts.join(', ') : fullAddress;
   }
 
   // Get full formatted address for display
   String getFullAddress() {
     final parts = <String>[];
-    
+
     if (houseNumber != null && houseNumber!.isNotEmpty) {
       parts.add(houseNumber!);
     }
-    
+
     if (streetName.isNotEmpty) {
       parts.add(streetName);
     }
-    
+
     if (district != null && district!.isNotEmpty) {
       parts.add(district!);
     }
-    
+
     if (city != null && city!.isNotEmpty) {
       parts.add(city!);
     }
-    
+
     return parts.isNotEmpty ? parts.join(', ') : fullAddress;
   }
 

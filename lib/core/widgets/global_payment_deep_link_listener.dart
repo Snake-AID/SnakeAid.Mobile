@@ -90,7 +90,8 @@ class _GlobalPaymentDeepLinkListenerState
       if (isConfirmed) {
         result = const PayOsVerificationResult(
           status: PayOsVerificationStatus.confirmed,
-          message: 'Số dư ví đã được cập nhật sau khi PayOS xác nhận giao dịch.',
+          message:
+              'Số dư ví đã được cập nhật sau khi PayOS xác nhận giao dịch.',
         );
       } else {
         result = await verifier.verify(context: pendingTopupContext);

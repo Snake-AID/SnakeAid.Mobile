@@ -8,24 +8,26 @@ class RescuerRegistrationScreen extends ConsumerStatefulWidget {
   const RescuerRegistrationScreen({super.key});
 
   @override
-  ConsumerState<RescuerRegistrationScreen> createState() => _RescuerRegistrationScreenState();
+  ConsumerState<RescuerRegistrationScreen> createState() =>
+      _RescuerRegistrationScreenState();
 }
 
-class _RescuerRegistrationScreenState extends ConsumerState<RescuerRegistrationScreen> {
+class _RescuerRegistrationScreenState
+    extends ConsumerState<RescuerRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   final bool _isLoading = false;
   bool _submitAttempted = false;
-  
+
   String _rescuerType = 'Emergency'; // Emergency, SnakeCatching, Both
-  
+
   // Password requirements
   bool _hasMinLength = false;
   bool _hasLowercase = false;
@@ -50,11 +52,15 @@ class _RescuerRegistrationScreenState extends ConsumerState<RescuerRegistrationS
       _hasLowercase = password.contains(RegExp(r'[a-z]'));
       _hasUppercase = password.contains(RegExp(r'[A-Z]'));
       _hasDigit = password.contains(RegExp(r'[0-9]'));
-      _hasSpecialChar = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;/~`]'));
-      
+      _hasSpecialChar = password.contains(
+        RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;/~`]'),
+      );
+
       if (password.isEmpty) {
         _passwordStrength = 0.0;
-      } else if (_hasDigit && (_hasLowercase || _hasUppercase) && _hasSpecialChar) {
+      } else if (_hasDigit &&
+          (_hasLowercase || _hasUppercase) &&
+          _hasSpecialChar) {
         _passwordStrength = 1.0;
       } else if (_hasDigit && (_hasLowercase || _hasUppercase)) {
         _passwordStrength = 0.66;
@@ -182,7 +188,9 @@ class _RescuerRegistrationScreenState extends ConsumerState<RescuerRegistrationS
                     if (value == null || value.isEmpty) {
                       return 'Vui lòng nhập email';
                     }
-                    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                    final emailRegex = RegExp(
+                      r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                    );
                     if (!emailRegex.hasMatch(value)) {
                       return 'Email không hợp lệ';
                     }
@@ -265,7 +273,9 @@ class _RescuerRegistrationScreenState extends ConsumerState<RescuerRegistrationS
                         borderRadius: BorderRadius.circular(8),
                       ),
                       elevation: 0,
-                      disabledBackgroundColor: const Color(0xFFFF6B35).withOpacity(0.5),
+                      disabledBackgroundColor: const Color(
+                        0xFFFF6B35,
+                      ).withOpacity(0.5),
                     ),
                     child: _isLoading
                         ? const SizedBox(
@@ -273,7 +283,9 @@ class _RescuerRegistrationScreenState extends ConsumerState<RescuerRegistrationS
                             height: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           )
                         : const Text(
@@ -350,46 +362,28 @@ class _RescuerRegistrationScreenState extends ConsumerState<RescuerRegistrationS
           validator: validator,
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(
-              color: Color(0xFFBDBDBD),
-              fontSize: 14,
-            ),
+            hintStyle: const TextStyle(color: Color(0xFFBDBDBD), fontSize: 14),
             filled: true,
             fillColor: Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Color(0xFFDDDDDD),
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Color(0xFFDDDDDD), width: 1),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Color(0xFFDDDDDD),
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Color(0xFFDDDDDD), width: 1),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Color(0xFFFF6B35),
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Color(0xFFFF6B35), width: 1),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Colors.red,
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Colors.red, width: 1),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Colors.red,
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Colors.red, width: 1),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
@@ -430,10 +424,7 @@ class _RescuerRegistrationScreenState extends ConsumerState<RescuerRegistrationS
           validator: validator,
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(
-              color: Color(0xFFBDBDBD),
-              fontSize: 14,
-            ),
+            hintStyle: const TextStyle(color: Color(0xFFBDBDBD), fontSize: 14),
             suffixIcon: IconButton(
               icon: Icon(
                 isPasswordVisible ? Icons.visibility : Icons.visibility_off,
@@ -446,38 +437,23 @@ class _RescuerRegistrationScreenState extends ConsumerState<RescuerRegistrationS
             fillColor: Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Color(0xFFDDDDDD),
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Color(0xFFDDDDDD), width: 1),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Color(0xFFDDDDDD),
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Color(0xFFDDDDDD), width: 1),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Color(0xFFFF6B35),
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Color(0xFFFF6B35), width: 1),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Colors.red,
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Colors.red, width: 1),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Colors.red,
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Colors.red, width: 1),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
@@ -530,7 +506,10 @@ class _RescuerRegistrationScreenState extends ConsumerState<RescuerRegistrationS
           Row(
             children: [
               Expanded(
-                child: _buildPasswordRequirement('Ít nhất 8 ký tự', _hasMinLength),
+                child: _buildPasswordRequirement(
+                  'Ít nhất 8 ký tự',
+                  _hasMinLength,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -542,11 +521,17 @@ class _RescuerRegistrationScreenState extends ConsumerState<RescuerRegistrationS
           Row(
             children: [
               Expanded(
-                child: _buildPasswordRequirement('Ít nhất 1 chữ hoa (A-Z)', _hasUppercase),
+                child: _buildPasswordRequirement(
+                  'Ít nhất 1 chữ hoa (A-Z)',
+                  _hasUppercase,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _buildPasswordRequirement('Ký tự đặc biệt (!@#\$...)', _hasSpecialChar),
+                child: _buildPasswordRequirement(
+                  'Ký tự đặc biệt (!@#\$...)',
+                  _hasSpecialChar,
+                ),
               ),
             ],
           ),
@@ -556,19 +541,13 @@ class _RescuerRegistrationScreenState extends ConsumerState<RescuerRegistrationS
   }
 
   Widget _buildPasswordRequirement(String requirement, bool isMet) {
-    final color = isMet 
+    final color = isMet
         ? const Color(0xFFFF6B35)
-        : (_submitAttempted 
-            ? const Color(0xFFFF4136)
-            : Colors.grey.shade400);
-    
+        : (_submitAttempted ? const Color(0xFFFF4136) : Colors.grey.shade400);
+
     return Row(
       children: [
-        Icon(
-          isMet ? Icons.check_circle : Icons.cancel,
-          size: 16,
-          color: color,
-        ),
+        Icon(isMet ? Icons.check_circle : Icons.cancel, size: 16, color: color),
         const SizedBox(width: 8),
         Text(
           requirement,
@@ -599,10 +578,7 @@ class _RescuerRegistrationScreenState extends ConsumerState<RescuerRegistrationS
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: const Color(0xFFDDDDDD),
-              width: 1,
-            ),
+            border: Border.all(color: const Color(0xFFDDDDDD), width: 1),
           ),
           child: Column(
             children: [
@@ -624,10 +600,7 @@ class _RescuerRegistrationScreenState extends ConsumerState<RescuerRegistrationS
                 ),
                 subtitle: const Text(
                   'Hỗ trợ các trường hợp cấp cứu rắn cắn',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF666666),
-                  ),
+                  style: TextStyle(fontSize: 12, color: Color(0xFF666666)),
                 ),
                 activeColor: const Color(0xFFFF6B35),
               ),
@@ -650,10 +623,7 @@ class _RescuerRegistrationScreenState extends ConsumerState<RescuerRegistrationS
                 ),
                 subtitle: const Text(
                   'Bắt và di dời rắn an toàn',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF666666),
-                  ),
+                  style: TextStyle(fontSize: 12, color: Color(0xFF666666)),
                 ),
                 activeColor: const Color(0xFFFF6B35),
               ),
@@ -676,10 +646,7 @@ class _RescuerRegistrationScreenState extends ConsumerState<RescuerRegistrationS
                 ),
                 subtitle: const Text(
                   'Cả cứu hộ khẩn cấp và bắt rắn',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF666666),
-                  ),
+                  style: TextStyle(fontSize: 12, color: Color(0xFF666666)),
                 ),
                 activeColor: const Color(0xFFFF6B35),
               ),

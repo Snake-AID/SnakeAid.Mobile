@@ -5,6 +5,7 @@ class SnakeSpecies {
   final String? scientificName;
   final String? imageUrl;
   final bool isVenomous;
+
   /// Numeric risk level from API (1–10). Use [riskLevelLabel] for display.
   final int? riskLevel;
 
@@ -18,15 +19,16 @@ class SnakeSpecies {
   });
 
   factory SnakeSpecies.fromJson(Map<String, dynamic> json) => SnakeSpecies(
-        id: (json['id'] as num?)?.toInt() ?? 0,
-        commonName: json['commonName'] as String? ??
-            json['common_name'] as String? ??
-            'Không rõ',
-        scientificName: json['scientificName'] as String?,
-        imageUrl: json['imageUrl'] as String?,
-        isVenomous: json['isVenomous'] as bool? ?? false,
-        riskLevel: (json['riskLevel'] as num?)?.toInt(),
-      );
+    id: (json['id'] as num?)?.toInt() ?? 0,
+    commonName:
+        json['commonName'] as String? ??
+        json['common_name'] as String? ??
+        'Không rõ',
+    scientificName: json['scientificName'] as String?,
+    imageUrl: json['imageUrl'] as String?,
+    isVenomous: json['isVenomous'] as bool? ?? false,
+    riskLevel: (json['riskLevel'] as num?)?.toInt(),
+  );
 
   @override
   String toString() => commonName;
@@ -89,8 +91,9 @@ class CommunityReport {
   factory CommunityReport.fromJson(Map<String, dynamic> json) {
     SnakeSpecies? species;
     if (json['snakeSpecies'] is Map<String, dynamic>) {
-      species =
-          SnakeSpecies.fromJson(json['snakeSpecies'] as Map<String, dynamic>);
+      species = SnakeSpecies.fromJson(
+        json['snakeSpecies'] as Map<String, dynamic>,
+      );
     }
     return CommunityReport(
       id: _toStringNullable(json['id']) ?? '',
@@ -100,13 +103,15 @@ class CommunityReport {
       imageUrl: json['imageUrl'] as String?,
       snakeSpeciesId: (json['snakeSpeciesId'] as num?)?.toInt(),
       snakeSpecies: species,
-      reporterName: _toStringNullable(json['reporterName']) ??
+      reporterName:
+          _toStringNullable(json['reporterName']) ??
           _toStringNullable(json['reporterFullName']),
-      reporterId: _toStringNullable(json['reporterId']) ??
+      reporterId:
+          _toStringNullable(json['reporterId']) ??
           _toStringNullable(json['userId']),
-      riskLevel: _toStringNullable(json['riskLevel']) ?? species?.riskLevelLabel,
-      isVenomous:
-          json['isVenomous'] as bool? ?? species?.isVenomous ?? false,
+      riskLevel:
+          _toStringNullable(json['riskLevel']) ?? species?.riskLevelLabel,
+      isVenomous: json['isVenomous'] as bool? ?? species?.isVenomous ?? false,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
           : DateTime.now(),

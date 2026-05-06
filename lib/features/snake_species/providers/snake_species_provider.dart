@@ -41,18 +41,18 @@ class SnakeSpeciesListState {
 }
 
 final snakeSpeciesListProvider =
-    StateNotifierProvider<SnakeSpeciesListNotifier, SnakeSpeciesListState>(
-        (ref) {
-  final repository = ref.watch(snakeSpeciesRepositoryProvider);
-  return SnakeSpeciesListNotifier(repository);
-});
+    StateNotifierProvider<SnakeSpeciesListNotifier, SnakeSpeciesListState>((
+      ref,
+    ) {
+      final repository = ref.watch(snakeSpeciesRepositoryProvider);
+      return SnakeSpeciesListNotifier(repository);
+    });
 
-class SnakeSpeciesListNotifier
-    extends StateNotifier<SnakeSpeciesListState> {
+class SnakeSpeciesListNotifier extends StateNotifier<SnakeSpeciesListState> {
   final SnakeSpeciesRepository _repository;
 
   SnakeSpeciesListNotifier(this._repository)
-      : super(const SnakeSpeciesListState()) {
+    : super(const SnakeSpeciesListState()) {
     loadSpecies();
   }
 
@@ -81,8 +81,7 @@ class SnakeSpeciesListNotifier
         : state.species.where((s) {
             return s.commonName.toLowerCase().contains(q) ||
                 s.scientificName.toLowerCase().contains(q) ||
-                s.alternativeNames
-                    .any((n) => n.toLowerCase().contains(q));
+                s.alternativeNames.any((n) => n.toLowerCase().contains(q));
           }).toList();
     state = state.copyWith(searchQuery: query, filtered: filtered);
   }
@@ -117,18 +116,22 @@ class SnakeSpeciesDetailState {
   }
 }
 
-final snakeSpeciesDetailProvider = StateNotifierProvider.family<
-    SnakeSpeciesDetailNotifier, SnakeSpeciesDetailState, int>((ref, id) {
-  final repository = ref.watch(snakeSpeciesRepositoryProvider);
-  return SnakeSpeciesDetailNotifier(repository, id);
-});
+final snakeSpeciesDetailProvider =
+    StateNotifierProvider.family<
+      SnakeSpeciesDetailNotifier,
+      SnakeSpeciesDetailState,
+      int
+    >((ref, id) {
+      final repository = ref.watch(snakeSpeciesRepositoryProvider);
+      return SnakeSpeciesDetailNotifier(repository, id);
+    });
 
 class SnakeSpeciesDetailNotifier
     extends StateNotifier<SnakeSpeciesDetailState> {
   final SnakeSpeciesRepository _repository;
 
   SnakeSpeciesDetailNotifier(this._repository, int id)
-      : super(const SnakeSpeciesDetailState()) {
+    : super(const SnakeSpeciesDetailState()) {
     load(id);
   }
 
@@ -175,25 +178,28 @@ class SnakeFirstAidState {
   }
 }
 
-final snakeFirstAidProvider = StateNotifierProvider.family<
-    SnakeFirstAidNotifier, SnakeFirstAidState, int>((ref, snakeSpeciesId) {
-  final repository = ref.watch(snakeSpeciesRepositoryProvider);
-  return SnakeFirstAidNotifier(repository, snakeSpeciesId);
-});
+final snakeFirstAidProvider =
+    StateNotifierProvider.family<
+      SnakeFirstAidNotifier,
+      SnakeFirstAidState,
+      int
+    >((ref, snakeSpeciesId) {
+      final repository = ref.watch(snakeSpeciesRepositoryProvider);
+      return SnakeFirstAidNotifier(repository, snakeSpeciesId);
+    });
 
 class SnakeFirstAidNotifier extends StateNotifier<SnakeFirstAidState> {
   final SnakeSpeciesRepository _repository;
 
   SnakeFirstAidNotifier(this._repository, int snakeSpeciesId)
-      : super(const SnakeFirstAidState()) {
+    : super(const SnakeFirstAidState()) {
     load(snakeSpeciesId);
   }
 
   Future<void> load(int snakeSpeciesId) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final guideline =
-          await _repository.getFirstAidBySpecies(snakeSpeciesId);
+      final guideline = await _repository.getFirstAidBySpecies(snakeSpeciesId);
       state = state.copyWith(isLoading: false, guideline: guideline);
     } catch (e) {
       state = state.copyWith(

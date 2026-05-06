@@ -8,7 +8,7 @@ import '../models/catching_environment.dart';
 
 class PricingBottomSheet extends ConsumerStatefulWidget {
   final ScrollController? scrollController;
-  
+
   const PricingBottomSheet({super.key, this.scrollController});
 
   @override
@@ -104,35 +104,39 @@ class _PricingBottomSheetState extends ConsumerState<PricingBottomSheet> {
               child: _isLoading
                   ? const Center(
                       child: Padding(
-                      padding: EdgeInsets.all(32.0),
-                      child: CircularProgressIndicator(),
-                    ))
+                        padding: EdgeInsets.all(32.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
                   : _error != null
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(32.0),
-                            child: Text(
-                              'Đã xảy ra lỗi: $_error',
-                              style: const TextStyle(color: Colors.red),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        )
-                      : SingleChildScrollView(
-                          controller: widget.scrollController,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildPaymentProcessSection(),
-                              const SizedBox(height: 24),
-                              _buildBasePricingSection(),
-                              const SizedBox(height: 24),
-                              _buildEnvironmentPricingSection(),
-                              const SizedBox(height: 24),
-                            ],
-                          ),
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32.0),
+                        child: Text(
+                          'Đã xảy ra lỗi: $_error',
+                          style: const TextStyle(color: Colors.red),
+                          textAlign: TextAlign.center,
                         ),
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      controller: widget.scrollController,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 8,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildPaymentProcessSection(),
+                          const SizedBox(height: 24),
+                          _buildBasePricingSection(),
+                          const SizedBox(height: 24),
+                          _buildEnvironmentPricingSection(),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
+                    ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
@@ -163,17 +167,21 @@ class _PricingBottomSheetState extends ConsumerState<PricingBottomSheet> {
 
   Widget _buildBasePricingSection() {
     final basePrice = _settings.firstWhere(
-        (s) => s.settingKey == 'Catching:BasePrice',
-        orElse: () => const SystemSetting(settingKey: '', value: '0'));
+      (s) => s.settingKey == 'Catching:BasePrice',
+      orElse: () => const SystemSetting(settingKey: '', value: '0'),
+    );
     final venomPrice = _settings.firstWhere(
-        (s) => s.settingKey == 'Catching:VenomSnakePrice',
-        orElse: () => const SystemSetting(settingKey: '', value: '0'));
+      (s) => s.settingKey == 'Catching:VenomSnakePrice',
+      orElse: () => const SystemSetting(settingKey: '', value: '0'),
+    );
     final nonVenomPrice = _settings.firstWhere(
-        (s) => s.settingKey == 'Catching:NonVenomSnakePrice',
-        orElse: () => const SystemSetting(settingKey: '', value: '0'));
+      (s) => s.settingKey == 'Catching:NonVenomSnakePrice',
+      orElse: () => const SystemSetting(settingKey: '', value: '0'),
+    );
     final kmPrice = _settings.firstWhere(
-        (s) => s.settingKey == 'Catching:PricePerKilomenter',
-        orElse: () => const SystemSetting(settingKey: '', value: '0'));
+      (s) => s.settingKey == 'Catching:PricePerKilomenter',
+      orElse: () => const SystemSetting(settingKey: '', value: '0'),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,14 +210,27 @@ class _PricingBottomSheetState extends ConsumerState<PricingBottomSheet> {
           padding: const EdgeInsets.all(12),
           child: Column(
             children: [
-              _buildPriceRow('Phí dịch vụ cơ bản:', _formatCurrency(basePrice.value)),
+              _buildPriceRow(
+                'Phí dịch vụ cơ bản:',
+                _formatCurrency(basePrice.value),
+              ),
               const Divider(height: 16, thickness: 1),
-              _buildPriceRow('Phí di chuyển (mỗi km):', _formatCurrency(kmPrice.value)),
+              _buildPriceRow(
+                'Phí di chuyển (mỗi km):',
+                _formatCurrency(kmPrice.value),
+              ),
               const Divider(height: 16, thickness: 1),
-              _buildPriceRow('Phụ phí rắn độc:', _formatCurrency(venomPrice.value),
-                  isHighlight: true, highlightColor: Colors.red),
+              _buildPriceRow(
+                'Phụ phí rắn độc:',
+                _formatCurrency(venomPrice.value),
+                isHighlight: true,
+                highlightColor: Colors.red,
+              ),
               const Divider(height: 16, thickness: 1),
-              _buildPriceRow('Phụ phí rắn không độc:', _formatCurrency(nonVenomPrice.value)),
+              _buildPriceRow(
+                'Phụ phí rắn không độc:',
+                _formatCurrency(nonVenomPrice.value),
+              ),
             ],
           ),
         ),
@@ -242,8 +263,10 @@ class _PricingBottomSheetState extends ConsumerState<PricingBottomSheet> {
         ),
         const SizedBox(height: 12),
         if (_environments.isEmpty)
-          const Text('Không có dữ liệu phụ phí môi trường.',
-              style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic))
+          const Text(
+            'Không có dữ liệu phụ phí môi trường.',
+            style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+          )
         else
           Container(
             decoration: BoxDecoration(
@@ -255,7 +278,8 @@ class _PricingBottomSheetState extends ConsumerState<PricingBottomSheet> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _environments.length,
-              separatorBuilder: (context, index) => const Divider(height: 1, thickness: 1),
+              separatorBuilder: (context, index) =>
+                  const Divider(height: 1, thickness: 1),
               itemBuilder: (context, index) {
                 final env = _environments[index];
                 return Padding(
@@ -276,7 +300,8 @@ class _PricingBottomSheetState extends ConsumerState<PricingBottomSheet> {
                                 color: Color(0xFF333333),
                               ),
                             ),
-                            if (env.description != null && env.description!.isNotEmpty) ...[
+                            if (env.description != null &&
+                                env.description!.isNotEmpty) ...[
                               const SizedBox(height: 4),
                               Text(
                                 env.description!,
@@ -285,7 +310,7 @@ class _PricingBottomSheetState extends ConsumerState<PricingBottomSheet> {
                                   color: Color(0xFF666666),
                                 ),
                               ),
-                            ]
+                            ],
                           ],
                         ),
                       ),
@@ -340,7 +365,8 @@ class _PricingBottomSheetState extends ConsumerState<PricingBottomSheet> {
               _buildPaymentStep(
                 step: 'Đợt 1',
                 title: 'Thanh toán phí di chuyển',
-                description: 'Thanh toán trước khi đội cứu hộ xuất phát. Chi phí dựa trên số km thực tế từ trạm cứu hộ đến hiện trường.',
+                description:
+                    'Thanh toán trước khi đội cứu hộ xuất phát. Chi phí dựa trên số km thực tế từ trạm cứu hộ đến hiện trường.',
               ),
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 12),
@@ -349,7 +375,8 @@ class _PricingBottomSheetState extends ConsumerState<PricingBottomSheet> {
               _buildPaymentStep(
                 step: 'Đợt 2',
                 title: 'Thanh toán phí dịch vụ bắt rắn',
-                description: 'Thanh toán sau khi nhiệm vụ hoàn thành. Bao gồm: Giá dịch vụ cơ bản + Phụ phí rắn (Loại rắn × Số lượng) + Phụ phí môi trường.',
+                description:
+                    'Thanh toán sau khi nhiệm vụ hoàn thành. Bao gồm: Giá dịch vụ cơ bản + Phụ phí rắn (Loại rắn × Số lượng) + Phụ phí môi trường.',
               ),
             ],
           ),
@@ -358,7 +385,11 @@ class _PricingBottomSheetState extends ConsumerState<PricingBottomSheet> {
     );
   }
 
-  Widget _buildPaymentStep({required String step, required String title, required String description}) {
+  Widget _buildPaymentStep({
+    required String step,
+    required String title,
+    required String description,
+  }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -406,8 +437,12 @@ class _PricingBottomSheetState extends ConsumerState<PricingBottomSheet> {
     );
   }
 
-  Widget _buildPriceRow(String label, String value,
-      {bool isHighlight = false, Color highlightColor = Colors.green}) {
+  Widget _buildPriceRow(
+    String label,
+    String value, {
+    bool isHighlight = false,
+    Color highlightColor = Colors.green,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [

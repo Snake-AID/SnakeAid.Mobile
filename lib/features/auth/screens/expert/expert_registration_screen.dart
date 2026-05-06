@@ -671,8 +671,8 @@ class _ExpertRegistrationScreenState
         );
 
         if (mounted && result == null) {
-           // OTP verified successfully, go to login
-           context.goNamed('expert_login');
+          // OTP verified successfully, go to login
+          context.goNamed('expert_login');
         }
       }
     } catch (e) {

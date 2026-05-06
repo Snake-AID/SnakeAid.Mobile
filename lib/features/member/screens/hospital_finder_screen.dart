@@ -75,14 +75,14 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
                 children: [
                   // Header
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 8,
+                    ),
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       border: Border(
-                        bottom: BorderSide(
-                          color: Color(0xFFE0E0E0),
-                          width: 1,
-                        ),
+                        bottom: BorderSide(color: Color(0xFFE0E0E0), width: 1),
                       ),
                     ),
                     child: Row(
@@ -111,7 +111,9 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
                           icon: const Icon(Icons.filter_list),
                           onPressed: () {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Bộ lọc - Đang phát triển')),
+                              const SnackBar(
+                                content: Text('Bộ lọc - Đang phát triển'),
+                              ),
                             );
                           },
                         ),
@@ -157,7 +159,9 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
                         TextButton(
                           onPressed: () {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Đang lấy vị trí của bạn...')),
+                              const SnackBar(
+                                content: Text('Đang lấy vị trí của bạn...'),
+                              ),
                             );
                           },
                           child: const Text(
@@ -214,10 +218,7 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
                     decoration: BoxDecoration(
                       color: const Color(0xFF2196F3),
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white,
-                        width: 3,
-                      ),
+                      border: Border.all(color: Colors.white, width: 3),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.2),
@@ -229,21 +230,9 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
                   ),
                 ),
                 // Hospital markers
-                Positioned(
-                  top: 60,
-                  left: 80,
-                  child: _buildMapMarker('1'),
-                ),
-                Positioned(
-                  top: 100,
-                  right: 60,
-                  child: _buildMapMarker('2'),
-                ),
-                Positioned(
-                  bottom: 80,
-                  left: 70,
-                  child: _buildMapMarker('3'),
-                ),
+                Positioned(top: 60, left: 80, child: _buildMapMarker('1')),
+                Positioned(top: 100, right: 60, child: _buildMapMarker('2')),
+                Positioned(bottom: 80, left: 70, child: _buildMapMarker('3')),
                 // Zoom controls
                 Positioned(
                   bottom: 16,
@@ -333,10 +322,7 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
               top: false,
               child: Row(
                 children: [
-                  const Text(
-                    '💡',
-                    style: TextStyle(fontSize: 20),
-                  ),
+                  const Text('💡', style: TextStyle(fontSize: 20)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: RichText(
@@ -376,10 +362,7 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
           decoration: BoxDecoration(
             color: const Color(0xFFE53935),
             shape: BoxShape.circle,
-            border: Border.all(
-              color: Colors.white,
-              width: 2,
-            ),
+            border: Border.all(color: Colors.white, width: 2),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.3),
@@ -399,10 +382,7 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
             ),
           ),
         ),
-        CustomPaint(
-          size: const Size(12, 8),
-          painter: _MarkerTrianglePainter(),
-        ),
+        CustomPaint(size: const Size(12, 8), painter: _MarkerTrianglePainter()),
       ],
     );
   }
@@ -421,7 +401,9 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
           color: isSelected ? const Color(0xFF228B22) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? const Color(0xFF228B22) : const Color(0xFFE0E0E0),
+            color: isSelected
+                ? const Color(0xFF228B22)
+                : const Color(0xFFE0E0E0),
           ),
         ),
         child: Text(
@@ -488,10 +470,7 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
           const SizedBox(height: 4),
           Text(
             hospital['duration'],
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF888888),
-            ),
+            style: const TextStyle(fontSize: 13, color: Color(0xFF888888)),
           ),
           const SizedBox(height: 12),
 
@@ -506,7 +485,9 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
                     Icon(
                       feature['icon'],
                       size: 18,
-                      color: isWarning ? const Color(0xFFFFA726) : const Color(0xFF228B22),
+                      color: isWarning
+                          ? const Color(0xFFFFA726)
+                          : const Color(0xFF228B22),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -528,11 +509,7 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
           // Rating
           Row(
             children: [
-              const Icon(
-                Icons.star,
-                size: 18,
-                color: Color(0xFFFFB300),
-              ),
+              const Icon(Icons.star, size: 18, color: Color(0xFFFFB300)),
               const SizedBox(width: 4),
               Text(
                 hospital['rating'].toString(),
@@ -544,10 +521,7 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
               const SizedBox(width: 4),
               Text(
                 '(${hospital['reviews']} đánh giá)',
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF888888),
-                ),
+                style: const TextStyle(fontSize: 13, color: Color(0xFF888888)),
               ),
             ],
           ),
@@ -577,10 +551,7 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
                   icon: const Icon(Icons.directions, size: 20),
                   label: const Text(
                     'Chỉ đường',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -589,17 +560,12 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
                 child: OutlinedButton(
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Đang gọi bệnh viện...'),
-                      ),
+                      const SnackBar(content: Text('Đang gọi bệnh viện...')),
                     );
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF228B22),
-                    side: const BorderSide(
-                      color: Color(0xFF228B22),
-                      width: 2,
-                    ),
+                    side: const BorderSide(color: Color(0xFF228B22), width: 2),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -607,10 +573,7 @@ class _HospitalFinderScreenState extends State<HospitalFinderScreen> {
                   ),
                   child: const Text(
                     'Gọi ngay',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),

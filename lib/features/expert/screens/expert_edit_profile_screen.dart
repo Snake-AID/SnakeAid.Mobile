@@ -12,10 +12,12 @@ class ExpertEditProfileScreen extends ConsumerStatefulWidget {
   const ExpertEditProfileScreen({super.key});
 
   @override
-  ConsumerState<ExpertEditProfileScreen> createState() => _ExpertEditProfileScreenState();
+  ConsumerState<ExpertEditProfileScreen> createState() =>
+      _ExpertEditProfileScreenState();
 }
 
-class _ExpertEditProfileScreenState extends ConsumerState<ExpertEditProfileScreen> {
+class _ExpertEditProfileScreenState
+    extends ConsumerState<ExpertEditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
 
   // Profile state
@@ -46,7 +48,9 @@ class _ExpertEditProfileScreenState extends ConsumerState<ExpertEditProfileScree
 
   Future<void> _loadProfile() async {
     try {
-      final profile = await ref.read(expertProfileRepositoryProvider).getMyProfile();
+      final profile = await ref
+          .read(expertProfileRepositoryProvider)
+          .getMyProfile();
       if (mounted) {
         setState(() {
           _loadedProfile = profile;
@@ -165,19 +169,29 @@ class _ExpertEditProfileScreenState extends ConsumerState<ExpertEditProfileScree
                   child: ClipOval(
                     child: _pickedImageFile != null
                         ? Image.file(_pickedImageFile!, fit: BoxFit.cover)
-                        : (_newAvatarUrl ?? _loadedProfile?.avatarUrl)?.isNotEmpty == true
-                            ? Image.network(
-                                _newAvatarUrl ?? _loadedProfile!.avatarUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
-                                  color: const Color(0xFF6C47C2).withOpacity(0.1),
-                                  child: const Icon(Icons.person, size: 50, color: Color(0xFF6C47C2)),
-                                ),
-                              )
-                            : Container(
-                                color: const Color(0xFF6C47C2).withOpacity(0.1),
-                                child: const Icon(Icons.person, size: 50, color: Color(0xFF6C47C2)),
+                        : (_newAvatarUrl ?? _loadedProfile?.avatarUrl)
+                                  ?.isNotEmpty ==
+                              true
+                        ? Image.network(
+                            _newAvatarUrl ?? _loadedProfile!.avatarUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: const Color(0xFF6C47C2).withOpacity(0.1),
+                              child: const Icon(
+                                Icons.person,
+                                size: 50,
+                                color: Color(0xFF6C47C2),
                               ),
+                            ),
+                          )
+                        : Container(
+                            color: const Color(0xFF6C47C2).withOpacity(0.1),
+                            child: const Icon(
+                              Icons.person,
+                              size: 50,
+                              color: Color(0xFF6C47C2),
+                            ),
+                          ),
                   ),
                 ),
                 if (_isUploadingAvatar)
@@ -189,7 +203,10 @@ class _ExpertEditProfileScreenState extends ConsumerState<ExpertEditProfileScree
                           child: SizedBox(
                             width: 28,
                             height: 28,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
                           ),
                         ),
                       ),
@@ -216,13 +233,16 @@ class _ExpertEditProfileScreenState extends ConsumerState<ExpertEditProfileScree
             ),
           ),
           const SizedBox(height: 12),
-            TextButton(
+          TextButton(
             onPressed: _isUploadingAvatar ? null : _pickAndUploadAvatar,
             child: _isUploadingAvatar
                 ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF6C47C2)),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFF6C47C2),
+                    ),
                   )
                 : const Text(
                     'Thay Đổi Ảnh Đại Diện',
@@ -551,21 +571,26 @@ class _ExpertEditProfileScreenState extends ConsumerState<ExpertEditProfileScree
 
   Future<void> _pickAndUploadAvatar() async {
     final picker = ImagePicker();
-    final xFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    final xFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
     if (xFile == null || !mounted) return;
     setState(() {
       _pickedImageFile = File(xFile.path);
       _isUploadingAvatar = true;
     });
     try {
-      final url = await ref.read(expertProfileRepositoryProvider).uploadAvatar(_pickedImageFile!);
+      final url = await ref
+          .read(expertProfileRepositoryProvider)
+          .uploadAvatar(_pickedImageFile!);
       if (mounted) setState(() => _newAvatarUrl = url);
     } catch (e) {
       if (mounted) {
         setState(() => _pickedImageFile = null);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Tải ảnh thất bại: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Tải ảnh thất bại: $e')));
       }
     } finally {
       if (mounted) setState(() => _isUploadingAvatar = false);
@@ -576,22 +601,28 @@ class _ExpertEditProfileScreenState extends ConsumerState<ExpertEditProfileScree
     if (_formKey.currentState!.validate()) {
       setState(() => _isSaving = true);
       try {
-        final scheduled = double.tryParse(
-            _scheduledFeeController.text.replaceAll(',', '').trim()) ?? 0;
+        final scheduled =
+            double.tryParse(
+              _scheduledFeeController.text.replaceAll(',', '').trim(),
+            ) ??
+            0;
         final emergency = _emergencyFeeController.text.trim().isEmpty
             ? null
             : double.tryParse(
-                _emergencyFeeController.text.replaceAll(',', '').trim());
-        await ref.read(expertProfileRepositoryProvider).updateMyProfile(
-          fullName: _fullNameController.text.trim(),
-          phoneNumber: _phoneController.text.trim().isEmpty
-              ? null
-              : _phoneController.text.trim(),
-          avatarUrl: _newAvatarUrl ?? _loadedProfile?.avatarUrl,
-          biography: _bioController.text.trim(),
-          scheduledConsultationFee: scheduled,
-          emergencyConsultationFee: emergency,
-        );
+                _emergencyFeeController.text.replaceAll(',', '').trim(),
+              );
+        await ref
+            .read(expertProfileRepositoryProvider)
+            .updateMyProfile(
+              fullName: _fullNameController.text.trim(),
+              phoneNumber: _phoneController.text.trim().isEmpty
+                  ? null
+                  : _phoneController.text.trim(),
+              avatarUrl: _newAvatarUrl ?? _loadedProfile?.avatarUrl,
+              biography: _bioController.text.trim(),
+              scheduledConsultationFee: scheduled,
+              emergencyConsultationFee: emergency,
+            );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Đã lưu thay đổi thành công!')),
@@ -600,9 +631,9 @@ class _ExpertEditProfileScreenState extends ConsumerState<ExpertEditProfileScree
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Lưu thất bại: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Lưu thất bại: $e')));
         }
       } finally {
         if (mounted) setState(() => _isSaving = false);

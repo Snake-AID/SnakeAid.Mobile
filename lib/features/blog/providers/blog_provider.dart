@@ -37,9 +37,7 @@ class BlogListState {
   List<BlogModel> get filtered {
     if (searchQuery.isEmpty) return blogs;
     final q = searchQuery.toLowerCase();
-    return blogs
-        .where((b) => b.title.toLowerCase().contains(q))
-        .toList();
+    return blogs.where((b) => b.title.toLowerCase().contains(q)).toList();
   }
 }
 
@@ -47,11 +45,12 @@ class BlogListState {
 // Member – Published Blogs
 // ---------------------------------------------------------------------------
 
-final blogListProvider =
-    StateNotifierProvider<BlogListNotifier, BlogListState>((ref) {
-  final repo = ref.watch(blogRepositoryProvider);
-  return BlogListNotifier(repo);
-});
+final blogListProvider = StateNotifierProvider<BlogListNotifier, BlogListState>(
+  (ref) {
+    final repo = ref.watch(blogRepositoryProvider);
+    return BlogListNotifier(repo);
+  },
+);
 
 class BlogListNotifier extends StateNotifier<BlogListState> {
   final BlogRepository _repo;
@@ -121,9 +120,9 @@ class BlogListNotifier extends StateNotifier<BlogListState> {
 
 final expertBlogListProvider =
     StateNotifierProvider<ExpertBlogListNotifier, BlogListState>((ref) {
-  final repo = ref.watch(blogRepositoryProvider);
-  return ExpertBlogListNotifier(repo);
-});
+      final repo = ref.watch(blogRepositoryProvider);
+      return ExpertBlogListNotifier(repo);
+    });
 
 class ExpertBlogListNotifier extends StateNotifier<BlogListState> {
   final BlogRepository _repo;
@@ -151,9 +150,7 @@ class ExpertBlogListNotifier extends StateNotifier<BlogListState> {
   }
 
   /// Promote Draft → PendingApproval via PUT
-  Future<void> submitForApproval({
-    required BlogModel blog,
-  }) async {
+  Future<void> submitForApproval({required BlogModel blog}) async {
     await _repo.updateBlog(
       id: blog.id,
       title: blog.title,
@@ -177,11 +174,7 @@ class BlogDetailState {
   final bool isLoading;
   final String? error;
 
-  const BlogDetailState({
-    this.blog,
-    this.isLoading = false,
-    this.error,
-  });
+  const BlogDetailState({this.blog, this.isLoading = false, this.error});
 
   BlogDetailState copyWith({
     BlogModel? blog,
@@ -197,18 +190,22 @@ class BlogDetailState {
   }
 }
 
-final blogDetailProvider = StateNotifierProvider.family<BlogDetailNotifier,
-    BlogDetailState, String>((ref, id) {
-  final repo = ref.watch(blogRepositoryProvider);
-  return BlogDetailNotifier(repo, id, ref);
-});
+final blogDetailProvider =
+    StateNotifierProvider.family<BlogDetailNotifier, BlogDetailState, String>((
+      ref,
+      id,
+    ) {
+      final repo = ref.watch(blogRepositoryProvider);
+      return BlogDetailNotifier(repo, id, ref);
+    });
 
 class BlogDetailNotifier extends StateNotifier<BlogDetailState> {
   final BlogRepository _repo;
   final String _id;
   final Ref _ref;
 
-  BlogDetailNotifier(this._repo, this._id, this._ref) : super(const BlogDetailState()) {
+  BlogDetailNotifier(this._repo, this._id, this._ref)
+    : super(const BlogDetailState()) {
     _load();
   }
 
@@ -238,11 +235,13 @@ class BlogDetailNotifier extends StateNotifier<BlogDetailState> {
     try {
       await _repo.toggleLike(_id, isCurrentlyLiked: wasLiked);
       // Sync like state back to the list so it reflects correctly when navigating back
-      _ref.read(blogListProvider.notifier).syncLike(
-        id: _id,
-        isLiked: !wasLiked,
-        likeCount: wasLiked ? blog.likeCount - 1 : blog.likeCount + 1,
-      );
+      _ref
+          .read(blogListProvider.notifier)
+          .syncLike(
+            id: _id,
+            isLiked: !wasLiked,
+            likeCount: wasLiked ? blog.likeCount - 1 : blog.likeCount + 1,
+          );
     } catch (_) {
       // rollback
       state = state.copyWith(blog: blog);
@@ -255,7 +254,7 @@ class BlogDetailNotifier extends StateNotifier<BlogDetailState> {
 // ---------------------------------------------------------------------------
 
 class BlogFormState {
-  final bool isSaving;    // saving as Draft
+  final bool isSaving; // saving as Draft
   final bool isSubmitting; // submitting for approval
   final String? error;
   final bool success;
@@ -285,9 +284,9 @@ class BlogFormState {
 
 final blogFormProvider =
     StateNotifierProvider.autoDispose<BlogFormNotifier, BlogFormState>((ref) {
-  final repo = ref.watch(blogRepositoryProvider);
-  return BlogFormNotifier(repo);
-});
+      final repo = ref.watch(blogRepositoryProvider);
+      return BlogFormNotifier(repo);
+    });
 
 class BlogFormNotifier extends StateNotifier<BlogFormState> {
   final BlogRepository _repo;
@@ -344,7 +343,11 @@ class BlogFormNotifier extends StateNotifier<BlogFormState> {
     required List<BlogTag> tags,
     required int readingTime,
   }) async {
-    state = state.copyWith(isSubmitting: true, clearError: true, success: false);
+    state = state.copyWith(
+      isSubmitting: true,
+      clearError: true,
+      success: false,
+    );
     try {
       if (existingId != null) {
         await _repo.updateBlog(
@@ -376,7 +379,11 @@ class BlogFormNotifier extends StateNotifier<BlogFormState> {
 
   /// PATCH status only — Draft → PendingApproval (no content update)
   Future<void> promoteToApproval(String id) async {
-    state = state.copyWith(isSubmitting: true, clearError: true, success: false);
+    state = state.copyWith(
+      isSubmitting: true,
+      clearError: true,
+      success: false,
+    );
     try {
       await _repo.updateStatus(id, BlogStatus.pendingApproval);
       state = state.copyWith(isSubmitting: false, success: true);

@@ -143,10 +143,7 @@ class _ServiceCompletionScreenState extends State<ServiceCompletionScreen>
                     const SizedBox(height: 12),
                     const Text(
                       'Cảm ơn bạn đã sử dụng dịch vụ SnakeAid',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 15,
-                      ),
+                      style: TextStyle(color: Colors.white70, fontSize: 15),
                     ),
                   ],
                 ),
@@ -237,10 +234,7 @@ class _ServiceCompletionScreenState extends State<ServiceCompletionScreen>
                     const SizedBox(height: 8),
                     Text(
                       'Bạn có hài lòng với dịch vụ không?',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                     ),
                     const SizedBox(height: 20),
 
@@ -411,11 +405,7 @@ class _ServiceCompletionScreenState extends State<ServiceCompletionScreen>
                 color: const Color(0xFF228B22).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(
-                icon,
-                color: const Color(0xFF228B22),
-                size: 22,
-              ),
+              child: Icon(icon, color: const Color(0xFF228B22), size: 22),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -424,10 +414,7 @@ class _ServiceCompletionScreenState extends State<ServiceCompletionScreen>
                 children: [
                   Text(
                     label,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 4),
                   Text(

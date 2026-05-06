@@ -31,12 +31,19 @@ class _TransactionDetailScreenState
   }
 
   Future<void> _load() async {
-    setState(() { _isLoading = true; _error = null; });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
     try {
       final tx = await ref
           .read(transactionRepositoryProvider)
           .getTransactionById(widget.transactionId);
-      if (mounted) setState(() { _tx = tx; _isLoading = false; });
+      if (mounted)
+        setState(() {
+          _tx = tx;
+          _isLoading = false;
+        });
     } catch (e) {
       if (mounted)
         setState(() {
@@ -49,8 +56,9 @@ class _TransactionDetailScreenState
   // ── Helpers ──────────────────────────────────────────────────────────────
 
   String _formatAmount(double amount) {
-    final f = amount.toStringAsFixed(0).replaceAllMapped(
-        RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+    final f = amount
+        .toStringAsFixed(0)
+        .replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
     return '$f đ';
   }
 
@@ -111,12 +119,17 @@ class _TransactionDetailScreenState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline,
-                  size: 48, color: Color(0xFFDC3545)),
+              const Icon(
+                Icons.error_outline,
+                size: 48,
+                color: Color(0xFFDC3545),
+              ),
               const SizedBox(height: 16),
-              Text(_error!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Color(0xFF666666))),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Color(0xFF666666)),
+              ),
               const SizedBox(height: 20),
               ElevatedButton.icon(
                 onPressed: _load,
@@ -126,7 +139,8 @@ class _TransactionDetailScreenState
                   backgroundColor: widget.themeColor,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ],
@@ -137,8 +151,9 @@ class _TransactionDetailScreenState
 
     final tx = _tx!;
     final credit = isCredit(tx.transactionType);
-    final amountColor =
-        credit ? const Color(0xFF228B22) : const Color(0xFFDC3545);
+    final amountColor = credit
+        ? const Color(0xFF228B22)
+        : const Color(0xFFDC3545);
     final amountPrefix = credit ? '+' : '-';
     final typeLabel = transTypeLabel(tx.transactionType);
 
@@ -206,8 +221,16 @@ class _TransactionDetailScreenState
             title: 'THÔNG TIN GIAO DỊCH',
             children: [
               _DetailRow(label: 'Loại giao dịch', value: typeLabel),
-              _DetailRow(label: 'Phương thức', value: tx.paymentMethod.isEmpty ? '—' : (tx.paymentMethod == 'PayOS' ? 'PayOS' : 'SnakeAidPay')),
-              _DetailRow(label: 'Mô tả', value: tx.description.isEmpty ? '—' : tx.description),
+              _DetailRow(
+                label: 'Phương thức',
+                value: tx.paymentMethod.isEmpty
+                    ? '—'
+                    : (tx.paymentMethod == 'PayOS' ? 'PayOS' : 'SnakeAidPay'),
+              ),
+              _DetailRow(
+                label: 'Mô tả',
+                value: tx.description.isEmpty ? '—' : tx.description,
+              ),
               _DetailRow(label: 'Tiền tệ', value: tx.currency),
               _DetailRow(label: 'Thời gian', value: _formatDate(tx.createdAt)),
             ],
@@ -223,8 +246,9 @@ class _TransactionDetailScreenState
                 _CopyRow(label: 'Mã tham chiếu', value: tx.referenceId),
               if (tx.externalTransactionId.isNotEmpty)
                 _CopyRow(
-                    label: 'Mã ngoài hệ thống',
-                    value: tx.externalTransactionId),
+                  label: 'Mã ngoài hệ thống',
+                  value: tx.externalTransactionId,
+                ),
             ],
           ),
           const SizedBox(height: 12),
@@ -272,13 +296,15 @@ class _SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF999999),
-                letterSpacing: 0.6,
-              )),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF999999),
+              letterSpacing: 0.6,
+            ),
+          ),
           const SizedBox(height: 10),
           ...children,
         ],
@@ -303,16 +329,20 @@ class _DetailRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 130,
-            child: Text(label,
-                style: const TextStyle(
-                    fontSize: 13, color: Color(0xFF888888))),
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 13, color: Color(0xFF888888)),
+            ),
           ),
           Expanded(
-            child: Text(value,
-                style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF222222))),
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF222222),
+              ),
+            ),
           ),
         ],
       ),
@@ -336,9 +366,10 @@ class _CopyRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 130,
-            child: Text(label,
-                style: const TextStyle(
-                    fontSize: 13, color: Color(0xFF888888))),
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 13, color: Color(0xFF888888)),
+            ),
           ),
           Expanded(
             child: Text(
@@ -362,8 +393,11 @@ class _CopyRow extends StatelessWidget {
                 ),
               );
             },
-            child: const Icon(Icons.copy_rounded,
-                size: 16, color: Color(0xFFAAAAAA)),
+            child: const Icon(
+              Icons.copy_rounded,
+              size: 16,
+              color: Color(0xFFAAAAAA),
+            ),
           ),
         ],
       ),

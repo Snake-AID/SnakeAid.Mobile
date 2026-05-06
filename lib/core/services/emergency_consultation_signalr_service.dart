@@ -29,7 +29,8 @@ class EmergencyConsultationRequestEvent {
   });
 
   factory EmergencyConsultationRequestEvent.fromJson(
-      Map<String, dynamic> json) {
+    Map<String, dynamic> json,
+  ) {
     int? parseAmount(dynamic value) {
       if (value is num) return value.toInt();
       if (value == null) return null;
@@ -54,7 +55,8 @@ class EmergencyConsultationRequestEvent {
         ? Map<String, dynamic>.from(json['consultationPayment'] as Map)
         : <String, dynamic>{};
 
-    final feeCost = parseAmount(json['feeCost']) ??
+    final feeCost =
+        parseAmount(json['feeCost']) ??
         parseAmount(json['amount']) ??
         parseAmount(json['consultationFee']) ??
         parseAmount(json['emergencyConsultationFee']) ??
@@ -117,7 +119,8 @@ class EmergencyRequestStatusChanged {
 
     String? readString(List<String> keys) {
       for (final key in keys) {
-        final value = json[key] ??
+        final value =
+            json[key] ??
             nestedData[key] ??
             nestedPayload[key] ??
             nestedEvent[key];
@@ -158,16 +161,19 @@ class EmergencyRequestStatusChanged {
 
     final rawStatus =
         readString(['status', 'Status', 'requestStatus', 'RequestStatus']) ??
-            '';
+        '';
 
     return EmergencyRequestStatusChanged(
       requestId: readString(['requestId', 'RequestId', 'requestID']) ?? '',
       status: normalizeStatus(rawStatus),
-      consultationId:
-          readString(['consultationId', 'ConsultationId', 'consultId']),
+      consultationId: readString([
+        'consultationId',
+        'ConsultationId',
+        'consultId',
+      ]),
       roomId: readString(['roomId', 'RoomId']),
-      updatedAtUtc: readString(['updatedAtUtc', 'updatedAt', 'UpdatedAtUtc']) !=
-              null
+      updatedAtUtc:
+          readString(['updatedAtUtc', 'updatedAt', 'UpdatedAtUtc']) != null
           ? DateTime.tryParse(
               readString(['updatedAtUtc', 'updatedAt', 'UpdatedAtUtc'])!,
             )
@@ -206,16 +212,21 @@ class ExpertPresenceChangedEvent {
     }
 
     return ExpertPresenceChangedEvent(
-      expertId: (json['expertId'] ??
-              json['ExpertId'] ??
-              json['userId'] ??
-              json['UserId'] ??
-              '')
-          .toString(),
+      expertId:
+          (json['expertId'] ??
+                  json['ExpertId'] ??
+                  json['userId'] ??
+                  json['UserId'] ??
+                  '')
+              .toString(),
       isOnline: parseBool(
-        json['isOnline'] ?? json['IsOnline'] ?? json['online'] ?? json['Online'],
+        json['isOnline'] ??
+            json['IsOnline'] ??
+            json['online'] ??
+            json['Online'],
       ),
-      changedAtUtc: (json['changedAtUtc'] ??
+      changedAtUtc:
+          (json['changedAtUtc'] ??
                   json['ChangedAtUtc'] ??
                   json['changedAt'] ??
                   json['ChangedAt']) !=
@@ -244,19 +255,19 @@ class EmergencyConsultationSignalRService {
   Stream<EmergencyRequestStatusChanged> get statusChangedStream =>
       _statusChangedController.stream;
 
-    final _requestController =
+  final _requestController =
       StreamController<EmergencyConsultationRequestEvent>.broadcast();
-    Stream<EmergencyConsultationRequestEvent> get requestStream =>
+  Stream<EmergencyConsultationRequestEvent> get requestStream =>
       _requestController.stream;
 
-    final _onlineExpertsSnapshotController =
+  final _onlineExpertsSnapshotController =
       StreamController<Set<String>>.broadcast();
-    Stream<Set<String>> get onlineExpertsSnapshotStream =>
+  Stream<Set<String>> get onlineExpertsSnapshotStream =>
       _onlineExpertsSnapshotController.stream;
 
-    final _expertPresenceChangedController =
+  final _expertPresenceChangedController =
       StreamController<ExpertPresenceChangedEvent>.broadcast();
-    Stream<ExpertPresenceChangedEvent> get expertPresenceChangedStream =>
+  Stream<ExpertPresenceChangedEvent> get expertPresenceChangedStream =>
       _expertPresenceChangedController.stream;
 
   bool get isConnected => _hubConnection?.state == HubConnectionState.Connected;
@@ -315,7 +326,8 @@ class EmergencyConsultationSignalRService {
       }
 
       // Shape C: map itself is id->bool map.
-      if (rawMap.isNotEmpty && rawMap.values.any((v) => v is bool || v is num)) {
+      if (rawMap.isNotEmpty &&
+          rawMap.values.any((v) => v is bool || v is num)) {
         return rawMap.entries
             .where((e) {
               final v = e.value;
@@ -333,7 +345,9 @@ class EmergencyConsultationSignalRService {
     return normalizeIds(arguments);
   }
 
-  Map<String, dynamic>? _tryParsePresenceChangedPayload(List<Object?>? arguments) {
+  Map<String, dynamic>? _tryParsePresenceChangedPayload(
+    List<Object?>? arguments,
+  ) {
     if (arguments == null || arguments.isEmpty) return null;
 
     final firstAsMap = _tryParseMap(arguments[0]);
@@ -344,14 +358,17 @@ class EmergencyConsultationSignalRService {
       return {
         'expertId': (arguments[0] ?? '').toString(),
         'isOnline': arguments[1],
-        if (arguments.length > 2) 'changedAtUtc': (arguments[2] ?? '').toString(),
+        if (arguments.length > 2)
+          'changedAtUtc': (arguments[2] ?? '').toString(),
       };
     }
 
     return null;
   }
 
-  Map<String, dynamic>? _tryParseStatusChangedPayload(List<Object?>? arguments) {
+  Map<String, dynamic>? _tryParseStatusChangedPayload(
+    List<Object?>? arguments,
+  ) {
     if (arguments == null || arguments.isEmpty) return null;
 
     // Preferred shape: single object payload.
@@ -395,9 +412,7 @@ class EmergencyConsultationSignalRService {
             transport: HttpTransportType.WebSockets,
           ),
         )
-        .withAutomaticReconnect(
-          retryDelays: [0, 2000, 5000, 10000, 30000],
-        )
+        .withAutomaticReconnect(retryDelays: [0, 2000, 5000, 10000, 30000])
         .build();
 
     conn.on('EmergencyRequestStatusChanged', (arguments) {
@@ -405,7 +420,9 @@ class EmergencyConsultationSignalRService {
         debugPrint('🔔 EmergencyRequestStatusChanged raw args: $arguments');
         final data = _tryParseStatusChangedPayload(arguments);
         if (data == null) {
-          debugPrint('⚠️ Unable to parse EmergencyRequestStatusChanged payload');
+          debugPrint(
+            '⚠️ Unable to parse EmergencyRequestStatusChanged payload',
+          );
           return;
         }
         debugPrint('📦 EmergencyRequestStatusChanged payload: $data');
@@ -434,7 +451,9 @@ class EmergencyConsultationSignalRService {
       try {
         final ids = _extractOnlineExpertIds(arguments);
         if (ids.isEmpty) {
-          debugPrint('⚠️ OnlineExpertsSnapshot parsed empty ids from: $arguments');
+          debugPrint(
+            '⚠️ OnlineExpertsSnapshot parsed empty ids from: $arguments',
+          );
         }
         _onlineExpertsSnapshotController.add(ids);
       } catch (e) {

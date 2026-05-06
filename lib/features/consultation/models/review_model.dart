@@ -30,27 +30,34 @@ class ReviewModel {
               as String,
       // Backend variants: patientId/userId/raterId.
       patientId:
-        (json['patientId'] ?? json['userId'] ?? json['raterId'] ?? '') as String,
+          (json['patientId'] ?? json['userId'] ?? json['raterId'] ?? '')
+              as String,
       // Backend variants: patientName/userName/fullName/raterName.
-      patientName: (json['patientName'] ??
-              json['userName'] ??
-              json['fullName'] ??
-          json['raterName'] ??
-              'Người dùng') as String,
+      patientName:
+          (json['patientName'] ??
+                  json['userName'] ??
+                  json['fullName'] ??
+                  json['raterName'] ??
+                  'Người dùng')
+              as String,
       // Backend variants: patientAvatarUrl/userAvatarUrl/avatarUrl/raterAvatarUrl.
-      patientAvatarUrl: (json['patientAvatarUrl'] ??
-          json['userAvatarUrl'] ??
-        json['avatarUrl'] ??
-        json['raterAvatarUrl']) as String?,
+      patientAvatarUrl:
+          (json['patientAvatarUrl'] ??
+                  json['userAvatarUrl'] ??
+                  json['avatarUrl'] ??
+                  json['raterAvatarUrl'])
+              as String?,
       rating: ((json['rating'] ?? json['stars'] ?? 0) as num).toDouble(),
       // Backend variants: comment/comments/feedback/content.
-      comment: (json['comment'] ??
-          json['comments'] ??
-              json['feedback'] ??
-              json['content'] ??
-              '') as String,
+      comment:
+          (json['comment'] ??
+                  json['comments'] ??
+                  json['feedback'] ??
+                  json['content'] ??
+                  '')
+              as String,
       createdAt: (json['createdAt'] ?? json['reviewedAt']) != null
-        ? DateTime.parse((json['createdAt'] ?? json['reviewedAt']) as String)
+          ? DateTime.parse((json['createdAt'] ?? json['reviewedAt']) as String)
           : DateTime.now(),
     );
   }

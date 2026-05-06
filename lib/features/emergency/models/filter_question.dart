@@ -21,8 +21,8 @@ class FilterQuestionResponse {
       isSuccess: json['is_success'] ?? false,
       data: json['data'] != null
           ? (json['data'] as List<dynamic>)
-              .map((q) => FilterQuestion.fromJson(q))
-              .toList()
+                .map((q) => FilterQuestion.fromJson(q))
+                .toList()
           : null,
       error: json['error'],
     );
@@ -45,7 +45,8 @@ class FilterQuestion {
     return FilterQuestion(
       id: json['id'] ?? 0,
       question: json['question'] ?? '',
-      options: (json['options'] as List<dynamic>?)
+      options:
+          (json['options'] as List<dynamic>?)
               ?.map((o) => FilterOption.fromJson(o))
               .toList() ??
           [],

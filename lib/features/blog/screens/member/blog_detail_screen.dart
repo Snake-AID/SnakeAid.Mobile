@@ -24,10 +24,7 @@ class BlogDetailScreen extends ConsumerWidget {
 
     if (state.error != null || state.blog == null) {
       return Scaffold(
-        appBar: AppBar(
-          backgroundColor: _green,
-          foregroundColor: Colors.white,
-        ),
+        appBar: AppBar(backgroundColor: _green, foregroundColor: Colors.white),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -67,20 +64,27 @@ class BlogDetailScreen extends ConsumerWidget {
                               color: const Color(0xFF1A6B1A),
                               child: const Center(
                                 child: CircularProgressIndicator(
-                                    color: Colors.white54),
+                                  color: Colors.white54,
+                                ),
                               ),
                             );
                           },
                           errorBuilder: (_, __, ___) => Container(
                             color: const Color(0xFF1A6B1A),
-                            child: const Icon(Icons.image,
-                                size: 64, color: Colors.white54),
+                            child: const Icon(
+                              Icons.image,
+                              size: 64,
+                              color: Colors.white54,
+                            ),
                           ),
                         )
                       : Container(
                           color: const Color(0xFF1A6B1A),
-                          child: const Icon(Icons.image,
-                              size: 64, color: Colors.white54),
+                          child: const Icon(
+                            Icons.image,
+                            size: 64,
+                            color: Colors.white54,
+                          ),
                         ),
                   // Gradient overlay for readability
                   DecoratedBox(
@@ -128,10 +132,10 @@ class BlogDetailScreen extends ConsumerWidget {
                         label: blogCategoryLabel(blog.category),
                         color: _green,
                       ),
-                      ...blog.tags.map((t) => _Chip(
-                            label: blogTagLabel(t),
-                            color: Colors.teal,
-                          )),
+                      ...blog.tags.map(
+                        (t) =>
+                            _Chip(label: blogTagLabel(t), color: Colors.teal),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -170,18 +174,21 @@ class BlogDetailScreen extends ConsumerWidget {
                             Text(
                               _formatDate(blog.createdAt ?? DateTime.now()),
                               style: const TextStyle(
-                                  fontSize: 11, color: Colors.grey),
+                                fontSize: 11,
+                                color: Colors.grey,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      const Icon(Icons.schedule,
-                          size: 13, color: Colors.grey),
+                      const Icon(Icons.schedule, size: 13, color: Colors.grey),
                       const SizedBox(width: 4),
                       Text(
                         '${blog.readingTime} phút đọc',
-                        style:
-                            const TextStyle(fontSize: 12, color: Colors.grey),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
                       ),
                     ],
                   ),
@@ -190,13 +197,18 @@ class BlogDetailScreen extends ConsumerWidget {
                   // Stats
                   Row(
                     children: [
-                      const Icon(Icons.visibility_outlined,
-                          size: 16, color: Colors.grey),
+                      const Icon(
+                        Icons.visibility_outlined,
+                        size: 16,
+                        color: Colors.grey,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '${blog.viewCount} lượt xem',
-                        style:
-                            const TextStyle(fontSize: 13, color: Colors.grey),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey,
+                        ),
                       ),
                       const SizedBox(width: 16),
                       GestureDetector(
@@ -216,7 +228,9 @@ class BlogDetailScreen extends ConsumerWidget {
                             Text(
                               '${blog.likeCount} lượt thích',
                               style: const TextStyle(
-                                  fontSize: 13, color: Colors.grey),
+                                fontSize: 13,
+                                color: Colors.grey,
+                              ),
                             ),
                           ],
                         ),

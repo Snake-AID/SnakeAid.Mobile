@@ -7,7 +7,8 @@ class RescuerIdDocumentsScreen extends StatefulWidget {
   const RescuerIdDocumentsScreen({super.key});
 
   @override
-  State<RescuerIdDocumentsScreen> createState() => _RescuerIdDocumentsScreenState();
+  State<RescuerIdDocumentsScreen> createState() =>
+      _RescuerIdDocumentsScreenState();
 }
 
 class _RescuerIdDocumentsScreenState extends State<RescuerIdDocumentsScreen> {
@@ -18,8 +19,10 @@ class _RescuerIdDocumentsScreenState extends State<RescuerIdDocumentsScreen> {
       issueDate: '15/03/2020',
       expiryDate: 'Vô thời hạn',
       status: DocumentStatus.verified,
-      frontImageUrl: 'https://via.placeholder.com/400x250/FF8800/FFFFFF?text=CCCD+Front',
-      backImageUrl: 'https://via.placeholder.com/400x250/FF8800/FFFFFF?text=CCCD+Back',
+      frontImageUrl:
+          'https://via.placeholder.com/400x250/FF8800/FFFFFF?text=CCCD+Front',
+      backImageUrl:
+          'https://via.placeholder.com/400x250/FF8800/FFFFFF?text=CCCD+Back',
     ),
     DocumentItem(
       type: 'BHYT',
@@ -27,7 +30,8 @@ class _RescuerIdDocumentsScreenState extends State<RescuerIdDocumentsScreen> {
       issueDate: '01/01/2026',
       expiryDate: '31/12/2026',
       status: DocumentStatus.verified,
-      frontImageUrl: 'https://via.placeholder.com/400x250/1E88E5/FFFFFF?text=BHYT',
+      frontImageUrl:
+          'https://via.placeholder.com/400x250/1E88E5/FFFFFF?text=BHYT',
     ),
     DocumentItem(
       type: 'Bằng lái xe',
@@ -35,24 +39,30 @@ class _RescuerIdDocumentsScreenState extends State<RescuerIdDocumentsScreen> {
       issueDate: '10/05/2022',
       expiryDate: '10/05/2032',
       status: DocumentStatus.pending,
-      frontImageUrl: 'https://via.placeholder.com/400x250/FFA726/FFFFFF?text=Driving+License',
+      frontImageUrl:
+          'https://via.placeholder.com/400x250/FFA726/FFFFFF?text=Driving+License',
     ),
   ];
 
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.of(context).canPop();
-    
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7F5),
       appBar: AppBar(
         backgroundColor: const Color(0xFFF8F7F5),
         elevation: 0,
         centerTitle: true,
-        leading: canPop ? IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF1D150C)),
-          onPressed: () => context.pop(),
-        ) : null,
+        leading: canPop
+            ? IconButton(
+                icon: const Icon(
+                  Icons.arrow_back_ios_new,
+                  color: Color(0xFF1D150C),
+                ),
+                onPressed: () => context.pop(),
+              )
+            : null,
         automaticallyImplyLeading: canPop,
         title: const Text(
           'Chứng Chỉ & Giấy Tờ',
@@ -202,9 +212,9 @@ class _RescuerIdDocumentsScreenState extends State<RescuerIdDocumentsScreen> {
           setState(() {
             _documents.add(document);
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Đã thêm ${document.type}')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Đã thêm ${document.type}')));
         },
       ),
     );
@@ -228,9 +238,7 @@ class _RescuerIdDocumentsScreenState extends State<RescuerIdDocumentsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: const Text('Xóa giấy tờ'),
         content: Text('Bạn có chắc muốn xóa ${document.type}?'),
         actions: [
@@ -268,11 +276,7 @@ class _RescuerIdDocumentsScreenState extends State<RescuerIdDocumentsScreen> {
   }
 }
 
-enum DocumentStatus {
-  verified,
-  pending,
-  rejected,
-}
+enum DocumentStatus { verified, pending, rejected }
 
 class DocumentItem {
   final String type;
@@ -405,7 +409,8 @@ class _DocumentCard extends StatelessWidget {
               ],
             ),
             // Rejection Reason (if rejected)
-            if (document.status == DocumentStatus.rejected && document.rejectionReason != null) ...[
+            if (document.status == DocumentStatus.rejected &&
+                document.rejectionReason != null) ...[
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -463,7 +468,9 @@ class _DocumentCard extends StatelessWidget {
                     child: ElevatedButton.icon(
                       onPressed: onUpload,
                       icon: const Icon(Icons.upload, size: 16),
-                      label: Text(document.frontImageUrl == null ? 'Upload' : 'Re-upload'),
+                      label: Text(
+                        document.frontImageUrl == null ? 'Upload' : 'Re-upload',
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFFF8800),
                         foregroundColor: Colors.white,
@@ -483,7 +490,10 @@ class _DocumentCard extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF666666),
                       side: const BorderSide(color: Color(0xFFE5E5E5)),
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 12,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -613,10 +623,7 @@ class _DetailItem extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF666666),
-                ),
+                style: const TextStyle(fontSize: 11, color: Color(0xFF666666)),
               ),
               Text(
                 value,
@@ -648,9 +655,9 @@ class _AddDocumentDialogState extends State<_AddDocumentDialog> {
   final _numberController = TextEditingController();
   final _issueDateController = TextEditingController();
   final _expiryDateController = TextEditingController();
-  
+
   String _selectedType = 'CMND/CCCD';
-  
+
   final List<String> _documentTypes = [
     'CMND/CCCD',
     'BHYT',
@@ -673,9 +680,7 @@ class _AddDocumentDialogState extends State<_AddDocumentDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -713,10 +718,7 @@ class _AddDocumentDialogState extends State<_AddDocumentDialog> {
                     ),
                   ),
                   items: _documentTypes.map((type) {
-                    return DropdownMenuItem(
-                      value: type,
-                      child: Text(type),
-                    );
+                    return DropdownMenuItem(value: type, child: Text(type));
                   }).toList(),
                   onChanged: (value) {
                     if (value != null) {
@@ -787,7 +789,8 @@ class _AddDocumentDialogState extends State<_AddDocumentDialog> {
                       lastDate: DateTime.now(),
                     );
                     if (date != null) {
-                      _issueDateController.text = '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+                      _issueDateController.text =
+                          '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
                     }
                   },
                   readOnly: true,
@@ -844,7 +847,11 @@ class _AddDocumentDialogState extends State<_AddDocumentDialog> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.info_outline, size: 16, color: Color(0xFFFF8800)),
+                          const Icon(
+                            Icons.info_outline,
+                            size: 16,
+                            color: Color(0xFFFF8800),
+                          ),
                           const SizedBox(width: 8),
                           const Expanded(
                             child: Text(
@@ -892,9 +899,7 @@ class _AddDocumentDialogState extends State<_AddDocumentDialog> {
                       ),
                       child: const Text(
                         'Lưu',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
@@ -933,9 +938,7 @@ class _DocumentDetailDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -978,7 +981,11 @@ class _DocumentDetailDialog extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Center(
-                          child: Icon(Icons.image, size: 48, color: Color(0xFFE5E5E5)),
+                          child: Icon(
+                            Icons.image,
+                            size: 48,
+                            color: Color(0xFFE5E5E5),
+                          ),
                         ),
                       );
                     },
@@ -1001,7 +1008,11 @@ class _DocumentDetailDialog extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Center(
-                          child: Icon(Icons.image, size: 48, color: Color(0xFFE5E5E5)),
+                          child: Icon(
+                            Icons.image,
+                            size: 48,
+                            color: Color(0xFFE5E5E5),
+                          ),
                         ),
                       );
                     },
@@ -1032,10 +1043,7 @@ class _DocumentDetailDialog extends StatelessWidget {
                   ),
                   child: const Text(
                     'Đóng',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -1051,10 +1059,7 @@ class _InfoRowDetail extends StatelessWidget {
   final String label;
   final String value;
 
-  const _InfoRowDetail({
-    required this.label,
-    required this.value,
-  });
+  const _InfoRowDetail({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -1063,10 +1068,7 @@ class _InfoRowDetail extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Color(0xFF666666),
-          ),
+          style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
         ),
         Text(
           value,

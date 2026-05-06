@@ -79,8 +79,7 @@ class _ConsultationItem {
     final scheduledAt = c.startTime ?? c.slotStartTime ?? DateTime.now();
     final slotStart = c.slotStartTime ?? c.startTime;
     final slotEnd = c.slotEndTime ?? c.endTime;
-    final scheduledDurationSeconds =
-      (slotStart != null && slotEnd != null)
+    final scheduledDurationSeconds = (slotStart != null && slotEnd != null)
         ? slotEnd.difference(slotStart).inSeconds
         : 1800;
 
@@ -142,7 +141,8 @@ class _ConsultationItem {
   ) {
     final happenedAt =
         instant.respondedAt ?? instant.requestedAt ?? DateTime.now();
-    final status = instant.requestStatus == InstantRequestStatus.declinedByExpert
+    final status =
+        instant.requestStatus == InstantRequestStatus.declinedByExpert
         ? ConsultationStatus.instantDeclined
         : ConsultationStatus.instantExpired;
 
@@ -314,8 +314,8 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
             scheduledTime: b.scheduledTime,
             scheduledDurationSeconds:
                 (b.slotStartTime != null && b.slotEndTime != null)
-                    ? b.slotEndTime!.difference(b.slotStartTime!).inSeconds
-                    : 1800,
+                ? b.slotEndTime!.difference(b.slotStartTime!).inSeconds
+                : 1800,
             requestedAt: null,
             respondedAt: null,
             status: b.status == ConsultationBookingStatus.pendingPayment
@@ -398,10 +398,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
         status == ConsultationStatus.expertAbsentHandled;
   }
 
-  _ConsultationItem _withRating(
-    _ConsultationItem item,
-    double? rating,
-  ) {
+  _ConsultationItem _withRating(_ConsultationItem item, double? rating) {
     return _ConsultationItem(
       kind: item.kind,
       id: item.id,
@@ -572,18 +569,22 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
     }
     final upcoming = upcomingById.values.toList()
       ..sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
-    final history = _historyItems
-        .map((item) => _withRating(
-              item,
-              ratingByConsultationId[item.consultationId],
-            ))
-        .toList()
-      ..sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
+    final history =
+        _historyItems
+            .map(
+              (item) => _withRating(
+                item,
+                ratingByConsultationId[item.consultationId],
+              ),
+            )
+            .toList()
+          ..sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
 
     return Scaffold(
       backgroundColor: Colors.white, // Changed to match AppBar and status bar
       body: SafeArea(
-        bottom: false, // Allows content to flow to the bottom edge if needed, or keep true if preferred
+        bottom:
+            false, // Allows content to flow to the bottom edge if needed, or keep true if preferred
         child: Column(
           children: [
             // App Bar
@@ -595,7 +596,9 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
             // Tab Content
             Expanded(
               child: Container(
-                color: const Color(0xFFF6F8F6), // Moved the slightly grey background here
+                color: const Color(
+                  0xFFF6F8F6,
+                ), // Moved the slightly grey background here
                 child: (consultationsState.isLoading && bookingsState.isLoading)
                     ? const Center(
                         child: CircularProgressIndicator(
@@ -1197,10 +1200,10 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
               isExpertAbsentHandled
                   ? 'Đã hoàn tiền'
                   : (isExpertAbsent
-                      ? 'Đang chờ hoàn tiền'
-                      : (isCancelled
-                          ? 'Đã hoàn tiền'
-                          : _formatFee(item.feeCost))),
+                        ? 'Đang chờ hoàn tiền'
+                        : (isCancelled
+                              ? 'Đã hoàn tiền'
+                              : _formatFee(item.feeCost))),
             ),
 
             // Rating (nếu đã hoàn thành và có đánh giá)
@@ -1344,28 +1347,29 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                   ),
               ],
             ),
-              if (item.consultationId != null && item.consultationId!.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  height: 36,
-                  child: TextButton.icon(
-                    onPressed: () => _openMessageHistory(context, item),
-                    icon: const Icon(Icons.chat_bubble_outline, size: 16),
-                    label: const Text(
-                      'Xem Lịch Sử Tin Nhắn',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                    ),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF228B22),
-                      backgroundColor: const Color(0xFFE8F5E9),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+            if (item.consultationId != null &&
+                item.consultationId!.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                height: 36,
+                child: TextButton.icon(
+                  onPressed: () => _openMessageHistory(context, item),
+                  icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                  label: const Text(
+                    'Xem Lịch Sử Tin Nhắn',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF228B22),
+                    backgroundColor: const Color(0xFFE8F5E9),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                 ),
-              ],
+              ),
+            ],
           ],
         ),
       ),
@@ -1377,11 +1381,14 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
     _ConsultationItem item,
   ) {
     final isDeclined = item.status == ConsultationStatus.instantDeclined;
-    final statusLabel =
-        isDeclined ? 'Chuyên gia từ chối' : 'Hết hạn chờ phản hồi';
-    final statusColor =
-        isDeclined ? const Color(0xFFEF4444) : const Color(0xFFF59E0B);
-    final timeLabel = item.respondedAt ?? item.requestedAt ?? item.scheduledTime;
+    final statusLabel = isDeclined
+        ? 'Chuyên gia từ chối'
+        : 'Hết hạn chờ phản hồi';
+    final statusColor = isDeclined
+        ? const Color(0xFFEF4444)
+        : const Color(0xFFF59E0B);
+    final timeLabel =
+        item.respondedAt ?? item.requestedAt ?? item.scheduledTime;
 
     return Container(
       decoration: BoxDecoration(
@@ -1481,10 +1488,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
                 icon: const Icon(Icons.refresh, size: 16),
                 label: const Text(
                   'Đặt Lại',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF228B22),
@@ -1532,9 +1536,7 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
           : Icon(
               Icons.person,
               size: 28,
-              color: greyed
-                  ? const Color(0xFF9CA3AF)
-                  : const Color(0xFF228B22),
+              color: greyed ? const Color(0xFF9CA3AF) : const Color(0xFF228B22),
             ),
     );
   }
@@ -1828,17 +1830,16 @@ class _ConsultationHomeScreenState extends ConsumerState<ConsultationHomeScreen>
     final consultationId = item.consultationId;
     if (consultationId == null || consultationId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Phiên tư vấn này chưa có lịch sử tin nhắn.')),
+        const SnackBar(
+          content: Text('Phiên tư vấn này chưa có lịch sử tin nhắn.'),
+        ),
       );
       return;
     }
 
     context.push(
       '/consultation-message-history/$consultationId',
-      extra: {
-        'title': item.expertName,
-        'isExpertMode': false,
-      },
+      extra: {'title': item.expertName, 'isExpertMode': false},
     );
   }
 

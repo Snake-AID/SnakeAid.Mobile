@@ -744,8 +744,6 @@ class _ConsultationCompletionScreenState
     final pad = (int v) => v.toString().padLeft(2, '0');
     return '${pad(dt.day)}/${pad(dt.month)}/${dt.year} - ${pad(dt.hour)}:${pad(dt.minute)}';
   }
-
-  
 }
 
 class _Avatar extends StatelessWidget {

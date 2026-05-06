@@ -6,20 +6,14 @@ class LessonReadState {
   final Set<String> readIds;
   final Set<String> allKnownIds;
 
-  const LessonReadState({
-    this.readIds = const {},
-    this.allKnownIds = const {},
-  });
+  const LessonReadState({this.readIds = const {}, this.allKnownIds = const {}});
 
   /// True nếu có ít nhất một bài học trong danh sách đã biết mà chưa đọc.
   bool get hasUnread => allKnownIds.difference(readIds).isNotEmpty;
 
   bool isRead(String id) => readIds.contains(id);
 
-  LessonReadState copyWith({
-    Set<String>? readIds,
-    Set<String>? allKnownIds,
-  }) {
+  LessonReadState copyWith({Set<String>? readIds, Set<String>? allKnownIds}) {
     return LessonReadState(
       readIds: readIds ?? this.readIds,
       allKnownIds: allKnownIds ?? this.allKnownIds,
@@ -71,6 +65,6 @@ class LessonReadNotifier extends StateNotifier<LessonReadState> {
 /// Provider scoped theo userId — tự reset khi user thay đổi.
 final lessonReadProvider =
     StateNotifierProvider<LessonReadNotifier, LessonReadState>((ref) {
-  final userId = ref.watch(currentUserProvider)?.id ?? 'guest';
-  return LessonReadNotifier(userId);
-});
+      final userId = ref.watch(currentUserProvider)?.id ?? 'guest';
+      return LessonReadNotifier(userId);
+    });

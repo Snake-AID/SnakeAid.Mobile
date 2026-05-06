@@ -6,10 +6,7 @@ import 'messages_screen.dart';
 class MessageDetailScreen extends StatefulWidget {
   final MessageThread thread;
 
-  const MessageDetailScreen({
-    super.key,
-    required this.thread,
-  });
+  const MessageDetailScreen({super.key, required this.thread});
 
   @override
   State<MessageDetailScreen> createState() => _MessageDetailScreenState();
@@ -40,15 +37,20 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
         ),
         Message(
           id: '2',
-          text: 'Em bị rắn cắn, không biết rắn gì. Em có thể gửi ảnh được không ạ?',
+          text:
+              'Em bị rắn cắn, không biết rắn gì. Em có thể gửi ảnh được không ạ?',
           isSentByMe: true,
-          timestamp: DateTime.now().subtract(const Duration(hours: 1, minutes: 55)),
+          timestamp: DateTime.now().subtract(
+            const Duration(hours: 1, minutes: 55),
+          ),
         ),
         Message(
           id: '3',
           text: 'Được, bạn gửi ảnh rõ nét phần đầu và thân rắn nhé',
           isSentByMe: false,
-          timestamp: DateTime.now().subtract(const Duration(hours: 1, minutes: 50)),
+          timestamp: DateTime.now().subtract(
+            const Duration(hours: 1, minutes: 50),
+          ),
           senderName: widget.thread.userName,
           senderAvatar: widget.thread.userAvatar,
         ),
@@ -56,14 +58,19 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
           id: '4',
           text: '[Hình ảnh]',
           isSentByMe: true,
-          timestamp: DateTime.now().subtract(const Duration(hours: 1, minutes: 45)),
+          timestamp: DateTime.now().subtract(
+            const Duration(hours: 1, minutes: 45),
+          ),
           hasImage: true,
         ),
         Message(
           id: '5',
-          text: 'Đây là rắn lục đuôi đỏ, không độc. Vết cắn chỉ cần rửa sạch và sát trùng',
+          text:
+              'Đây là rắn lục đuôi đỏ, không độc. Vết cắn chỉ cần rửa sạch và sát trùng',
           isSentByMe: false,
-          timestamp: DateTime.now().subtract(const Duration(hours: 1, minutes: 40)),
+          timestamp: DateTime.now().subtract(
+            const Duration(hours: 1, minutes: 40),
+          ),
           senderName: widget.thread.userName,
           senderAvatar: widget.thread.userAvatar,
         ),
@@ -71,7 +78,9 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
           id: '6',
           text: 'Cảm ơn bác sĩ rất nhiều ạ!',
           isSentByMe: true,
-          timestamp: DateTime.now().subtract(const Duration(hours: 1, minutes: 35)),
+          timestamp: DateTime.now().subtract(
+            const Duration(hours: 1, minutes: 35),
+          ),
         ),
         Message(
           id: '7',
@@ -191,10 +200,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
                   ),
                   const Text(
                     'Đang hoạt động',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF228B22),
-                    ),
+                    style: TextStyle(fontSize: 12, color: Color(0xFF228B22)),
                   ),
                 ],
               ),
@@ -205,9 +211,9 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
           IconButton(
             icon: const Icon(Icons.phone, color: Color(0xFF228B22)),
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Gọi điện thoại')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Gọi điện thoại')));
             },
           ),
           IconButton(
@@ -228,14 +234,12 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final message = _messages[index];
-                final showAvatar = !message.isSentByMe &&
+                final showAvatar =
+                    !message.isSentByMe &&
                     (index == _messages.length - 1 ||
                         _messages[index + 1].isSentByMe);
 
-                return MessageBubble(
-                  message: message,
-                  showAvatar: showAvatar,
-                );
+                return MessageBubble(message: message, showAvatar: showAvatar);
               },
             ),
           ),
@@ -337,7 +341,10 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.notifications_off_outlined, color: Colors.grey),
+              leading: const Icon(
+                Icons.notifications_off_outlined,
+                color: Colors.grey,
+              ),
               title: const Text('Tắt thông báo'),
               onTap: () {
                 context.pop();
@@ -377,10 +384,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
               padding: EdgeInsets.all(16),
               child: Text(
                 'Đính kèm',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
             Row(
@@ -403,9 +407,9 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
                   color: const Color(0xFF2196F3),
                   onTap: () {
                     context.pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Mở camera')),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(const SnackBar(content: Text('Mở camera')));
                   },
                 ),
                 _AttachmentOption(
@@ -445,8 +449,9 @@ class MessageBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
-        mainAxisAlignment:
-            message.isSentByMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: message.isSentByMe
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!message.isSentByMe) ...[
@@ -602,19 +607,12 @@ class _AttachmentOption extends StatelessWidget {
               color: color.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 28,
-            ),
+            child: Icon(icon, color: color, size: 28),
           ),
           const SizedBox(height: 8),
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF666666),
-            ),
+            style: const TextStyle(fontSize: 12, color: Color(0xFF666666)),
           ),
         ],
       ),

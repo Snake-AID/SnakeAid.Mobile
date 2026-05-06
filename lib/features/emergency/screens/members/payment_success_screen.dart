@@ -78,14 +78,14 @@ class _PaymentSuccessScreenState extends ConsumerState<PaymentSuccessScreen> {
                   const SizedBox(height: 24),
 
                   // Action Buttons
-                    _buildActionButtons(context),
+                  _buildActionButtons(context),
                 ],
               ),
             ),
           ),
 
           // Bottom Button
-            _buildBottomButton(context),
+          _buildBottomButton(context),
         ],
       ),
     );
@@ -123,10 +123,7 @@ class _PaymentSuccessScreenState extends ConsumerState<PaymentSuccessScreen> {
                       gradient: const LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [
-                          Color(0xFF228B22),
-                          Color(0xFF1a6b1a),
-                        ],
+                        colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
                       ),
                       shape: BoxShape.circle,
                       boxShadow: [
@@ -173,18 +170,12 @@ class _PaymentSuccessScreenState extends ConsumerState<PaymentSuccessScreen> {
           children: [
             Text(
               'Mã giao dịch: #TXN-20231217-00123',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[500],
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
             ),
             const SizedBox(height: 4),
             Text(
               'Thời gian: ${_getCurrentDateTime()}',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[500],
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
             ),
           ],
         ),
@@ -232,10 +223,7 @@ class _PaymentSuccessScreenState extends ConsumerState<PaymentSuccessScreen> {
             padding: const EdgeInsets.only(top: 16),
             decoration: BoxDecoration(
               border: Border(
-                top: BorderSide(
-                  color: Colors.grey[200]!,
-                  width: 1,
-                ),
+                top: BorderSide(color: Colors.grey[200]!, width: 1),
               ),
             ),
             child: Row(
@@ -267,7 +255,10 @@ class _PaymentSuccessScreenState extends ConsumerState<PaymentSuccessScreen> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF228B22).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -298,11 +289,7 @@ class _PaymentSuccessScreenState extends ConsumerState<PaymentSuccessScreen> {
           const SizedBox(height: 16),
           Row(
             children: [
-              Icon(
-                Icons.mail_rounded,
-                size: 18,
-                color: Colors.grey[500],
-              ),
+              Icon(Icons.mail_rounded, size: 18, color: Colors.grey[500]),
               const SizedBox(width: 8),
               Text(
                 'Hóa đơn đã gửi qua email',
@@ -397,10 +384,7 @@ class _PaymentSuccessScreenState extends ConsumerState<PaymentSuccessScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.grey[200]!,
-          width: 1,
-        ),
+        border: Border.all(color: Colors.grey[200]!, width: 1),
       ),
       child: Material(
         color: Colors.transparent,
@@ -418,11 +402,7 @@ class _PaymentSuccessScreenState extends ConsumerState<PaymentSuccessScreen> {
                     color: iconColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    icon,
-                    color: iconColor,
-                    size: 24,
-                  ),
+                  child: Icon(icon, color: iconColor, size: 24),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -471,10 +451,7 @@ class _PaymentSuccessScreenState extends ConsumerState<PaymentSuccessScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Colors.grey[300]!,
-              width: 1,
-            ),
+            border: Border.all(color: Colors.grey[300]!, width: 1),
           ),
           child: Material(
             color: Colors.transparent,
@@ -489,7 +466,10 @@ class _PaymentSuccessScreenState extends ConsumerState<PaymentSuccessScreen> {
                 );
               },
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 16,
+                  horizontal: 20,
+                ),
                 child: Row(
                   children: [
                     Container(
@@ -534,10 +514,7 @@ class _PaymentSuccessScreenState extends ConsumerState<PaymentSuccessScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Colors.grey[300]!,
-              width: 1,
-            ),
+            border: Border.all(color: Colors.grey[300]!, width: 1),
           ),
           child: Material(
             color: Colors.transparent,
@@ -552,7 +529,10 @@ class _PaymentSuccessScreenState extends ConsumerState<PaymentSuccessScreen> {
                 );
               },
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 16,
+                  horizontal: 20,
+                ),
                 child: Row(
                   children: [
                     Container(
@@ -620,12 +600,7 @@ class _PaymentSuccessScreenState extends ConsumerState<PaymentSuccessScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: const Color(0xFFF8F8F6),
-        border: Border(
-          top: BorderSide(
-            color: Colors.grey[200]!,
-            width: 1,
-          ),
-        ),
+        border: Border(top: BorderSide(color: Colors.grey[200]!, width: 1)),
       ),
       child: SafeArea(
         child: Container(
@@ -634,10 +609,7 @@ class _PaymentSuccessScreenState extends ConsumerState<PaymentSuccessScreen> {
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF228B22),
-                Color(0xFF1a6b1a),
-              ],
+              colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
             ),
             borderRadius: BorderRadius.circular(30),
             boxShadow: [

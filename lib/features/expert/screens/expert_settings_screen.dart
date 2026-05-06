@@ -91,7 +91,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
 
             const SizedBox(height: 32),
 
-             // SECTION 1: Notifications
+            // SECTION 1: Notifications
             _buildSectionHeader('Thông Báo'),
             _buildCard(
               children: [
@@ -209,10 +209,7 @@ class _ExpertSettingsScreenState extends ConsumerState<ExpertSettingsScreen> {
             Center(
               child: Text(
                 'SnakeAid Expert • v1.0.0',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             ),
             const SizedBox(height: 32),

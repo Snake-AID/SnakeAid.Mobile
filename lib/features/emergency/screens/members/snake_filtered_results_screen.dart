@@ -31,7 +31,10 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
               context.pop();
             } else {
               // Fallback: go to emergency tracking if no navigation stack
-              context.goNamed('emergency_tracking', extra: {'incidentId': incidentId});
+              context.goNamed(
+                'emergency_tracking',
+                extra: {'incidentId': incidentId},
+              );
             }
           },
         ),
@@ -52,9 +55,7 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: const Color(0xFFE0E0E0),
-              ),
+              border: Border.all(color: const Color(0xFFE0E0E0)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.05),
@@ -94,9 +95,7 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: const Color(0xFFE3F2FD),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: const Color(0xFFBBDEFB),
-              ),
+              border: Border.all(color: const Color(0xFFBBDEFB)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.blue.withOpacity(0.1),
@@ -130,10 +129,7 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         'Chọn con giống với rắn bạn gặp nhất',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.blue[700],
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.blue[700]),
                       ),
                     ],
                   ),
@@ -156,10 +152,7 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
-                  '💡',
-                  style: TextStyle(fontSize: 16),
-                ),
+                const Text('💡', style: TextStyle(fontSize: 16)),
                 const SizedBox(width: 8),
                 Flexible(
                   child: RichText(
@@ -223,20 +216,18 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
                     ),
                   )
                 : GridView.builder(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 0.65,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: 0.65,
+                        ),
                     padding: const EdgeInsets.all(16),
                     itemCount: filteredSnakes.length,
                     itemBuilder: (context, index) {
                       final snake = filteredSnakes[index];
-                      return _buildSnakeCard(
-                        context: context,
-                        snake: snake,
-                      );
+                      return _buildSnakeCard(context: context, snake: snake);
                     },
                   ),
           ),
@@ -247,10 +238,7 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border(
-                top: BorderSide(
-                  color: Colors.grey[200]!,
-                  width: 1,
-                ),
+                top: BorderSide(color: Colors.grey[200]!, width: 1),
               ),
               boxShadow: [
                 BoxShadow(
@@ -276,7 +264,10 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
                   foregroundColor: const Color(0xFF666666),
                   side: const BorderSide(color: Color(0xFFBDBDBD)),
                   minimumSize: const Size(double.infinity, 50),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -341,7 +332,10 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
                 top: 8,
                 left: 8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.7),
                     borderRadius: BorderRadius.circular(12),
@@ -372,9 +366,14 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
                 top: 8,
                 right: 8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: snake.isVenomous ? const Color(0xFFDC3545) : const Color(0xFF28A745),
+                    color: snake.isVenomous
+                        ? const Color(0xFFDC3545)
+                        : const Color(0xFF28A745),
                     borderRadius: BorderRadius.circular(4),
                     boxShadow: [
                       BoxShadow(
@@ -447,7 +446,9 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
                     child: ListView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      itemCount: snake.matchedFeatures.length > 3 ? 3 : snake.matchedFeatures.length,
+                      itemCount: snake.matchedFeatures.length > 3
+                          ? 3
+                          : snake.matchedFeatures.length,
                       itemBuilder: (context, index) {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 4),
@@ -486,7 +487,9 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
-                        final confirmationFeatures = _getConfirmationFeatures(snake);
+                        final confirmationFeatures = _getConfirmationFeatures(
+                          snake,
+                        );
                         context.pushNamed(
                           'snake_confirmation',
                           extra: {
@@ -543,7 +546,7 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
   List<IdentificationFeature> _getConfirmationFeatures(FilteredSnake snake) {
     // Convert matched features from API to IdentificationFeature objects
     final features = <IdentificationFeature>[];
-    
+
     for (int i = 0; i < snake.matchedFeatures.length && i < 5; i++) {
       features.add(
         IdentificationFeature(
@@ -554,10 +557,10 @@ class SnakeFilteredResultsScreen extends StatelessWidget {
         ),
       );
     }
-    
+
     return features;
   }
-  
+
   IconData _getIconForFeature(int index) {
     const icons = [
       Icons.psychology,

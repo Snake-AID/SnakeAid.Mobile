@@ -519,7 +519,11 @@ class _SnakeReportDetailScreenState
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.info_outline, size: 18, color: Colors.blue[700]),
+                      Icon(
+                        Icons.info_outline,
+                        size: 18,
+                        color: Colors.blue[700],
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         'Tham khảo bảng giá dịch vụ bắt rắn',
@@ -3496,7 +3500,8 @@ class _SnakeReportDetailScreenState
         initialChildSize: 0.8,
         minChildSize: 0.5,
         maxChildSize: 0.9,
-        builder: (_, controller) => PricingBottomSheet(scrollController: controller),
+        builder: (_, controller) =>
+            PricingBottomSheet(scrollController: controller),
       ),
     );
   }

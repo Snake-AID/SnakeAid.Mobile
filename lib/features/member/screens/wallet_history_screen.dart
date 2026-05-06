@@ -21,8 +21,7 @@ class WalletHistoryScreen extends ConsumerStatefulWidget {
       _WalletHistoryScreenState();
 }
 
-class _WalletHistoryScreenState
-    extends ConsumerState<WalletHistoryScreen> {
+class _WalletHistoryScreenState extends ConsumerState<WalletHistoryScreen> {
   List<WithdrawalInfo> _withdrawals = [];
   List<TransactionInfo> _topups = [];
   bool _isLoading = true;
@@ -45,18 +44,24 @@ class _WalletHistoryScreenState
       final userId = ref.read(currentUserProvider)?.id;
       final results = await Future.wait([
         ref.read(withdrawalRepositoryProvider).getMyWithdrawals(),
-        ref.read(transactionRepositoryProvider).getTransactions(
-          userId: userId,
-          transType: 'system',
-          pageNumber: 1,
-          pageSize: 100,
-        ),
+        ref
+            .read(transactionRepositoryProvider)
+            .getTransactions(
+              userId: userId,
+              transType: 'system',
+              pageNumber: 1,
+              pageSize: 100,
+            ),
       ]);
       final withdrawals = results[0] as List<WithdrawalInfo>;
       final allTx = results[1] as List<TransactionInfo>;
-      final topups = allTx.where((t) =>
-          t.transactionType == 'WalletTopup' &&
-          t.externalTransactionId.isNotEmpty).toList();
+      final topups = allTx
+          .where(
+            (t) =>
+                t.transactionType == 'WalletTopup' &&
+                t.externalTransactionId.isNotEmpty,
+          )
+          .toList();
       if (mounted) {
         setState(() {
           _withdrawals = withdrawals;
@@ -77,40 +82,58 @@ class _WalletHistoryScreenState
 
   String _statusLabel(String status) {
     switch (status) {
-      case 'Pending':   return 'Chờ duyệt';
-      case 'Approved':  return 'Đã duyệt';
-      case 'Rejected':  return 'Đã hủy';
-      case 'Completed': return 'Hoàn tất';
-      case 'Failed':    return 'Thất bại';
-      default:          return status;
+      case 'Pending':
+        return 'Chờ duyệt';
+      case 'Approved':
+        return 'Đã duyệt';
+      case 'Rejected':
+        return 'Đã hủy';
+      case 'Completed':
+        return 'Hoàn tất';
+      case 'Failed':
+        return 'Thất bại';
+      default:
+        return status;
     }
   }
 
   Color _statusColor(String status) {
     switch (status) {
-      case 'Pending':   return const Color(0xFFFF9800);
-      case 'Approved':  return const Color(0xFF2196F3);
-      case 'Rejected':  return const Color(0xFFDC3545);
-      case 'Completed': return const Color(0xFF228B22);
-      case 'Failed':    return const Color(0xFFDC3545);
-      default:          return const Color(0xFF888888);
+      case 'Pending':
+        return const Color(0xFFFF9800);
+      case 'Approved':
+        return const Color(0xFF2196F3);
+      case 'Rejected':
+        return const Color(0xFFDC3545);
+      case 'Completed':
+        return const Color(0xFF228B22);
+      case 'Failed':
+        return const Color(0xFFDC3545);
+      default:
+        return const Color(0xFF888888);
     }
   }
 
   IconData _statusIcon(String status) {
     switch (status) {
-      case 'Pending':   return Icons.schedule;
-      case 'Approved':  return Icons.check_circle_outline;
-      case 'Completed': return Icons.task_alt;
+      case 'Pending':
+        return Icons.schedule;
+      case 'Approved':
+        return Icons.check_circle_outline;
+      case 'Completed':
+        return Icons.task_alt;
       case 'Rejected':
-      case 'Failed':    return Icons.cancel_outlined;
-      default:          return Icons.info_outline;
+      case 'Failed':
+        return Icons.cancel_outlined;
+      default:
+        return Icons.info_outline;
     }
   }
 
   String _formatAmount(double amount) {
-    final f = amount.toStringAsFixed(0).replaceAllMapped(
-        RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+    final f = amount
+        .toStringAsFixed(0)
+        .replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
     return '$f đ';
   }
 
@@ -153,13 +176,25 @@ class _WalletHistoryScreenState
             color: Colors.white,
             child: Row(
               children: [
-                _FilterTab(label: 'Tất cả', selected: _selectedFilter == 0,
-                    themeColor: widget.themeColor, onTap: () => setState(() => _selectedFilter = 0)),
+                _FilterTab(
+                  label: 'Tất cả',
+                  selected: _selectedFilter == 0,
+                  themeColor: widget.themeColor,
+                  onTap: () => setState(() => _selectedFilter = 0),
+                ),
                 if (widget.showTopup)
-                  _FilterTab(label: 'Nạp tiền', selected: _selectedFilter == 1,
-                      themeColor: widget.themeColor, onTap: () => setState(() => _selectedFilter = 1)),
-                _FilterTab(label: 'Rút tiền', selected: _selectedFilter == 2,
-                    themeColor: widget.themeColor, onTap: () => setState(() => _selectedFilter = 2)),
+                  _FilterTab(
+                    label: 'Nạp tiền',
+                    selected: _selectedFilter == 1,
+                    themeColor: widget.themeColor,
+                    onTap: () => setState(() => _selectedFilter = 1),
+                  ),
+                _FilterTab(
+                  label: 'Rút tiền',
+                  selected: _selectedFilter == 2,
+                  themeColor: widget.themeColor,
+                  onTap: () => setState(() => _selectedFilter = 2),
+                ),
               ],
             ),
           ),
@@ -171,9 +206,7 @@ class _WalletHistoryScreenState
 
   Widget _buildBody() {
     if (_isLoading) {
-      return Center(
-        child: CircularProgressIndicator(color: widget.themeColor),
-      );
+      return Center(child: CircularProgressIndicator(color: widget.themeColor));
     }
 
     if (_error != null) {
@@ -183,11 +216,17 @@ class _WalletHistoryScreenState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline, size: 48, color: Color(0xFFDC3545)),
+              const Icon(
+                Icons.error_outline,
+                size: 48,
+                color: Color(0xFFDC3545),
+              ),
               const SizedBox(height: 16),
-              Text(_error!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Color(0xFF666666))),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Color(0xFF666666)),
+              ),
               const SizedBox(height: 20),
               ElevatedButton.icon(
                 onPressed: _load,
@@ -197,7 +236,8 @@ class _WalletHistoryScreenState
                   backgroundColor: widget.themeColor,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ],
@@ -214,8 +254,7 @@ class _WalletHistoryScreenState
     final List<_HistoryEntry> entries = [
       if (showWithdrawals)
         ..._withdrawals.map((w) => _HistoryEntry.withdrawal(w)),
-      if (showTopups)
-        ..._topups.map((t) => _HistoryEntry.topup(t)),
+      if (showTopups) ..._topups.map((t) => _HistoryEntry.topup(t)),
     ]..sort((a, b) => b.date.compareTo(a.date));
 
     if (entries.isEmpty) {
@@ -225,15 +264,18 @@ class _WalletHistoryScreenState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.receipt_long_outlined,
-                  size: 56, color: Colors.grey.shade300),
+              Icon(
+                Icons.receipt_long_outlined,
+                size: 56,
+                color: Colors.grey.shade300,
+              ),
               const SizedBox(height: 16),
               Text(
                 _selectedFilter == 1
                     ? 'Chưa có lịch sử nạp tiền'
                     : _selectedFilter == 2
-                        ? 'Chưa có yêu cầu rút tiền nào'
-                        : 'Chưa có giao dịch nào',
+                    ? 'Chưa có yêu cầu rút tiền nào'
+                    : 'Chưa có giao dịch nào',
                 style: const TextStyle(fontSize: 16, color: Color(0xFF888888)),
               ),
             ],
@@ -284,14 +326,14 @@ class _HistoryEntry {
   final DateTime date;
 
   _HistoryEntry.withdrawal(WithdrawalInfo w)
-      : withdrawal = w,
-        topup = null,
-        date = w.createdAt;
+    : withdrawal = w,
+      topup = null,
+      date = w.createdAt;
 
   _HistoryEntry.topup(TransactionInfo t)
-      : topup = t,
-        withdrawal = null,
-        date = t.createdAt;
+    : topup = t,
+      withdrawal = null,
+      date = t.createdAt;
 }
 
 // ── Filter Tab ─────────────────────────────────────────────────────────────
@@ -378,7 +420,11 @@ class _TopupCard extends StatelessWidget {
               color: green.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.arrow_downward_rounded, color: green, size: 22),
+            child: const Icon(
+              Icons.arrow_downward_rounded,
+              color: green,
+              size: 22,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -407,7 +453,10 @@ class _TopupCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   formatDate(item.createdAt),
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF999999)),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF999999),
+                  ),
                 ),
               ],
             ),
@@ -417,7 +466,7 @@ class _TopupCard extends StatelessWidget {
     );
   }
 
-// ── _WalletHistoryScreenState closing brace was moved above ─────────────────
+  // ── _WalletHistoryScreenState closing brace was moved above ─────────────────
 }
 
 // ── Withdrawal Card ────────────────────────────────────────────────────────

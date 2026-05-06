@@ -42,10 +42,7 @@ class AvailableDate {
 class ConsultationTimeSelectionScreen extends ConsumerStatefulWidget {
   final String expertId;
 
-  const ConsultationTimeSelectionScreen({
-    super.key,
-    required this.expertId,
-  });
+  const ConsultationTimeSelectionScreen({super.key, required this.expertId});
 
   @override
   ConsumerState<ConsultationTimeSelectionScreen> createState() =>
@@ -100,7 +97,7 @@ class _ConsultationTimeSelectionScreenState
     final month = date.month.toString().padLeft(2, '0');
     final year = date.year.toString();
     final dayLabel = _getFullDayLabel(date);
-    
+
     if (includeYear) {
       return '$dayLabel, $day/$month/$year';
     } else {
@@ -130,7 +127,13 @@ class _ConsultationTimeSelectionScreenState
         'selectedDate': _formatDate(_selectedDateObj!),
         'selectedTime': '${_selectedSlotObj!.startTime} (30 phút)',
         'duration': '30 phút',
-        'price': _formatFee(ref.read(expertDetailProvider(widget.expertId)).expert?.scheduledConsultationFee ?? 0),
+        'price': _formatFee(
+          ref
+                  .read(expertDetailProvider(widget.expertId))
+                  .expert
+                  ?.scheduledConsultationFee ??
+              0,
+        ),
         if (_selectedSlotId != null) 'timeSlotId': _selectedSlotId!,
       },
     );
@@ -142,7 +145,8 @@ class _ConsultationTimeSelectionScreenState
     final theme = Theme.of(context);
 
     // Derive display dates and slots from provider when available
-    final availability = state.expert?.availability ?? const <AvailabilityDay>[];
+    final availability =
+        state.expert?.availability ?? const <AvailabilityDay>[];
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
@@ -198,12 +202,16 @@ class _ConsultationTimeSelectionScreenState
     }).toList();
 
     final displayDates = futureAvailability.isNotEmpty
-        ? futureAvailability.map((d) => AvailableDate(
-              date: d.date,
-              dayLabel: d.dayOfWeek,
-              hasAvailability: d.isAvailable,
-        )).toList()
-      : const <AvailableDate>[];
+        ? futureAvailability
+              .map(
+                (d) => AvailableDate(
+                  date: d.date,
+                  dayLabel: d.dayOfWeek,
+                  hasAvailability: d.isAvailable,
+                ),
+              )
+              .toList()
+        : const <AvailableDate>[];
 
     final List<TimeSlot> displaySlots;
     final List<TimeSlotEntry> rawSlotsForSelected;
@@ -225,12 +233,23 @@ class _ConsultationTimeSelectionScreenState
       }
 
       displaySlots = rawSlotsForSelected
-          .map((e) => TimeSlot(startTime: e.startTime, endTime: e.endTime, isAvailable: true))
+          .map(
+            (e) => TimeSlot(
+              startTime: e.startTime,
+              endTime: e.endTime,
+              isAvailable: true,
+            ),
+          )
           .toList();
       // Reset selection if the previously selected slot was filtered out
-      if (_selectedTimeSlotIndex != null && _selectedTimeSlotIndex! >= displaySlots.length) {
+      if (_selectedTimeSlotIndex != null &&
+          _selectedTimeSlotIndex! >= displaySlots.length) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) setState(() { _selectedTimeSlotIndex = null; _selectedSlotId = null; });
+          if (mounted)
+            setState(() {
+              _selectedTimeSlotIndex = null;
+              _selectedSlotId = null;
+            });
         });
       }
     } else {
@@ -260,48 +279,55 @@ class _ConsultationTimeSelectionScreenState
       body: state.isLoading
           ? const Center(child: CircularProgressIndicator())
           : state.expert == null
-              ? const Center(child: Text('Không tìm thấy chuyên gia'))
-            : (availability.isEmpty)
-                  ? _buildNoAvailability(theme)
-                  : Column(
-                  children: [
-                    // Main scrollable content
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                children: [
-                                  // Expert Profile Card
-                                  _buildExpertProfile(
-                                      context, state.expert!, theme),
-                                ],
+          ? const Center(child: Text('Không tìm thấy chuyên gia'))
+          : (availability.isEmpty)
+          ? _buildNoAvailability(theme)
+          : Column(
+              children: [
+                // Main scrollable content
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            children: [
+                              // Expert Profile Card
+                              _buildExpertProfile(
+                                context,
+                                state.expert!,
+                                theme,
                               ),
-                            ),
-
-                            // Horizontal Date Scroller
-                            _buildDateScroller(displayDates, theme),
-
-                            // Available Times Section
-                            Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: _buildAvailableTimesSection(
-                                  displayDates, displaySlots, rawSlotsForSelected, theme),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ),
 
-                    // Bottom Summary & Actions
-                    if (_selectedDateIndex != null &&
-                        _selectedTimeSlotIndex != null)
-                      _buildBottomSummary(displayDates, displaySlots, theme),
-                  ],
+                        // Horizontal Date Scroller
+                        _buildDateScroller(displayDates, theme),
+
+                        // Available Times Section
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: _buildAvailableTimesSection(
+                            displayDates,
+                            displaySlots,
+                            rawSlotsForSelected,
+                            theme,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
+
+                // Bottom Summary & Actions
+                if (_selectedDateIndex != null &&
+                    _selectedTimeSlotIndex != null)
+                  _buildBottomSummary(displayDates, displaySlots, theme),
+              ],
+            ),
     );
   }
 
@@ -355,7 +381,11 @@ class _ConsultationTimeSelectionScreenState
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  expert.specialty ?? (expert.specialties.isEmpty ? null : expert.specialties.first) ?? 'Chuyên gia tư vấn',
+                  expert.specialty ??
+                      (expert.specialties.isEmpty
+                          ? null
+                          : expert.specialties.first) ??
+                      'Chuyên gia tư vấn',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -597,15 +627,15 @@ class _ConsultationTimeSelectionScreenState
                   color: !timeSlot.isAvailable
                       ? Colors.grey.shade100
                       : isSelected
-                          ? _primaryColor
-                          : Colors.white,
+                      ? _primaryColor
+                      : Colors.white,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: !timeSlot.isAvailable
                         ? Colors.transparent
                         : isSelected
-                            ? _primaryColor
-                            : Colors.grey.shade300,
+                        ? _primaryColor
+                        : Colors.grey.shade300,
                   ),
                 ),
                 alignment: Alignment.center,
@@ -616,8 +646,8 @@ class _ConsultationTimeSelectionScreenState
                     color: !timeSlot.isAvailable
                         ? Colors.grey.shade400
                         : isSelected
-                            ? Colors.white
-                            : theme.colorScheme.onSurface,
+                        ? Colors.white
+                        : theme.colorScheme.onSurface,
                     decoration: !timeSlot.isAvailable
                         ? TextDecoration.lineThrough
                         : null,
@@ -637,7 +667,8 @@ class _ConsultationTimeSelectionScreenState
     List<TimeSlot> displaySlots,
     ThemeData theme,
   ) {
-    if (_selectedDateObj == null || _selectedSlotObj == null) return const SizedBox.shrink();
+    if (_selectedDateObj == null || _selectedSlotObj == null)
+      return const SizedBox.shrink();
     final selectedDate = _selectedDateObj!;
     final selectedTimeSlot = _selectedSlotObj!;
 
@@ -712,7 +743,13 @@ class _ConsultationTimeSelectionScreenState
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    _formatFee(ref.read(expertDetailProvider(widget.expertId)).expert?.scheduledConsultationFee ?? 0),
+                    _formatFee(
+                      ref
+                              .read(expertDetailProvider(widget.expertId))
+                              .expert
+                              ?.scheduledConsultationFee ??
+                          0,
+                    ),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: _primaryColor,
@@ -740,10 +777,7 @@ class _ConsultationTimeSelectionScreenState
                   ),
                   child: const Text(
                     'Tiếp Tục',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),

@@ -8,16 +8,17 @@ import '../models/ai_recognition_review_models.dart';
 /// Provider for [AiRecognitionReviewRepository].
 final aiRecognitionReviewRepositoryProvider =
     Provider<AiRecognitionReviewRepository>((ref) {
-  return AiRecognitionReviewRepository(
-      httpService: ref.watch(httpServiceProvider));
-});
+      return AiRecognitionReviewRepository(
+        httpService: ref.watch(httpServiceProvider),
+      );
+    });
 
 /// Repository for Expert AI Recognition Review API.
 class AiRecognitionReviewRepository {
   final HttpService _httpService;
 
   AiRecognitionReviewRepository({required HttpService httpService})
-      : _httpService = httpService;
+    : _httpService = httpService;
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -34,10 +35,7 @@ class AiRecognitionReviewRepository {
     } else {
       list = [];
     }
-    return list
-        .whereType<Map<String, dynamic>>()
-        .map(fromJson)
-        .toList();
+    return list.whereType<Map<String, dynamic>>().map(fromJson).toList();
   }
 
   // ── Queue ─────────────────────────────────────────────────────────────────
@@ -48,8 +46,10 @@ class AiRecognitionReviewRepository {
     int pageSize = 20,
   }) async {
     try {
-      debugPrint('🤖 GET /api/experts/ai-recognition/review-queue'
-          ' page=$page size=$pageSize');
+      debugPrint(
+        '🤖 GET /api/experts/ai-recognition/review-queue'
+        ' page=$page size=$pageSize',
+      );
       final response = await _httpService.get(
         '/api/experts/ai-recognition/review-queue',
         queryParameters: {'page': page, 'pageSize': pageSize},
@@ -66,12 +66,15 @@ class AiRecognitionReviewRepository {
 
   /// GET /api/experts/ai-recognition/review-queue/{recognitionResultId}
   Future<AIRecognitionReviewDetailResponse> getReviewDetail(
-      String recognitionResultId) async {
+    String recognitionResultId,
+  ) async {
     try {
       debugPrint(
-          '🔍 GET /api/experts/ai-recognition/review-queue/$recognitionResultId');
-      final response = await _httpService
-          .get('/api/experts/ai-recognition/review-queue/$recognitionResultId');
+        '🔍 GET /api/experts/ai-recognition/review-queue/$recognitionResultId',
+      );
+      final response = await _httpService.get(
+        '/api/experts/ai-recognition/review-queue/$recognitionResultId',
+      );
       final body = response.data as Map<String, dynamic>;
       final data = body['data'] as Map<String, dynamic>? ?? body;
       return AIRecognitionReviewDetailResponse.fromJson(data);
@@ -89,15 +92,19 @@ class AiRecognitionReviewRepository {
     int pageSize = 20,
   }) async {
     try {
-      debugPrint('📋 GET /api/experts/ai-recognition/review-history'
-          ' page=$page size=$pageSize');
+      debugPrint(
+        '📋 GET /api/experts/ai-recognition/review-history'
+        ' page=$page size=$pageSize',
+      );
       final response = await _httpService.get(
         '/api/experts/ai-recognition/review-history',
         queryParameters: {'page': page, 'pageSize': pageSize},
       );
       final body = response.data as Map<String, dynamic>;
       return _parseList(
-          body['data'], ExpertReviewedRecognitionItemResponse.fromJson);
+        body['data'],
+        ExpertReviewedRecognitionItemResponse.fromJson,
+      );
     } on DioException catch (e) {
       debugPrint('❌ getReviewHistory: ${e.message}');
       throw Exception('Không thể tải lịch sử. Vui lòng thử lại.');
@@ -113,8 +120,10 @@ class AiRecognitionReviewRepository {
     String? expertNotes,
   }) async {
     try {
-      debugPrint('✅ POST verify  id=$recognitionResultId'
-          '  speciesId=$correctedSpeciesId');
+      debugPrint(
+        '✅ POST verify  id=$recognitionResultId'
+        '  speciesId=$correctedSpeciesId',
+      );
       final payload = ExpertVerifyRecognitionRequest(
         correctedSpeciesId: correctedSpeciesId,
         expertNotes: expertNotes,
@@ -139,8 +148,9 @@ class AiRecognitionReviewRepository {
   }) async {
     try {
       debugPrint('❌ POST reject  id=$recognitionResultId');
-      final payload =
-          ExpertRejectRecognitionRequest(expertNotes: expertNotes).toJson();
+      final payload = ExpertRejectRecognitionRequest(
+        expertNotes: expertNotes,
+      ).toJson();
       final response = await _httpService.post(
         '/api/experts/ai-recognition/review-queue/$recognitionResultId/reject',
         data: payload,

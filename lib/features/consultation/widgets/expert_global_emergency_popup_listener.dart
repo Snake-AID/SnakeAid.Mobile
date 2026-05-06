@@ -150,7 +150,9 @@ class _ExpertGlobalEmergencyPopupListenerState
 
       if (consultationId == null || consultationId.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã chấp nhận nhưng chưa có consultationId')),
+          const SnackBar(
+            content: Text('Đã chấp nhận nhưng chưa có consultationId'),
+          ),
         );
         return;
       }
@@ -246,209 +248,232 @@ class _ExpertGlobalEmergencyPopupListenerState
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 64,
-                            height: 64,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF6C47C2).withOpacity(0.1),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.check_circle,
-                              size: 40,
-                              color: Color(0xFF6C47C2),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'Xác Nhận Bắt Đầu Tư Vấn',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF6C47C2),
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFF3CD),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.timer,
-                                    size: 16, color: Color(0xFFD97706)),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Tự từ chối sau $_countdownLabel',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFFD97706),
-                                  ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+                          child: Column(
+                            children: [
+                              Container(
+                                width: 64,
+                                height: 64,
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFF6C47C2,
+                                  ).withOpacity(0.1),
+                                  shape: BoxShape.circle,
                                 ),
-                              ],
-                            ),
+                                child: const Icon(
+                                  Icons.check_circle,
+                                  size: 40,
+                                  color: Color(0xFF6C47C2),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'Xác Nhận Bắt Đầu Tư Vấn',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF6C47C2),
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFF3CD),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.timer,
+                                      size: 16,
+                                      color: Color(0xFFD97706),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Tự từ chối sau $_countdownLabel',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFFD97706),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
+                        ),
 
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Column(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFAF8FC),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.grey.shade200),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color:
-                                        const Color(0xFF6C47C2).withOpacity(0.1),
-                                    shape: BoxShape.circle,
-                                    border:
-                                        Border.all(color: Colors.grey.shade200),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFAF8FC),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.grey.shade200,
                                   ),
-                                  child: const Icon(Icons.person,
-                                      color: Color(0xFF6C47C2)),
                                 ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        req.requesterName ?? 'Bệnh nhân',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF160D1B),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: const Color(
+                                          0xFF6C47C2,
+                                        ).withOpacity(0.1),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.grey.shade200,
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
-                                      const Text(
-                                        'Tư vấn 30 phút · Video Call',
+                                      child: const Icon(
+                                        Icons.person,
+                                        color: Color(0xFF6C47C2),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            req.requesterName ?? 'Bệnh nhân',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 17,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF160D1B),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          const Text(
+                                            'Tư vấn 30 phút · Video Call',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: Color(0xFF6B7280),
+                                            ),
+                                          ),
+                                          Text(
+                                            req.snakeSuspect ??
+                                                'Chưa rõ loài rắn',
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Color(0xFF6B7280),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEEF2FF),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: const Color(0xFFDBEAFE),
+                                  ),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline,
+                                      size: 18,
+                                      color: Color(0xFF4F46E5),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Yêu cầu đã được thanh toán từ phía người dùng.',
                                         style: TextStyle(
                                           fontSize: 13,
-                                          color: Color(0xFF6B7280),
+                                          fontWeight: FontWeight.w500,
+                                          color: Color(0xFF4338CA),
                                         ),
                                       ),
-                                      Text(
-                                        req.snakeSuspect ?? 'Chưa rõ loài rắn',
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: Color(0xFF6B7280),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEEF2FF),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFDBEAFE)),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.info_outline,
-                                    size: 18, color: Color(0xFF4F46E5)),
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Yêu cầu đã được thanh toán từ phía người dùng.',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                      color: Color(0xFF4338CA),
                                     ),
-                                  ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                      child: Column(
-                        children: [
-                          SizedBox(
-                            width: double.infinity,
-                            height: 52,
-                            child: ElevatedButton(
-                              onPressed: _isHandlingAction ? null : _accept,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF6C47C2),
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12)),
-                                elevation: 4,
-                                shadowColor:
-                                    const Color(0xFF6C47C2).withOpacity(0.4),
                               ),
-                              child: _isHandlingAction
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Text(
-                                      'Bắt Đầu Ngay',
-                                      style: TextStyle(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                            ],
+                          ),
+                        ),
+
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                          child: Column(
+                            children: [
+                              SizedBox(
+                                width: double.infinity,
+                                height: 52,
+                                child: ElevatedButton(
+                                  onPressed: _isHandlingAction ? null : _accept,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF6C47C2),
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
-                            ),
+                                    elevation: 4,
+                                    shadowColor: const Color(
+                                      0xFF6C47C2,
+                                    ).withOpacity(0.4),
+                                  ),
+                                  child: _isHandlingAction
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Text(
+                                          'Bắt Đầu Ngay',
+                                          style: TextStyle(
+                                            fontSize: 17,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextButton(
+                                onPressed: _isHandlingAction ? null : _reject,
+                                child: const Text(
+                                  'Từ Chối',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF999999),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 8),
-                          TextButton(
-                            onPressed: _isHandlingAction ? null : _reject,
-                            child: const Text(
-                              'Từ Chối',
-                              style: TextStyle(
-                                  fontSize: 13, color: Color(0xFF999999)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                        ),
+                      ],
                     ),
                   ),
                 ),

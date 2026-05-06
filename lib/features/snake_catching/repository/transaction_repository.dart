@@ -59,7 +59,9 @@ class TransactionRepository {
   /// GET /api/transactions?referenceId={requestId}
   /// Returns the paid CatchingDeposit transaction for a snake catching request.
   /// Returns null if none found or not yet paid.
-  Future<TransactionInfo?> getDepositTransactionByRequestId(String requestId) async {
+  Future<TransactionInfo?> getDepositTransactionByRequestId(
+    String requestId,
+  ) async {
     try {
       debugPrint('🔍 GET /api/transactions?referenceId=$requestId');
       final response = await _httpService.get(
@@ -98,7 +100,9 @@ class TransactionRepository {
   Future<TransactionInfo?> getTransactionById(String transactionId) async {
     try {
       debugPrint('🔍 GET /api/transactions/$transactionId');
-      final response = await _httpService.get('/api/transactions/$transactionId');
+      final response = await _httpService.get(
+        '/api/transactions/$transactionId',
+      );
       debugPrint('✅ Transaction Response: ${response.statusCode}');
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data['data'];

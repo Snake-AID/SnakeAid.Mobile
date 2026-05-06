@@ -28,8 +28,7 @@ class SnakeSpeciesRepository {
       final data = body['data'];
       if (data is List) {
         return data
-            .map((e) =>
-                SnakeSpeciesModel.fromJson(e as Map<String, dynamic>))
+            .map((e) => SnakeSpeciesModel.fromJson(e as Map<String, dynamic>))
             .toList();
       }
       // Single object (shouldn't happen for list endpoint)
@@ -62,9 +61,12 @@ class SnakeSpeciesRepository {
   Future<SnakeFirstAidModel> getFirstAidBySpecies(int snakeSpeciesId) async {
     try {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      debugPrint('🩹 Fetching first aid guideline for species #$snakeSpeciesId');
+      debugPrint(
+        '🩹 Fetching first aid guideline for species #$snakeSpeciesId',
+      );
       final response = await httpService.get(
-          '/api/first-aid-guidelines/recommendation/species/$snakeSpeciesId');
+        '/api/first-aid-guidelines/recommendation/species/$snakeSpeciesId',
+      );
       final body = response.data as Map<String, dynamic>;
       final data = body['data'] as Map<String, dynamic>;
       return SnakeFirstAidModel.fromJson(data);

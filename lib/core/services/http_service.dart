@@ -143,9 +143,9 @@ class HttpService {
 
   /// Fast-fail health check using cached result (15 s TTL by default).
   /// No-op when [healthCheckService] is null.
- Future<void> _healthCheck() async {
+  Future<void> _healthCheck() async {
     // Tạm thời return luôn để bỏ qua bước check mạng, cho phép login thẳng
-    return; 
+    return;
 
     /* Code cũ được tạm ẩn đi
     if (healthCheckService == null) return;
@@ -220,12 +220,12 @@ class HttpService {
       // Priority 1: Check for validation errors (most specific)
       if (data['error'] is Map) {
         final err = data['error'] as Map;
-        
+
         // Format: error.validationErrors (Dictionary<string, string[]>)
         if (err['validationErrors'] is Map) {
           final validationErrors = err['validationErrors'] as Map;
           final errorMessages = <String>[];
-          
+
           validationErrors.forEach((field, messages) {
             if (messages is List && messages.isNotEmpty) {
               // Format: "Field: error1, error2"
@@ -234,7 +234,7 @@ class HttpService {
               errorMessages.add('${field}: $messages');
             }
           });
-          
+
           if (errorMessages.isNotEmpty) {
             return errorMessages.join('\n');
           }

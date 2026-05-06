@@ -15,11 +15,7 @@ class SnakeLocationState {
   final bool isLoading;
   final String? error;
 
-  SnakeLocationState({
-    this.data,
-    this.isLoading = false,
-    this.error,
-  });
+  SnakeLocationState({this.data, this.isLoading = false, this.error});
 
   SnakeLocationState copyWith({
     SnakesByLocationResponse? data,
@@ -53,19 +49,12 @@ class SnakeLocationNotifier extends StateNotifier<SnakeLocationState> {
         longitude: longitude,
       );
 
-      state = state.copyWith(
-        data: result,
-        isLoading: false,
-        error: null,
-      );
+      state = state.copyWith(data: result, isLoading: false, error: null);
     } catch (e) {
       // Extract clean error message
       String errorMessage = e.toString().replaceAll('Exception: ', '');
-      
-      state = state.copyWith(
-        isLoading: false,
-        error: errorMessage,
-      );
+
+      state = state.copyWith(isLoading: false, error: errorMessage);
     }
   }
 
@@ -78,6 +67,6 @@ class SnakeLocationNotifier extends StateNotifier<SnakeLocationState> {
 /// Provider for SnakeLocationNotifier
 final snakeLocationProvider =
     StateNotifierProvider<SnakeLocationNotifier, SnakeLocationState>((ref) {
-  final repository = ref.watch(snakeSpeciesRepositoryProvider);
-  return SnakeLocationNotifier(repository);
-});
+      final repository = ref.watch(snakeSpeciesRepositoryProvider);
+      return SnakeLocationNotifier(repository);
+    });

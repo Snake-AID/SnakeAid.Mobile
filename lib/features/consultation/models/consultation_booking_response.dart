@@ -1,10 +1,10 @@
 /// Booking status values returned by the backend
 enum ConsultationBookingStatus {
   pendingPayment, // Chờ thanh toán
-  confirmed,      // Đã xác nhận
-  completed,      // Đã hoàn thành
-  cancelled,      // Đã hủy
-  expertAbsent,   // Chuyên gia vắng mặt
+  confirmed, // Đã xác nhận
+  completed, // Đã hoàn thành
+  cancelled, // Đã hủy
+  expertAbsent, // Chuyên gia vắng mặt
   expertAbsentHandled, // Đã hoàn tiền
 }
 
@@ -25,13 +25,13 @@ class ConsultationBookingResponse {
   final String? timeSlotId;
   final double? rating;
   // Fields from create-booking response
-  final String? consultationId;  // ID for the video call room
-  final String? roomId;          // LiveKit room ID
+  final String? consultationId; // ID for the video call room
+  final String? roomId; // LiveKit room ID
   final DateTime? slotStartTime;
   final DateTime? slotEndTime;
   final DateTime? paymentDeadline;
-  final String? userName;             // Patient name (from expert's view)
-  final String? problemDescription;  // Problem submitted by patient
+  final String? userName; // Patient name (from expert's view)
+  final String? problemDescription; // Problem submitted by patient
   final DateTime? bookedAt;
   final int? grossPrice;
   final int? netPrice;
@@ -97,13 +97,16 @@ class ConsultationBookingResponse {
       expertName: (json['expertName'] as String?) ?? 'Chuyên gia',
       expertAvatarUrl: json['expertAvatarUrl'] as String?,
       userAvatarUrl: json['userAvatarUrl'] as String?,
-      expertSpecialty: (json['expertSpecialty'] ?? json['specialization']) as String?,
+      expertSpecialty:
+          (json['expertSpecialty'] ?? json['specialization']) as String?,
       consultationType: (json['consultationType'] as String?) ?? 'Scheduled',
-      scheduledTime: slotStart ??
+      scheduledTime:
+          slotStart ??
           (_parseBackendDate(json['bookedAt']) ??
               (_parseBackendDate(json['scheduledTime']) ?? DateTime.now())),
       status: _parseStatus(json['status'] as String?),
-      feeCost: (json['grossPrice'] as num?)?.toInt() ??
+      feeCost:
+          (json['grossPrice'] as num?)?.toInt() ??
           (json['grossAmount'] as num?)?.toInt() ??
           (json['feeCost'] as num?)?.toInt() ??
           (json['fee'] as num?)?.toInt() ??
@@ -119,9 +122,11 @@ class ConsultationBookingResponse {
       userName: json['userName'] as String?,
       problemDescription: json['problemDescription'] as String?,
       bookedAt: _parseBackendDate(json['bookedAt']),
-      grossPrice: (json['grossPrice'] as num?)?.toInt() ??
+      grossPrice:
+          (json['grossPrice'] as num?)?.toInt() ??
           (json['grossAmount'] as num?)?.toInt(),
-      netPrice: (json['netPrice'] as num?)?.toInt() ??
+      netPrice:
+          (json['netPrice'] as num?)?.toInt() ??
           (json['netAmount'] as num?)?.toInt(),
     );
   }
@@ -158,7 +163,7 @@ class CreateConsultationBookingRequest {
   });
 
   Map<String, dynamic> toJson() => {
-        'timeSlotId': timeSlotId,
-        'problemDescription': problemDescription,
-      };
+    'timeSlotId': timeSlotId,
+    'problemDescription': problemDescription,
+  };
 }

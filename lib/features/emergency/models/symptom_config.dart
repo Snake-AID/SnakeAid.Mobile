@@ -34,13 +34,13 @@ class SymptomConfigResponse {
 
         for (var item in rawData) {
           final attributeKey = item['attributeKey'] as String;
-          
+
           // Store first occurrence for group metadata
           if (!groupMap.containsKey(attributeKey)) {
             groupMap[attributeKey] = item;
             optionsMap[attributeKey] = [];
           }
-          
+
           // Collect all options for this attributeKey
           optionsMap[attributeKey]!.add(item);
         }
@@ -50,7 +50,7 @@ class SymptomConfigResponse {
           final attributeKey = entry.key;
           final firstItem = entry.value;
           final options = optionsMap[attributeKey]!;
-          
+
           return GroupedSymptomConfig(
             groupName: firstItem['groupName'] ?? '',
             attributeKey: attributeKey,
@@ -61,7 +61,7 @@ class SymptomConfigResponse {
                 .toList(),
           );
         }).toList();
-        
+
         // Sort by displayOrder
         groupedData.sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
       }

@@ -23,17 +23,15 @@ String _formatFee(double fee) {
 class ServiceSelectionScreen extends ConsumerStatefulWidget {
   final String expertId;
 
-  const ServiceSelectionScreen({
-    super.key,
-    required this.expertId,
-  });
+  const ServiceSelectionScreen({super.key, required this.expertId});
 
   @override
   ConsumerState<ServiceSelectionScreen> createState() =>
       _ServiceSelectionScreenState();
 }
 
-class _ServiceSelectionScreenState extends ConsumerState<ServiceSelectionScreen> {
+class _ServiceSelectionScreenState
+    extends ConsumerState<ServiceSelectionScreen> {
   EmergencyConsultationSignalRService? _presenceService;
   StreamSubscription<Set<String>>? _snapshotSub;
   StreamSubscription<ExpertPresenceChangedEvent>? _presenceChangedSub;
@@ -56,18 +54,20 @@ class _ServiceSelectionScreenState extends ConsumerState<ServiceSelectionScreen>
       final baseUrl = ref.read(httpServiceProvider).baseUrl;
       _presenceService = EmergencyConsultationSignalRService(baseUrl: baseUrl);
 
-      _snapshotSub = _presenceService!.onlineExpertsSnapshotStream.listen((ids) {
+      _snapshotSub = _presenceService!.onlineExpertsSnapshotStream.listen((
+        ids,
+      ) {
         if (!mounted) return;
         final isOnline = ids.any(_isMatchExpertId);
         setState(() => _isExpertOnlineRealtime = isOnline);
       });
 
-      _presenceChangedSub =
-          _presenceService!.expertPresenceChangedStream.listen((event) {
-        if (!mounted) return;
-        if (!_isMatchExpertId(event.expertId)) return;
-        setState(() => _isExpertOnlineRealtime = event.isOnline);
-      });
+      _presenceChangedSub = _presenceService!.expertPresenceChangedStream
+          .listen((event) {
+            if (!mounted) return;
+            if (!_isMatchExpertId(event.expertId)) return;
+            setState(() => _isExpertOnlineRealtime = event.isOnline);
+          });
 
       await _presenceService!.connectAsMember();
     } catch (e) {
@@ -102,7 +102,7 @@ class _ServiceSelectionScreenState extends ConsumerState<ServiceSelectionScreen>
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF333333)
+            color: Color(0xFF333333),
           ),
         ),
         centerTitle: true,
@@ -110,39 +110,39 @@ class _ServiceSelectionScreenState extends ConsumerState<ServiceSelectionScreen>
       body: state.isLoading
           ? const Center(child: CircularProgressIndicator())
           : state.expert == null
-              ? const Center(child: Text('Không tìm thấy chuyên gia'))
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      // Expert Profile Card
-                      _buildExpertProfile(context, state.expert!, theme),
-                      const SizedBox(height: 16),
+          ? const Center(child: Text('Không tìm thấy chuyên gia'))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  // Expert Profile Card
+                  _buildExpertProfile(context, state.expert!, theme),
+                  const SizedBox(height: 16),
 
-                      // Instant Consultation Card
-                      _buildInstantConsultationCard(
-                        context,
-                        state.expert!,
-                        theme,
-                        _isExpertOnlineRealtime ?? state.expert!.isOnline,
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Scheduled Consultation Card
-                      _buildScheduledConsultationCard(
-                        context,
-                        state.expert!,
-                        state.expert!.availability.isNotEmpty,
-                        theme,
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Info Box
-                      _buildInfoBox(theme),
-                      const SizedBox(height: 24),
-                    ],
+                  // Instant Consultation Card
+                  _buildInstantConsultationCard(
+                    context,
+                    state.expert!,
+                    theme,
+                    _isExpertOnlineRealtime ?? state.expert!.isOnline,
                   ),
-                ),
+                  const SizedBox(height: 16),
+
+                  // Scheduled Consultation Card
+                  _buildScheduledConsultationCard(
+                    context,
+                    state.expert!,
+                    state.expert!.availability.isNotEmpty,
+                    theme,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Info Box
+                  _buildInfoBox(theme),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
     );
   }
 
@@ -221,9 +221,7 @@ class _ServiceSelectionScreenState extends ConsumerState<ServiceSelectionScreen>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Colors.grey.shade200,
-        ),
+        border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),
@@ -246,29 +244,28 @@ class _ServiceSelectionScreenState extends ConsumerState<ServiceSelectionScreen>
                   color: Colors.amber[50],
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  Icons.bolt,
-                  color: Colors.amber[500],
-                  size: 20,
-                ),
+                child: Icon(Icons.bolt, color: Colors.amber[500], size: 20),
               ),
               Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isOnline
-                        ? _primaryColor.withOpacity(0.1)
-                        : Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    isOnline ? 'Đang Online' : 'Ngoại Tuyến',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: isOnline ? _primaryColor : Colors.grey,
-                    ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: isOnline
+                      ? _primaryColor.withOpacity(0.1)
+                      : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  isOnline ? 'Đang Online' : 'Ngoại Tuyến',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: isOnline ? _primaryColor : Colors.grey,
                   ),
                 ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -342,17 +339,16 @@ class _ServiceSelectionScreenState extends ConsumerState<ServiceSelectionScreen>
                     }
                   : null,
               style: FilledButton.styleFrom(
-                backgroundColor: isOnline ? _primaryColor : Colors.grey.shade400,
+                backgroundColor: isOnline
+                    ? _primaryColor
+                    : Colors.grey.shade400,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
               child: const Text(
                 'Chọn Tư Vấn Ngay',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
           ),
@@ -362,15 +358,18 @@ class _ServiceSelectionScreenState extends ConsumerState<ServiceSelectionScreen>
   }
 
   /// Build scheduled consultation card
-  Widget _buildScheduledConsultationCard(BuildContext context, ExpertDetailModel expert, bool hasAvailability, ThemeData theme) {
+  Widget _buildScheduledConsultationCard(
+    BuildContext context,
+    ExpertDetailModel expert,
+    bool hasAvailability,
+    ThemeData theme,
+  ) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Colors.grey.shade200,
-        ),
+        border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),
@@ -457,7 +456,9 @@ class _ServiceSelectionScreenState extends ConsumerState<ServiceSelectionScreen>
             child: OutlinedButton(
               onPressed: hasAvailability
                   ? () {
-                      context.push('/consultation-time-selection/${expert.userId}');
+                      context.push(
+                        '/consultation-time-selection/${expert.userId}',
+                      );
                     }
                   : null,
               style: OutlinedButton.styleFrom(
@@ -488,11 +489,7 @@ class _ServiceSelectionScreenState extends ConsumerState<ServiceSelectionScreen>
   Widget _buildBenefit(IconData icon, String text, ThemeData theme) {
     return Row(
       children: [
-        Icon(
-          icon,
-          color: _primaryColor,
-          size: 20,
-        ),
+        Icon(icon, color: _primaryColor, size: 20),
         const SizedBox(width: 12),
         Text(
           text,
@@ -511,20 +508,11 @@ class _ServiceSelectionScreenState extends ConsumerState<ServiceSelectionScreen>
       decoration: BoxDecoration(
         color: Colors.amber[50],
         borderRadius: BorderRadius.circular(8),
-        border: Border(
-          left: BorderSide(
-            color: Colors.amber,
-            width: 4,
-          ),
-        ),
+        border: Border(left: BorderSide(color: Colors.amber, width: 4)),
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.info_outline,
-            color: Colors.amber[700],
-            size: 20,
-          ),
+          Icon(Icons.info_outline, color: Colors.amber[700], size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(

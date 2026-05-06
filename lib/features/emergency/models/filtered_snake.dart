@@ -21,8 +21,8 @@ class FilteredSnakeResponse {
       isSuccess: json['is_success'] ?? false,
       data: json['data'] != null
           ? (json['data'] as List<dynamic>)
-              .map((s) => FilteredSnake.fromJson(s))
-              .toList()
+                .map((s) => FilteredSnake.fromJson(s))
+                .toList()
           : null,
       error: json['error'],
     );
@@ -66,7 +66,8 @@ class FilteredSnake {
       matchScore: json['matchScore'] ?? 0,
       totalAnswered: json['totalAnswered'] ?? 0,
       matchPercentage: (json['matchPercentage'] ?? 0).toDouble(),
-      matchedFeatures: (json['matchedFeatures'] as List<dynamic>?)
+      matchedFeatures:
+          (json['matchedFeatures'] as List<dynamic>?)
               ?.map((f) => f.toString())
               .toList() ??
           [],

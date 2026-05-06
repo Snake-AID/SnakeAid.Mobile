@@ -4,17 +4,11 @@ class RefreshTokenRequest {
   final String userId;
   final String refreshToken;
 
-  RefreshTokenRequest({
-    required this.userId,
-    required this.refreshToken,
-  });
+  RefreshTokenRequest({required this.userId, required this.refreshToken});
 
   /// Convert to JSON for API request
   Map<String, dynamic> toJson() {
-    return {
-      'userId': userId,
-      'refreshToken': refreshToken,
-    };
+    return {'userId': userId, 'refreshToken': refreshToken};
   }
 
   @override

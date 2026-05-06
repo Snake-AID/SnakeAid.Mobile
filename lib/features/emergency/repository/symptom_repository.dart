@@ -16,7 +16,9 @@ class SymptomRepository {
   /// Get all symptom configurations (grouped for UI)
   Future<SymptomConfigResponse> getSymptomConfigs() async {
     try {
-      final response = await _httpService.get('/api/symptom-configs/grouped-for-ui');
+      final response = await _httpService.get(
+        '/api/symptom-configs/grouped-for-ui',
+      );
       return SymptomConfigResponse.fromJson(response.data);
     } catch (e) {
       return SymptomConfigResponse(

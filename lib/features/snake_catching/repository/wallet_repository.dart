@@ -75,8 +75,9 @@ class WalletRepository {
         '/api/wallet/topup',
         data: {'amount': amount, 'description': description},
       );
-      final data = (response.data as Map<String, dynamic>)['data']
-          as Map<String, dynamic>?;
+      final data =
+          (response.data as Map<String, dynamic>)['data']
+              as Map<String, dynamic>?;
       final url = data?['checkoutUrl'] as String?;
       if (url == null || url.isEmpty) {
         throw Exception('Không nhận được link thanh toán.');
@@ -86,7 +87,9 @@ class WalletRepository {
     } on DioException catch (e) {
       debugPrint('❌ createTopupLink DioException: ${e.message}');
       final msg = e.response?.data?['message'] as String?;
-      throw Exception(msg ?? 'Không thể tạo yêu cầu nạp tiền. Vui lòng thử lại.');
+      throw Exception(
+        msg ?? 'Không thể tạo yêu cầu nạp tiền. Vui lòng thử lại.',
+      );
     } catch (e) {
       if (e is Exception) rethrow;
       throw Exception('Lỗi không xác định: $e');
@@ -104,7 +107,9 @@ class WalletRepository {
     try {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       debugPrint('💸 Wallet Payment: POST /api/wallet/payment');
-      debugPrint('   requestId: $snakeCatchingRequestId | amount: $amount | type: $transactionType');
+      debugPrint(
+        '   requestId: $snakeCatchingRequestId | amount: $amount | type: $transactionType',
+      );
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       final response = await _httpService.post(
@@ -128,7 +133,8 @@ class WalletRepository {
       final msg = e.response?.data?['message'] as String?;
       if (e.response?.statusCode == 400) {
         throw Exception(msg ?? 'Số dư không đủ hoặc yêu cầu không hợp lệ.');
-      } else if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
+      } else if (e.response?.statusCode == 401 ||
+          e.response?.statusCode == 403) {
         throw Exception('Không có quyền thực hiện thanh toán.');
       }
       throw Exception(msg ?? 'Thanh toán thất bại. Vui lòng thử lại.');

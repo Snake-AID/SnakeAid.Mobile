@@ -98,24 +98,31 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     try {
       final repo = ref.read(expertCertificateRepositoryProvider);
       final certs = await repo.getMyCertificates();
-      
+
       final hasVerified = certs.any((c) => c.isVerified);
-      final hasPending = certs.any((c) => !c.isVerified && (c.rejectionReason == null || c.rejectionReason!.isEmpty));
-      
+      final hasPending = certs.any(
+        (c) =>
+            !c.isVerified &&
+            (c.rejectionReason == null || c.rejectionReason!.isEmpty),
+      );
+
       if (!mounted) return;
-      
+
       if (hasVerified) {
         await ref.read(authProvider.notifier).markUserAsVerified();
         if (mounted) context.go('/expert-home');
       } else if (hasPending) {
         context.goNamed('registration_pending', extra: user.email);
       } else {
-        context.goNamed('expert_credentials', extra: {
-          'email': user.email,
-          'fullName': user.fullName,
-          'phoneNumber': user.phoneNumber ?? '',
-          'fromLogin': 'true',
-        });
+        context.goNamed(
+          'expert_credentials',
+          extra: {
+            'email': user.email,
+            'fullName': user.fullName,
+            'phoneNumber': user.phoneNumber ?? '',
+            'fromLogin': 'true',
+          },
+        );
       }
     } catch (e) {
       if (mounted) context.go('/expert-id-documents');

@@ -150,14 +150,16 @@ class HospitalHandoverAcceptedData {
     return HospitalHandoverAcceptedData(
       incidentId:
           json['IncidentId'] as String? ?? json['incidentId'] as String? ?? '',
-      hospitalName: json['HospitalName'] as String? ??
+      hospitalName:
+          json['HospitalName'] as String? ??
           json['hospitalName'] as String? ??
           '',
-      hospitalPhone: json['HospitalPhone'] as String? ??
-          json['hospitalPhone'] as String?,
-      operatorNote: json['OperatorNote'] as String? ??
-          json['operatorNote'] as String?,
-      suggestedClientAction: json['SuggestedClientAction'] as String? ??
+      hospitalPhone:
+          json['HospitalPhone'] as String? ?? json['hospitalPhone'] as String?,
+      operatorNote:
+          json['OperatorNote'] as String? ?? json['operatorNote'] as String?,
+      suggestedClientAction:
+          json['SuggestedClientAction'] as String? ??
           json['suggestedClientAction'] as String?,
       updatedAt: json['UpdatedAt'] != null
           ? DateTime.parse(json['UpdatedAt'] as String)
@@ -221,8 +223,7 @@ class MissionHubService {
       _missionCompletedController.stream;
   Stream<String> get missionCancelledStream =>
       _missionCancelledController.stream;
-  Stream<String> get missionAbortedStream =>
-      _missionAbortedController.stream;
+  Stream<String> get missionAbortedStream => _missionAbortedController.stream;
   Stream<void> get sessionExpiredStream => _sessionExpiredController.stream;
   Stream<IncidentFalseAlarmData> get incidentFalseAlarmStream =>
       _incidentFalseAlarmController.stream;

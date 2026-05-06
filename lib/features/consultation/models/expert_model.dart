@@ -93,7 +93,8 @@ class ExpertModel {
   factory ExpertModel.fromJson(Map<String, dynamic> json) {
     // Map tất cả field names có thể có từ backend
     // accountId (production) | id (legacy/test)
-    final id = (json['accountId'] ?? json['id'] ?? json['expertId'] ?? '').toString();
+    final id = (json['accountId'] ?? json['id'] ?? json['expertId'] ?? '')
+        .toString();
 
     // specializations (production) | specialties (legacy)
     final List<dynamic> rawSpecializations =
@@ -107,48 +108,65 @@ class ExpertModel {
 
     return ExpertModel(
       id: id,
-      userId: (json['userId'] ?? json['accountId'] ?? json['id'] ?? '').toString(),
+      userId: (json['userId'] ?? json['accountId'] ?? json['id'] ?? '')
+          .toString(),
       fullName: (json['fullName'] ?? json['name'] ?? '') as String,
-      avatarUrl: (json['avatarUrl'] ?? json['profileImage'] ?? json['avatar'])
-          as String?,
+      avatarUrl:
+          (json['avatarUrl'] ?? json['profileImage'] ?? json['avatar'])
+              as String?,
       academicRank: json['academicRank'] as String?,
-      specialty: (json['specialty'] ?? json['specialization'] ??
-          (specialties.isNotEmpty ? specialties.first : null)) as String?,
+      specialty:
+          (json['specialty'] ??
+                  json['specialization'] ??
+                  (specialties.isNotEmpty ? specialties.first : null))
+              as String?,
       specialties: specialties,
       isVerified: json['isVerified'] as bool? ?? false,
       isOnline: json['isOnline'] as bool? ?? false,
       rating: ((json['rating'] ?? 0) as num).toDouble(),
       // ratingCount (production) | reviewCount/totalFeedbacks (legacy)
-      reviewCount: (json['ratingCount'] ??
-              json['reviewCount'] ??
-              json['totalFeedbacks'] ??
-              json['feedbackCount'] ??
-              0) as int,
-      consultationFee: ((json['grossConsultationFee'] ??
-              json['grossFee'] ??
-              json['consultationFee'] ??
-              json['fee'] ??
-              json['price'] ??
-              0) as num)
-          .toDouble(),
-      scheduledConsultationFee: ((json['grossScheduledConsultationFee'] ??
-              json['scheduledGrossFee'] ??
-              json['scheduledConsultationFee'] ??
-              json['consultationFee'] ??
-              json['fee'] ??
-              json['price'] ??
-              0) as num)
-          .toDouble(),
-      emergencyConsultationFee: ((json['grossEmergencyConsultationFee'] ??
-              json['emergencyGrossFee'] ??
-              json['emergencyConsultationFee'] ??
-              json['price'] ??
-              0) as num)
-          .toDouble(),
+      reviewCount:
+          (json['ratingCount'] ??
+                  json['reviewCount'] ??
+                  json['totalFeedbacks'] ??
+                  json['feedbackCount'] ??
+                  0)
+              as int,
+      consultationFee:
+          ((json['grossConsultationFee'] ??
+                      json['grossFee'] ??
+                      json['consultationFee'] ??
+                      json['fee'] ??
+                      json['price'] ??
+                      0)
+                  as num)
+              .toDouble(),
+      scheduledConsultationFee:
+          ((json['grossScheduledConsultationFee'] ??
+                      json['scheduledGrossFee'] ??
+                      json['scheduledConsultationFee'] ??
+                      json['consultationFee'] ??
+                      json['fee'] ??
+                      json['price'] ??
+                      0)
+                  as num)
+              .toDouble(),
+      emergencyConsultationFee:
+          ((json['grossEmergencyConsultationFee'] ??
+                      json['emergencyGrossFee'] ??
+                      json['emergencyConsultationFee'] ??
+                      json['price'] ??
+                      0)
+                  as num)
+              .toDouble(),
       consultationDuration: (json['consultationDuration'] ?? 30) as int,
       // biography (production) | bio/introduction/description (legacy)
-      bio: (json['biography'] ?? json['bio'] ?? json['introduction'] ?? json['description'])
-          as String?,
+      bio:
+          (json['biography'] ??
+                  json['bio'] ??
+                  json['introduction'] ??
+                  json['description'])
+              as String?,
       yearsOfExperience:
           (json['yearsOfExperience'] ?? json['experience'] ?? 0) as int,
       createdAt: json['createdAt'] != null
@@ -195,13 +213,12 @@ class ExpertModel {
 
   /// Get formatted consultation fee
   String get formattedFee {
-     final fee = (scheduledConsultationFee > 0 
-      ? scheduledConsultationFee 
-      : consultationFee).round();
-    return '${fee.toString().replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (Match m) => '${m[1]},',
-        )} VNĐ/$consultationDuration phút';
+    final fee =
+        (scheduledConsultationFee > 0
+                ? scheduledConsultationFee
+                : consultationFee)
+            .round();
+    return '${fee.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} VNĐ/$consultationDuration phút';
   }
 
   /// Get primary specialty (first in list or specialty field)

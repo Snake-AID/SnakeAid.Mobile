@@ -21,7 +21,8 @@ class SnakeFirstAidScreen extends ConsumerWidget {
       return Scaffold(
         appBar: _buildAppBar(commonName ?? 'Sơ cứu rắn cắn'),
         body: const Center(
-            child: CircularProgressIndicator(color: Color(0xFF1B5E20))),
+          child: CircularProgressIndicator(color: Color(0xFF1B5E20)),
+        ),
       );
     }
 
@@ -34,8 +35,10 @@ class SnakeFirstAidScreen extends ConsumerWidget {
             children: [
               Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
               const SizedBox(height: 12),
-              Text(state.error ?? 'Không tải được hướng dẫn sơ cứu.',
-                  style: const TextStyle(color: Colors.black54)),
+              Text(
+                state.error ?? 'Không tải được hướng dẫn sơ cứu.',
+                style: const TextStyle(color: Colors.black54),
+              ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 onPressed: () => ref
@@ -58,7 +61,8 @@ class SnakeFirstAidScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: _buildAppBar(
-          commonName != null ? 'Sơ cứu: $commonName' : guideline.guidelineName),
+        commonName != null ? 'Sơ cứu: $commonName' : guideline.guidelineName,
+      ),
       body: _FirstAidBody(guideline: guideline),
     );
   }
@@ -142,13 +146,15 @@ class _FirstAidBody extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.orange.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
-                  border:
-                      Border.all(color: Colors.orange.withOpacity(0.4)),
+                  border: Border.all(color: Colors.orange.withOpacity(0.4)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.warning_amber_rounded,
-                        color: Colors.orange, size: 18),
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.orange,
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -171,15 +177,15 @@ class _FirstAidBody extends StatelessWidget {
         if (content.steps.isNotEmpty) ...[
           const SizedBox(height: 16),
           _SectionHeader(
-              icon: Icons.format_list_numbered,
-              title: 'Các bước sơ cứu',
-              color: const Color(0xFF1565C0)),
+            icon: Icons.format_list_numbered,
+            title: 'Các bước sơ cứu',
+            color: const Color(0xFF1565C0),
+          ),
           const SizedBox(height: 10),
           ...content.steps.asMap().entries.map(
             (e) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: _StepCard(
-                  stepNumber: e.key + 1, step: e.value),
+              child: _StepCard(stepNumber: e.key + 1, step: e.value),
             ),
           ),
         ],
@@ -188,9 +194,10 @@ class _FirstAidBody extends StatelessWidget {
         if (content.dos.isNotEmpty) ...[
           const SizedBox(height: 8),
           _SectionHeader(
-              icon: Icons.check_circle_outline,
-              title: 'Nên làm',
-              color: const Color(0xFF2E7D32)),
+            icon: Icons.check_circle_outline,
+            title: 'Nên làm',
+            color: const Color(0xFF2E7D32),
+          ),
           const SizedBox(height: 10),
           ...content.dos.map(
             (d) => Padding(
@@ -204,9 +211,10 @@ class _FirstAidBody extends StatelessWidget {
         if (content.donts.isNotEmpty) ...[
           const SizedBox(height: 8),
           _SectionHeader(
-              icon: Icons.cancel_outlined,
-              title: 'Không nên làm',
-              color: const Color(0xFFB71C1C)),
+            icon: Icons.cancel_outlined,
+            title: 'Không nên làm',
+            color: const Color(0xFFB71C1C),
+          ),
           const SizedBox(height: 10),
           ...content.donts.map(
             (d) => Padding(
@@ -220,9 +228,10 @@ class _FirstAidBody extends StatelessWidget {
         if (content.notes.isNotEmpty) ...[
           const SizedBox(height: 8),
           _SectionHeader(
-              icon: Icons.info_outline,
-              title: 'Lưu ý',
-              color: Colors.orange[800]!),
+            icon: Icons.info_outline,
+            title: 'Lưu ý',
+            color: Colors.orange[800]!,
+          ),
           const SizedBox(height: 10),
           ...content.notes.map(
             (n) => Padding(
@@ -231,15 +240,17 @@ class _FirstAidBody extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.orange.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(10),
-                  border:
-                      Border.all(color: Colors.orange.withOpacity(0.3)),
+                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
                 ),
                 padding: const EdgeInsets.all(12),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.lightbulb_outline,
-                        size: 16, color: Colors.orange[700]),
+                    Icon(
+                      Icons.lightbulb_outline,
+                      size: 16,
+                      color: Colors.orange[700],
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -269,8 +280,11 @@ class _SectionHeader extends StatelessWidget {
   final String title;
   final Color color;
 
-  const _SectionHeader(
-      {required this.icon, required this.title, required this.color});
+  const _SectionHeader({
+    required this.icon,
+    required this.title,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -325,7 +339,8 @@ class _StepCard extends StatelessWidget {
           if (step.mediaUrl != null)
             ClipRRect(
               borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(12)),
+                top: Radius.circular(12),
+              ),
               child: Image.network(
                 step.mediaUrl!,
                 width: double.infinity,
@@ -405,7 +420,8 @@ class _MediaCard extends StatelessWidget {
           if (step.mediaUrl != null)
             ClipRRect(
               borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(12)),
+                top: Radius.circular(12),
+              ),
               child: Image.network(
                 step.mediaUrl!,
                 width: double.infinity,

@@ -18,7 +18,9 @@ class BlogRepository {
   /// GET /api/blogs — list all blogs (server may accept optional query params)
   Future<List<BlogModel>> getBlogs({String? status}) async {
     try {
-      debugPrint('📰 Fetching blogs${status != null ? ' (status=$status)' : ''}');
+      debugPrint(
+        '📰 Fetching blogs${status != null ? ' (status=$status)' : ''}',
+      );
       final response = await httpService.get(
         '/api/blogs',
         queryParameters: status != null ? {'status': status} : null,
@@ -72,15 +74,18 @@ class BlogRepository {
   }) async {
     try {
       debugPrint('📰 Creating blog: $title');
-      final response = await httpService.post('/api/blogs', data: {
-        'title': title,
-        'content': content,
-        'thumbnailUrl': thumbnailUrl,
-        'status': blogStatusToString(status),
-        'category': blogCategoryToString(category),
-        'tags': tags.map(blogTagToString).toList(),
-        'readingTime': readingTime,
-      });
+      final response = await httpService.post(
+        '/api/blogs',
+        data: {
+          'title': title,
+          'content': content,
+          'thumbnailUrl': thumbnailUrl,
+          'status': blogStatusToString(status),
+          'category': blogCategoryToString(category),
+          'tags': tags.map(blogTagToString).toList(),
+          'readingTime': readingTime,
+        },
+      );
       final body = response.data as Map<String, dynamic>;
       final data = body['data'] as Map<String, dynamic>;
       return BlogModel.fromJson(data);
@@ -103,15 +108,18 @@ class BlogRepository {
   }) async {
     try {
       debugPrint('📰 Updating blog #$id');
-      final response = await httpService.put('/api/blogs/$id', data: {
-        'title': title,
-        'content': content,
-        'thumbnailUrl': thumbnailUrl,
-        'status': blogStatusToString(status),
-        'category': blogCategoryToString(category),
-        'tags': tags.map(blogTagToString).toList(),
-        'readingTime': readingTime,
-      });
+      final response = await httpService.put(
+        '/api/blogs/$id',
+        data: {
+          'title': title,
+          'content': content,
+          'thumbnailUrl': thumbnailUrl,
+          'status': blogStatusToString(status),
+          'category': blogCategoryToString(category),
+          'tags': tags.map(blogTagToString).toList(),
+          'readingTime': readingTime,
+        },
+      );
       final body = response.data as Map<String, dynamic>;
       final data = body['data'] as Map<String, dynamic>;
       return BlogModel.fromJson(data);
@@ -174,10 +182,13 @@ class BlogRepository {
   /// PATCH /api/blogs/{id}/status — change status (e.g. Draft → PendingApproval)
   Future<void> updateStatus(String id, BlogStatus status) async {
     try {
-      debugPrint('📰 Updating blog #$id status → ${blogStatusToString(status)}');
-      await httpService.patch('/api/blogs/$id/status', data: {
-        'status': blogStatusToString(status),
-      });
+      debugPrint(
+        '📰 Updating blog #$id status → ${blogStatusToString(status)}',
+      );
+      await httpService.patch(
+        '/api/blogs/$id/status',
+        data: {'status': blogStatusToString(status)},
+      );
     } on DioException catch (e) {
       debugPrint('❌ updateStatus error: ${e.message}');
       rethrow;

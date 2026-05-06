@@ -10,10 +10,7 @@ import '../repository/expert_certificate_repository.dart';
 class ExpertCertificateFormScreen extends ConsumerStatefulWidget {
   final String? certificateId;
 
-  const ExpertCertificateFormScreen({
-    super.key,
-    this.certificateId,
-  });
+  const ExpertCertificateFormScreen({super.key, this.certificateId});
 
   @override
   ConsumerState<ExpertCertificateFormScreen> createState() =>
@@ -25,7 +22,7 @@ class _ExpertCertificateFormScreenState
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _orgController = TextEditingController();
-  
+
   bool _isLoading = false;
   bool _isSaving = false;
   String? _error;
@@ -33,7 +30,7 @@ class _ExpertCertificateFormScreenState
   DateTime? _issueDate;
   DateTime? _expiryDate;
   ExpertCertificate? _certificate;
-  
+
   final List<Map<String, dynamic>> _selectedFiles = [];
 
   bool get _isEdit => widget.certificateId != null;
@@ -69,7 +66,7 @@ class _ExpertCertificateFormScreenState
         _orgController.text = certificate.issuingOrganization;
         _issueDate = certificate.issueDate;
         _expiryDate = certificate.expiryDate;
-        
+
         _selectedFiles.clear();
         for (var media in certificate.reportMediaFiles) {
           if (media.id.isNotEmpty) {
@@ -82,7 +79,7 @@ class _ExpertCertificateFormScreenState
             });
           }
         }
-        
+
         _isLoading = false;
       });
     } catch (e) {
@@ -103,7 +100,9 @@ class _ExpertCertificateFormScreenState
     );
     if (picked != null) {
       // Ép về múi giờ UTC để tránh bị lùi ngày do chênh lệch +7 khi gửi lên server
-      setState(() => _issueDate = DateTime.utc(picked.year, picked.month, picked.day));
+      setState(
+        () => _issueDate = DateTime.utc(picked.year, picked.month, picked.day),
+      );
     }
   }
 
@@ -116,7 +115,9 @@ class _ExpertCertificateFormScreenState
     );
     if (picked != null) {
       // Ép về múi giờ UTC để tránh bị lùi ngày
-      setState(() => _expiryDate = DateTime.utc(picked.year, picked.month, picked.day));
+      setState(
+        () => _expiryDate = DateTime.utc(picked.year, picked.month, picked.day),
+      );
     }
   }
 
@@ -140,7 +141,7 @@ class _ExpertCertificateFormScreenState
               );
               continue;
             }
-            
+
             String sizeStr = file.size < 1024 * 1024
                 ? '${(file.size / 1024).toStringAsFixed(1)} KB'
                 : '${(file.size / (1024 * 1024)).toStringAsFixed(1)} MB';
@@ -157,7 +158,10 @@ class _ExpertCertificateFormScreenState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi chọn file: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Lỗi chọn file: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -171,9 +175,9 @@ class _ExpertCertificateFormScreenState
     if (!_formKey.currentState!.validate()) return;
 
     if (_issueDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng chọn ngày cấp')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Vui lòng chọn ngày cấp')));
       return;
     }
 
@@ -259,61 +263,61 @@ class _ExpertCertificateFormScreenState
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? _buildErrorState()
-              : Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildInfoBanner(),
-                        const SizedBox(height: 24),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _buildTextField(
-                                  controller: _nameController,
-                                  label: 'Tên chứng chỉ *',
-                                  errorMsg: 'Vui lòng nhập tên chứng chỉ',
-                                ),
-                                const SizedBox(height: 16),
-                                _buildTextField(
-                                  controller: _orgController,
-                                  label: 'Tổ chức cấp *',
-                                  errorMsg: 'Vui lòng nhập tổ chức cấp',
-                                ),
-                                const SizedBox(height: 16),
-                                _buildDatePicker(
-                                  label: 'Ngày cấp *',
-                                  date: _issueDate,
-                                  onTap: _pickIssueDate,
-                                ),
-                                const SizedBox(height: 16),
-                                _buildDatePicker(
-                                  label: 'Ngày hết hạn (không bắt buộc)',
-                                  date: _expiryDate,
-                                  onTap: _pickExpiryDate,
-                                  isOptional: true,
-                                ),
-                                const SizedBox(height: 24),
-                                _buildFileRulesBanner(),
-                                const SizedBox(height: 16),
-                                _buildUploadArea(),
-                                const SizedBox(height: 24),
-                                if (_selectedFiles.isNotEmpty) _buildImageGrid(),
-                              ],
+          ? _buildErrorState()
+          : Padding(
+              padding: const EdgeInsets.all(24),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildInfoBanner(),
+                    const SizedBox(height: 24),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildTextField(
+                              controller: _nameController,
+                              label: 'Tên chứng chỉ *',
+                              errorMsg: 'Vui lòng nhập tên chứng chỉ',
                             ),
-                          ),
+                            const SizedBox(height: 16),
+                            _buildTextField(
+                              controller: _orgController,
+                              label: 'Tổ chức cấp *',
+                              errorMsg: 'Vui lòng nhập tổ chức cấp',
+                            ),
+                            const SizedBox(height: 16),
+                            _buildDatePicker(
+                              label: 'Ngày cấp *',
+                              date: _issueDate,
+                              onTap: _pickIssueDate,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildDatePicker(
+                              label: 'Ngày hết hạn (không bắt buộc)',
+                              date: _expiryDate,
+                              onTap: _pickExpiryDate,
+                              isOptional: true,
+                            ),
+                            const SizedBox(height: 24),
+                            _buildFileRulesBanner(),
+                            const SizedBox(height: 16),
+                            _buildUploadArea(),
+                            const SizedBox(height: 24),
+                            if (_selectedFiles.isNotEmpty) _buildImageGrid(),
+                          ],
                         ),
-                        const SizedBox(height: 24),
-                        _buildSubmitButton(),
-                      ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 24),
+                    _buildSubmitButton(),
+                  ],
                 ),
+              ),
+            ),
     );
   }
 
@@ -330,8 +334,13 @@ class _ExpertCertificateFormScreenState
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _loadDetail,
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C47C2)),
-              child: const Text('Thử lại', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6C47C2),
+              ),
+              child: const Text(
+                'Thử lại',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         ),
@@ -349,17 +358,29 @@ class _ExpertCertificateFormScreenState
       ),
       child: Column(
         children: [
-          Icon(Icons.verified_outlined, size: 48, color: Theme.of(context).primaryColor),
+          Icon(
+            Icons.verified_outlined,
+            size: 48,
+            color: Theme.of(context).primaryColor,
+          ),
           const SizedBox(height: 16),
           const Text(
             'Thông Tin Chứng Chỉ',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
             'Vui lòng nhập thông tin và tải lên hình ảnh chứng chỉ chuyên môn của bạn.',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.5),
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade700,
+              height: 1.5,
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -367,7 +388,11 @@ class _ExpertCertificateFormScreenState
     );
   }
 
-  Widget _buildTextField({required TextEditingController controller, required String label, required String errorMsg}) {
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required String errorMsg,
+  }) {
     return TextFormField(
       controller: controller,
       decoration: InputDecoration(
@@ -378,7 +403,12 @@ class _ExpertCertificateFormScreenState
     );
   }
 
-  Widget _buildDatePicker({required String label, required DateTime? date, required VoidCallback onTap, bool isOptional = false}) {
+  Widget _buildDatePicker({
+    required String label,
+    required DateTime? date,
+    required VoidCallback onTap,
+    bool isOptional = false,
+  }) {
     return InkWell(
       onTap: onTap,
       child: InputDecorator(
@@ -386,13 +416,17 @@ class _ExpertCertificateFormScreenState
           labelText: label,
           border: const OutlineInputBorder(),
           suffixIcon: isOptional && date != null
-            ? IconButton(
-                icon: const Icon(Icons.close, size: 18),
-                onPressed: () => setState(() => _expiryDate = null),
-              )
-            : const Icon(Icons.calendar_today, size: 18),
+              ? IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  onPressed: () => setState(() => _expiryDate = null),
+                )
+              : const Icon(Icons.calendar_today, size: 18),
         ),
-        child: Text(date != null ? DateFormat('dd/MM/yyyy').format(date) : (isOptional ? 'Chọn ngày (nếu có)' : 'Chọn ngày')),
+        child: Text(
+          date != null
+              ? DateFormat('dd/MM/yyyy').format(date)
+              : (isOptional ? 'Chọn ngày (nếu có)' : 'Chọn ngày'),
+        ),
       ),
     );
   }
@@ -428,15 +462,26 @@ class _ExpertCertificateFormScreenState
         decoration: BoxDecoration(
           color: Theme.of(context).primaryColor.withOpacity(0.05),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Theme.of(context).primaryColor.withOpacity(0.3), width: 2),
+          border: Border.all(
+            color: Theme.of(context).primaryColor.withOpacity(0.3),
+            width: 2,
+          ),
         ),
         child: Column(
           children: [
-            Icon(Icons.cloud_upload_outlined, size: 48, color: Theme.of(context).primaryColor),
+            Icon(
+              Icons.cloud_upload_outlined,
+              size: 48,
+              color: Theme.of(context).primaryColor,
+            ),
             const SizedBox(height: 12),
             Text(
               'Nhấn để chọn hình ảnh chứng chỉ',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Theme.of(context).primaryColor),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).primaryColor,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
@@ -458,11 +503,19 @@ class _ExpertCertificateFormScreenState
           children: [
             const Text(
               'Hình ảnh đã chọn:',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
             ),
             Text(
               '${_selectedFiles.length} ảnh',
-              style: TextStyle(fontSize: 14, color: Theme.of(context).primaryColor, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context).primaryColor,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -492,25 +545,36 @@ class _ExpertCertificateFormScreenState
                       width: double.infinity,
                       height: double.infinity,
                       color: Colors.grey.shade100,
-                      child: file['path'] != null 
+                      child: file['path'] != null
                           ? Image.file(File(file['path']), fit: BoxFit.contain)
                           : file['url'] != null
-                              ? Image.network(file['url'], fit: BoxFit.contain)
-                              : Container(
-                                  color: Colors.grey.shade200,
-                                  child: Icon(Icons.image, color: Colors.grey.shade400, size: 40),
-                                ),
+                          ? Image.network(file['url'], fit: BoxFit.contain)
+                          : Container(
+                              color: Colors.grey.shade200,
+                              child: Icon(
+                                Icons.image,
+                                color: Colors.grey.shade400,
+                                size: 40,
+                              ),
+                            ),
                     ),
                   ),
                   Positioned(
-                    bottom: 0, left: 0, right: 0,
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
                     child: Container(
                       decoration: BoxDecoration(
-                        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(11)),
+                        borderRadius: const BorderRadius.vertical(
+                          bottom: Radius.circular(11),
+                        ),
                         gradient: LinearGradient(
                           begin: Alignment.bottomCenter,
                           end: Alignment.topCenter,
-                          colors: [Colors.black.withOpacity(0.8), Colors.transparent],
+                          colors: [
+                            Colors.black.withOpacity(0.8),
+                            Colors.transparent,
+                          ],
                         ),
                       ),
                       padding: const EdgeInsets.fromLTRB(8, 20, 8, 8),
@@ -519,14 +583,22 @@ class _ExpertCertificateFormScreenState
                         children: [
                           Text(
                             file['name'],
-                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
-                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                           if (file['size'] != '') ...[
                             const SizedBox(height: 2),
                             Text(
                               file['size'],
-                              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 10),
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.8),
+                                fontSize: 10,
+                              ),
                             ),
                           ],
                         ],
@@ -534,7 +606,8 @@ class _ExpertCertificateFormScreenState
                     ),
                   ),
                   Positioned(
-                    top: 4, right: 4,
+                    top: 4,
+                    right: 4,
                     child: GestureDetector(
                       onTap: () => _removeFile(index),
                       child: Container(
@@ -543,7 +616,11 @@ class _ExpertCertificateFormScreenState
                           color: Colors.black.withOpacity(0.5),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.close, color: Colors.white, size: 16),
+                        child: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 16,
+                        ),
                       ),
                     ),
                   ),
@@ -563,19 +640,28 @@ class _ExpertCertificateFormScreenState
         onPressed: _isSaving ? null : _submit,
         style: ElevatedButton.styleFrom(
           backgroundColor: Theme.of(context).primaryColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
         child: _isSaving
             ? const SizedBox(
-                height: 20, width: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
               )
             : Text(
                 _isEdit ? 'Cập Nhật Chứng Chỉ' : 'Hoàn Thành Nộp Chứng Chỉ',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
       ),
     );
   }
 }
-

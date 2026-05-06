@@ -38,19 +38,23 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
       final baseUrl = ref.read(httpServiceProvider).baseUrl;
       _presenceService = EmergencyConsultationSignalRService(baseUrl: baseUrl);
 
-      _snapshotSub = _presenceService!.onlineExpertsSnapshotStream.listen((ids) {
+      _snapshotSub = _presenceService!.onlineExpertsSnapshotStream.listen((
+        ids,
+      ) {
         if (!mounted) return;
         ref.read(expertListProvider.notifier).applyOnlineExpertsSnapshot(ids);
       });
 
-      _presenceChangedSub =
-          _presenceService!.expertPresenceChangedStream.listen((event) {
-        if (!mounted) return;
-        ref.read(expertListProvider.notifier).applyExpertPresenceChanged(
-              expertId: event.expertId,
-              isOnline: event.isOnline,
-            );
-      });
+      _presenceChangedSub = _presenceService!.expertPresenceChangedStream
+          .listen((event) {
+            if (!mounted) return;
+            ref
+                .read(expertListProvider.notifier)
+                .applyExpertPresenceChanged(
+                  expertId: event.expertId,
+                  isOnline: event.isOnline,
+                );
+          });
 
       await _presenceService!.connectAsMember();
     } catch (e) {
@@ -89,9 +93,7 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
             _buildStatsSection(expertState),
 
             // Expert List
-            Expanded(
-              child: _buildExpertList(context, expertState),
-            ),
+            Expanded(child: _buildExpertList(context, expertState)),
           ],
         ),
       ),
@@ -104,9 +106,7 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(
-          bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1),
-        ),
+        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1)),
       ),
       child: Row(
         children: [
@@ -117,10 +117,7 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
               width: 40,
               height: 40,
               alignment: Alignment.center,
-              child: const Icon(
-                Icons.arrow_back,
-                color: Color(0xFF1F2937),
-              ),
+              child: const Icon(Icons.arrow_back, color: Color(0xFF1F2937)),
             ),
           ),
 
@@ -137,10 +134,7 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
             ),
           ),
 
-          const SizedBox(
-            width: 40,
-            height: 40,
-          ),
+          const SizedBox(width: 40, height: 40),
         ],
       ),
     );
@@ -177,7 +171,10 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
                 ),
           filled: true,
           fillColor: const Color(0xFFF6F8F6),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 0,
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
@@ -244,10 +241,7 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const Icon(
-                  Icons.keyboard_arrow_down,
-                  color: Color(0xFF6B7280),
-                ),
+                const Icon(Icons.keyboard_arrow_down, color: Color(0xFF6B7280)),
               ],
             ),
           ),
@@ -259,8 +253,7 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
   /// Build stats section
   Widget _buildStatsSection(ExpertListState state) {
     final totalCount = state.filteredExperts.length;
-    final onlineCount =
-        state.filteredExperts.where((e) => e.isOnline).length;
+    final onlineCount = state.filteredExperts.where((e) => e.isOnline).length;
 
     return Container(
       color: Colors.white,
@@ -270,10 +263,7 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
         state.searchQuery.isEmpty
             ? '$totalCount chuyên gia - $onlineCount đang online'
             : '$totalCount kết quả cho "${state.searchQuery}" - $onlineCount đang online',
-        style: const TextStyle(
-          fontSize: 14,
-          color: Color(0xFF6B7280),
-        ),
+        style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
       ),
     );
   }
@@ -282,9 +272,7 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
   Widget _buildExpertList(BuildContext context, ExpertListState state) {
     if (state.isLoading) {
       return const Center(
-        child: CircularProgressIndicator(
-          color: Color(0xFF228B22),
-        ),
+        child: CircularProgressIndicator(color: Color(0xFF228B22)),
       );
     }
 
@@ -303,10 +291,7 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
               const SizedBox(height: 16),
               Text(
                 state.error!,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF6B7280),
-                ),
+                style: const TextStyle(fontSize: 16, color: Color(0xFF6B7280)),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -332,10 +317,7 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
           padding: EdgeInsets.all(24),
           child: Text(
             'Không tìm thấy chuyên gia phù hợp',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF6B7280),
-            ),
+            style: TextStyle(fontSize: 16, color: Color(0xFF6B7280)),
           ),
         ),
       );
@@ -499,11 +481,7 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
             ),
 
             // Chevron
-            const Icon(
-              Icons.chevron_right,
-              color: Color(0xFF9CA3AF),
-              size: 24,
-            ),
+            const Icon(Icons.chevron_right, color: Color(0xFF9CA3AF), size: 24),
           ],
         ),
       ),
@@ -540,11 +518,7 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.verified,
-            size: 12,
-            color: Color(0xFF3B82F6),
-          ),
+          Icon(Icons.verified, size: 12, color: Color(0xFF3B82F6)),
           SizedBox(width: 4),
           Text(
             'Đã xác minh',
@@ -577,10 +551,7 @@ class _ExpertListScreenState extends ConsumerState<ExpertListScreen> {
             children: [
               const Text(
                 'Sắp xếp theo',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               ...sortOptions.entries.map((entry) {

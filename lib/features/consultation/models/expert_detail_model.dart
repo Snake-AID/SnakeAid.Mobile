@@ -9,7 +9,8 @@ class ExpertDetailModel extends ExpertModel {
   final int totalConsultations; // Tổng số ca tư vấn
   final String averageResponseTime; // Thời gian phản hồi trung bình
   final double successRate; // Tỷ lệ thành công (%)
-  final Map<int, double> consultationFees; // Bảng giá theo thời lượng {30: 150000, 60: 200000}
+  final Map<int, double>
+  consultationFees; // Bảng giá theo thời lượng {30: 150000, 60: 200000}
   final List<AvailabilityDay> availability; // Lịch trống
   final List<ReviewModel> reviews; // Danh sách đánh giá
 
@@ -59,8 +60,12 @@ class ExpertDetailModel extends ExpertModel {
       rating: (json['rating'] ?? 0).toDouble(),
       reviewCount: json['reviewCount'] ?? 0,
       consultationFee: (json['consultationFee'] ?? 0).toDouble(),
-      scheduledConsultationFee: ((json['scheduledConsultationFee'] ?? json['consultationFee'] ?? 0) as num).toDouble(),
-      emergencyConsultationFee: ((json['emergencyConsultationFee'] ?? 0) as num).toDouble(),
+      scheduledConsultationFee:
+          ((json['scheduledConsultationFee'] ?? json['consultationFee'] ?? 0)
+                  as num)
+              .toDouble(),
+      emergencyConsultationFee: ((json['emergencyConsultationFee'] ?? 0) as num)
+          .toDouble(),
       consultationDuration: json['consultationDuration'] ?? 30,
       bio: json['bio'],
       yearsOfExperience: json['yearsOfExperience'] ?? 0,
@@ -87,13 +92,13 @@ class ExpertDetailModel extends ExpertModel {
           : {},
       availability: json['availability'] != null
           ? (json['availability'] as List)
-              .map((item) => AvailabilityDay.fromJson(item))
-              .toList()
+                .map((item) => AvailabilityDay.fromJson(item))
+                .toList()
           : [],
       reviews: json['reviews'] != null
           ? (json['reviews'] as List)
-              .map((item) => ReviewModel.fromJson(item))
-              .toList()
+                .map((item) => ReviewModel.fromJson(item))
+                .toList()
           : [],
     );
   }
@@ -148,7 +153,9 @@ class ExpertDetailModel extends ExpertModel {
       'totalConsultations': totalConsultations,
       'averageResponseTime': averageResponseTime,
       'successRate': successRate,
-      'consultationFees': consultationFees.map((k, v) => MapEntry(k.toString(), v)),
+      'consultationFees': consultationFees.map(
+        (k, v) => MapEntry(k.toString(), v),
+      ),
       'availability': availability.map((e) => e.toJson()).toList(),
       'reviews': reviews.map((e) => e.toJson()).toList(),
     });

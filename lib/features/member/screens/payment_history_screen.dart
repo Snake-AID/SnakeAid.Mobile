@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../wallet/repository/transaction_repository.dart';
@@ -25,8 +25,7 @@ class PaymentHistoryScreen extends ConsumerStatefulWidget {
       _PaymentHistoryScreenState();
 }
 
-class _PaymentHistoryScreenState
-    extends ConsumerState<PaymentHistoryScreen> {
+class _PaymentHistoryScreenState extends ConsumerState<PaymentHistoryScreen> {
   // â”€â”€ Filter state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   String? _selectedType; // null = "Tất cả"
 
@@ -117,10 +116,12 @@ class _PaymentHistoryScreenState
 
   String _formatAmount(double amount) {
     return amount
-        .toStringAsFixed(0)
-        .replaceAllMapped(
-            RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')
-        + ' đ';
+            .toStringAsFixed(0)
+            .replaceAllMapped(
+              RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+              (m) => '${m[1]}.',
+            ) +
+        ' đ';
   }
 
   String _formatDate(DateTime dt) {
@@ -152,8 +153,7 @@ class _PaymentHistoryScreenState
     ];
     if (widget.filterTypes == null) return all;
     return all
-        .where((c) =>
-            c.type == null || widget.filterTypes!.contains(c.type))
+        .where((c) => c.type == null || widget.filterTypes!.contains(c.type))
         .toList();
   }
 
@@ -182,14 +182,11 @@ class _PaymentHistoryScreenState
           Container(
             decoration: const BoxDecoration(
               color: Colors.white,
-              border: Border(
-                bottom: BorderSide(color: Color(0xFFEEEEEE)),
-              ),
+              border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
             ),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: _chips.map((c) {
                   final selected = _selectedType == c.type;
@@ -215,8 +212,7 @@ class _PaymentHistoryScreenState
 
   Widget _buildList() {
     if (_isLoading) {
-      return Center(
-          child: CircularProgressIndicator(color: widget.themeColor));
+      return Center(child: CircularProgressIndicator(color: widget.themeColor));
     }
     if (_error != null && _items.isEmpty) {
       return Center(
@@ -227,17 +223,20 @@ class _PaymentHistoryScreenState
             children: [
               Icon(Icons.error_outline, size: 60, color: Colors.grey[400]),
               const SizedBox(height: 12),
-              Text(_error!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Color(0xFF666666))),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Color(0xFF666666)),
+              ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 onPressed: _initialLoad,
                 icon: const Icon(Icons.refresh),
                 label: const Text('Thử lại'),
                 style: ElevatedButton.styleFrom(
-                    backgroundColor: widget.themeColor,
-                    foregroundColor: Colors.white),
+                  backgroundColor: widget.themeColor,
+                  foregroundColor: Colors.white,
+                ),
               ),
             ],
           ),
@@ -251,17 +250,25 @@ class _PaymentHistoryScreenState
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.receipt_long_outlined,
-                  size: 80, color: Colors.grey[400]),
+              Icon(
+                Icons.receipt_long_outlined,
+                size: 80,
+                color: Colors.grey[400],
+              ),
               const SizedBox(height: 16),
-              const Text('Chưa có giao dịch',
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF333333))),
+              const Text(
+                'Chưa có giao dịch',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF333333),
+                ),
+              ),
               const SizedBox(height: 8),
-              Text('Lịch sử giao dịch sẽ hiển thị tại đây.',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+              Text(
+                'Lịch sử giao dịch sẽ hiển thị tại đây.',
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              ),
             ],
           ),
         ),
@@ -280,8 +287,7 @@ class _PaymentHistoryScreenState
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Center(
-                child:
-                    CircularProgressIndicator(color: widget.themeColor),
+                child: CircularProgressIndicator(color: widget.themeColor),
               ),
             );
           }
@@ -346,7 +352,7 @@ class _FilterChip extends StatelessWidget {
                     color: themeColor.withOpacity(0.25),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
-                  )
+                  ),
                 ]
               : [],
         ),
@@ -423,8 +429,9 @@ class _TransactionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final credit = isCredit(transaction.transactionType);
-    final amountColor =
-        credit ? const Color(0xFF2E7D32) : const Color(0xFF333333);
+    final amountColor = credit
+        ? const Color(0xFF2E7D32)
+        : const Color(0xFF333333);
     final prefix = credit ? '+' : '-';
     final iconBg = themeColor.withOpacity(0.1);
     final iconColor = themeColor;
@@ -449,10 +456,7 @@ class _TransactionCard extends StatelessWidget {
             Container(
               width: 46,
               height: 46,
-              decoration: BoxDecoration(
-                color: iconBg,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
               child: Icon(_icon, color: iconColor, size: 22),
             ),
             const SizedBox(width: 12),

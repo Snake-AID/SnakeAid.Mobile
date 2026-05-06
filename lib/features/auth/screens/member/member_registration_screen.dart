@@ -10,22 +10,24 @@ class MemberRegistrationScreen extends ConsumerStatefulWidget {
   const MemberRegistrationScreen({super.key});
 
   @override
-  ConsumerState<MemberRegistrationScreen> createState() => _MemberRegistrationScreenState();
+  ConsumerState<MemberRegistrationScreen> createState() =>
+      _MemberRegistrationScreenState();
 }
 
-class _MemberRegistrationScreenState extends ConsumerState<MemberRegistrationScreen> {
+class _MemberRegistrationScreenState
+    extends ConsumerState<MemberRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
   bool _submitAttempted = false; // Track if user attempted to submit
-  
+
   // Password requirements
   bool _hasMinLength = false;
   bool _hasLowercase = false;
@@ -50,15 +52,19 @@ class _MemberRegistrationScreenState extends ConsumerState<MemberRegistrationScr
       _hasLowercase = password.contains(RegExp(r'[a-z]'));
       _hasUppercase = password.contains(RegExp(r'[A-Z]'));
       _hasDigit = password.contains(RegExp(r'[0-9]'));
-      _hasSpecialChar = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;/~`]'));
-      
+      _hasSpecialChar = password.contains(
+        RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;/~`]'),
+      );
+
       // Tính password strength
       // Đỏ (0.33): Chỉ có chữ hoặc chỉ số
       // Vàng (0.66): Có chữ + số
       // Xanh (1.0): Có chữ + số + ký tự đặc biệt
       if (password.isEmpty) {
         _passwordStrength = 0.0;
-      } else if (_hasDigit && (_hasLowercase || _hasUppercase) && _hasSpecialChar) {
+      } else if (_hasDigit &&
+          (_hasLowercase || _hasUppercase) &&
+          _hasSpecialChar) {
         _passwordStrength = 1.0; // Xanh - có đủ 3
       } else if (_hasDigit && (_hasLowercase || _hasUppercase)) {
         _passwordStrength = 0.66; // Vàng - có chữ + số
@@ -154,7 +160,9 @@ class _MemberRegistrationScreenState extends ConsumerState<MemberRegistrationScr
                     if (value == null || value.isEmpty) {
                       return 'Vui lòng nhập email';
                     }
-                    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                    final emailRegex = RegExp(
+                      r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                    );
                     if (!emailRegex.hasMatch(value)) {
                       return 'Email không hợp lệ';
                     }
@@ -236,7 +244,9 @@ class _MemberRegistrationScreenState extends ConsumerState<MemberRegistrationScr
                         borderRadius: BorderRadius.circular(8),
                       ),
                       elevation: 0,
-                      disabledBackgroundColor: const Color(0xFF228B22).withOpacity(0.5),
+                      disabledBackgroundColor: const Color(
+                        0xFF228B22,
+                      ).withOpacity(0.5),
                     ),
                     child: _isLoading
                         ? const SizedBox(
@@ -244,7 +254,9 @@ class _MemberRegistrationScreenState extends ConsumerState<MemberRegistrationScr
                             height: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           )
                         : const Text(
@@ -327,53 +339,31 @@ class _MemberRegistrationScreenState extends ConsumerState<MemberRegistrationScr
           validator: validator,
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(
-              color: Color(0xFFBDBDBD),
-              fontSize: 14,
-            ),
+            hintStyle: const TextStyle(color: Color(0xFFBDBDBD), fontSize: 14),
             suffixIcon: suffixIcon != null
-                ? Icon(
-                    suffixIcon,
-                    color: const Color(0xFF666666),
-                    size: 20,
-                  )
+                ? Icon(suffixIcon, color: const Color(0xFF666666), size: 20)
                 : null,
             filled: true,
             fillColor: Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Color(0xFFDDDDDD),
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Color(0xFFDDDDDD), width: 1),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Color(0xFFDDDDDD),
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Color(0xFFDDDDDD), width: 1),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Color(0xFF228B22),
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Color(0xFF228B22), width: 1),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Colors.red,
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Colors.red, width: 1),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Colors.red,
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Colors.red, width: 1),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
@@ -414,10 +404,7 @@ class _MemberRegistrationScreenState extends ConsumerState<MemberRegistrationScr
           validator: validator,
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(
-              color: Color(0xFFBDBDBD),
-              fontSize: 14,
-            ),
+            hintStyle: const TextStyle(color: Color(0xFFBDBDBD), fontSize: 14),
             suffixIcon: IconButton(
               icon: Icon(
                 isPasswordVisible ? Icons.visibility : Icons.visibility_off,
@@ -430,38 +417,23 @@ class _MemberRegistrationScreenState extends ConsumerState<MemberRegistrationScr
             fillColor: Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Color(0xFFDDDDDD),
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Color(0xFFDDDDDD), width: 1),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Color(0xFFDDDDDD),
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Color(0xFFDDDDDD), width: 1),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Color(0xFF228B22),
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Color(0xFF228B22), width: 1),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Colors.red,
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Colors.red, width: 1),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Colors.red,
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Colors.red, width: 1),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
@@ -516,7 +488,10 @@ class _MemberRegistrationScreenState extends ConsumerState<MemberRegistrationScr
           Row(
             children: [
               Expanded(
-                child: _buildPasswordRequirement('Ít nhất 8 ký tự', _hasMinLength),
+                child: _buildPasswordRequirement(
+                  'Ít nhất 8 ký tự',
+                  _hasMinLength,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -528,11 +503,17 @@ class _MemberRegistrationScreenState extends ConsumerState<MemberRegistrationScr
           Row(
             children: [
               Expanded(
-                child: _buildPasswordRequirement('Ít nhất 1 chữ hoa (A-Z)', _hasUppercase),
+                child: _buildPasswordRequirement(
+                  'Ít nhất 1 chữ hoa (A-Z)',
+                  _hasUppercase,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _buildPasswordRequirement('Ký tự đặc biệt (!@#\$...)', _hasSpecialChar),
+                child: _buildPasswordRequirement(
+                  'Ký tự đặc biệt (!@#\$...)',
+                  _hasSpecialChar,
+                ),
               ),
             ],
           ),
@@ -543,19 +524,15 @@ class _MemberRegistrationScreenState extends ConsumerState<MemberRegistrationScr
 
   Widget _buildPasswordRequirement(String requirement, bool isMet) {
     // Nếu chưa submit, hiển thị xám. Nếu đã submit, hiển thị xanh/đỏ
-    final color = isMet 
+    final color = isMet
         ? const Color(0xFF228B22) // Xanh khi đạt yêu cầu
-        : (_submitAttempted 
-            ? const Color(0xFFFF4136) // Đỏ khi đã submit mà chưa đạt
-            : Colors.grey.shade400); // Xám khi chưa submit
-    
+        : (_submitAttempted
+              ? const Color(0xFFFF4136) // Đỏ khi đã submit mà chưa đạt
+              : Colors.grey.shade400); // Xám khi chưa submit
+
     return Row(
       children: [
-        Icon(
-          isMet ? Icons.check_circle : Icons.cancel,
-          size: 16,
-          color: color,
-        ),
+        Icon(isMet ? Icons.check_circle : Icons.cancel, size: 16, color: color),
         const SizedBox(width: 8),
         Text(
           requirement,
@@ -614,7 +591,9 @@ class _MemberRegistrationScreenState extends ConsumerState<MemberRegistrationScr
         // Hiển thị thông báo thành công
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Đăng ký thành công! Mã OTP đã được gửi đến email của bạn'),
+            content: Text(
+              'Đăng ký thành công! Mã OTP đã được gửi đến email của bạn',
+            ),
             backgroundColor: Color(0xFF228B22),
           ),
         );

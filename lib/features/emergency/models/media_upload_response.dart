@@ -31,8 +31,6 @@ class MediaData {
   MediaData({required this.id});
 
   factory MediaData.fromJson(Map<String, dynamic> json) {
-    return MediaData(
-      id: json['id'] ?? '',
-    );
+    return MediaData(id: json['id'] ?? '');
   }
 }

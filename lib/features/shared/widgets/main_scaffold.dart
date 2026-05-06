@@ -11,10 +11,7 @@ import '../../notifications/providers/notification_inbox_provider.dart';
 class MainScaffold extends ConsumerStatefulWidget {
   final int initialIndex;
 
-  const MainScaffold({
-    super.key,
-    this.initialIndex = 0,
-  });
+  const MainScaffold({super.key, this.initialIndex = 0});
 
   @override
   ConsumerState<MainScaffold> createState() => _MainScaffoldState();
@@ -60,12 +57,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(
-            color: Colors.grey[200]!,
-            width: 1,
-          ),
-        ),
+        border: Border(top: BorderSide(color: Colors.grey[200]!, width: 1)),
       ),
       child: SafeArea(
         child: SizedBox(
@@ -131,10 +123,7 @@ class _NavItem extends StatelessWidget {
         decoration: BoxDecoration(
           border: isActive
               ? const Border(
-                  top: BorderSide(
-                    color: Color(0xFF228B22),
-                    width: 3,
-                  ),
+                  top: BorderSide(color: Color(0xFF228B22), width: 3),
                 )
               : null,
         ),

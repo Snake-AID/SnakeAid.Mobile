@@ -93,7 +93,9 @@ class QuickActionButtons extends StatelessWidget {
         color: backgroundColor,
         gradient: gradient,
         borderRadius: BorderRadius.circular(20),
-        border: borderColor != null ? Border.all(color: borderColor, width: 1.5) : null,
+        border: borderColor != null
+            ? Border.all(color: borderColor, width: 1.5)
+            : null,
         boxShadow: [
           BoxShadow(
             color: shadowColor,
@@ -108,7 +110,10 @@ class QuickActionButtons extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(20),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 8.0),
+            padding: const EdgeInsets.symmetric(
+              vertical: 16.0,
+              horizontal: 8.0,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               mainAxisAlignment: MainAxisAlignment.center,
@@ -119,11 +124,7 @@ class QuickActionButtons extends StatelessWidget {
                     color: iconBackgroundColor,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    icon,
-                    color: iconColor,
-                    size: 26,
-                  ),
+                  child: Icon(icon, color: iconColor, size: 26),
                 ),
                 const SizedBox(height: 12),
                 Column(

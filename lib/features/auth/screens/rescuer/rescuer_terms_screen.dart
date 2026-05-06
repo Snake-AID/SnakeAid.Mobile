@@ -9,10 +9,7 @@ import '../../repository/auth_repository.dart';
 class RescuerTermsScreen extends ConsumerStatefulWidget {
   final Map<String, String> registrationData;
 
-  const RescuerTermsScreen({
-    super.key,
-    required this.registrationData,
-  });
+  const RescuerTermsScreen({super.key, required this.registrationData});
 
   @override
   ConsumerState<RescuerTermsScreen> createState() => _RescuerTermsScreenState();
@@ -41,7 +38,7 @@ class _RescuerTermsScreenState extends ConsumerState<RescuerTermsScreen> {
     if (_scrollController.hasClients) {
       final maxScroll = _scrollController.position.maxScrollExtent;
       final currentScroll = _scrollController.position.pixels;
-      
+
       // Check if scrolled to bottom (with 50px threshold)
       if (currentScroll >= maxScroll - 50 && !_hasScrolledToBottom) {
         setState(() {
@@ -102,83 +99,59 @@ class _RescuerTermsScreenState extends ConsumerState<RescuerTermsScreen> {
                     const SizedBox(height: 8),
                     const Text(
                       'Vui lòng đọc kỹ các điều khoản sau đây',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF666666),
-                      ),
+                      style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
                     ),
                     const SizedBox(height: 24),
 
                     // Terms Content
-                    _buildTermSection(
-                      '1. Trách nhiệm và Nghĩa vụ',
-                      [
-                        'Cung cấp dịch vụ cứu hộ rắn chuyên nghiệp, an toàn và hiệu quả.',
-                        'Tuân thủ các quy định pháp luật về bảo vệ động vật hoang dã.',
-                        'Đảm bảo trang thiết bị cứu hộ đầy đủ và đáp ứng tiêu chuẩn.',
-                        'Có bảo hiểm trách nhiệm nghề nghiệp (nếu áp dụng).',
-                        'Thông báo kịp thời khi không thể thực hiện nhiệm vụ.',
-                      ],
-                    ),
+                    _buildTermSection('1. Trách nhiệm và Nghĩa vụ', [
+                      'Cung cấp dịch vụ cứu hộ rắn chuyên nghiệp, an toàn và hiệu quả.',
+                      'Tuân thủ các quy định pháp luật về bảo vệ động vật hoang dã.',
+                      'Đảm bảo trang thiết bị cứu hộ đầy đủ và đáp ứng tiêu chuẩn.',
+                      'Có bảo hiểm trách nhiệm nghề nghiệp (nếu áp dụng).',
+                      'Thông báo kịp thời khi không thể thực hiện nhiệm vụ.',
+                    ]),
 
-                    _buildTermSection(
-                      '2. Quyền lợi',
-                      [
-                        'Nhận phí dịch vụ theo thỏa thuận với khách hàng.',
-                        'Được hỗ trợ về mặt thông tin và kỹ thuật từ hệ thống.',
-                        'Được bảo vệ quyền lợi khi thực hiện đúng quy trình.',
-                        'Tham gia các khóa đào tạo và nâng cao kỹ năng.',
-                      ],
-                    ),
+                    _buildTermSection('2. Quyền lợi', [
+                      'Nhận phí dịch vụ theo thỏa thuận với khách hàng.',
+                      'Được hỗ trợ về mặt thông tin và kỹ thuật từ hệ thống.',
+                      'Được bảo vệ quyền lợi khi thực hiện đúng quy trình.',
+                      'Tham gia các khóa đào tạo và nâng cao kỹ năng.',
+                    ]),
 
-                    _buildTermSection(
-                      '3. Quy trình cứu hộ',
-                      [
-                        'Xác nhận yêu cầu cứu hộ trong vòng 5-10 phút.',
-                        'Đánh giá tình huống và thông báo thời gian đến hiện trường.',
-                        'Thực hiện cứu hộ theo đúng quy trình an toàn.',
-                        'Tư vấn cho khách hàng về phòng ngừa và xử lý.',
-                        'Báo cáo kết quả và cập nhật trạng thái trên hệ thống.',
-                      ],
-                    ),
+                    _buildTermSection('3. Quy trình cứu hộ', [
+                      'Xác nhận yêu cầu cứu hộ trong vòng 5-10 phút.',
+                      'Đánh giá tình huống và thông báo thời gian đến hiện trường.',
+                      'Thực hiện cứu hộ theo đúng quy trình an toàn.',
+                      'Tư vấn cho khách hàng về phòng ngừa và xử lý.',
+                      'Báo cáo kết quả và cập nhật trạng thái trên hệ thống.',
+                    ]),
 
-                    _buildTermSection(
-                      '4. An toàn',
-                      [
-                        'Ưu tiên an toàn của bản thân và mọi người xung quanh.',
-                        'Không cố gắng cứu hộ khi điều kiện không đảm bảo.',
-                        'Sử dụng đúng trang thiết bị bảo hộ.',
-                        'Thông báo ngay khi gặp tình huống nguy hiểm.',
-                      ],
-                    ),
+                    _buildTermSection('4. An toàn', [
+                      'Ưu tiên an toàn của bản thân và mọi người xung quanh.',
+                      'Không cố gắng cứu hộ khi điều kiện không đảm bảo.',
+                      'Sử dụng đúng trang thiết bị bảo hộ.',
+                      'Thông báo ngay khi gặp tình huống nguy hiểm.',
+                    ]),
 
-                    _buildTermSection(
-                      '5. Đạo đức nghề nghiệp',
-                      [
-                        'Tôn trọng khách hàng và giữ bí mật thông tin cá nhân.',
-                        'Không lạm dụng vị trí để yêu cầu phí không hợp lý.',
-                        'Hợp tác với các cứu hộ viên khác khi cần thiết.',
-                        'Thực hiện đúng cam kết với khách hàng và hệ thống.',
-                      ],
-                    ),
+                    _buildTermSection('5. Đạo đức nghề nghiệp', [
+                      'Tôn trọng khách hàng và giữ bí mật thông tin cá nhân.',
+                      'Không lạm dụng vị trí để yêu cầu phí không hợp lý.',
+                      'Hợp tác với các cứu hộ viên khác khi cần thiết.',
+                      'Thực hiện đúng cam kết với khách hàng và hệ thống.',
+                    ]),
 
-                    _buildTermSection(
-                      '6. Xử lý vi phạm',
-                      [
-                        'Vi phạm quy định có thể dẫn đến cảnh cáo hoặc đình chỉ tài khoản.',
-                        'Khiếu nại từ khách hàng sẽ được xem xét và xử lý công bằng.',
-                        'Quyền khiếu nại được đảm bảo trong quá trình xử lý.',
-                      ],
-                    ),
+                    _buildTermSection('6. Xử lý vi phạm', [
+                      'Vi phạm quy định có thể dẫn đến cảnh cáo hoặc đình chỉ tài khoản.',
+                      'Khiếu nại từ khách hàng sẽ được xem xét và xử lý công bằng.',
+                      'Quyền khiếu nại được đảm bảo trong quá trình xử lý.',
+                    ]),
 
-                    _buildTermSection(
-                      '7. Cam kết',
-                      [
-                        'Tôi cam kết đã đọc, hiểu rõ và đồng ý với tất cả các điều khoản trên.',
-                        'Tôi cam kết thực hiện đúng trách nhiệm và nghĩa vụ của người cứu hộ.',
-                        'Tôi hiểu rằng mọi vi phạm sẽ bị xử lý theo quy định.',
-                      ],
-                    ),
+                    _buildTermSection('7. Cam kết', [
+                      'Tôi cam kết đã đọc, hiểu rõ và đồng ý với tất cả các điều khoản trên.',
+                      'Tôi cam kết thực hiện đúng trách nhiệm và nghĩa vụ của người cứu hộ.',
+                      'Tôi hiểu rằng mọi vi phạm sẽ bị xử lý theo quy định.',
+                    ]),
 
                     const SizedBox(height: 24),
 
@@ -189,9 +162,7 @@ class _RescuerTermsScreenState extends ConsumerState<RescuerTermsScreen> {
                         decoration: BoxDecoration(
                           color: const Color(0xFFFFF3CD),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: const Color(0xFFFFE69C),
-                          ),
+                          border: Border.all(color: const Color(0xFFFFE69C)),
                         ),
                         child: Row(
                           children: const [
@@ -288,7 +259,10 @@ class _RescuerTermsScreenState extends ConsumerState<RescuerTermsScreen> {
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: (_hasScrolledToBottom && _agreedToTerms && !_isLoading)
+                      onPressed:
+                          (_hasScrolledToBottom &&
+                              _agreedToTerms &&
+                              !_isLoading)
                           ? _handleContinue
                           : null,
                       style: ElevatedButton.styleFrom(
@@ -298,7 +272,9 @@ class _RescuerTermsScreenState extends ConsumerState<RescuerTermsScreen> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         elevation: 0,
-                        disabledBackgroundColor: const Color(0xFF228B22).withOpacity(0.3),
+                        disabledBackgroundColor: const Color(
+                          0xFF228B22,
+                        ).withOpacity(0.3),
                       ),
                       child: _isLoading
                           ? const SizedBox(
@@ -306,7 +282,9 @@ class _RescuerTermsScreenState extends ConsumerState<RescuerTermsScreen> {
                               height: 24,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               ),
                             )
                           : const Text(
@@ -342,32 +320,34 @@ class _RescuerTermsScreenState extends ConsumerState<RescuerTermsScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          ...points.map((point) => Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '• ',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Color(0xFF228B22),
-                        fontWeight: FontWeight.bold,
+          ...points.map(
+            (point) => Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '• ',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Color(0xFF228B22),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      point,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF666666),
+                        height: 1.5,
                       ),
                     ),
-                    Expanded(
-                      child: Text(
-                        point,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF666666),
-                          height: 1.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              )),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -410,7 +390,9 @@ class _RescuerTermsScreenState extends ConsumerState<RescuerTermsScreen> {
         // Hiển thị thông báo thành công
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Đăng ký thành công! Mã OTP đã được gửi đến email của bạn'),
+            content: Text(
+              'Đăng ký thành công! Mã OTP đã được gửi đến email của bạn',
+            ),
             backgroundColor: Color(0xFFFF8800),
           ),
         );
@@ -430,7 +412,7 @@ class _RescuerTermsScreenState extends ConsumerState<RescuerTermsScreen> {
         setState(() {
           _isLoading = false;
         });
-        
+
         // Hiển thị lỗi
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

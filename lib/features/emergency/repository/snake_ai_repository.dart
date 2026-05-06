@@ -128,9 +128,7 @@ class SnakeAiRepository {
 
       final response = await httpService.post(
         '/api/incidents/$incidentId/identify/ai',
-        data: {
-          'recognitionResultId': recognitionResultId,
-        },
+        data: {'recognitionResultId': recognitionResultId},
       );
 
       debugPrint('✅ Identification confirmed successfully');
@@ -155,7 +153,9 @@ class SnakeAiRepository {
   }) async {
     try {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      debugPrint('🩺 Getting first aid recommendation for incident: $incidentId');
+      debugPrint(
+        '🩺 Getting first aid recommendation for incident: $incidentId',
+      );
 
       final response = await httpService.get(
         '/api/first-aid-guidelines/recommendation/incident/$incidentId',

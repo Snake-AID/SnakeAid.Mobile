@@ -5,7 +5,9 @@ import '../../../core/providers/http_provider.dart';
 import '../../../core/services/http_service.dart';
 import '../models/rescuer_profile.dart';
 
-final rescuerProfileRepositoryProvider = Provider<RescuerProfileRepository>((ref) {
+final rescuerProfileRepositoryProvider = Provider<RescuerProfileRepository>((
+  ref,
+) {
   final httpService = ref.watch(httpServiceProvider);
   return RescuerProfileRepository(httpService: httpService);
 });
@@ -14,7 +16,7 @@ class RescuerProfileRepository {
   final HttpService _httpService;
 
   RescuerProfileRepository({required HttpService httpService})
-      : _httpService = httpService;
+    : _httpService = httpService;
 
   /// GET /api/rescuers/me/profile
   Future<RescuerProfile> getMyProfile() async {

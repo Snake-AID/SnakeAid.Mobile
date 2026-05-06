@@ -87,10 +87,14 @@ class _ExpertLoginScreenState extends ConsumerState<ExpertLoginScreen> {
         try {
           final repo = ref.read(expertCertificateRepositoryProvider);
           final certs = await repo.getMyCertificates();
-          
+
           final hasVerified = certs.any((c) => c.isVerified);
-          final hasPending = certs.any((c) => !c.isVerified && (c.rejectionReason == null || c.rejectionReason!.isEmpty));
-          
+          final hasPending = certs.any(
+            (c) =>
+                !c.isVerified &&
+                (c.rejectionReason == null || c.rejectionReason!.isEmpty),
+          );
+
           if (!mounted) return;
           if (hasVerified) {
             await ref.read(authProvider.notifier).markUserAsVerified();
@@ -99,12 +103,15 @@ class _ExpertLoginScreenState extends ConsumerState<ExpertLoginScreen> {
             context.goNamed('registration_pending', extra: user?.email ?? '');
           } else {
             // Chưa có chứng chỉ hoặc tất cả đều bị Reject -> Bắt nộp lại
-            context.goNamed('expert_credentials', extra: {
-              'email': user?.email ?? '',
-              'fullName': user?.fullName ?? '',
-              'phoneNumber': user?.phoneNumber ?? '',
-              'fromLogin': 'true',
-            });
+            context.goNamed(
+              'expert_credentials',
+              extra: {
+                'email': user?.email ?? '',
+                'fullName': user?.fullName ?? '',
+                'phoneNumber': user?.phoneNumber ?? '',
+                'fromLogin': 'true',
+              },
+            );
           }
         } catch (e) {
           if (!mounted) return;

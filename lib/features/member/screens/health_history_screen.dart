@@ -16,10 +16,7 @@ class HealthHistoryScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border(
-                bottom: BorderSide(
-                  color: const Color(0xFFDDDDDD),
-                  width: 1,
-                ),
+                bottom: BorderSide(color: const Color(0xFFDDDDDD), width: 1),
               ),
             ),
             child: SafeArea(
@@ -65,7 +62,9 @@ class HealthHistoryScreen extends StatelessWidget {
                         onPressed: () {
                           // TODO: Implement filter
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Bộ lọc - Đang phát triển')),
+                            const SnackBar(
+                              content: Text('Bộ lọc - Đang phát triển'),
+                            ),
                           );
                         },
                       ),
@@ -276,10 +275,7 @@ class _IncidentCard extends StatelessWidget {
             children: [
               const Text(
                 'Loài rắn:',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF666666),
-                ),
+                style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
               ),
               Row(
                 children: [
@@ -323,10 +319,7 @@ class _IncidentCard extends StatelessWidget {
             children: [
               const Text(
                 'Trạng thái:',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF666666),
-                ),
+                style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
               ),
               Row(
                 children: [
@@ -352,27 +345,17 @@ class _IncidentCard extends StatelessWidget {
           // Location
           Row(
             children: [
-              Icon(
-                Icons.location_on,
-                size: 16,
-                color: const Color(0xFF666666),
-              ),
+              Icon(Icons.location_on, size: 16, color: const Color(0xFF666666)),
               const SizedBox(width: 4),
               Text(
                 location,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF666666),
-                ),
+                style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
               ),
             ],
           ),
           const SizedBox(height: 12),
           // Divider and View Details
-          Container(
-            height: 1,
-            color: const Color(0xFFDDDDDD),
-          ),
+          Container(height: 1, color: const Color(0xFFDDDDDD)),
           const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerRight,
@@ -423,10 +406,7 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'Các ca rắn cắn sẽ được lưu tại đây.',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
           ],
         ),

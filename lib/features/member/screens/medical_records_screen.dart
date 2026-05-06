@@ -16,7 +16,8 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen> {
   String _chronicDiseases = 'Cao huyết áp';
   String _surgeries = 'Phẫu thuật ruột thừa (2020)';
   String _familyHistory = 'Đái tháo đường (Cha)';
-  String _emergencyNotes = '⚠️ Dị ứng nghiêm trọng với Penicillin\n⚠️ Đang dùng thuốc chống đông máu';
+  String _emergencyNotes =
+      '⚠️ Dị ứng nghiêm trọng với Penicillin\n⚠️ Đang dùng thuốc chống đông máu';
 
   @override
   Widget build(BuildContext context) {
@@ -29,10 +30,7 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border(
-                bottom: BorderSide(
-                  color: const Color(0xFFDDDDDD),
-                  width: 1,
-                ),
+                bottom: BorderSide(color: const Color(0xFFDDDDDD), width: 1),
               ),
             ),
             child: SafeArea(
@@ -71,10 +69,7 @@ class _MedicalRecordsScreenState extends State<MedicalRecordsScreen> {
                       top: 0,
                       bottom: 0,
                       child: IconButton(
-                        icon: const Icon(
-                          Icons.edit,
-                          color: Color(0xFF228B22),
-                        ),
+                        icon: const Icon(Icons.edit, color: Color(0xFF228B22)),
                         onPressed: () {
                           _showEditDialog();
                         },
@@ -374,11 +369,7 @@ class _SectionCard extends StatelessWidget {
                   color: iconColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                  size: 22,
-                ),
+                child: Icon(icon, color: iconColor, size: 22),
               ),
               const SizedBox(width: 12),
               Text(
@@ -415,11 +406,7 @@ class _InfoRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          icon,
-          size: 20,
-          color: const Color(0xFF888888),
-        ),
+        Icon(icon, size: 20, color: const Color(0xFF888888)),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -538,7 +525,8 @@ class _EditMedicalRecordsDialog extends StatefulWidget {
   });
 
   @override
-  State<_EditMedicalRecordsDialog> createState() => _EditMedicalRecordsDialogState();
+  State<_EditMedicalRecordsDialog> createState() =>
+      _EditMedicalRecordsDialogState();
 }
 
 class _EditMedicalRecordsDialogState extends State<_EditMedicalRecordsDialog> {
@@ -553,20 +541,40 @@ class _EditMedicalRecordsDialogState extends State<_EditMedicalRecordsDialog> {
   late String _selectedBloodType;
 
   final List<String> _bloodTypes = [
-    'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Không rõ'
+    'A+',
+    'A-',
+    'B+',
+    'B-',
+    'AB+',
+    'AB-',
+    'O+',
+    'O-',
+    'Không rõ',
   ];
 
   @override
   void initState() {
     super.initState();
     _selectedBloodType = widget.bloodType;
-    _drugAllergiesController = TextEditingController(text: widget.drugAllergies);
-    _foodAllergiesController = TextEditingController(text: widget.foodAllergies);
-    _otherAllergiesController = TextEditingController(text: widget.otherAllergies);
-    _chronicDiseasesController = TextEditingController(text: widget.chronicDiseases);
+    _drugAllergiesController = TextEditingController(
+      text: widget.drugAllergies,
+    );
+    _foodAllergiesController = TextEditingController(
+      text: widget.foodAllergies,
+    );
+    _otherAllergiesController = TextEditingController(
+      text: widget.otherAllergies,
+    );
+    _chronicDiseasesController = TextEditingController(
+      text: widget.chronicDiseases,
+    );
     _surgeriesController = TextEditingController(text: widget.surgeries);
-    _familyHistoryController = TextEditingController(text: widget.familyHistory);
-    _emergencyNotesController = TextEditingController(text: widget.emergencyNotes);
+    _familyHistoryController = TextEditingController(
+      text: widget.familyHistory,
+    );
+    _emergencyNotesController = TextEditingController(
+      text: widget.emergencyNotes,
+    );
   }
 
   @override
@@ -585,9 +593,7 @@ class _EditMedicalRecordsDialogState extends State<_EditMedicalRecordsDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -626,10 +632,7 @@ class _EditMedicalRecordsDialogState extends State<_EditMedicalRecordsDialog> {
                     ),
                   ),
                   items: _bloodTypes.map((type) {
-                    return DropdownMenuItem(
-                      value: type,
-                      child: Text(type),
-                    );
+                    return DropdownMenuItem(value: type, child: Text(type));
                   }).toList(),
                   onChanged: (value) {
                     if (value != null) {
@@ -841,9 +844,7 @@ class _EditMedicalRecordsDialogState extends State<_EditMedicalRecordsDialog> {
                       ),
                       child: const Text(
                         'Lưu',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],

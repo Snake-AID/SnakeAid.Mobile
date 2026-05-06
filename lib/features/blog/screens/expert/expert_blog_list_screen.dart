@@ -12,8 +12,7 @@ class ExpertBlogListScreen extends ConsumerStatefulWidget {
       _ExpertBlogListScreenState();
 }
 
-class _ExpertBlogListScreenState
-    extends ConsumerState<ExpertBlogListScreen>
+class _ExpertBlogListScreenState extends ConsumerState<ExpertBlogListScreen>
     with SingleTickerProviderStateMixin {
   static const _purple = Color(0xFF6C47C2);
 
@@ -60,32 +59,35 @@ class _ExpertBlogListScreenState
           indicatorColor: Colors.white,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white60,
-          labelStyle:
-              const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+          labelStyle: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+          ),
           unselectedLabelStyle: const TextStyle(fontSize: 13),
           tabs: _tabs.map((t) => Tab(text: t.label)).toList(),
         ),
         elevation: 0,
       ),
       body: state.isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: _purple))
+          ? const Center(child: CircularProgressIndicator(color: _purple))
           : state.error != null
-              ? _ErrorView(error: state.error!, onRetry: notifier.refresh)
-              : TabBarView(
-                  controller: _tabController,
-                  children: _tabs
-                      .map((t) => _BlogTabContent(
-                            blogs: t.status == null
-                                ? state.blogs
-                                : state.blogs
-                                    .where((b) => b.status == t.status)
-                                    .toList(),
-                            notifier: notifier,
-                            onRefresh: notifier.refresh,
-                          ))
-                      .toList(),
-                ),
+          ? _ErrorView(error: state.error!, onRetry: notifier.refresh)
+          : TabBarView(
+              controller: _tabController,
+              children: _tabs
+                  .map(
+                    (t) => _BlogTabContent(
+                      blogs: t.status == null
+                          ? state.blogs
+                          : state.blogs
+                                .where((b) => b.status == t.status)
+                                .toList(),
+                      notifier: notifier,
+                      onRefresh: notifier.refresh,
+                    ),
+                  )
+                  .toList(),
+            ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           await context.push('/expert/blogs/new');
@@ -119,8 +121,10 @@ class _BlogTabContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (blogs.isEmpty) {
       return const Center(
-        child: Text('Không có bài viết nào',
-            style: TextStyle(color: Colors.grey)),
+        child: Text(
+          'Không có bài viết nào',
+          style: TextStyle(color: Colors.grey),
+        ),
       );
     }
 
@@ -145,8 +149,10 @@ class _BlogTabContent extends ConsumerWidget {
               },
               onSubmit: blog.status == BlogStatus.draft
                   ? () async {
-                      final confirmed =
-                          await _confirmSubmit(context, blog.title);
+                      final confirmed = await _confirmSubmit(
+                        context,
+                        blog.title,
+                      );
                       if (confirmed == true) {
                         await notifier.submitForApproval(blog: blog);
                         if (context.mounted) {
@@ -186,12 +192,14 @@ class _BlogTabContent extends ConsumerWidget {
         content: Text('Bạn có chắc muốn xoá "$title"?'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Huỷ')),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Huỷ'),
+          ),
           TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: const Text('Xoá')),
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Xoá'),
+          ),
         ],
       ),
     );
@@ -205,13 +213,16 @@ class _BlogTabContent extends ConsumerWidget {
         content: Text('Gửi "$title" để chờ duyệt?'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Huỷ')),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Huỷ'),
+          ),
           TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF6C47C2)),
-              child: const Text('Đăng')),
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF6C47C2),
+            ),
+            child: const Text('Đăng'),
+          ),
         ],
       ),
     );
@@ -238,11 +249,11 @@ class _ExpertBlogCard extends StatelessWidget {
   static const _purple = Color(0xFF6C47C2);
 
   Color _statusColor(BlogStatus s) => switch (s) {
-        BlogStatus.draft => Colors.grey,
-        BlogStatus.pendingApproval => Colors.orange,
-        BlogStatus.published => const Color(0xFF228B22),
-        BlogStatus.rejected => Colors.red,
-      };
+    BlogStatus.draft => Colors.grey,
+    BlogStatus.pendingApproval => Colors.orange,
+    BlogStatus.published => const Color(0xFF228B22),
+    BlogStatus.rejected => Colors.red,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -263,8 +274,7 @@ class _ExpertBlogCard extends StatelessWidget {
         children: [
           // Thumbnail
           ClipRRect(
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(16)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             child: Image.network(
               blog.thumbnailUrl,
               height: 140,
@@ -288,7 +298,9 @@ class _ExpertBlogCard extends StatelessWidget {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: _statusColor(blog.status).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
@@ -305,17 +317,16 @@ class _ExpertBlogCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: _purple.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         blogCategoryLabel(blog.category),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: _purple,
-                        ),
+                        style: const TextStyle(fontSize: 11, color: _purple),
                       ),
                     ),
                   ],
@@ -348,14 +359,19 @@ class _ExpertBlogCard extends StatelessWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.info_outline,
-                            size: 14, color: Colors.red),
+                        const Icon(
+                          Icons.info_outline,
+                          size: 14,
+                          color: Colors.red,
+                        ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             'Lý do từ chối: ${blog.rejectionReason}',
                             style: const TextStyle(
-                                fontSize: 12, color: Colors.red),
+                              fontSize: 12,
+                              color: Colors.red,
+                            ),
                           ),
                         ),
                       ],
@@ -367,19 +383,27 @@ class _ExpertBlogCard extends StatelessWidget {
                 // Stats
                 Row(
                   children: [
-                    const Icon(Icons.visibility_outlined,
-                        size: 13, color: Colors.grey),
+                    const Icon(
+                      Icons.visibility_outlined,
+                      size: 13,
+                      color: Colors.grey,
+                    ),
                     const SizedBox(width: 4),
-                    Text('${blog.viewCount}',
-                        style: const TextStyle(
-                            fontSize: 12, color: Colors.grey)),
+                    Text(
+                      '${blog.viewCount}',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
                     const SizedBox(width: 10),
-                    const Icon(Icons.favorite_border,
-                        size: 13, color: Colors.grey),
+                    const Icon(
+                      Icons.favorite_border,
+                      size: 13,
+                      color: Colors.grey,
+                    ),
                     const SizedBox(width: 4),
-                    Text('${blog.likeCount}',
-                        style: const TextStyle(
-                            fontSize: 12, color: Colors.grey)),
+                    Text(
+                      '${blog.likeCount}',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
                   ],
                 ),
 
@@ -394,22 +418,21 @@ class _ExpertBlogCard extends StatelessWidget {
                         onPressed: onSubmit,
                         icon: const Icon(Icons.send, size: 16),
                         label: const Text('Đăng'),
-                        style: TextButton.styleFrom(
-                            foregroundColor: _purple),
+                        style: TextButton.styleFrom(foregroundColor: _purple),
                       ),
                     TextButton.icon(
                       onPressed: onEdit,
                       icon: const Icon(Icons.edit, size: 16),
                       label: const Text('Sửa'),
                       style: TextButton.styleFrom(
-                          foregroundColor: Colors.blueGrey),
+                        foregroundColor: Colors.blueGrey,
+                      ),
                     ),
                     TextButton.icon(
                       onPressed: onDelete,
                       icon: const Icon(Icons.delete_outline, size: 16),
                       label: const Text('Xoá'),
-                      style:
-                          TextButton.styleFrom(foregroundColor: Colors.red),
+                      style: TextButton.styleFrom(foregroundColor: Colors.red),
                     ),
                   ],
                 ),
@@ -445,8 +468,9 @@ class _ErrorView extends StatelessWidget {
           ElevatedButton(
             onPressed: onRetry,
             style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6C47C2),
-                foregroundColor: Colors.white),
+              backgroundColor: const Color(0xFF6C47C2),
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Thử lại'),
           ),
         ],

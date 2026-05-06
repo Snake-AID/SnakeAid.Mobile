@@ -9,10 +9,7 @@ class SnakesByLocationResponse {
   final GeographicRegionDto region;
   final List<SnakeInRegionDto> snakes;
 
-  SnakesByLocationResponse({
-    required this.region,
-    required this.snakes,
-  });
+  SnakesByLocationResponse({required this.region, required this.snakes});
 
   factory SnakesByLocationResponse.fromJson(Map<String, dynamic> json) =>
       _$SnakesByLocationResponseFromJson(json);

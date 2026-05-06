@@ -100,8 +100,7 @@ class RescuerLessonDetailScreen extends StatelessWidget {
     final cat = _catMeta(lesson.category);
     final sections = _parseSections(lesson.content);
     final videoUrl = lesson.youtubeUrl;
-    final dateStr =
-        DateFormat('dd/MM/yyyy').format(lesson.updatedAt.toLocal());
+    final dateStr = DateFormat('dd/MM/yyyy').format(lesson.updatedAt.toLocal());
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7F5),
@@ -139,10 +138,7 @@ class RescuerLessonDetailScreen extends StatelessWidget {
               background: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
-                      cat.color.withValues(alpha: 0.85),
-                      cat.color,
-                    ],
+                    colors: [cat.color.withValues(alpha: 0.85), cat.color],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                   ),
@@ -290,10 +286,7 @@ class RescuerLessonDetailScreen extends StatelessWidget {
 
                   // ── Sections ─────────────────────────────────────────
                   ...sections.map(
-                    (s) => _SectionCard(
-                      section: s,
-                      accentColor: cat.color,
-                    ),
+                    (s) => _SectionCard(section: s, accentColor: cat.color),
                   ),
 
                   const SizedBox(height: 24),
@@ -371,9 +364,8 @@ class _VideoBanner extends StatelessWidget {
                 Image.network(
                   thumbUrl,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: const Color(0xFF1A1A2E),
-                  ),
+                  errorBuilder: (_, __, ___) =>
+                      Container(color: const Color(0xFF1A1A2E)),
                 )
               else
                 Container(color: const Color(0xFF1A1A2E)),
@@ -521,12 +513,7 @@ class _SectionCard extends StatelessWidget {
             ),
           if (hasBody)
             Padding(
-              padding: EdgeInsets.fromLTRB(
-                14,
-                hasHeading ? 10 : 12,
-                14,
-                12,
-              ),
+              padding: EdgeInsets.fromLTRB(14, hasHeading ? 10 : 12, 14, 12),
               child: _buildBodyText(section.body),
             ),
         ],

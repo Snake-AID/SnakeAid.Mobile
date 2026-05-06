@@ -204,7 +204,8 @@ class MissionStatusNotifier extends StateNotifier<MissionStatus> {
   final Ref _ref;
   final List<StreamSubscription> _subscriptions = [];
 
-  MissionStatusNotifier(this._service, this._ref) : super(const MissionStatus()) {
+  MissionStatusNotifier(this._service, this._ref)
+    : super(const MissionStatus()) {
     _subscriptions.add(
       _service.rescuerAcceptedStream.listen((data) {
         final incidentId = _ref.read(missionHubConnectionProvider).incidentId;

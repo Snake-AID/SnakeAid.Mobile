@@ -70,7 +70,9 @@ class ConsultationMessageHistoryResponse {
     required this.meta,
   });
 
-  factory ConsultationMessageHistoryResponse.fromJson(Map<String, dynamic> json) {
+  factory ConsultationMessageHistoryResponse.fromJson(
+    Map<String, dynamic> json,
+  ) {
     final itemsRaw = (json['items'] as List<dynamic>? ?? const []);
     final metaRaw = json['meta'] as Map<String, dynamic>? ?? const {};
 

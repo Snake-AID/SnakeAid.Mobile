@@ -13,7 +13,7 @@ import '../../models/snake_species.dart';
 class RescuerRequestDetailScreen extends ConsumerStatefulWidget {
   final String requestId;
   final SnakeCatchingRequestData? requestData;
-  
+
   const RescuerRequestDetailScreen({
     super.key,
     required this.requestId,
@@ -21,13 +21,15 @@ class RescuerRequestDetailScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<RescuerRequestDetailScreen> createState() => _RescuerRequestDetailScreenState();
+  ConsumerState<RescuerRequestDetailScreen> createState() =>
+      _RescuerRequestDetailScreenState();
 }
 
-class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetailScreen> {
+class _RescuerRequestDetailScreenState
+    extends ConsumerState<RescuerRequestDetailScreen> {
   int _currentImageIndex = 0;
   final List<bool> _equipmentChecked = [false, false, false, false, false];
-  
+
   bool _isLoading = false;
   String? _errorMessage;
   SnakeCatchingRequestData? _requestData;
@@ -48,7 +50,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
 
   Future<void> _loadRequestDetail() async {
     if (!mounted) return;
-    
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -57,9 +59,9 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
     try {
       final repository = ref.read(snakeCatchingRepositoryProvider);
       final response = await repository.getRequestById(widget.requestId);
-      
+
       if (!mounted) return;
-      
+
       if (response.isSuccess && response.data != null) {
         setState(() {
           _requestData = response.data;
@@ -104,7 +106,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 10),
       );
-      
+
       if (mounted) {
         setState(() {});
       }
@@ -124,25 +126,28 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
   double _calculateDistance() {
     if (_requestData == null || _currentPosition == null) return 0.0;
     if (!_isValidCoordinate(_requestData!.locationCoordinates)) return 0.0;
-    
+
     return Geolocator.distanceBetween(
-      _currentPosition!.latitude,
-      _currentPosition!.longitude,
-      _requestData!.locationCoordinates.latitude,
-      _requestData!.locationCoordinates.longitude,
-    ) / 1000; // Convert to km
+          _currentPosition!.latitude,
+          _currentPosition!.longitude,
+          _requestData!.locationCoordinates.latitude,
+          _requestData!.locationCoordinates.longitude,
+        ) /
+        1000; // Convert to km
   }
 
   Future<void> _loadSnakeSpeciesDetails() async {
     if (_requestData == null || _requestData!.details.isEmpty) return;
-    
+
     try {
       final repository = ref.read(snakeSpeciesRepositoryProvider);
-      
+
       for (final detail in _requestData!.details) {
         if (!_speciesCache.containsKey(detail.snakeSpeciesId)) {
           try {
-            final species = await repository.getSnakeSpeciesById(detail.snakeSpeciesId);
+            final species = await repository.getSnakeSpeciesById(
+              detail.snakeSpeciesId,
+            );
             if (species != null && mounted) {
               setState(() {
                 _speciesCache[detail.snakeSpeciesId] = species;
@@ -160,26 +165,35 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
 
   Map<String, String?> _parseNotes() {
     if (_requestData?.notes == null) return {};
-    
+
     final notes = _requestData!.notes!;
     final result = <String, String?>{};
-    
+
     // Parse different patterns from notes
-    final locationMatch = RegExp(r'Vị trí cụ thể:\s*(.+?)(?:,|$)', caseSensitive: false).firstMatch(notes);
+    final locationMatch = RegExp(
+      r'Vị trí cụ thể:\s*(.+?)(?:,|$)',
+      caseSensitive: false,
+    ).firstMatch(notes);
     if (locationMatch != null) {
       result['location'] = locationMatch.group(1)?.trim();
     }
-    
-    final sizeMatch = RegExp(r'Kích thước ước tính:\s*(.+?)(?:,|$)', caseSensitive: false).firstMatch(notes);
+
+    final sizeMatch = RegExp(
+      r'Kích thước ước tính:\s*(.+?)(?:,|$)',
+      caseSensitive: false,
+    ).firstMatch(notes);
     if (sizeMatch != null) {
       result['size'] = sizeMatch.group(1)?.trim();
     }
-    
-    final behaviorMatch = RegExp(r'Hành vi của rắn:\s*(.+?)(?:,|$)', caseSensitive: false).firstMatch(notes);
+
+    final behaviorMatch = RegExp(
+      r'Hành vi của rắn:\s*(.+?)(?:,|$)',
+      caseSensitive: false,
+    ).firstMatch(notes);
     if (behaviorMatch != null) {
       result['behavior'] = behaviorMatch.group(1)?.trim();
     }
-    
+
     return result;
   }
 
@@ -263,9 +277,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
       return Scaffold(
         backgroundColor: const Color(0xFFF9F9F9),
         body: const Center(
-          child: CircularProgressIndicator(
-            color: Color(0xFFFF6B35),
-          ),
+          child: CircularProgressIndicator(color: Color(0xFFFF6B35)),
         ),
       );
     }
@@ -289,18 +301,12 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
               const SizedBox(height: 16),
               const Text(
                 'Không thể tải chi tiết yêu cầu',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Text(
-                  _errorMessage!,
-                  textAlign: TextAlign.center,
-                ),
+                child: Text(_errorMessage!, textAlign: TextAlign.center),
               ),
               const SizedBox(height: 16),
               ElevatedButton(
@@ -323,14 +329,12 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
           title: const Text('Lỗi'),
           backgroundColor: const Color(0xFFF9F9F9),
         ),
-        body: const Center(
-          child: Text('Không có dữ liệu'),
-        ),
+        body: const Center(child: Text('Không có dữ liệu')),
       );
     }
 
     final images = _getImageUrls();
-    
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
       body: SafeArea(
@@ -338,7 +342,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
           children: [
             // Top App Bar
             _buildTopBar(),
-            
+
             // Main Content (Scrollable)
             Expanded(
               child: SingleChildScrollView(
@@ -348,35 +352,35 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
                   children: [
                     // Priority and Distance Badges
                     _buildBadgesRow(),
-                    
+
                     // Image Gallery
                     if (images.isNotEmpty) _buildImageGallery(images),
-                    
+
                     // Snake Species Card (NEW)
                     if (_requestData!.details.isNotEmpty)
                       _buildSnakeSpeciesCard(),
-                    
+
                     // Request Info Card (Enhanced)
                     _buildRequestInfoCard(),
-                    
+
                     // Location Card
                     _buildLocationCard(),
-                    
+
                     // User Info Card (Enhanced with rating)
                     _buildUserInfoCard(),
-                    
+
                     // Parsed Notes Info (NEW)
-                    if (_parseNotes().isNotEmpty)
-                      _buildParsedNotesCard(),
-                    
+                    if (_parseNotes().isNotEmpty) _buildParsedNotesCard(),
+
                     // Equipment Checklist Card
                     _buildEquipmentChecklistCard(),
-                    
+
                     // Safety Guidelines
                     _buildSafetyGuidelinesCard(),
-                    
+
                     // Raw Notes (if any additional info)
-                    if (_requestData!.notes != null && _requestData!.notes!.isNotEmpty)
+                    if (_requestData!.notes != null &&
+                        _requestData!.notes!.isNotEmpty)
                       _buildNotesCard(),
                   ],
                 ),
@@ -385,7 +389,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
           ],
         ),
       ),
-      
+
       // Sticky Footer Actions
       bottomSheet: (_requestData != null && _requestData!.status != 'Pending')
           ? null
@@ -394,10 +398,10 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
   }
 
   Widget _buildTopBar() {
-    final timeAgo = _requestData != null 
+    final timeAgo = _requestData != null
         ? _getTimeAgo(_requestData!.requestDate)
         : '';
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       color: const Color(0xFFF9F9F9),
@@ -412,7 +416,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
               child: Icon(Icons.arrow_back_ios_new, color: Color(0xFF333333)),
             ),
           ),
-          
+
           // Title
           const Expanded(
             child: Text(
@@ -425,7 +429,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
               ),
             ),
           ),
-          
+
           // Time Ago
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -435,7 +439,11 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
             ),
             child: Row(
               children: [
-                const Icon(Icons.access_time, color: Color(0xFFDC3545), size: 16),
+                const Icon(
+                  Icons.access_time,
+                  color: Color(0xFFDC3545),
+                  size: 16,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   timeAgo,
@@ -456,7 +464,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
   String _getTimeAgo(DateTime dateTime) {
     final now = DateTime.now();
     final difference = now.difference(dateTime);
-    
+
     if (difference.inMinutes < 60) {
       return '${difference.inMinutes}p trước';
     } else if (difference.inHours < 24) {
@@ -468,7 +476,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
 
   Widget _buildBadgesRow() {
     final distance = _calculateDistance();
-    
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -501,9 +509,9 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
               ],
             ),
           ),
-          
+
           const SizedBox(width: 8),
-          
+
           // Status Badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -521,9 +529,9 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
               ),
             ),
           ),
-          
+
           const Spacer(),
-          
+
           // Distance Badge
           if (_currentPosition != null && distance > 0)
             Container(
@@ -587,10 +595,10 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
               ),
             ),
             const SizedBox(height: 16),
-            
+
             ..._requestData!.details.map((detail) {
               final species = _speciesCache[detail.snakeSpeciesId];
-              
+
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(12),
@@ -617,14 +625,17 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
                                 species!.imageUrl!,
                                 fit: BoxFit.cover,
                                 errorBuilder: (context, error, stackTrace) =>
-                                    const Icon(Icons.image_not_supported, color: Color(0xFF999999)),
+                                    const Icon(
+                                      Icons.image_not_supported,
+                                      color: Color(0xFF999999),
+                                    ),
                               ),
                             )
                           : const Icon(Icons.pets, color: Color(0xFF999999)),
                     ),
-                    
+
                     const SizedBox(width: 12),
-                    
+
                     // Species Info
                     Expanded(
                       child: Column(
@@ -652,7 +663,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
                             Row(
                               children: [
                                 Icon(
-                                  species.isVenomous 
+                                  species.isVenomous
                                       ? Icons.warning_amber_rounded
                                       : Icons.info_outline,
                                   size: 16,
@@ -677,10 +688,13 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
                         ],
                       ),
                     ),
-                    
+
                     // Quantity
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFF6B35).withOpacity(0.15),
                         borderRadius: BorderRadius.circular(20),
@@ -706,7 +720,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
 
   Widget _buildParsedNotesCard() {
     final parsedNotes = _parseNotes();
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -735,19 +749,19 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
               ),
             ),
             const SizedBox(height: 16),
-            
+
             if (parsedNotes['location'] != null)
               _buildInfoRow('Vị trí cụ thể', parsedNotes['location']!),
-            
+
             if (parsedNotes['location'] != null && parsedNotes['size'] != null)
               const SizedBox(height: 12),
-            
+
             if (parsedNotes['size'] != null)
               _buildInfoRow('Kích thước', parsedNotes['size']!),
-            
+
             if (parsedNotes['size'] != null && parsedNotes['behavior'] != null)
               const SizedBox(height: 12),
-            
+
             if (parsedNotes['behavior'] != null)
               _buildInfoRow('Hành vi', parsedNotes['behavior']!),
           ],
@@ -798,7 +812,11 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
                             return Container(
                               color: const Color(0xFFF0F0F0),
                               child: const Center(
-                                child: Icon(Icons.image, size: 60, color: Color(0xFFCCCCCC)),
+                                child: Icon(
+                                  Icons.image,
+                                  size: 60,
+                                  color: Color(0xFFCCCCCC),
+                                ),
                               ),
                             );
                           },
@@ -868,14 +886,14 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // Request Date
             _buildInfoRow(
               'Thời gian yêu cầu',
               DateFormat('dd/MM/yyyy HH:mm').format(request.requestDate),
             ),
             const SizedBox(height: 12),
-            
+
             // Preferred Time
             if (request.preferredTime != null) ...[
               _buildInfoRow(
@@ -884,7 +902,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
               ),
               const SizedBox(height: 12),
             ],
-            
+
             // Estimated Price
             if (request.estimatedPrice != null) ...[
               Row(
@@ -894,10 +912,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
                     width: 120,
                     child: Text(
                       'Chi phí ước tính',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF999999),
-                      ),
+                      style: TextStyle(fontSize: 14, color: Color(0xFF999999)),
                     ),
                   ),
                   Expanded(
@@ -914,9 +929,12 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
               ),
               const SizedBox(height: 12),
             ],
-            
+
             // Request ID (for reference)
-            _buildInfoRow('Mã yêu cầu', '#${request.id.substring(0, 8).toUpperCase()}'),
+            _buildInfoRow(
+              'Mã yêu cầu',
+              '#${request.id.substring(0, 8).toUpperCase()}',
+            ),
           ],
         ),
       ),
@@ -926,7 +944,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
   Widget _buildUserInfoCard() {
     final request = _requestData!;
     final user = request.user;
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -960,7 +978,10 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
                 // User Rating
                 if (user != null && user.ratingCount > 0)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFFC107).withOpacity(0.15),
                       borderRadius: BorderRadius.circular(12),
@@ -988,47 +1009,47 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
               ],
             ),
             const SizedBox(height: 16),
-            
+
             // Name
             if (user?.account?.fullName != null) ...[
               _buildInfoRow('Họ tên', user!.account!.fullName!),
               const SizedBox(height: 12),
             ],
-            
+
             // Emergency Contacts
-            if (user?.emergencyContacts != null && user!.emergencyContacts.isNotEmpty) ...[
+            if (user?.emergencyContacts != null &&
+                user!.emergencyContacts.isNotEmpty) ...[
               const Text(
                 'Liên hệ khẩn cấp',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF999999),
-                ),
+                style: TextStyle(fontSize: 14, color: Color(0xFF999999)),
               ),
               const SizedBox(height: 8),
-              ...user.emergencyContacts.map((contact) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.phone,
-                      size: 16,
-                      color: Color(0xFFFF6B35),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      contact,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF333333),
+              ...user.emergencyContacts.map(
+                (contact) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.phone,
+                        size: 16,
+                        color: Color(0xFFFF6B35),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Text(
+                        contact,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF333333),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              )),
+              ),
               const SizedBox(height: 12),
             ],
-            
+
             // Health Warning
             if (user?.hasUnderlyingDisease == true)
               Container(
@@ -1073,21 +1094,14 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
         decoration: BoxDecoration(
           color: const Color(0xFFFFF9E6),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: const Color(0xFFFFBE0B),
-            width: 1,
-          ),
+          border: Border.all(color: const Color(0xFFFFBE0B), width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: const [
-                Icon(
-                  Icons.info_outline,
-                  color: Color(0xFFFF6B35),
-                  size: 20,
-                ),
+                Icon(Icons.info_outline, color: Color(0xFFFF6B35), size: 20),
                 SizedBox(width: 8),
                 Text(
                   'Ghi Chú Thêm',
@@ -1122,10 +1136,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
           width: 120,
           child: Text(
             label,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF999999),
-            ),
+            style: const TextStyle(fontSize: 14, color: Color(0xFF999999)),
           ),
         ),
         Expanded(
@@ -1146,7 +1157,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
     final request = _requestData!;
     final address = request.address ?? 'Địa chỉ không xác định';
     final additionalDetails = request.additionalDetails;
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -1176,7 +1187,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
                 ),
               ),
               const SizedBox(height: 16),
-              
+
               // Address
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1199,9 +1210,10 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
                   ),
                 ],
               ),
-              
+
               // Additional Location Details
-              if (additionalDetails != null && additionalDetails.isNotEmpty) ...[
+              if (additionalDetails != null &&
+                  additionalDetails.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -1236,9 +1248,9 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
                   ),
                 ),
               ],
-              
+
               const SizedBox(height: 16),
-              
+
               // Directions Button
               SizedBox(
                 width: double.infinity,
@@ -1249,10 +1261,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
                   icon: const Icon(Icons.directions),
                   label: const Text(
                     'Chỉ Đường',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFFFF6B35),
@@ -1317,17 +1326,17 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Checklist
             _buildSafetyItem('Mang găng tay dày'),
             _buildSafetyItem('Sử dụng móc bắt rắn chuyên dụng'),
             _buildSafetyItem('Giữ khoảng cách an toàn 2m'),
             _buildSafetyItem('Chuẩn bị túi vải dày'),
-            
+
             const SizedBox(height: 12),
-            
+
             // Full Guide Link
             Align(
               alignment: Alignment.centerRight,
@@ -1337,10 +1346,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
                 },
                 child: const Text(
                   'Xem hướng dẫn đầy đủ',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF2196F3),
-                  ),
+                  style: TextStyle(fontSize: 13, color: Color(0xFF2196F3)),
                 ),
               ),
             ),
@@ -1356,19 +1362,12 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons.check_circle,
-            color: Color(0xFFFF6B35),
-            size: 20,
-          ),
+          const Icon(Icons.check_circle, color: Color(0xFFFF6B35), size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF666666),
-              ),
+              style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
             ),
           ),
         ],
@@ -1441,10 +1440,7 @@ class _RescuerRequestDetailScreenState extends ConsumerState<RescuerRequestDetai
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF666666),
-              ),
+              style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
             ),
           ),
         ],

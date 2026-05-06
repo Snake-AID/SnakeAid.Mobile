@@ -37,15 +37,18 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   Future<void> _loadProfile() async {
     try {
-      final profile = await ref.read(memberProfileRepositoryProvider).getMyProfile();
+      final profile = await ref
+          .read(memberProfileRepositoryProvider)
+          .getMyProfile();
       if (mounted) {
         setState(() {
           _loadedProfile = profile;
           _fullNameController.text = profile.fullName;
           _phoneController.text = profile.phoneNumber ?? '';
           for (final contact in profile.emergencyContacts) {
-            _emergencyContactControllers
-                .add(TextEditingController(text: contact));
+            _emergencyContactControllers.add(
+              TextEditingController(text: contact),
+            );
           }
           _hasUnderlyingDisease = profile.hasUnderlyingDisease;
           _isLoading = false;
@@ -81,10 +84,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border(
-                bottom: BorderSide(
-                  color: const Color(0xFFDDDDDD),
-                  width: 1,
-                ),
+                bottom: BorderSide(color: const Color(0xFFDDDDDD), width: 1),
               ),
             ),
             child: SafeArea(
@@ -146,13 +146,18 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                   color: const Color(0xFFDDDDDD),
                                   width: 1,
                                 ),
-                              image: DecorationImage(
+                                image: DecorationImage(
                                   image: _pickedImageFile != null
-                                      ? FileImage(_pickedImageFile!) as ImageProvider
+                                      ? FileImage(_pickedImageFile!)
+                                            as ImageProvider
                                       : NetworkImage(
-                                          _newAvatarUrl ?? (_loadedProfile?.avatarUrl?.isNotEmpty == true
-                                              ? _loadedProfile!.avatarUrl!
-                                              : 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_loadedProfile?.fullName ?? 'User')}&background=228B22&color=fff&size=200'),
+                                          _newAvatarUrl ??
+                                              (_loadedProfile
+                                                          ?.avatarUrl
+                                                          ?.isNotEmpty ==
+                                                      true
+                                                  ? _loadedProfile!.avatarUrl!
+                                                  : 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_loadedProfile?.fullName ?? 'User')}&background=228B22&color=fff&size=200'),
                                         ),
                                   fit: BoxFit.cover,
                                 ),
@@ -167,7 +172,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                       child: SizedBox(
                                         width: 28,
                                         height: 28,
-                                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -178,7 +186,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                               bottom: 0,
                               right: 0,
                               child: InkWell(
-                                onTap: _isUploadingAvatar ? null : _pickAndUploadAvatar,
+                                onTap: _isUploadingAvatar
+                                    ? null
+                                    : _pickAndUploadAvatar,
                                 child: Container(
                                   width: 32,
                                   height: 32,
@@ -251,7 +261,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                             subtitle: const Text(
                               'Tiền sử bệnh nền hoặc dị ứng',
                               style: TextStyle(
-                                  fontSize: 13, color: Color(0xFF888888)),
+                                fontSize: 13,
+                                color: Color(0xFF888888),
+                              ),
                             ),
                             value: _hasUnderlyingDisease,
                             onChanged: (val) =>
@@ -375,7 +387,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           decoration: InputDecoration(
             hintText: placeholder,
             hintStyle: const TextStyle(color: Color(0xFF888888)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Color(0xFFDDDDDD)),
@@ -431,10 +446,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               ),
               const Padding(
                 padding: EdgeInsets.only(right: 16),
-                child: Icon(
-                  Icons.check_circle,
-                  color: Color(0xFF228B22),
-                ),
+                child: Icon(Icons.check_circle, color: Color(0xFF228B22)),
               ),
             ],
           ),
@@ -468,10 +480,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               alignment: Alignment.centerLeft,
               child: Text(
                 _loadedProfile?.email ?? 'Chưa có email',
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF333333),
-                ),
+                style: const TextStyle(fontSize: 16, color: Color(0xFF333333)),
               ),
             ),
           ),
@@ -523,7 +532,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       hintText: 'Số điện thoại khẩn cấp',
                       hintStyle: const TextStyle(color: Color(0xFF888888)),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 16),
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: const BorderSide(color: Color(0xFFDDDDDD)),
@@ -534,8 +545,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide:
-                            const BorderSide(color: Color(0xFF228B22)),
+                        borderSide: const BorderSide(color: Color(0xFF228B22)),
                       ),
                     ),
                   ),
@@ -559,21 +569,26 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   Future<void> _pickAndUploadAvatar() async {
     final picker = ImagePicker();
-    final xFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    final xFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
     if (xFile == null || !mounted) return;
     setState(() {
       _pickedImageFile = File(xFile.path);
       _isUploadingAvatar = true;
     });
     try {
-      final url = await ref.read(memberProfileRepositoryProvider).uploadAvatar(_pickedImageFile!);
+      final url = await ref
+          .read(memberProfileRepositoryProvider)
+          .uploadAvatar(_pickedImageFile!);
       if (mounted) setState(() => _newAvatarUrl = url);
     } catch (e) {
       if (mounted) {
         setState(() => _pickedImageFile = null);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Tải ảnh thất bại: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Tải ảnh thất bại: $e')));
       }
     } finally {
       if (mounted) setState(() => _isUploadingAvatar = false);
@@ -584,29 +599,31 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isSaving = true);
       try {
-        await ref.read(memberProfileRepositoryProvider).updateMyProfile(
-          fullName: _fullNameController.text.trim(),
-          phoneNumber: _phoneController.text.trim().isEmpty
-              ? null
-              : _phoneController.text.trim(),
-          avatarUrl: _newAvatarUrl ?? _loadedProfile?.avatarUrl,
-          emergencyContacts: _emergencyContactControllers
-              .map((c) => c.text.trim())
-              .where((s) => s.isNotEmpty)
-              .toList(),
-          hasUnderlyingDisease: _hasUnderlyingDisease,
-        );
+        await ref
+            .read(memberProfileRepositoryProvider)
+            .updateMyProfile(
+              fullName: _fullNameController.text.trim(),
+              phoneNumber: _phoneController.text.trim().isEmpty
+                  ? null
+                  : _phoneController.text.trim(),
+              avatarUrl: _newAvatarUrl ?? _loadedProfile?.avatarUrl,
+              emergencyContacts: _emergencyContactControllers
+                  .map((c) => c.text.trim())
+                  .where((s) => s.isNotEmpty)
+                  .toList(),
+              hasUnderlyingDisease: _hasUnderlyingDisease,
+            );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Lưu thành công')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Lưu thành công')));
           Navigator.of(context).pop();
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Lưu thất bại: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Lưu thất bại: $e')));
         }
       } finally {
         if (mounted) setState(() => _isSaving = false);

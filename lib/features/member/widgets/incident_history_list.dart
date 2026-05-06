@@ -182,9 +182,9 @@ class _IncidentHistoryListState extends ConsumerState<IncidentHistoryList> {
         if (shouldShowLoading) {
           _hideTrackingLoadingDialog();
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.message)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(response.message)));
         return;
       }
 
@@ -378,11 +378,7 @@ class _IncidentHistoryListState extends ConsumerState<IncidentHistoryList> {
                     ),
                   ),
                   const Spacer(),
-                  Icon(
-                    Icons.access_time,
-                    size: 13,
-                    color: Colors.grey[500],
-                  ),
+                  Icon(Icons.access_time, size: 13, color: Colors.grey[500]),
                   const SizedBox(width: 4),
                   Text(
                     fmt.format(date.toLocal()),
@@ -435,11 +431,7 @@ class _IncidentHistoryListState extends ConsumerState<IncidentHistoryList> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Icon(
-                      Icons.attach_money,
-                      size: 15,
-                      color: Colors.grey[500],
-                    ),
+                    Icon(Icons.attach_money, size: 15, color: Colors.grey[500]),
                     const SizedBox(width: 4),
                     Text(
                       'Chi phí: ${fmt2.format(mission.actualCost ?? mission.price ?? 0)}',
@@ -487,11 +479,7 @@ class _IncidentHistoryListState extends ConsumerState<IncidentHistoryList> {
                   ),
                   child: const Row(
                     children: [
-                      Icon(
-                        Icons.payment,
-                        size: 16,
-                        color: Color(0xFFF57F17),
-                      ),
+                      Icon(Icons.payment, size: 16, color: Color(0xFFF57F17)),
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(

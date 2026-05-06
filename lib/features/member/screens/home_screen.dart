@@ -77,30 +77,36 @@ class _MemberHomeScreenState extends ConsumerState<MemberHomeScreen>
       if (response.statusCode == 200 && response.data != null) {
         final address = response.data['address'] as Map<String, dynamic>?;
         if (address != null) {
-          String? city = address['city'] ?? address['state'] ?? address['province'] ?? address['town'];
+          String? city =
+              address['city'] ??
+              address['state'] ??
+              address['province'] ??
+              address['town'];
           if (city != null) {
             final normalized = city.toLowerCase();
-            final isHcmGroup = normalized.contains('hồ chí minh') ||
-                               normalized.contains('ho chi minh') ||
-                               normalized.contains('bình dương') ||
-                               normalized.contains('binh duong') ||
-                               normalized.contains('thủ đức') ||
-                               normalized.contains('thu duc') ||
-                               normalized.contains('vũng tàu') ||
-                               normalized.contains('vung tau');
+            final isHcmGroup =
+                normalized.contains('hồ chí minh') ||
+                normalized.contains('ho chi minh') ||
+                normalized.contains('bình dương') ||
+                normalized.contains('binh duong') ||
+                normalized.contains('thủ đức') ||
+                normalized.contains('thu duc') ||
+                normalized.contains('vũng tàu') ||
+                normalized.contains('vung tau');
 
-            final isDongNai = normalized.contains('đồng nai') ||
-                              normalized.contains('dong nai');
-            
+            final isDongNai =
+                normalized.contains('đồng nai') ||
+                normalized.contains('dong nai');
+
             final isSupported = isHcmGroup || isDongNai;
-            
+
             // Gộp chung hiển thị cho HCM và các khu vực lân cận, giữ nguyên Đồng Nai
             if (isHcmGroup) {
               city = 'TP.HCM';
             } else if (isDongNai) {
               city = 'Đồng Nai';
             }
-            
+
             if (mounted) {
               setState(() {
                 _currentCity = city!;
@@ -246,98 +252,108 @@ class _MemberHomeScreenState extends ConsumerState<MemberHomeScreen>
                   else ...[
                     const SizedBox(height: 16),
                     // Location Indicator
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            'Vị trí: $_currentCity',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF160D1B),
-                            ),
-                          ),
-                        ),
-                  ]),
-                  ),
-
-                  // Hero Emergency Area - SOS Button
-                  if (_isLocationSupported)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 20,
-                        horizontal: 16,
-                      ),
-                      child: SosButton(
-                        onActivate: () {
-                          final hasActiveIncident = ref
-                              .read(activeIncidentProvider)
-                              .hasActiveIncident;
-                          if (hasActiveIncident) {
-                            _navigateToActiveIncident(context, ref);
-                          } else {
-                            _handleSosActivation(context, ref);
-                          }
-                        },
-                      ),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                      child: Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFF3CD),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFFFECB5)),
-                        ),
-                        child: Column(
-                          children: [
-                            const Icon(Icons.info_outline_rounded, color: Color(0xFF856404), size: 36),
-                            const SizedBox(height: 12),
-                            const Text(
-                              'Dịch vụ Cấp cứu & Bắt rắn tạm thời chưa hỗ trợ tại khu vực của bạn.',
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              'Vị trí: $_currentCity',
                               textAlign: TextAlign.center,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF856404),
-                                height: 1.4,
+                                color: Color(0xFF160D1B),
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'SnakeAid đang mở rộng dịch vụ. Hiện tại, bạn vẫn có thể sử dụng Tư vấn chuyên gia và các tính năng khác.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: const Color(0xFF856404).withOpacity(0.9),
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
 
-                  // Quick Action Buttons
-                  Container(
-                    color: Colors.white,
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: QuickActionButtons(
-                      isLocationSupported: _isLocationSupported,
-                      onCameraPressed: () {
-                        context.push('/snake-quantity-selection');
-                      },
-                      onConsultationPressed: () {
-                        context.push('/consultation-home');
-                      },
+                    // Hero Emergency Area - SOS Button
+                    if (_isLocationSupported)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 20,
+                          horizontal: 16,
+                        ),
+                        child: SosButton(
+                          onActivate: () {
+                            final hasActiveIncident = ref
+                                .read(activeIncidentProvider)
+                                .hasActiveIncident;
+                            if (hasActiveIncident) {
+                              _navigateToActiveIncident(context, ref);
+                            } else {
+                              _handleSosActivation(context, ref);
+                            }
+                          },
+                        ),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 20,
+                          horizontal: 16,
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF3CD),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFFFECB5)),
+                          ),
+                          child: Column(
+                            children: [
+                              const Icon(
+                                Icons.info_outline_rounded,
+                                color: Color(0xFF856404),
+                                size: 36,
+                              ),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'Dịch vụ Cấp cứu & Bắt rắn tạm thời chưa hỗ trợ tại khu vực của bạn.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF856404),
+                                  height: 1.4,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'SnakeAid đang mở rộng dịch vụ. Hiện tại, bạn vẫn có thể sử dụng Tư vấn chuyên gia và các tính năng khác.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: const Color(
+                                    0xFF856404,
+                                  ).withOpacity(0.9),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                    // Quick Action Buttons
+                    Container(
+                      color: Colors.white,
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: QuickActionButtons(
+                        isLocationSupported: _isLocationSupported,
+                        onCameraPressed: () {
+                          context.push('/snake-quantity-selection');
+                        },
+                        onConsultationPressed: () {
+                          context.push('/consultation-home');
+                        },
+                      ),
                     ),
-                  ),
-                 ],
+                  ],
 
                   const SizedBox(height: 8),
 
@@ -389,7 +405,7 @@ class _MemberHomeScreenState extends ConsumerState<MemberHomeScreen>
               ],
             ),
           ),
-          
+
           // Skeleton for SOS Button
           Container(
             margin: const EdgeInsets.fromLTRB(16, 32, 16, 32),

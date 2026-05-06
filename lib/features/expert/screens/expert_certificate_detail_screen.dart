@@ -7,10 +7,7 @@ import '../repository/expert_certificate_repository.dart';
 class ExpertCertificateDetailScreen extends ConsumerStatefulWidget {
   final String certificateId;
 
-  const ExpertCertificateDetailScreen({
-    super.key,
-    required this.certificateId,
-  });
+  const ExpertCertificateDetailScreen({super.key, required this.certificateId});
 
   @override
   ConsumerState<ExpertCertificateDetailScreen> createState() =>
@@ -93,14 +90,14 @@ class _ExpertCertificateDetailScreenState
           .deleteCertificate(widget.certificateId);
       if (!mounted) return;
       context.pop(true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã xóa chứng chỉ')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Đã xóa chứng chỉ')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
     }
   }
 
@@ -138,10 +135,10 @@ class _ExpertCertificateDetailScreenState
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? _buildErrorState()
-              : _certificate == null
-                  ? const Center(child: Text('Không tìm thấy chứng chỉ'))
-                  : _buildContent(_certificate!),
+          ? _buildErrorState()
+          : _certificate == null
+          ? const Center(child: Text('Không tìm thấy chứng chỉ'))
+          : _buildContent(_certificate!),
     );
   }
 

@@ -46,9 +46,7 @@ class FilterQuestionRepository {
 
       final response = await httpService.post(
         '/api/snake-species/filter-by-answers',
-        data: {
-          'selectedOptionIds': selectedOptionIds,
-        },
+        data: {'selectedOptionIds': selectedOptionIds},
       );
 
       debugPrint('✅ Snakes filtered successfully');
@@ -108,7 +106,9 @@ class FilterQuestionRepository {
 }
 
 /// Provider for Filter Question Repository
-final filterQuestionRepositoryProvider = Provider<FilterQuestionRepository>((ref) {
+final filterQuestionRepositoryProvider = Provider<FilterQuestionRepository>((
+  ref,
+) {
   final httpService = ref.watch(httpServiceProvider);
   return FilterQuestionRepository(httpService: httpService);
 });

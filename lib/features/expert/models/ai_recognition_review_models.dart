@@ -113,8 +113,7 @@ class SnakeAIRecognitionResultResponse {
     this.detectedSpecies,
   });
 
-  factory SnakeAIRecognitionResultResponse.fromJson(
-      Map<String, dynamic> json) {
+  factory SnakeAIRecognitionResultResponse.fromJson(Map<String, dynamic> json) {
     return SnakeAIRecognitionResultResponse(
       id: json['id'] as String? ?? '',
       reportMediaId: json['reportMediaId'] as String? ?? '',
@@ -125,7 +124,8 @@ class SnakeAIRecognitionResultResponse {
       status: json['status'] as String? ?? '',
       detectedSpecies: json['detectedSpecies'] != null
           ? DetectedSpeciesResponse.fromJson(
-              json['detectedSpecies'] as Map<String, dynamic>)
+              json['detectedSpecies'] as Map<String, dynamic>,
+            )
           : null,
     );
   }
@@ -139,17 +139,16 @@ class ExpertReviewItemResponse {
   final ReportMediaResponse media;
   final SnakeAIRecognitionResultResponse aiResult;
 
-  const ExpertReviewItemResponse({
-    required this.media,
-    required this.aiResult,
-  });
+  const ExpertReviewItemResponse({required this.media, required this.aiResult});
 
   factory ExpertReviewItemResponse.fromJson(Map<String, dynamic> json) {
     return ExpertReviewItemResponse(
       media: ReportMediaResponse.fromJson(
-          json['media'] as Map<String, dynamic>),
+        json['media'] as Map<String, dynamic>,
+      ),
       aiResult: SnakeAIRecognitionResultResponse.fromJson(
-          json['aiResult'] as Map<String, dynamic>),
+        json['aiResult'] as Map<String, dynamic>,
+      ),
     );
   }
 }
@@ -170,13 +169,16 @@ class AIRecognitionReviewDetailResponse {
   });
 
   factory AIRecognitionReviewDetailResponse.fromJson(
-      Map<String, dynamic> json) {
+    Map<String, dynamic> json,
+  ) {
     return AIRecognitionReviewDetailResponse(
       recognitionResultId: json['recognitionResultId'] as String? ?? '',
       media: ReportMediaResponse.fromJson(
-          json['media'] as Map<String, dynamic>),
+        json['media'] as Map<String, dynamic>,
+      ),
       aiResult: SnakeAIRecognitionResultResponse.fromJson(
-          json['aiResult'] as Map<String, dynamic>),
+        json['aiResult'] as Map<String, dynamic>,
+      ),
     );
   }
 }
@@ -210,8 +212,8 @@ class ExpertReviewActionResponse {
       expertVerifiedAt: json['expertVerifiedAt'] != null
           ? DateTime.tryParse(json['expertVerifiedAt'] as String)
           : null,
-      expertCorrectedSpeciesId:
-          (json['expertCorrectedSpeciesId'] as num?)?.toInt(),
+      expertCorrectedSpeciesId: (json['expertCorrectedSpeciesId'] as num?)
+          ?.toInt(),
       isTrainingReady: json['isTrainingReady'] as bool? ?? false,
     );
   }
@@ -237,7 +239,8 @@ class ExpertReviewedRecognitionItemResponse {
   });
 
   factory ExpertReviewedRecognitionItemResponse.fromJson(
-      Map<String, dynamic> json) {
+    Map<String, dynamic> json,
+  ) {
     // Handle both 'media+aiResult' shape and flattened shapes
     final mediaJson = json['media'] as Map<String, dynamic>?;
     final aiJson = json['aiResult'] as Map<String, dynamic>?;
@@ -265,16 +268,18 @@ class ExpertReviewedRecognitionItemResponse {
               isMapped: false,
               status: json['status'] as String? ?? '',
             ),
-      expertStatus: json['expertStatus'] as String? ??
+      expertStatus:
+          json['expertStatus'] as String? ??
           json['status'] as String? ??
           aiJson?['status'] as String?,
       expertReviewedAt: (() {
-        final raw = json['expertReviewedAt'] as String? ??
+        final raw =
+            json['expertReviewedAt'] as String? ??
             json['expertVerifiedAt'] as String?;
         return raw != null ? DateTime.tryParse(raw) : null;
       })(),
-      expertCorrectedSpeciesId:
-          (json['expertCorrectedSpeciesId'] as num?)?.toInt(),
+      expertCorrectedSpeciesId: (json['expertCorrectedSpeciesId'] as num?)
+          ?.toInt(),
     );
   }
 }
@@ -305,10 +310,10 @@ class ExpertVerifyRecognitionRequest {
   });
 
   Map<String, dynamic> toJson() => {
-        'correctedSpeciesId': correctedSpeciesId,
-        if (expertNotes != null && expertNotes!.isNotEmpty)
-          'expertNotes': expertNotes,
-      };
+    'correctedSpeciesId': correctedSpeciesId,
+    if (expertNotes != null && expertNotes!.isNotEmpty)
+      'expertNotes': expertNotes,
+  };
 }
 
 class ExpertRejectRecognitionRequest {
@@ -317,7 +322,7 @@ class ExpertRejectRecognitionRequest {
   const ExpertRejectRecognitionRequest({this.expertNotes});
 
   Map<String, dynamic> toJson() => {
-        if (expertNotes != null && expertNotes!.isNotEmpty)
-          'expertNotes': expertNotes,
-      };
+    if (expertNotes != null && expertNotes!.isNotEmpty)
+      'expertNotes': expertNotes,
+  };
 }

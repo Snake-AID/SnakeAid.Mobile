@@ -26,16 +26,19 @@ class RescuerEnRouteScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<RescuerEnRouteScreen> createState() => _RescuerEnRouteScreenState();
+  ConsumerState<RescuerEnRouteScreen> createState() =>
+      _RescuerEnRouteScreenState();
 }
 
 class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
     with TickerProviderStateMixin {
   final MapController _mapController = MapController();
-  final _dio = Dio(BaseOptions(
-    connectTimeout: const Duration(seconds: 10),
-    receiveTimeout: const Duration(seconds: 15),
-  ));
+  final _dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 15),
+    ),
+  );
 
   LatLng? _rescuerPos;
   List<LatLng> _routePoints = [];
@@ -68,7 +71,8 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
       for (final d in details) {
         if (!_speciesCache.containsKey(d.snakeSpeciesId)) {
           final s = await repo.getSnakeSpeciesById(d.snakeSpeciesId);
-          if (s != null && mounted) setState(() => _speciesCache[d.snakeSpeciesId] = s);
+          if (s != null && mounted)
+            setState(() => _speciesCache[d.snakeSpeciesId] = s);
         }
       }
     } catch (_) {}
@@ -76,15 +80,20 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
   }
 
   LatLng get _destination => LatLng(
-        widget.requestData.locationCoordinates.latitude,
-        widget.requestData.locationCoordinates.longitude,
-      );
+    widget.requestData.locationCoordinates.latitude,
+    widget.requestData.locationCoordinates.longitude,
+  );
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 0.3, end: 1.0).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut));
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+    _pulseAnim = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
     _initLocation();
     _startStatusRefresh();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadSpecies());
@@ -111,36 +120,63 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
   }
 
   Future<void> _initLocation() async {
-    setState(() { _isLocating = true; _hasLocationError = false; });
+    setState(() {
+      _isLocating = true;
+      _hasLocationError = false;
+    });
     try {
       LocationPermission perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
-      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
-        if (mounted) setState(() { _hasLocationError = true; _isLocating = false; });
+      if (perm == LocationPermission.denied)
+        perm = await Geolocator.requestPermission();
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        if (mounted)
+          setState(() {
+            _hasLocationError = true;
+            _isLocating = false;
+          });
         return;
       }
 
-      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
       _onNewPosition(pos);
 
       _positionSub?.cancel();
       _positionSub = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 25),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 25,
+        ),
       ).listen(_onNewPosition);
 
       _routeRefreshTimer = Timer.periodic(const Duration(seconds: 35), (_) {
         if (_rescuerPos != null && mounted) _fetchRoute(_rescuerPos!);
       });
     } catch (_) {
-      if (mounted) setState(() { _hasLocationError = true; _isLocating = false; });
+      if (mounted)
+        setState(() {
+          _hasLocationError = true;
+          _isLocating = false;
+        });
     }
   }
 
   void _onNewPosition(Position pos) {
     final ll = LatLng(pos.latitude, pos.longitude);
-    final dist = Geolocator.distanceBetween(pos.latitude, pos.longitude, _destination.latitude, _destination.longitude);
+    final dist = Geolocator.distanceBetween(
+      pos.latitude,
+      pos.longitude,
+      _destination.latitude,
+      _destination.longitude,
+    );
     if (!mounted) return;
-    setState(() { _rescuerPos = ll; _isLocating = false; _directDistanceM = dist; });
+    setState(() {
+      _rescuerPos = ll;
+      _isLocating = false;
+      _directDistanceM = dist;
+    });
     _fetchRoute(ll);
     try {
       final z = _mapController.camera.zoom;
@@ -164,7 +200,10 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
         if (routes != null && routes.isNotEmpty) {
           final route = routes[0];
           final coords = (route['geometry']['coordinates'] as List)
-              .map<LatLng>((c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()))
+              .map<LatLng>(
+                (c) =>
+                    LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()),
+              )
               .toList();
           if (mounted) {
             setState(() {
@@ -181,7 +220,8 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
     }
   }
 
-  bool get _canMarkArrived => _directDistanceM != null && _directDistanceM! <= 1000;
+  bool get _canMarkArrived =>
+      _directDistanceM != null && _directDistanceM! <= 1000;
 
   String _fmtDist(double m) =>
       m >= 1000 ? '${(m / 1000).toStringAsFixed(1)} km' : '${m.toInt()} m';
@@ -196,8 +236,11 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
   Future<void> _openExternalNav() async {
     final lat = _destination.latitude;
     final lng = _destination.longitude;
-    final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving');
-    if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final uri = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving',
+    );
+    if (await canLaunchUrl(uri))
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Future<void> _callCustomer() async {
@@ -226,7 +269,8 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
       if (!mounted || response.data == null) return;
 
       final status = response.data!.status.toLowerCase();
-      if ((status == 'cancelled' || status == 'canceled') && !_hasHandledCancellation) {
+      if ((status == 'cancelled' || status == 'canceled') &&
+          !_hasHandledCancellation) {
         _hasHandledCancellation = true;
         _positionSub?.cancel();
         _routeRefreshTimer?.cancel();
@@ -253,19 +297,31 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                 color: const Color(0xFFDC3545).withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.cancel, color: Color(0xFFDC3545), size: 38),
+              child: const Icon(
+                Icons.cancel,
+                color: Color(0xFFDC3545),
+                size: 38,
+              ),
             ),
             const SizedBox(height: 16),
             const Text(
               'Đơn đã bị hủy',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF1F1F1F)),
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1F1F1F),
+              ),
             ),
             const SizedBox(height: 8),
             const Text(
               'Khách hàng đã hủy đơn này. Bạn sẽ được đưa về danh sách công việc.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: Color(0xFF666666), height: 1.4),
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF666666),
+                height: 1.4,
+              ),
             ),
             if (reason != null && reason.isNotEmpty) ...[
               const SizedBox(height: 12),
@@ -287,7 +343,11 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                     const SizedBox(height: 4),
                     Text(
                       reason,
-                      style: const TextStyle(fontSize: 13, color: Color(0xFF444444), fontStyle: FontStyle.italic),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF444444),
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
                   ],
                 ),
@@ -308,7 +368,9 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                 backgroundColor: const Color(0xFFFF6B35),
                 foregroundColor: Colors.white,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 padding: const EdgeInsets.symmetric(vertical: 13),
               ),
               child: const Text(
@@ -416,12 +478,15 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                                   setDialogState(() {});
                                   setState(() => _isArriving = true);
                                   try {
-                                    final repo = ref.read(snakeCatchingRepositoryProvider);
+                                    final repo = ref.read(
+                                      snakeCatchingRepositoryProvider,
+                                    );
                                     await repo.arrivedMission(widget.missionId);
                                   } catch (e) {
                                     debugPrint('⚠️ arrivedMission error: $e');
                                   } finally {
-                                    if (mounted) setState(() => _isArriving = false);
+                                    if (mounted)
+                                      setState(() => _isArriving = false);
                                   }
                                   if (!mounted) return;
                                   Navigator.pop(ctx);
@@ -502,7 +567,10 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
             children: [
               CircularProgressIndicator(color: Color(0xFFFF6B35)),
               SizedBox(height: 16),
-              Text('Đang lấy vị trí GPS', style: TextStyle(color: Color(0xFF666666), fontSize: 14)),
+              Text(
+                'Đang lấy vị trí GPS',
+                style: TextStyle(color: Color(0xFF666666), fontSize: 14),
+              ),
             ],
           ),
         ),
@@ -516,17 +584,30 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.location_off, size: 52, color: Color(0xFFFF6B35)),
+              const Icon(
+                Icons.location_off,
+                size: 52,
+                color: Color(0xFFFF6B35),
+              ),
               const SizedBox(height: 12),
-              const Text('Không thể lấy vị trí GPS', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              const Text(
+                'Không thể lấy vị trí GPS',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 6),
-              const Text('Vui lòng bật GPS và cấp quyền vị trí', style: TextStyle(color: Color(0xFF666666), fontSize: 13)),
+              const Text(
+                'Vui lòng bật GPS và cấp quyền vị trí',
+                style: TextStyle(color: Color(0xFF666666), fontSize: 13),
+              ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 onPressed: _initLocation,
                 icon: const Icon(Icons.refresh),
                 label: const Text('Thử lại'),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B35), foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF6B35),
+                  foregroundColor: Colors.white,
+                ),
               ),
             ],
           ),
@@ -551,8 +632,16 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
         if (_routePoints.isNotEmpty)
           PolylineLayer(
             polylines: [
-              Polyline(points: _routePoints, strokeWidth: 9, color: Colors.white.withOpacity(0.8)),
-              Polyline(points: _routePoints, strokeWidth: 5.5, color: const Color(0xFFFF6B35)),
+              Polyline(
+                points: _routePoints,
+                strokeWidth: 9,
+                color: Colors.white.withOpacity(0.8),
+              ),
+              Polyline(
+                points: _routePoints,
+                strokeWidth: 5.5,
+                color: const Color(0xFFFF6B35),
+              ),
             ],
           ),
         MarkerLayer(
@@ -570,7 +659,9 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                       width: 56 * _pulseAnim.value,
                       height: 56 * _pulseAnim.value,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF2196F3).withOpacity(0.18 * _pulseAnim.value),
+                        color: const Color(
+                          0xFF2196F3,
+                        ).withOpacity(0.18 * _pulseAnim.value),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -581,7 +672,12 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                         color: const Color(0xFF2196F3),
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 3),
-                        boxShadow: [BoxShadow(color: const Color(0xFF2196F3).withOpacity(0.55), blurRadius: 8)],
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF2196F3).withOpacity(0.55),
+                            blurRadius: 8,
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -596,8 +692,18 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
               child: const Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.location_on, color: Color(0xFFDC3545), size: 50,
-                      shadows: [Shadow(color: Colors.black26, offset: Offset(0, 2), blurRadius: 6)]),
+                  Icon(
+                    Icons.location_on,
+                    color: Color(0xFFDC3545),
+                    size: 50,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black26,
+                        offset: Offset(0, 2),
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -609,45 +715,90 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
 
   Widget _buildHeader() {
     return Positioned(
-      top: 0, left: 0, right: 0,
+      top: 0,
+      left: 0,
+      right: 0,
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(14),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 12)],
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.12),
+                      blurRadius: 12,
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: [
-                    _mapBtn(Icons.arrow_back_ios_new, const Color(0xFF555555), const Color(0xFFF5F5F5),
-                        _navigateBackToJobs),
+                    _mapBtn(
+                      Icons.arrow_back_ios_new,
+                      const Color(0xFF555555),
+                      const Color(0xFFF5F5F5),
+                      _navigateBackToJobs,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('ĐANG DI CHUYỂN',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFF6B35), letterSpacing: 0.8)),
-                          Text(widget.requestData.address,
-                              style: const TextStyle(fontSize: 11, color: Color(0xFF666666)),
-                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                          const Text(
+                            'ĐANG DI CHUYỂN',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFFF6B35),
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          Text(
+                            widget.requestData.address,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF666666),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ],
                       ),
                     ),
                     const SizedBox(width: 8),
                     if (_routeLoading)
-                      const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFF6B35))),
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFFFF6B35),
+                        ),
+                      ),
                     const SizedBox(width: 6),
-                    _mapBtn(Icons.my_location, const Color(0xFF2196F3), const Color(0xFFEFF6FF), () {
-                      if (_rescuerPos != null) _mapController.move(_rescuerPos!, 15.0);
-                    }),
+                    _mapBtn(
+                      Icons.my_location,
+                      const Color(0xFF2196F3),
+                      const Color(0xFFEFF6FF),
+                      () {
+                        if (_rescuerPos != null)
+                          _mapController.move(_rescuerPos!, 15.0);
+                      },
+                    ),
                     const SizedBox(width: 6),
-                    _mapBtn(Icons.navigation, Colors.white, const Color(0xFF2196F3), _openExternalNav),
+                    _mapBtn(
+                      Icons.navigation,
+                      Colors.white,
+                      const Color(0xFF2196F3),
+                      _openExternalNav,
+                    ),
                   ],
                 ),
               ),
@@ -655,22 +806,58 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                 const SizedBox(height: 8),
                 Center(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFF6B35),
                       borderRadius: BorderRadius.circular(24),
-                      boxShadow: [BoxShadow(color: const Color(0xFFFF6B35).withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4))],
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFF6B35).withOpacity(0.4),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.schedule, color: Colors.white, size: 15),
+                        const Icon(
+                          Icons.schedule,
+                          color: Colors.white,
+                          size: 15,
+                        ),
                         const SizedBox(width: 5),
-                        Text(_fmtDur(_routeDurationS!), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                        Container(margin: const EdgeInsets.symmetric(horizontal: 10), width: 1, height: 13, color: Colors.white38),
-                        const Icon(Icons.straighten, color: Colors.white, size: 15),
+                        Text(
+                          _fmtDur(_routeDurationS!),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 10),
+                          width: 1,
+                          height: 13,
+                          color: Colors.white38,
+                        ),
+                        const Icon(
+                          Icons.straighten,
+                          color: Colors.white,
+                          size: 15,
+                        ),
                         const SizedBox(width: 5),
-                        Text(_fmtDist(_routeDistanceM!), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                        Text(
+                          _fmtDist(_routeDistanceM!),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -688,7 +875,10 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(9)),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(9),
+        ),
         child: Icon(icon, size: 16, color: iconColor),
       ),
     );
@@ -709,7 +899,13 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(30),
-            boxShadow: [BoxShadow(color: const Color(0xFFFF6B35).withOpacity(0.55), blurRadius: 14, offset: const Offset(0, 5))],
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFFF6B35).withOpacity(0.55),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
+              ),
+            ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -720,8 +916,15 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('ĐÃ ĐẾN NƠI',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),   
+                  const Text(
+                    'ĐÃ ĐẾN NƠI',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -784,7 +987,11 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                           color: const Color(0xFFDC3545).withOpacity(0.1),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.cancel_outlined, color: Color(0xFFDC3545), size: 20),
+                        child: const Icon(
+                          Icons.cancel_outlined,
+                          color: Color(0xFFDC3545),
+                          size: 20,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       const Expanded(
@@ -801,7 +1008,10 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                             ),
                             Text(
                               'Vui lòng chọn lý do hủy đơn',
-                              style: TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF888888),
+                              ),
                             ),
                           ],
                         ),
@@ -819,12 +1029,19 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.warning_amber_rounded, color: Color(0xFFFF8F00), size: 16),
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          color: Color(0xFFFF8F00),
+                          size: 16,
+                        ),
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Hủy đơn nhiều lần có thể ảnh hưởng đến điểm uy tín của bạn.',
-                            style: TextStyle(fontSize: 12, color: Color(0xFF7B5800)),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF7B5800),
+                            ),
                           ),
                         ),
                       ],
@@ -842,7 +1059,10 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           color: _selectedReason == reason
                               ? const Color(0xFFDC3545).withOpacity(0.07)
@@ -895,7 +1115,10 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                       maxLength: 200,
                       decoration: InputDecoration(
                         hintText: 'Nhập lý do cụ thể...',
-                        hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+                        hintStyle: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 13,
+                        ),
                         filled: true,
                         fillColor: const Color(0xFFF8F8F8),
                         border: OutlineInputBorder(
@@ -908,10 +1131,18 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFDC3545)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFDC3545),
+                          ),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        counterStyle: TextStyle(color: Colors.grey[400], fontSize: 11),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        counterStyle: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 11,
+                        ),
                       ),
                       style: const TextStyle(fontSize: 14),
                     ),
@@ -927,9 +1158,14 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                             foregroundColor: const Color(0xFF666666),
                             side: BorderSide(color: Colors.grey[300]!),
                             padding: const EdgeInsets.symmetric(vertical: 13),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
-                          child: const Text('Giữ đơn', style: TextStyle(fontWeight: FontWeight.w600)),
+                          child: const Text(
+                            'Giữ đơn',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -940,8 +1176,8 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                               : () async {
                                   final reason = _selectedReason == 'Lý do khác'
                                       ? (_otherController.text.trim().isNotEmpty
-                                          ? _otherController.text.trim()
-                                          : 'Lý do khác')
+                                            ? _otherController.text.trim()
+                                            : 'Lý do khác')
                                       : _selectedReason!;
 
                                   Navigator.pop(sheetContext);
@@ -953,9 +1189,14 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                             foregroundColor: Colors.white,
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(vertical: 13),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
-                          child: const Text('Xác nhận hủy', style: TextStyle(fontWeight: FontWeight.bold)),
+                          child: const Text(
+                            'Xác nhận hủy',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ),
                     ],
@@ -976,7 +1217,7 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
       await repo.abortMission(widget.missionId, reason);
       _positionSub?.cancel();
       _routeRefreshTimer?.cancel();
-      
+
       // Tắt và bật lại rescue mode để refresh trạng thái của rescuer với server
       final prefs = await SharedPreferences.getInstance();
       final rescuerId = prefs.getString('user_id');
@@ -1008,11 +1249,16 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
   }
 
   ({String badge, Color color}) _dangerInfo(SnakeSpecies? species) {
-    if (species == null) return (badge: 'CHƯA RÕ', color: const Color(0xFF999999));
-    if (!species.isVenomous) return (badge: 'KHÔNG ĐỘC', color: const Color(0xFF28A745));
-    if (species.riskLevel >= 8.0) return (badge: 'CỰC ĐỘC', color: const Color(0xFFDC3545));
-    if (species.riskLevel >= 6.0) return (badge: 'ĐỘC MẠNH', color: const Color(0xFFFF6B35));
-    if (species.riskLevel >= 4.0) return (badge: 'CÓ ĐỘC', color: const Color(0xFFFFA500));
+    if (species == null)
+      return (badge: 'CHƯA RÕ', color: const Color(0xFF999999));
+    if (!species.isVenomous)
+      return (badge: 'KHÔNG ĐỘC', color: const Color(0xFF28A745));
+    if (species.riskLevel >= 8.0)
+      return (badge: 'CỰC ĐỘC', color: const Color(0xFFDC3545));
+    if (species.riskLevel >= 6.0)
+      return (badge: 'ĐỘC MẠNH', color: const Color(0xFFFF6B35));
+    if (species.riskLevel >= 4.0)
+      return (badge: 'CÓ ĐỘC', color: const Color(0xFFFFA500));
     return (badge: 'ÍT ĐỘC', color: const Color(0xFFFFC107));
   }
 
@@ -1028,13 +1274,27 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
           children: [
             Text(
               '${details.length} loài rắn trong đơn',
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF333333),
+              ),
             ),
             const Spacer(),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(color: const Color(0xFFFF6B35), borderRadius: BorderRadius.circular(10)),
-              child: Text('Tổng x$totalSnakes', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF6B35),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'Tổng x$totalSnakes',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         ),
@@ -1043,7 +1303,14 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
           const Center(
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 10),
-              child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFF6B35))),
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Color(0xFFFF6B35),
+                ),
+              ),
             ),
           )
         else
@@ -1056,55 +1323,111 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                 final species = _speciesCache[detail.snakeSpeciesId];
                 final danger = _dangerInfo(species);
                 return GestureDetector(
-                  onLongPress: species != null ? () => _showSnakeDetail(species, detail) : null,
+                  onLongPress: species != null
+                      ? () => _showSnakeDetail(species, detail)
+                      : null,
                   child: Container(
                     width: 130,
-                    margin: EdgeInsets.only(right: idx < details.length - 1 ? 10 : 0),
+                    margin: EdgeInsets.only(
+                      right: idx < details.length - 1 ? 10 : 0,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: const Color(0xFFEEEEEE)),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 6, offset: const Offset(0, 2))],
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         ClipRRect(
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(10),
+                          ),
                           child: SizedBox(
-                            height: 90, width: double.infinity,
+                            height: 90,
+                            width: double.infinity,
                             child: Stack(
                               fit: StackFit.expand,
                               children: [
                                 Container(
                                   color: const Color(0xFF1A1A2E),
                                   child: species?.imageUrl != null
-                                      ? Image.network(species!.imageUrl!, fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.pest_control, size: 32, color: Colors.white24)))
-                                      : const Center(child: Icon(Icons.pest_control, size: 32, color: Colors.white24)),
+                                      ? Image.network(
+                                          species!.imageUrl!,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              const Center(
+                                                child: Icon(
+                                                  Icons.pest_control,
+                                                  size: 32,
+                                                  color: Colors.white24,
+                                                ),
+                                              ),
+                                        )
+                                      : const Center(
+                                          child: Icon(
+                                            Icons.pest_control,
+                                            size: 32,
+                                            color: Colors.white24,
+                                          ),
+                                        ),
                                 ),
                                 Positioned(
-                                  top: 6, right: 6,
+                                  top: 6,
+                                  right: 6,
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 3,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: danger.color,
                                       borderRadius: BorderRadius.circular(5),
-                                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4)],
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.2),
+                                          blurRadius: 4,
+                                        ),
+                                      ],
                                     ),
-                                    child: Text(danger.badge, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white)),
+                                    child: Text(
+                                      danger.badge,
+                                      style: const TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 if (species != null)
                                   const Positioned(
-                                    bottom: 5, right: 6,
+                                    bottom: 5,
+                                    right: 6,
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(Icons.touch_app, size: 12, color: Colors.white60),
+                                        Icon(
+                                          Icons.touch_app,
+                                          size: 12,
+                                          color: Colors.white60,
+                                        ),
                                         SizedBox(width: 3),
-                                        Text('Giữ để xem', style: TextStyle(fontSize: 9, color: Colors.white60)),
+                                        Text(
+                                          'Giữ để xem',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            color: Colors.white60,
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -1120,26 +1443,49 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                             children: [
                               Text(
                                 species?.commonName ?? detail.snakeSpeciesName,
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF222222)),
-                                maxLines: 2, overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF222222),
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              if (detail.snakeSpeciesScientificName.isNotEmpty) ...[
-
+                              if (detail
+                                  .snakeSpeciesScientificName
+                                  .isNotEmpty) ...[
                                 const SizedBox(height: 2),
                                 Text(
                                   detail.snakeSpeciesScientificName,
-                                  style: const TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: Color(0xFF999999)),
-                                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontStyle: FontStyle.italic,
+                                    color: Color(0xFF999999),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                               const SizedBox(height: 5),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFF6B35).withOpacity(0.1),
+                                  color: const Color(
+                                    0xFFFF6B35,
+                                  ).withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
-                                child: Text('x${detail.quantity} con', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFFF6B35))),
+                                child: Text(
+                                  'x${detail.quantity} con',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFFF6B35),
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -1179,60 +1525,123 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
               children: [
                 // Hero image
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
                   child: SizedBox(
-                    height: 220, width: double.infinity,
+                    height: 220,
+                    width: double.infinity,
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
                         Container(
                           color: const Color(0xFF1A1A2E),
                           child: species.imageUrl != null
-                              ? Image.network(species.imageUrl!, fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.pest_control, size: 64, color: Colors.white24)))
-                              : const Center(child: Icon(Icons.pest_control, size: 64, color: Colors.white24)),
+                              ? Image.network(
+                                  species.imageUrl!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Center(
+                                    child: Icon(
+                                      Icons.pest_control,
+                                      size: 64,
+                                      color: Colors.white24,
+                                    ),
+                                  ),
+                                )
+                              : const Center(
+                                  child: Icon(
+                                    Icons.pest_control,
+                                    size: 64,
+                                    color: Colors.white24,
+                                  ),
+                                ),
                         ),
                         Positioned(
-                          bottom: 0, left: 0, right: 0,
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
                           child: Container(
                             height: 100,
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 begin: Alignment.bottomCenter,
                                 end: Alignment.topCenter,
-                                colors: [Colors.black.withOpacity(0.7), Colors.transparent],
+                                colors: [
+                                  Colors.black.withOpacity(0.7),
+                                  Colors.transparent,
+                                ],
                               ),
                             ),
                           ),
                         ),
                         Positioned(
-                          top: 10, left: 0, right: 0,
+                          top: 10,
+                          left: 0,
+                          right: 0,
                           child: Center(
-                            child: Container(width: 36, height: 4,
-                                decoration: BoxDecoration(color: Colors.white38, borderRadius: BorderRadius.circular(2))),
+                            child: Container(
+                              width: 36,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: Colors.white38,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
                           ),
                         ),
                         Positioned(
-                          bottom: 14, left: 16,
+                          bottom: 14,
+                          left: 16,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(color: danger.color, borderRadius: BorderRadius.circular(6)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: danger.color,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.warning_rounded, size: 14, color: Colors.white),
+                                const Icon(
+                                  Icons.warning_rounded,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
                                 const SizedBox(width: 5),
-                                Text(danger.badge, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                Text(
+                                  danger.badge,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
                         ),
                         Positioned(
-                          bottom: 14, right: 16,
+                          bottom: 14,
+                          right: 16,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(color: const Color(0xFFFF6B35), borderRadius: BorderRadius.circular(6)),
-                            child: Text('x${detail.quantity} con', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFF6B35),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'x${detail.quantity} con',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -1245,26 +1654,45 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(species.commonName,
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
+                      Text(
+                        species.commonName,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A1A2E),
+                        ),
+                      ),
                       if (detail.snakeSpeciesScientificName.isNotEmpty) ...[
-
                         const SizedBox(height: 4),
-                        Text(detail.snakeSpeciesScientificName,
-                            style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Color(0xFF888888))),
+                        Text(
+                          detail.snakeSpeciesScientificName,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontStyle: FontStyle.italic,
+                            color: Color(0xFF888888),
+                          ),
+                        ),
                       ],
                       const SizedBox(height: 14),
                       Wrap(
-                        spacing: 8, runSpacing: 8,
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
                           _detailChip(
-                            icon: species.isVenomous ? Icons.coronavirus : Icons.check_circle_outline,
-                            label: species.isVenomous ? 'Có nọc độc' : 'Không độc',
-                            color: species.isVenomous ? const Color(0xFFDC3545) : const Color(0xFF28A745),
+                            icon: species.isVenomous
+                                ? Icons.coronavirus
+                                : Icons.check_circle_outline,
+                            label: species.isVenomous
+                                ? 'Có nọc độc'
+                                : 'Không độc',
+                            color: species.isVenomous
+                                ? const Color(0xFFDC3545)
+                                : const Color(0xFF28A745),
                           ),
                           _detailChip(
                             icon: Icons.bar_chart,
-                            label: 'Cấp độ: ${species.riskLevel.toStringAsFixed(1)}',
+                            label:
+                                'Cấp độ: ${species.riskLevel.toStringAsFixed(1)}',
                             color: danger.color,
                           ),
                           if (species.primaryVenomType != null)
@@ -1275,99 +1703,173 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                             ),
                         ],
                       ),
-                      if (species.description != null && species.description!.isNotEmpty) ...[
-
+                      if (species.description != null &&
+                          species.description!.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         _sectionTitle('Mô tả'),
                         const SizedBox(height: 6),
-                        Text(species.description!, style: const TextStyle(fontSize: 13, color: Color(0xFF444444), height: 1.5)),
+                        Text(
+                          species.description!,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF444444),
+                            height: 1.5,
+                          ),
+                        ),
                       ],
-                      if (species.identificationSummary != null && species.identificationSummary!.isNotEmpty) ...[
-
+                      if (species.identificationSummary != null &&
+                          species.identificationSummary!.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         _sectionTitle('Nhận dạng'),
                         const SizedBox(height: 6),
-                        Text(species.identificationSummary!, style: const TextStyle(fontSize: 13, color: Color(0xFF444444), height: 1.5)),
+                        Text(
+                          species.identificationSummary!,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF444444),
+                            height: 1.5,
+                          ),
+                        ),
                       ],
-                      if (species.identification?.physicalTraits.isNotEmpty == true) ...[
-
+                      if (species.identification?.physicalTraits.isNotEmpty ==
+                          true) ...[
                         const SizedBox(height: 16),
                         _sectionTitle('Đặc điểm hình thái'),
                         const SizedBox(height: 8),
                         Wrap(
-                          spacing: 8, runSpacing: 6,
-                          children: species.identification!.physicalTraits.map((t) => _traitChip(t)).toList(),
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: species.identification!.physicalTraits
+                              .map((t) => _traitChip(t))
+                              .toList(),
                         ),
                       ],
-                      if (species.identification?.behaviors.isNotEmpty == true) ...[
-
+                      if (species.identification?.behaviors.isNotEmpty ==
+                          true) ...[
                         const SizedBox(height: 16),
                         _sectionTitle('Hành vi'),
                         const SizedBox(height: 8),
                         Wrap(
-                          spacing: 8, runSpacing: 6,
-                          children: species.identification!.behaviors.map((b) => _traitChip(b, color: const Color(0xFF2196F3))).toList(),
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: species.identification!.behaviors
+                              .map(
+                                (b) => _traitChip(
+                                  b,
+                                  color: const Color(0xFF2196F3),
+                                ),
+                              )
+                              .toList(),
                         ),
                       ],
-                      if (species.identification?.habitat.isNotEmpty == true) ...[
-
+                      if (species.identification?.habitat.isNotEmpty ==
+                          true) ...[
                         const SizedBox(height: 16),
                         _sectionTitle('Môi trường sống'),
                         const SizedBox(height: 6),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.forest_outlined, size: 16, color: Color(0xFF28A745)),
+                            const Icon(
+                              Icons.forest_outlined,
+                              size: 16,
+                              color: Color(0xFF28A745),
+                            ),
                             const SizedBox(width: 6),
-                            Expanded(child: Text(species.identification!.habitat,
-                                style: const TextStyle(fontSize: 13, color: Color(0xFF444444)))),
+                            Expanded(
+                              child: Text(
+                                species.identification!.habitat,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF444444),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ],
-                      if (species.symptomsByTime != null && species.symptomsByTime!.isNotEmpty) ...[
-
+                      if (species.symptomsByTime != null &&
+                          species.symptomsByTime!.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         _sectionTitle('Triệu chứng khi bị cắn'),
                         const SizedBox(height: 8),
-                        ...species.symptomsByTime!.map((sym) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: sym.isCritical ? const Color(0xFFFFF3F3) : const Color(0xFFF8F8F8),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: sym.isCritical ? const Color(0xFFFFCDD2) : const Color(0xFFEEEEEE)),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(sym.isCritical ? Icons.priority_high : Icons.access_time,
-                                        size: 14, color: sym.isCritical ? const Color(0xFFDC3545) : const Color(0xFF666666)),
-                                    const SizedBox(width: 5),
-                                    Text(sym.timeRange, style: TextStyle(
-                                      fontSize: 12, fontWeight: FontWeight.bold,
-                                      color: sym.isCritical ? const Color(0xFFDC3545) : const Color(0xFF555555),
-                                    )),
-                                  ],
+                        ...species.symptomsByTime!.map(
+                          (sym) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: sym.isCritical
+                                    ? const Color(0xFFFFF3F3)
+                                    : const Color(0xFFF8F8F8),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: sym.isCritical
+                                      ? const Color(0xFFFFCDD2)
+                                      : const Color(0xFFEEEEEE),
                                 ),
-                                const SizedBox(height: 6),
-                                ...sym.signs.map((sign) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 3),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
                                     children: [
-                                      const Text('• ', style: TextStyle(fontSize: 13, color: Color(0xFF888888))),
-                                      Expanded(child: Text(sign, style: const TextStyle(fontSize: 12, color: Color(0xFF444444)))),
+                                      Icon(
+                                        sym.isCritical
+                                            ? Icons.priority_high
+                                            : Icons.access_time,
+                                        size: 14,
+                                        color: sym.isCritical
+                                            ? const Color(0xFFDC3545)
+                                            : const Color(0xFF666666),
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        sym.timeRange,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: sym.isCritical
+                                              ? const Color(0xFFDC3545)
+                                              : const Color(0xFF555555),
+                                        ),
+                                      ),
                                     ],
                                   ),
-                                )),
-                              ],
+                                  const SizedBox(height: 6),
+                                  ...sym.signs.map(
+                                    (sign) => Padding(
+                                      padding: const EdgeInsets.only(bottom: 3),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            '• ',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: Color(0xFF888888),
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Text(
+                                              sign,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Color(0xFF444444),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        )),
+                        ),
                       ],
                     ],
                   ),
@@ -1380,7 +1882,11 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
     );
   }
 
-  Widget _detailChip({required IconData icon, required String label, required Color color}) {
+  Widget _detailChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -1393,14 +1899,27 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
         children: [
           Icon(icon, size: 13, color: color),
           const SizedBox(width: 5),
-          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _sectionTitle(String title) =>
-      Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E)));
+  Widget _sectionTitle(String title) => Text(
+    title,
+    style: const TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.bold,
+      color: Color(0xFF1A1A2E),
+    ),
+  );
 
   Widget _traitChip(String label, {Color color = const Color(0xFF555555)}) {
     return Container(
@@ -1426,7 +1945,13 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 16, offset: const Offset(0, -4))],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.12),
+                blurRadius: 16,
+                offset: const Offset(0, -4),
+              ),
+            ],
           ),
           child: SafeArea(
             top: false,
@@ -1439,7 +1964,8 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     child: Container(
-                      width: 36, height: 4,
+                      width: 36,
+                      height: 4,
                       decoration: BoxDecoration(
                         color: const Color(0xFFDDDDDD),
                         borderRadius: BorderRadius.circular(2),
@@ -1466,13 +1992,22 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
         children: [
           _buildCustomerAvatar(radius: 18),
           const SizedBox(width: 10),
-          Expanded(child: Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold))),
+          Expanded(
+            child: Text(
+              name,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            ),
+          ),
           if (phone.isNotEmpty)
             GestureDetector(
               onTap: _callCustomer,
               child: Container(
-                width: 36, height: 36,
-                decoration: const BoxDecoration(color: Color(0xFF28A745), shape: BoxShape.circle),
+                width: 36,
+                height: 36,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF28A745),
+                  shape: BoxShape.circle,
+                ),
                 child: const Icon(Icons.call, color: Colors.white, size: 18),
               ),
             ),
@@ -1502,15 +2037,32 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF222222))),
-                    const SizedBox(height: 2),
-                    Row(children: [
-                      Expanded(
-                        child: Text('Địa chỉ: ${request.address}',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF666666), height: 1.35),
-                            maxLines: 2, softWrap: true, overflow: TextOverflow.visible),
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF222222),
                       ),
-                    ]),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Địa chỉ: ${request.address}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF666666),
+                              height: 1.35,
+                            ),
+                            maxLines: 2,
+                            softWrap: true,
+                            overflow: TextOverflow.visible,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -1518,9 +2070,17 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                 GestureDetector(
                   onTap: _callCustomer,
                   child: Container(
-                    width: 42, height: 42,
-                    decoration: const BoxDecoration(color: Color(0xFFFF6B35), shape: BoxShape.circle),
-                    child: const Icon(Icons.call, color: Colors.white, size: 20),
+                    width: 42,
+                    height: 42,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFF6B35),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.call,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
                 ),
             ],
@@ -1529,28 +2089,41 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: _canMarkArrived ? const Color(0xFFE8F5E9) : const Color(0xFFFFF8E1),
+              color: _canMarkArrived
+                  ? const Color(0xFFE8F5E9)
+                  : const Color(0xFFFFF8E1),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _canMarkArrived ? const Color(0xFF28A745) : const Color(0xFFFFE082)),
+              border: Border.all(
+                color: _canMarkArrived
+                    ? const Color(0xFF28A745)
+                    : const Color(0xFFFFE082),
+              ),
             ),
             child: Row(
               children: [
                 Icon(
-                  _canMarkArrived ? Icons.check_circle_outline : Icons.directions_car,
+                  _canMarkArrived
+                      ? Icons.check_circle_outline
+                      : Icons.directions_car,
                   size: 18,
-                  color: _canMarkArrived ? const Color(0xFF28A745) : const Color(0xFFFF8F00),
+                  color: _canMarkArrived
+                      ? const Color(0xFF28A745)
+                      : const Color(0xFFFF8F00),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     _directDistanceM == null
-                      ? 'Đang lấy vị trí'
-                      : _canMarkArrived
+                        ? 'Đang lấy vị trí'
+                        : _canMarkArrived
                         ? 'Bạn đã gần đến nơi! Bấm "ĐÃ ĐẾN NƠI" ở phía trên'
                         : 'Nút "Đã đến nơi" sẽ hiện khi bạn vào trong phạm vi 1 km',
                     style: TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w600,
-                      color: _canMarkArrived ? const Color(0xFF28A745) : const Color(0xFFFF8F00),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _canMarkArrived
+                          ? const Color(0xFF28A745)
+                          : const Color(0xFFFF8F00),
                     ),
                   ),
                 ),
@@ -1558,11 +2131,10 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
             ),
           ),
           if (widget.requestData.details.isNotEmpty) ...[
-
             const SizedBox(height: 12),
             _buildSnakeSection(),
           ],
-         
+
           const SizedBox(height: 100),
           SizedBox(
             width: double.infinity,
@@ -1572,18 +2144,26 @@ class _RescuerEnRouteScreenState extends ConsumerState<RescuerEnRouteScreen>
                   ? const SizedBox(
                       width: 14,
                       height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFDC3545)),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFFDC3545),
+                      ),
                     )
                   : const Icon(Icons.close, size: 16),
               label: Text(
                 _isCancelling ? 'Đang hủy đơn...' : 'Hủy đơn',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFFDC3545),
                 side: const BorderSide(color: Color(0xFFDC3545)),
                 padding: const EdgeInsets.symmetric(vertical: 11),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
           ),

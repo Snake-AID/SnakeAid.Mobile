@@ -10,7 +10,7 @@ class SnakeSpeciesRepository {
 
   /// Get snakes by GPS location
   /// Returns list of snake species common in the geographic region
-  /// 
+  ///
   /// Endpoint: GET /api/snake-species/by-location?lat={lat}&lng={lng}
   Future<SnakesByLocationResponse> getSnakesByLocation({
     required double latitude,
@@ -18,10 +18,7 @@ class SnakeSpeciesRepository {
   }) async {
     final response = await _httpService.get(
       '/api/snake-species/by-location',
-      queryParameters: {
-        'lat': latitude,
-        'lng': longitude,
-      },
+      queryParameters: {'lat': latitude, 'lng': longitude},
     );
 
     // Backend returns ApiResponse<SnakesByLocationResponse> with snake_case fields
@@ -37,7 +34,7 @@ class SnakeSpeciesRepository {
 
   /// Search snake species by text query
   /// Used for expert consultation to quickly find snake info
-  /// 
+  ///
   /// Endpoint: GET /api/snake-species/search?q={query}
   Future<List<dynamic>> searchSnakes(String query) async {
     final response = await _httpService.get(
@@ -49,15 +46,13 @@ class SnakeSpeciesRepository {
     if (response.data['is_success'] == true && response.data['data'] != null) {
       return response.data['data'] as List<dynamic>;
     } else {
-      throw Exception(
-        response.data['message'] ?? 'Failed to search snakes',
-      );
+      throw Exception(response.data['message'] ?? 'Failed to search snakes');
     }
   }
 
   /// Get snake species details by ID
   /// Returns detailed information including antivenoms, venoms, symptoms
-  /// 
+  ///
   /// Endpoint: GET /api/snake-species/{id}
   Future<Map<String, dynamic>> getSnakeSpeciesById(int id) async {
     final response = await _httpService.get('/api/snake-species/$id');

@@ -167,10 +167,7 @@ class _EmergencyServiceCompletionScreenState
                 const SizedBox(height: 2),
                 Text(
                   'Cảm ơn bạn đã tin tưởng SnakeAid.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
             ),
@@ -206,26 +203,23 @@ class _EmergencyServiceCompletionScreenState
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF228B22),
-                      Color(0xFF1a6b1a),
-                    ],
+                    colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
                   ),
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white, width: 2),
                 ),
                 child: const Center(
-                  child: Text(
-                    '🚑',
-                    style: TextStyle(fontSize: 24),
-                  ),
+                  child: Text('🚑', style: TextStyle(fontSize: 24)),
                 ),
               ),
               Positioned(
                 bottom: -2,
                 right: -2,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF228B22),
                     borderRadius: BorderRadius.circular(10),
@@ -340,10 +334,7 @@ class _EmergencyServiceCompletionScreenState
               const SizedBox(height: 16),
 
               // Divider
-              Container(
-                height: 1,
-                color: const Color(0xFFE5E7EB),
-              ),
+              Container(height: 1, color: const Color(0xFFE5E7EB)),
               const SizedBox(height: 16),
 
               // Total
@@ -380,13 +371,7 @@ class _EmergencyServiceCompletionScreenState
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[600],
-          ),
-        ),
+        Text(label, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
         Text(
           amount,
           style: const TextStyle(
@@ -409,11 +394,7 @@ class _EmergencyServiceCompletionScreenState
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons.info_rounded,
-            color: Color(0xFF2563EB),
-            size: 20,
-          ),
+          const Icon(Icons.info_rounded, color: Color(0xFF2563EB), size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -522,11 +503,7 @@ class _EmergencyServiceCompletionScreenState
                     color: iconColor,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    icon,
-                    color: Colors.white,
-                    size: 18,
-                  ),
+                  child: Icon(icon, color: Colors.white, size: 18),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -607,10 +584,7 @@ class _EmergencyServiceCompletionScreenState
           const SizedBox(height: 4),
           Text(
             'Ý kiến của bạn giúp chúng tôi cải thiện dịch vụ',
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey[600],
-            ),
+            style: TextStyle(fontSize: 13, color: Colors.grey[600]),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
@@ -660,16 +634,10 @@ class _EmergencyServiceCompletionScreenState
             child: TextField(
               controller: _commentController,
               maxLines: 3,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF191910),
-              ),
+              style: const TextStyle(fontSize: 14, color: Color(0xFF191910)),
               decoration: InputDecoration(
                 hintText: 'Nhập nhận xét chi tiết (không bắt buộc)...',
-                hintStyle: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[400],
-                ),
+                hintStyle: TextStyle(fontSize: 14, color: Colors.grey[400]),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.all(12),
               ),
@@ -698,10 +666,7 @@ class _EmergencyServiceCompletionScreenState
         decoration: BoxDecoration(
           gradient: isSelected
               ? const LinearGradient(
-                  colors: [
-                    Color(0xFF228B22),
-                    Color(0xFF1a6b1a),
-                  ],
+                  colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
                 )
               : null,
           color: isSelected ? null : const Color(0xFFF8F8F6),
@@ -742,10 +707,7 @@ class _EmergencyServiceCompletionScreenState
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF228B22),
-                    Color(0xFF1a6b1a),
-                  ],
+                  colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
                 ),
                 borderRadius: BorderRadius.circular(30),
                 boxShadow: [
@@ -764,7 +726,10 @@ class _EmergencyServiceCompletionScreenState
                     _processPayment(context);
                   },
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 24,
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: const [
@@ -804,10 +769,7 @@ class _EmergencyServiceCompletionScreenState
               },
               child: Text(
                 'Báo cáo vấn đề / Khiếu nại',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[500],
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
               ),
             ),
           ],
@@ -845,7 +807,9 @@ class _EmergencyServiceCompletionScreenState
                       child: CircularProgressIndicator(
                         value: value,
                         strokeWidth: 4,
-                        backgroundColor: const Color(0xFF228B22).withOpacity(0.1),
+                        backgroundColor: const Color(
+                          0xFF228B22,
+                        ).withOpacity(0.1),
                         valueColor: const AlwaysStoppedAnimation<Color>(
                           Color(0xFF228B22),
                         ),
@@ -865,10 +829,7 @@ class _EmergencyServiceCompletionScreenState
                 const SizedBox(height: 8),
                 Text(
                   'Vui lòng đợi trong giây lát',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                 ),
               ],
             ),
@@ -888,9 +849,7 @@ class _EmergencyServiceCompletionScreenState
       await Future.delayed(const Duration(milliseconds: 200));
       if (context.mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => const PaymentSuccessScreen(),
-          ),
+          MaterialPageRoute(builder: (context) => const PaymentSuccessScreen()),
         );
       }
     }
@@ -900,9 +859,7 @@ class _EmergencyServiceCompletionScreenState
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -936,10 +893,7 @@ class _EmergencyServiceCompletionScreenState
             const SizedBox(height: 8),
             Text(
               'Cảm ơn bạn đã đánh giá dịch vụ',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
               textAlign: TextAlign.center,
             ),
           ],

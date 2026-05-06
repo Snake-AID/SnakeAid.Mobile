@@ -121,8 +121,9 @@ class _ConsultationDocumentsScreenState
         final msg = e.toString().contains('409')
             ? 'Khung giờ này vừa được đặt bởi người khác. Vui lòng chọn giờ khác.'
             : 'Không thể tạo lịch tư vấn. Vui lòng thử lại.';
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(msg)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(msg)));
         setState(() => _isSubmitting = false);
         return;
       }
@@ -187,43 +188,49 @@ class _ConsultationDocumentsScreenState
       body: state.isLoading
           ? const Center(child: CircularProgressIndicator())
           : state.expert == null
-              ? const Center(child: Text('Không tìm thấy chuyên gia'))
-              : Column(
-                  children: [
-                    // Main scrollable content
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Consultation Summary Card
-                            _buildConsultationSummary(
-                                context, state.expert!, theme),
-                            const SizedBox(height: 24),
-
-                            // Problem Description Section
-                            _buildProblemDescriptionSection(theme),
-                            const SizedBox(height: 24),
-
-                            // Info Box
-                            _buildInfoBox(theme),
-                            const SizedBox(height: 24),
-                          ],
+          ? const Center(child: Text('Không tìm thấy chuyên gia'))
+          : Column(
+              children: [
+                // Main scrollable content
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Consultation Summary Card
+                        _buildConsultationSummary(
+                          context,
+                          state.expert!,
+                          theme,
                         ),
-                      ),
-                    ),
+                        const SizedBox(height: 24),
 
-                    // Footer Actions
-                    _buildFooter(),
-                  ],
+                        // Problem Description Section
+                        _buildProblemDescriptionSection(theme),
+                        const SizedBox(height: 24),
+
+                        // Info Box
+                        _buildInfoBox(theme),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
                 ),
+
+                // Footer Actions
+                _buildFooter(),
+              ],
+            ),
     );
   }
 
   /// Build consultation summary card
   Widget _buildConsultationSummary(
-      BuildContext context, expert, ThemeData theme) {
+    BuildContext context,
+    expert,
+    ThemeData theme,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -312,11 +319,7 @@ class _ConsultationDocumentsScreenState
                       ),
                       const SizedBox(width: 16),
                     ],
-                    Icon(
-                      Icons.paid,
-                      size: 14,
-                      color: _primaryColor,
-                    ),
+                    Icon(Icons.paid, size: 14, color: _primaryColor),
                     const SizedBox(width: 6),
                     Text(
                       widget.price ?? '150,000 VNĐ',
@@ -375,7 +378,8 @@ class _ConsultationDocumentsScreenState
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: _primaryColor, width: 1.5),
             ),
-            hintText: 'Ví dụ: Con rắn xuất hiện trong vườn nhà tôi, dài khoảng 1m...',
+            hintText:
+                'Ví dụ: Con rắn xuất hiện trong vườn nhà tôi, dài khoảng 1m...',
             counterText: '',
             contentPadding: const EdgeInsets.all(14),
           ),
@@ -408,11 +412,7 @@ class _ConsultationDocumentsScreenState
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.info,
-            color: Colors.blue.shade700,
-            size: 20,
-          ),
+          Icon(Icons.info, color: Colors.blue.shade700, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -429,14 +429,13 @@ class _ConsultationDocumentsScreenState
 
   /// Build footer with action buttons
   Widget _buildFooter() {
-    final hasRealSlot = widget.timeSlotId != null && widget.timeSlotId!.isNotEmpty;
+    final hasRealSlot =
+        widget.timeSlotId != null && widget.timeSlotId!.isNotEmpty;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _backgroundColor,
-        border: Border(
-          top: BorderSide(color: Colors.grey.shade300, width: 1),
-        ),
+        border: Border(top: BorderSide(color: Colors.grey.shade300, width: 1)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -458,7 +457,9 @@ class _ConsultationDocumentsScreenState
                       width: 22,
                       height: 22,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2.5, color: Colors.white),
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
                     )
                   : Text(
                       hasRealSlot ? 'Xác Nhận Đặt Lịch' : 'Tiếp Tục Thanh Toán',

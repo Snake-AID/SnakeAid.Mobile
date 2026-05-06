@@ -133,75 +133,75 @@ class _ExpertReviewsScreenState extends ConsumerState<ExpertReviewsScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: _primaryColor))
           : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _error!,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: Color(0xFF6B7280)),
-                        ),
-                        const SizedBox(height: 12),
-                        ElevatedButton(
-                          onPressed: () => _loadReviews(refresh: true),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _primaryColor,
-                          ),
-                          child: const Text('Thử lại'),
-                        ),
-                      ],
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Color(0xFF6B7280)),
                     ),
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: () => _loadReviews(refresh: true),
-                  color: _primaryColor,
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      _buildHeaderCard(),
-                      const SizedBox(height: 16),
-                      if (_reviews.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 48),
-                          child: Center(
-                            child: Text(
-                              'Chưa có đánh giá nào',
-                              style: TextStyle(color: Color(0xFF6B7280)),
-                            ),
-                          ),
-                        )
-                      else
-                        ..._reviews.map(_buildReviewCard),
-                      if (_currentPage < _totalPages) ...[
-                        const SizedBox(height: 6),
-                        OutlinedButton(
-                          onPressed: _isLoadingMore
-                              ? null
-                              : () => _loadReviews(refresh: false),
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: _primaryColor),
-                            foregroundColor: _primaryColor,
-                          ),
-                          child: _isLoadingMore
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: _primaryColor,
-                                  ),
-                                )
-                              : const Text('Xem thêm đánh giá'),
-                        ),
-                      ],
-                      const SizedBox(height: 20),
-                    ],
-                  ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: () => _loadReviews(refresh: true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _primaryColor,
+                      ),
+                      child: const Text('Thử lại'),
+                    ),
+                  ],
                 ),
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: () => _loadReviews(refresh: true),
+              color: _primaryColor,
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  _buildHeaderCard(),
+                  const SizedBox(height: 16),
+                  if (_reviews.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 48),
+                      child: Center(
+                        child: Text(
+                          'Chưa có đánh giá nào',
+                          style: TextStyle(color: Color(0xFF6B7280)),
+                        ),
+                      ),
+                    )
+                  else
+                    ..._reviews.map(_buildReviewCard),
+                  if (_currentPage < _totalPages) ...[
+                    const SizedBox(height: 6),
+                    OutlinedButton(
+                      onPressed: _isLoadingMore
+                          ? null
+                          : () => _loadReviews(refresh: false),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: _primaryColor),
+                        foregroundColor: _primaryColor,
+                      ),
+                      child: _isLoadingMore
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: _primaryColor,
+                              ),
+                            )
+                          : const Text('Xem thêm đánh giá'),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
     );
   }
 
@@ -283,13 +283,16 @@ class _ExpertReviewsScreenState extends ConsumerState<ExpertReviewsScreen> {
                 radius: 20,
                 backgroundColor: const Color(0xFFE5E7EB),
                 backgroundImage: hasAvatar
-                  ? CachedNetworkImageProvider(avatarUrl)
+                    ? CachedNetworkImageProvider(avatarUrl)
                     : null,
                 child: !hasAvatar
                     ? Text(
-                    review.patientName.trim().isEmpty
-                      ? '?'
-                      : review.patientName.trim().substring(0, 1).toUpperCase(),
+                        review.patientName.trim().isEmpty
+                            ? '?'
+                            : review.patientName
+                                  .trim()
+                                  .substring(0, 1)
+                                  .toUpperCase(),
                       )
                     : null,
               ),
@@ -332,10 +335,7 @@ class _ExpertReviewsScreenState extends ConsumerState<ExpertReviewsScreen> {
           const SizedBox(height: 10),
           Text(
             safeComment,
-            style: const TextStyle(
-              color: Color(0xFF374151),
-              height: 1.45,
-            ),
+            style: const TextStyle(color: Color(0xFF374151), height: 1.45),
           ),
         ],
       ),

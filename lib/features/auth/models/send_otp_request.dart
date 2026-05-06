@@ -3,15 +3,11 @@
 class SendOtpRequest {
   final String email;
 
-  SendOtpRequest({
-    required this.email,
-  });
+  SendOtpRequest({required this.email});
 
   /// Convert to JSON for API request
   Map<String, dynamic> toJson() {
-    return {
-      'email': email,
-    };
+    return {'email': email};
   }
 
   @override

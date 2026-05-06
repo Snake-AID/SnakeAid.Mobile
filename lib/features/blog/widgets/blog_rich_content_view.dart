@@ -50,20 +50,14 @@ class BlogRichContentView extends StatelessWidget {
     if (text.startsWith('⚠️') || text.startsWith('⚠')) return 'warning';
     if (text.startsWith('🚫') || text.startsWith('❌')) return 'danger';
     if (text.startsWith('✅') || text.startsWith('☑️')) return 'success';
-    if (text.startsWith('ℹ️') ||
-        text.startsWith('💡') ||
-        text.startsWith('📌')) return 'info';
+    if (text.startsWith('ℹ️') || text.startsWith('💡') || text.startsWith('📌'))
+      return 'info';
     return null;
   }
 
   /// Remove the leading trigger emoji (and optional trailing space) from callout text.
   String _stripEmoji(String text) {
-    const triggers = [
-      '⚠️', '⚠',
-      '🚫', '❌',
-      '✅', '☑️',
-      'ℹ️', '💡', '📌',
-    ];
+    const triggers = ['⚠️', '⚠', '🚫', '❌', '✅', '☑️', 'ℹ️', '💡', '📌'];
     for (final t in triggers) {
       if (text.startsWith(t)) {
         return text.substring(t.length).trimLeft();
@@ -83,10 +77,7 @@ class BlogRichContentView extends StatelessWidget {
       children: segments.map((s) {
         if (s is _CalloutSegment) return _CalloutBox(s);
         if (s is _MarkdownSegment) {
-          return _MarkdownBlock(
-            data: s.text,
-            styleSheet: _buildStyleSheet(),
-          );
+          return _MarkdownBlock(data: s.text, styleSheet: _buildStyleSheet());
         }
         return const SizedBox.shrink();
       }).toList(),
@@ -145,8 +136,10 @@ class BlogRichContentView extends StatelessWidget {
           left: BorderSide(color: Color(0xFFFFB300), width: 4),
         ),
       ),
-      blockquotePadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      blockquotePadding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 10,
+      ),
 
       // --- Code ---
       code: const TextStyle(
@@ -170,9 +163,15 @@ class BlogRichContentView extends StatelessWidget {
 
       // --- Tables ---
       tableBorder: TableBorder.all(color: Colors.grey.shade300),
-      tableHead: const TextStyle(fontWeight: FontWeight.bold, color: _darkGreen),
+      tableHead: const TextStyle(
+        fontWeight: FontWeight.bold,
+        color: _darkGreen,
+      ),
       tableBody: const TextStyle(fontSize: 14, color: Color(0xFF333333)),
-      tableCellsPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      tableCellsPadding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 8,
+      ),
     );
   }
 }
@@ -212,7 +211,9 @@ class _MarkdownBlock extends StatelessWidget {
         final url = uri.toString();
         if (url.isEmpty) return const SizedBox.shrink();
         return _ImageBlock(
-            url: url, caption: alt?.isNotEmpty == true ? alt : title);
+          url: url,
+          caption: alt?.isNotEmpty == true ? alt : title,
+        );
       },
       onTapLink: (text, href, title) async {
         if (href == null) return;
@@ -343,8 +344,11 @@ class _ImageBlock extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Center(
-                  child: Icon(Icons.broken_image_outlined,
-                      size: 48, color: Color(0xFF228B22)),
+                  child: Icon(
+                    Icons.broken_image_outlined,
+                    size: 48,
+                    color: Color(0xFF228B22),
+                  ),
                 ),
               ),
             ),

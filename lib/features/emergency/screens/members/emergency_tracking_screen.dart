@@ -652,10 +652,9 @@ class _EmergencyTrackingScreenState
     _missionHubSubscriptions.add(
       svc.incidentFalseAlarmStream.listen((data) async {
         if (!mounted) return;
-        final reasonText =
-            (data.reason == null || data.reason!.trim().isEmpty)
-                ? 'Điều phối viên đã xác nhận đây là báo động giả. Ca SOS đã được đóng.'
-                : 'Điều phối viên đã xác nhận đây là báo động giả. Lý do: ${data.reason}';
+        final reasonText = (data.reason == null || data.reason!.trim().isEmpty)
+            ? 'Điều phối viên đã xác nhận đây là báo động giả. Ca SOS đã được đóng.'
+            : 'Điều phối viên đã xác nhận đây là báo động giả. Lý do: ${data.reason}';
         await _terminateToHome(message: reasonText);
       }),
     );
@@ -699,12 +698,12 @@ class _EmergencyTrackingScreenState
 
     final phoneText =
         (data.hospitalPhone != null && data.hospitalPhone!.trim().isNotEmpty)
-            ? ' (${data.hospitalPhone})'
-            : '';
+        ? ' (${data.hospitalPhone})'
+        : '';
     final noteText =
         (data.operatorNote != null && data.operatorNote!.trim().isNotEmpty)
-            ? '\nGhi chú: ${data.operatorNote}'
-            : '';
+        ? '\nGhi chú: ${data.operatorNote}'
+        : '';
 
     final message =
         'Điều phối viên đã chuyển ca của bạn cho ${data.hospitalName}$phoneText.$noteText';
@@ -714,7 +713,9 @@ class _EmergencyTrackingScreenState
       barrierDismissible: false,
       builder: (dialogContext) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
             children: const [
               Icon(Icons.local_hospital, color: Color(0xFF2E7D32), size: 24),
@@ -727,10 +728,7 @@ class _EmergencyTrackingScreenState
               ),
             ],
           ),
-          content: Text(
-            message,
-            style: const TextStyle(fontSize: 14),
-          ),
+          content: Text(message, style: const TextStyle(fontSize: 14)),
           actions: [
             ElevatedButton(
               onPressed: () => Navigator.of(dialogContext).pop(),

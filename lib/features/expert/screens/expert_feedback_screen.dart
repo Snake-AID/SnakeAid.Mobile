@@ -49,7 +49,10 @@ class _ExpertFeedbackScreenState extends ConsumerState<ExpertFeedbackScreen> {
 
     try {
       final repo = ref.read(consultationRepositoryProvider);
-      final reviews = await repo.getExpertReviews(currentUser.id, pageSize: 100);
+      final reviews = await repo.getExpertReviews(
+        currentUser.id,
+        pageSize: 100,
+      );
       reviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       if (!mounted) return;
@@ -77,9 +80,11 @@ class _ExpertFeedbackScreenState extends ConsumerState<ExpertFeedbackScreen> {
       return true;
     }).toList();
 
-    list.sort((a, b) => _showNewestFirst
-        ? b.createdAt.compareTo(a.createdAt)
-        : a.createdAt.compareTo(b.createdAt));
+    list.sort(
+      (a, b) => _showNewestFirst
+          ? b.createdAt.compareTo(a.createdAt)
+          : a.createdAt.compareTo(b.createdAt),
+    );
 
     return list;
   }
@@ -144,8 +149,8 @@ class _ExpertFeedbackScreenState extends ConsumerState<ExpertFeedbackScreen> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? _buildErrorState()
-                : _buildContent(),
+            ? _buildErrorState()
+            : _buildContent(),
       ),
     );
   }
@@ -192,7 +197,9 @@ class _ExpertFeedbackScreenState extends ConsumerState<ExpertFeedbackScreen> {
 
   Widget _buildSummaryCard() {
     final totalReviews = _reviews.length;
-    final withComment = _reviews.where((r) => r.comment.trim().isNotEmpty).length;
+    final withComment = _reviews
+        .where((r) => r.comment.trim().isNotEmpty)
+        .length;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -261,9 +268,7 @@ class _ExpertFeedbackScreenState extends ConsumerState<ExpertFeedbackScreen> {
           const Divider(height: 20),
           Row(
             children: [
-              Expanded(
-                child: _buildQuickStat('Có bình luận', '$withComment'),
-              ),
+              Expanded(child: _buildQuickStat('Có bình luận', '$withComment')),
               Expanded(
                 child: _buildQuickStat('Đánh giá 5 sao', '${_countByStar(5)}'),
               ),
@@ -278,7 +283,10 @@ class _ExpertFeedbackScreenState extends ConsumerState<ExpertFeedbackScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF8A8A8A))),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, color: Color(0xFF8A8A8A)),
+        ),
         const SizedBox(height: 4),
         Text(
           value,
@@ -350,7 +358,10 @@ class _ExpertFeedbackScreenState extends ConsumerState<ExpertFeedbackScreen> {
                     onTap: () => setState(() => _selectedFilter = index),
                     child: Container(
                       margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: isSelected
                             ? const Color(0xFF6C47C2)
@@ -362,7 +373,9 @@ class _ExpertFeedbackScreenState extends ConsumerState<ExpertFeedbackScreen> {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: isSelected ? Colors.white : const Color(0xFF4B4561),
+                          color: isSelected
+                              ? Colors.white
+                              : const Color(0xFF4B4561),
                         ),
                       ),
                     ),
@@ -372,7 +385,8 @@ class _ExpertFeedbackScreenState extends ConsumerState<ExpertFeedbackScreen> {
             ),
           ),
           TextButton.icon(
-            onPressed: () => setState(() => _showNewestFirst = !_showNewestFirst),
+            onPressed: () =>
+                setState(() => _showNewestFirst = !_showNewestFirst),
             icon: Icon(
               _showNewestFirst ? Icons.arrow_downward : Icons.arrow_upward,
               size: 16,
@@ -447,7 +461,10 @@ class _ExpertFeedbackScreenState extends ConsumerState<ExpertFeedbackScreen> {
                     ),
                     Text(
                       _formatDate(review.createdAt),
-                      style: const TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF888888),
+                      ),
                     ),
                   ],
                 ),
@@ -455,7 +472,9 @@ class _ExpertFeedbackScreenState extends ConsumerState<ExpertFeedbackScreen> {
               Row(
                 children: List.generate(5, (index) {
                   return Icon(
-                    index < review.rating.round() ? Icons.star : Icons.star_border,
+                    index < review.rating.round()
+                        ? Icons.star
+                        : Icons.star_border,
                     color: const Color(0xFFF59E0B),
                     size: 16,
                   );
@@ -486,10 +505,7 @@ class _ExpertFeedbackScreenState extends ConsumerState<ExpertFeedbackScreen> {
         : '?';
 
     if (avatar.isNotEmpty) {
-      return CircleAvatar(
-        radius: 20,
-        backgroundImage: NetworkImage(avatar),
-      );
+      return CircleAvatar(radius: 20, backgroundImage: NetworkImage(avatar));
     }
 
     return CircleAvatar(

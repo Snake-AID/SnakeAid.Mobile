@@ -10,23 +10,21 @@ import '../../providers/auth_provider.dart';
 class ExpertCredentialsScreen extends ConsumerStatefulWidget {
   final Map<String, String> registrationData;
 
-  const ExpertCredentialsScreen({
-    super.key,
-    required this.registrationData,
-  });
+  const ExpertCredentialsScreen({super.key, required this.registrationData});
 
   @override
   ConsumerState<ExpertCredentialsScreen> createState() =>
       _ExpertCredentialsScreenState();
 }
 
-class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScreen> {
+class _ExpertCredentialsScreenState
+    extends ConsumerState<ExpertCredentialsScreen> {
   final _formKey = GlobalKey<FormState>();
   final _certNameController = TextEditingController();
   final _orgController = TextEditingController();
   DateTime? _issueDate;
   DateTime? _expiryDate;
-  
+
   final List<Map<String, dynamic>> _selectedFiles = [];
   bool _isLoading = false;
 
@@ -46,7 +44,9 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
     );
     if (picked != null) {
       // Ép về múi giờ UTC để tránh bị lùi ngày do chênh lệch +7 khi gửi lên server
-      setState(() => _issueDate = DateTime.utc(picked.year, picked.month, picked.day));
+      setState(
+        () => _issueDate = DateTime.utc(picked.year, picked.month, picked.day),
+      );
     }
   }
 
@@ -59,7 +59,9 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
     );
     if (picked != null) {
       // Ép về múi giờ UTC để tránh bị lùi ngày
-      setState(() => _expiryDate = DateTime.utc(picked.year, picked.month, picked.day));
+      setState(
+        () => _expiryDate = DateTime.utc(picked.year, picked.month, picked.day),
+      );
     }
   }
 
@@ -67,7 +69,13 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
     try {
       FilePickerResult? result = await FilePicker.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'], // API only accepts image for ReportMedia
+        allowedExtensions: [
+          'jpg',
+          'jpeg',
+          'png',
+          'gif',
+          'webp',
+        ], // API only accepts image for ReportMedia
         allowMultiple: true,
       );
 
@@ -84,7 +92,7 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
               );
               continue;
             }
-            
+
             // Format file size
             String sizeStr;
             if (file.size < 1024 * 1024) {
@@ -114,7 +122,7 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-           SnackBar(
+          SnackBar(
             content: Text('Lỗi khi chọn file: $e'),
             backgroundColor: Colors.red,
           ),
@@ -131,7 +139,7 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
 
   void _handleContinue() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     if (_issueDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Vui lòng chọn ngày cấp chứng chỉ')),
@@ -141,7 +149,9 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
 
     if (_selectedFiles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng chọn ít nhất 1 file hình ảnh chứng chỉ')),
+        const SnackBar(
+          content: Text('Vui lòng chọn ít nhất 1 file hình ảnh chứng chỉ'),
+        ),
       );
       return;
     }
@@ -153,7 +163,7 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
     try {
       final repo = ref.read(expertCertificateRepositoryProvider);
       List<String> mediaIds = [];
-      
+
       // Upload từng file ảnh
       for (var f in _selectedFiles) {
         if (f['path'] != null) {
@@ -180,7 +190,10 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
         if (fromLogin) {
           // Nếu đến từ màn hình đăng nhập, nghĩa là account đã có, không cần OTP nữa
           // Chuyển tới màn hình pending luôn vì certificate mới tạo sẽ có status Pending
-          context.goNamed('registration_pending', extra: widget.registrationData['email'] ?? '');
+          context.goNamed(
+            'registration_pending',
+            extra: widget.registrationData['email'] ?? '',
+          );
         } else {
           // Navigate to OTP verification first
           final result = await context.pushNamed(
@@ -207,7 +220,7 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
           _isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-           SnackBar(
+          SnackBar(
             content: Text('Lỗi: ${e.toString().replaceAll('Exception: ', '')}'),
             backgroundColor: Colors.red,
           ),
@@ -308,7 +321,9 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
                           labelText: 'Tên chứng chỉ *',
                           border: OutlineInputBorder(),
                         ),
-                        validator: (v) => v == null || v.isEmpty ? 'Vui lòng nhập tên chứng chỉ' : null,
+                        validator: (v) => v == null || v.isEmpty
+                            ? 'Vui lòng nhập tên chứng chỉ'
+                            : null,
                       ),
                       const SizedBox(height: 16),
 
@@ -319,7 +334,9 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
                           labelText: 'Tổ chức cấp *',
                           border: OutlineInputBorder(),
                         ),
-                        validator: (v) => v == null || v.isEmpty ? 'Vui lòng nhập tổ chức cấp' : null,
+                        validator: (v) => v == null || v.isEmpty
+                            ? 'Vui lòng nhập tổ chức cấp'
+                            : null,
                       ),
                       const SizedBox(height: 16),
 
@@ -332,7 +349,9 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
                             border: OutlineInputBorder(),
                           ),
                           child: Text(
-                            _issueDate != null ? DateFormat('dd/MM/yyyy').format(_issueDate!) : 'Chọn ngày',
+                            _issueDate != null
+                                ? DateFormat('dd/MM/yyyy').format(_issueDate!)
+                                : 'Chọn ngày',
                           ),
                         ),
                       ),
@@ -347,7 +366,9 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
                             border: OutlineInputBorder(),
                           ),
                           child: Text(
-                            _expiryDate != null ? DateFormat('dd/MM/yyyy').format(_expiryDate!) : 'Chọn ngày (nếu có)',
+                            _expiryDate != null
+                                ? DateFormat('dd/MM/yyyy').format(_expiryDate!)
+                                : 'Chọn ngày (nếu có)',
                           ),
                         ),
                       ),
@@ -362,7 +383,11 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                            Icon(
+                              Icons.info_outline,
+                              color: Colors.blue.shade700,
+                              size: 20,
+                            ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
@@ -383,12 +408,19 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
                         onTap: _pickFiles,
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 24,
+                            horizontal: 16,
+                          ),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor.withOpacity(0.05),
+                            color: Theme.of(
+                              context,
+                            ).primaryColor.withOpacity(0.05),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: Theme.of(context).primaryColor.withOpacity(0.3),
+                              color: Theme.of(
+                                context,
+                              ).primaryColor.withOpacity(0.3),
                               width: 2,
                             ),
                           ),
@@ -449,12 +481,13 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
                         GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                            childAspectRatio: 0.85,
-                          ),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                                childAspectRatio: 0.85,
+                              ),
                           itemCount: _selectedFiles.length,
                           itemBuilder: (context, index) {
                             final file = _selectedFiles[index];
@@ -471,15 +504,21 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
                                     child: Container(
                                       width: double.infinity,
                                       height: double.infinity,
-                                      color: Colors.grey.shade100, // Background for contain
-                                      child: file['path'] != null 
+                                      color: Colors
+                                          .grey
+                                          .shade100, // Background for contain
+                                      child: file['path'] != null
                                           ? Image.file(
                                               File(file['path']),
                                               fit: BoxFit.contain,
                                             )
                                           : Container(
                                               color: Colors.grey.shade200,
-                                              child: Icon(Icons.image, color: Colors.grey.shade400, size: 40),
+                                              child: Icon(
+                                                Icons.image,
+                                                color: Colors.grey.shade400,
+                                                size: 40,
+                                              ),
                                             ),
                                     ),
                                   ),
@@ -490,7 +529,10 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
                                     right: 0,
                                     child: Container(
                                       decoration: BoxDecoration(
-                                        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(11)),
+                                        borderRadius:
+                                            const BorderRadius.vertical(
+                                              bottom: Radius.circular(11),
+                                            ),
                                         gradient: LinearGradient(
                                           begin: Alignment.bottomCenter,
                                           end: Alignment.topCenter,
@@ -500,9 +542,15 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
                                           ],
                                         ),
                                       ),
-                                      padding: const EdgeInsets.fromLTRB(8, 20, 8, 8),
+                                      padding: const EdgeInsets.fromLTRB(
+                                        8,
+                                        20,
+                                        8,
+                                        8,
+                                      ),
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             file['name'],
@@ -518,7 +566,9 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
                                           Text(
                                             file['size'],
                                             style: TextStyle(
-                                              color: Colors.white.withOpacity(0.8),
+                                              color: Colors.white.withOpacity(
+                                                0.8,
+                                              ),
                                               fontSize: 10,
                                             ),
                                           ),
@@ -576,8 +626,9 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         )
                       : const Text(
@@ -590,7 +641,6 @@ class _ExpertCredentialsScreenState extends ConsumerState<ExpertCredentialsScree
                         ),
                 ),
               ),
-
             ],
           ),
         ),

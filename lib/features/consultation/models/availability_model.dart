@@ -1,8 +1,8 @@
 /// A single bookable time slot entry returned from backend
 class TimeSlotEntry {
-  final String id;         // slot UUID (used as timeSlotId in booking request)
-  final String startTime;  // "09:00"
-  final String endTime;    // "09:30"
+  final String id; // slot UUID (used as timeSlotId in booking request)
+  final String startTime; // "09:00"
+  final String endTime; // "09:30"
 
   const TimeSlotEntry({
     required this.id,

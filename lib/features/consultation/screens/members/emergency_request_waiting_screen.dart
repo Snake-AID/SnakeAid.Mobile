@@ -108,9 +108,10 @@ class _EmergencyRequestWaitingDialogState
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 0.55, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
-    );
+    _pulseAnim = Tween<double>(
+      begin: 0.55,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
     Future.microtask(_initRealtime);
   }
 
@@ -188,7 +189,9 @@ class _EmergencyRequestWaitingDialogState
     try {
       final baseUrl = ref.read(httpServiceProvider).baseUrl;
       _signalR = EmergencyConsultationSignalRService(baseUrl: baseUrl);
-      debugPrint('🔌 [EmergencyWaiting] Connecting realtime for request=${widget.requestId}');
+      debugPrint(
+        '🔌 [EmergencyWaiting] Connecting realtime for request=${widget.requestId}',
+      );
 
       _statusSub = _signalR!.statusChangedStream.listen((event) {
         if (event.requestId.isNotEmpty && event.requestId != widget.requestId) {
@@ -225,7 +228,9 @@ class _EmergencyRequestWaitingDialogState
 
       await _signalR!.connectAndJoinRequestRoom(widget.requestId);
       _startStatusPolling();
-      debugPrint('✅ [EmergencyWaiting] Joined request room ${widget.requestId}');
+      debugPrint(
+        '✅ [EmergencyWaiting] Joined request room ${widget.requestId}',
+      );
 
       if (!mounted) return;
       setState(() {
@@ -246,7 +251,9 @@ class _EmergencyRequestWaitingDialogState
 
   void _startStatusPolling() {
     _statusPollTimer?.cancel();
-    debugPrint('🔁 [EmergencyWaiting] Start polling fallback for ${widget.requestId}');
+    debugPrint(
+      '🔁 [EmergencyWaiting] Start polling fallback for ${widget.requestId}',
+    );
     _statusPollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
       if (!mounted || _isPollingStatus || _isTerminal || _isAccepted) return;
 
@@ -317,8 +324,7 @@ class _EmergencyRequestWaitingDialogState
     }
   }
 
-  bool get _isTerminal =>
-      _status == 'DeclinedByExpert' || _status == 'Expired';
+  bool get _isTerminal => _status == 'DeclinedByExpert' || _status == 'Expired';
   bool get _isAccepted => _status == 'AcceptedByExpert';
 
   @override
@@ -335,10 +341,8 @@ class _EmergencyRequestWaitingDialogState
     return PopScope(
       canPop: _isTerminal,
       child: Dialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        insetPadding:
-            const EdgeInsets.symmetric(horizontal: 28, vertical: 52),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 52),
         backgroundColor: Colors.white,
         elevation: 24,
         child: Padding(
@@ -366,8 +370,8 @@ class _EmergencyRequestWaitingDialogState
                     _isAccepted
                         ? Icons.check_circle_outline_rounded
                         : _isTerminal
-                            ? Icons.cancel_outlined
-                            : Icons.bolt_rounded,
+                        ? Icons.cancel_outlined
+                        : Icons.bolt_rounded,
                     color: _accentColor,
                     size: 36,
                   ),
@@ -380,10 +384,10 @@ class _EmergencyRequestWaitingDialogState
                 _isAccepted
                     ? 'Chuyên gia đã chấp nhận!'
                     : _status == 'DeclinedByExpert'
-                        ? 'Yêu cầu bị từ chối'
-                        : _status == 'Expired'
-                            ? 'Yêu cầu hết hạn'
-                            : 'Yêu cầu đã được gửi',
+                    ? 'Yêu cầu bị từ chối'
+                    : _status == 'Expired'
+                    ? 'Yêu cầu hết hạn'
+                    : 'Yêu cầu đã được gửi',
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -397,8 +401,11 @@ class _EmergencyRequestWaitingDialogState
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.person_outline,
-                      size: 14, color: Color(0xFF9CA3AF)),
+                  const Icon(
+                    Icons.person_outline,
+                    size: 14,
+                    color: Color(0xFF9CA3AF),
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     widget.expertName,
@@ -415,13 +422,13 @@ class _EmergencyRequestWaitingDialogState
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 13),
+                  horizontal: 14,
+                  vertical: 13,
+                ),
                 decoration: BoxDecoration(
                   color: _accentColor.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: _accentColor.withOpacity(0.2),
-                  ),
+                  border: Border.all(color: _accentColor.withOpacity(0.2)),
                 ),
                 child: _isConnecting
                     ? const Row(
@@ -449,8 +456,7 @@ class _EmergencyRequestWaitingDialogState
                         children: [
                           if (!_isTerminal && !_isAccepted)
                             Padding(
-                              padding:
-                                  const EdgeInsets.only(top: 2, right: 8),
+                              padding: const EdgeInsets.only(top: 2, right: 8),
                               child: SizedBox(
                                 width: 13,
                                 height: 13,
@@ -486,8 +492,9 @@ class _EmergencyRequestWaitingDialogState
                       DateTime? respondedAt;
                       try {
                         final repo = ref.read(consultationRepositoryProvider);
-                        final request =
-                            await repo.getEmergencyRequestStatus(widget.requestId);
+                        final request = await repo.getEmergencyRequestStatus(
+                          widget.requestId,
+                        );
                         if (request != null) {
                           if (request.requestedAt != null) {
                             requestedAt = request.requestedAt!.toLocal();
@@ -509,8 +516,7 @@ class _EmergencyRequestWaitingDialogState
                         extra: {
                           'expertName': widget.expertName,
                           'expertSpecialty': 'Tư vấn ngay',
-                          'scheduledStartAtMs':
-                              startAt.millisecondsSinceEpoch,
+                          'scheduledStartAtMs': startAt.millisecondsSinceEpoch,
                           'scheduledDurationSeconds': 1800,
                           'canReportExpertAbsent': false,
                         },
@@ -526,7 +532,8 @@ class _EmergencyRequestWaitingDialogState
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 13),
                     ),
                   ),
@@ -544,7 +551,8 @@ class _EmergencyRequestWaitingDialogState
                     foregroundColor: const Color(0xFF6B7280),
                     side: const BorderSide(color: Color(0xFFD1D5DB)),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 13),
                   ),
                   child: const Text('Về trang tư vấn'),

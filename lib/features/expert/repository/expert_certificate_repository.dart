@@ -9,15 +9,15 @@ import '../models/expert_certificate.dart';
 
 final expertCertificateRepositoryProvider =
     Provider<ExpertCertificateRepository>((ref) {
-  final httpService = ref.watch(httpServiceProvider);
-  return ExpertCertificateRepository(httpService: httpService);
-});
+      final httpService = ref.watch(httpServiceProvider);
+      return ExpertCertificateRepository(httpService: httpService);
+    });
 
 class ExpertCertificateRepository {
   final HttpService _httpService;
 
   ExpertCertificateRepository({required HttpService httpService})
-      : _httpService = httpService;
+    : _httpService = httpService;
 
   Future<List<ExpertCertificate>> getMyCertificates() async {
     try {
@@ -39,8 +39,9 @@ class ExpertCertificateRepository {
 
   Future<ExpertCertificate> getCertificate(String certificateId) async {
     try {
-      final response = await _httpService
-          .get('/api/experts/me/certificates/$certificateId');
+      final response = await _httpService.get(
+        '/api/experts/me/certificates/$certificateId',
+      );
       final data = _unwrapData(response.data);
       if (data is Map<String, dynamic>) {
         return ExpertCertificate.fromJson(data);
@@ -128,16 +129,16 @@ class ExpertCertificateRepository {
     try {
       final fileName = imageFile.path.split('/').last.split('\\').last;
       final formData = FormData.fromMap({
-        'File': await MultipartFile.fromFile(imageFile.path, filename: fileName),
+        'File': await MultipartFile.fromFile(
+          imageFile.path,
+          filename: fileName,
+        ),
         'ReferenceId': '',
       });
       final response = await _httpService.post(
         '/api/media/report',
         data: formData,
-        queryParameters: {
-          'type': 'ExpertCertificate',
-          'purpose': 'Evidence',
-        },
+        queryParameters: {'type': 'ExpertCertificate', 'purpose': 'Evidence'},
       );
       final apiResponse = ReportMediaApiResponse.fromJson(response.data);
       if (!apiResponse.isSuccess || apiResponse.data == null) {

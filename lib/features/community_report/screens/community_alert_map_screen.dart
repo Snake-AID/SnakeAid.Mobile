@@ -494,12 +494,18 @@ class _CommunityAlertMapScreenState
                     // Cập nhật nhanh với last known
                     Position? pos = await _tryGetLastKnownLocation();
                     if (pos != null && mounted) {
-                      _mapController.move(LatLng(pos.latitude, pos.longitude), 15);
+                      _mapController.move(
+                        LatLng(pos.latitude, pos.longitude),
+                        15,
+                      );
                     }
                     // Cập nhật chính xác
                     pos = await _tryGetCurrentLocation();
                     if (pos != null && mounted) {
-                      _mapController.move(LatLng(pos.latitude, pos.longitude), 15);
+                      _mapController.move(
+                        LatLng(pos.latitude, pos.longitude),
+                        15,
+                      );
                     }
                   },
                 ),

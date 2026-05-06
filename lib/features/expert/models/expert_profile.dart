@@ -56,10 +56,10 @@ class ExpertProfile {
       biography: json['biography'] as String?,
       isOnline: json['isOnline'] as bool? ?? false,
       isVerified: json['isVerified'] as bool? ?? false,
-      scheduledConsultationFee:
-          (json['scheduledConsultationFee'] as num?)?.toDouble(),
-      emergencyConsultationFee:
-          (json['emergencyConsultationFee'] as num?)?.toDouble(),
+      scheduledConsultationFee: (json['scheduledConsultationFee'] as num?)
+          ?.toDouble(),
+      emergencyConsultationFee: (json['emergencyConsultationFee'] as num?)
+          ?.toDouble(),
       rating: (json['rating'] as num?)?.toDouble(),
       ratingCount: json['ratingCount'] as int?,
       createdAt: json['createdAt'] != null

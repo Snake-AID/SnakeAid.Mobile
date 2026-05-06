@@ -61,16 +61,20 @@ class EducationSection extends ConsumerWidget {
             ),
           )
         else
-          ...state.blogs.take(3).map((blog) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _ArticleCard(
-                  title: blog.title,
-                  readTime: '${blog.readingTime} phút đọc',
-                  views: '${blog.viewCount} lượt xem',
-                  imageUrl: blog.thumbnailUrl,
-                  onTap: () => context.push('/blogs/${blog.id}'),
+          ...state.blogs
+              .take(3)
+              .map(
+                (blog) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _ArticleCard(
+                    title: blog.title,
+                    readTime: '${blog.readingTime} phút đọc',
+                    views: '${blog.viewCount} lượt xem',
+                    imageUrl: blog.thumbnailUrl,
+                    onTap: () => context.push('/blogs/${blog.id}'),
+                  ),
                 ),
-              )),
+              ),
       ],
     );
   }
@@ -89,10 +93,8 @@ class EducationSection extends ConsumerWidget {
             ),
           ),
           TextButton(
-            onPressed: () =>
-                ref.read(blogListProvider.notifier).refresh(),
-            child: const Text('Thử lại',
-                style: TextStyle(color: _green)),
+            onPressed: () => ref.read(blogListProvider.notifier).refresh(),
+            child: const Text('Thử lại', style: TextStyle(color: _green)),
           ),
         ],
       ),
@@ -197,10 +199,7 @@ class _ArticleCard extends StatelessWidget {
                       const SizedBox(height: 8),
                       Text(
                         '$readTime • $views',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ],
                   ),

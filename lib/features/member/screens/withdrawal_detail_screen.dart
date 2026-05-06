@@ -41,7 +41,11 @@ class _WithdrawalDetailScreenState
       final w = await ref
           .read(withdrawalRepositoryProvider)
           .getWithdrawalById(widget.withdrawalId);
-      if (mounted) setState(() { _withdrawal = w; _isLoading = false; });
+      if (mounted)
+        setState(() {
+          _withdrawal = w;
+          _isLoading = false;
+        });
     } catch (e) {
       if (mounted)
         setState(() {
@@ -55,29 +59,42 @@ class _WithdrawalDetailScreenState
 
   String _statusLabel(String status) {
     switch (status) {
-      case 'Pending':   return 'Chờ duyệt';
-      case 'Approved':  return 'Đã duyệt';
-      case 'Rejected':  return 'Đã hủy';
-      case 'Completed': return 'Hoàn tất';
-      case 'Failed':    return 'Thất bại';
-      default:          return status;
+      case 'Pending':
+        return 'Chờ duyệt';
+      case 'Approved':
+        return 'Đã duyệt';
+      case 'Rejected':
+        return 'Đã hủy';
+      case 'Completed':
+        return 'Hoàn tất';
+      case 'Failed':
+        return 'Thất bại';
+      default:
+        return status;
     }
   }
 
   Color _statusColor(String status) {
     switch (status) {
-      case 'Pending':   return const Color(0xFFFF9800);
-      case 'Approved':  return const Color(0xFF2196F3);
-      case 'Rejected':  return const Color(0xFFDC3545);
-      case 'Completed': return const Color(0xFF228B22);
-      case 'Failed':    return const Color(0xFFDC3545);
-      default:          return const Color(0xFF888888);
+      case 'Pending':
+        return const Color(0xFFFF9800);
+      case 'Approved':
+        return const Color(0xFF2196F3);
+      case 'Rejected':
+        return const Color(0xFFDC3545);
+      case 'Completed':
+        return const Color(0xFF228B22);
+      case 'Failed':
+        return const Color(0xFFDC3545);
+      default:
+        return const Color(0xFF888888);
     }
   }
 
   String _formatAmount(double amount) {
-    final f = amount.toStringAsFixed(0).replaceAllMapped(
-        RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+    final f = amount
+        .toStringAsFixed(0)
+        .replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
     return '$f đ';
   }
 
@@ -102,7 +119,10 @@ class _WithdrawalDetailScreenState
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Hủy yêu cầu?',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF333333),
+          ),
         ),
         content: const Text(
           'Bạn có chắc muốn hủy yêu cầu rút tiền này?\nThao tác không thể hoàn tác.',
@@ -111,13 +131,20 @@ class _WithdrawalDetailScreenState
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Không', style: TextStyle(color: Color(0xFF666666))),
+            child: const Text(
+              'Không',
+              style: TextStyle(color: Color(0xFF666666)),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Hủy yêu cầu',
-                style: TextStyle(
-                    color: Color(0xFFDC3545), fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Hủy yêu cầu',
+              style: TextStyle(
+                color: Color(0xFFDC3545),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -189,9 +216,7 @@ class _WithdrawalDetailScreenState
 
   Widget _buildBody() {
     if (_isLoading) {
-      return Center(
-        child: CircularProgressIndicator(color: widget.themeColor),
-      );
+      return Center(child: CircularProgressIndicator(color: widget.themeColor));
     }
 
     if (_error != null) {
@@ -201,12 +226,17 @@ class _WithdrawalDetailScreenState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline,
-                  size: 48, color: Color(0xFFDC3545)),
+              const Icon(
+                Icons.error_outline,
+                size: 48,
+                color: Color(0xFFDC3545),
+              ),
               const SizedBox(height: 16),
-              Text(_error!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Color(0xFF666666))),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Color(0xFF666666)),
+              ),
               const SizedBox(height: 20),
               ElevatedButton.icon(
                 onPressed: _load,
@@ -216,7 +246,8 @@ class _WithdrawalDetailScreenState
                   backgroundColor: widget.themeColor,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ],
@@ -250,18 +281,9 @@ class _WithdrawalDetailScreenState
             _SectionCard(
               title: 'Thông Tin Ngân Hàng',
               children: [
-                _DetailRow(
-                  label: 'Ngân hàng',
-                  value: w.bankName,
-                ),
-                _DetailRow(
-                  label: 'Số tài khoản',
-                  value: w.bankAccount,
-                ),
-                _DetailRow(
-                  label: 'Chủ tài khoản',
-                  value: w.accountHolderName,
-                ),
+                _DetailRow(label: 'Ngân hàng', value: w.bankName),
+                _DetailRow(label: 'Số tài khoản', value: w.bankAccount),
+                _DetailRow(label: 'Chủ tài khoản', value: w.accountHolderName),
                 if (w.bankBin != null)
                   _DetailRow(label: 'BIN', value: w.bankBin!),
               ],
@@ -272,10 +294,7 @@ class _WithdrawalDetailScreenState
             _SectionCard(
               title: 'Thời Gian',
               children: [
-                _DetailRow(
-                  label: 'Tạo lúc',
-                  value: _formatDate(w.createdAt),
-                ),
+                _DetailRow(label: 'Tạo lúc', value: _formatDate(w.createdAt)),
                 _DetailRow(
                   label: 'Xử lý lúc',
                   value: _formatDate(w.processedAt),
@@ -292,8 +311,9 @@ class _WithdrawalDetailScreenState
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Text(
-                      w.rejectionReason == "Cancelled by user" ? "Đã hủy bởi người dùng" :
-                      w.rejectionReason!,
+                      w.rejectionReason == "Cancelled by user"
+                          ? "Đã hủy bởi người dùng"
+                          : w.rejectionReason!,
                       style: const TextStyle(
                         fontSize: 14,
                         color: Color(0xFF555555),
@@ -304,7 +324,6 @@ class _WithdrawalDetailScreenState
               ),
               const SizedBox(height: 12),
             ],
-
 
             // ── Cancel button ────────────────────────────────────────────
             if (w.status == 'Pending') ...[
@@ -326,10 +345,14 @@ class _WithdrawalDetailScreenState
                   label: Text(_isCancelling ? 'Đang hủy...' : 'Hủy Yêu Cầu'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFFDC3545),
-                    side: const BorderSide(color: Color(0xFFDC3545), width: 1.5),
+                    side: const BorderSide(
+                      color: Color(0xFFDC3545),
+                      width: 1.5,
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
@@ -359,12 +382,17 @@ class _StatusHeroCard extends StatelessWidget {
 
   IconData get _icon {
     switch (status) {
-      case 'Pending':   return Icons.schedule;
-      case 'Approved':  return Icons.check_circle_outline;
-      case 'Completed': return Icons.task_alt;
+      case 'Pending':
+        return Icons.schedule;
+      case 'Approved':
+        return Icons.check_circle_outline;
+      case 'Completed':
+        return Icons.task_alt;
       case 'Rejected':
-      case 'Failed':    return Icons.cancel_outlined;
-      default:          return Icons.info_outline;
+      case 'Failed':
+        return Icons.cancel_outlined;
+      default:
+        return Icons.info_outline;
     }
   }
 
@@ -406,8 +434,7 @@ class _StatusHeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
             decoration: BoxDecoration(
               color: statusColor.withOpacity(0.12),
               borderRadius: BorderRadius.circular(20),
@@ -507,5 +534,3 @@ class _DetailRow extends StatelessWidget {
     );
   }
 }
-
-

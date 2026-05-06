@@ -119,10 +119,7 @@ class _ControlButton extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           label,
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: compact ? 10 : 11,
-          ),
+          style: TextStyle(color: Colors.white70, fontSize: compact ? 10 : 11),
         ),
       ],
     );

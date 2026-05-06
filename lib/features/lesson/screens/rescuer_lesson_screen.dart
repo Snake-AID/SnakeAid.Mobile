@@ -87,9 +87,7 @@ class _RescuerLessonScreenState extends ConsumerState<RescuerLessonScreen>
       final response = await repo.getLessons();
       if (!mounted) return;
       setState(() {
-        final published = response.data
-            .where((l) => l.isPublished)
-            .toList()
+        final published = response.data.where((l) => l.isPublished).toList()
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
         _allLessons = published;
         _isLoading = false;
@@ -123,24 +121,26 @@ class _RescuerLessonScreenState extends ConsumerState<RescuerLessonScreen>
           Expanded(
             child: _isLoading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFFFF6B35),
-                    ),
+                    child: CircularProgressIndicator(color: Color(0xFFFF6B35)),
                   )
                 : _errorMessage != null
-                    ? _buildError()
-                    : Builder(builder: (context) {
-                        final readState = ref.watch(lessonReadProvider);
-                        return TabBarView(
-                          controller: _tabController,
-                          children: _categories
-                              .map((c) => _buildLessonList(
-                                    _forCategory(c.key),
-                                    readState,
-                                  ))
-                              .toList(),
-                        );
-                      }),
+                ? _buildError()
+                : Builder(
+                    builder: (context) {
+                      final readState = ref.watch(lessonReadProvider);
+                      return TabBarView(
+                        controller: _tabController,
+                        children: _categories
+                            .map(
+                              (c) => _buildLessonList(
+                                _forCategory(c.key),
+                                readState,
+                              ),
+                            )
+                            .toList(),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -186,10 +186,7 @@ class _RescuerLessonScreenState extends ConsumerState<RescuerLessonScreen>
         indicatorWeight: 3,
         labelColor: Colors.white,
         unselectedLabelColor: Colors.white60,
-        labelStyle: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.bold,
-        ),
+        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
         unselectedLabelStyle: const TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w500,
@@ -240,9 +237,11 @@ class _RescuerLessonScreenState extends ConsumerState<RescuerLessonScreen>
     return GestureDetector(
       onTap: () {
         ref.read(lessonReadProvider.notifier).markAsRead(lesson.id);
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => RescuerLessonDetailScreen(lesson: lesson),
-        ));
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => RescuerLessonDetailScreen(lesson: lesson),
+          ),
+        );
       },
       child: Container(
         decoration: BoxDecoration(
@@ -264,8 +263,9 @@ class _RescuerLessonScreenState extends ConsumerState<RescuerLessonScreen>
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
               decoration: BoxDecoration(
                 color: cat.color.withValues(alpha: 0.08),
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(14)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(14),
+                ),
               ),
               child: Row(
                 children: [
@@ -370,7 +370,9 @@ class _RescuerLessonScreenState extends ConsumerState<RescuerLessonScreen>
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFDC3545).withValues(alpha: 0.1),
+                            color: const Color(
+                              0xFFDC3545,
+                            ).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: const Row(

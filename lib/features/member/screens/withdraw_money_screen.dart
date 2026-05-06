@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,7 +15,8 @@ class WithdrawMoneyScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<WithdrawMoneyScreen> createState() => _WithdrawMoneyScreenState();
+  ConsumerState<WithdrawMoneyScreen> createState() =>
+      _WithdrawMoneyScreenState();
 }
 
 class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
@@ -36,7 +37,13 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
   int _activeWithdrawalCount = 0;
   bool _isCheckingActive = false;
 
-  static const List<int> _quickAmounts = [100000, 500000, 1000000, 2000000, 5000000];
+  static const List<int> _quickAmounts = [
+    100000,
+    500000,
+    1000000,
+    2000000,
+    5000000,
+  ];
 
   @override
   void initState() {
@@ -57,7 +64,11 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
   Future<void> _loadWallet() async {
     try {
       final wallet = await ref.read(walletRepositoryProvider).getWalletInfo();
-      if (mounted) setState(() { _walletInfo = wallet; _isLoadingWallet = false; });
+      if (mounted)
+        setState(() {
+          _walletInfo = wallet;
+          _isLoadingWallet = false;
+        });
     } catch (_) {
       if (mounted) setState(() => _isLoadingWallet = false);
     }
@@ -87,11 +98,17 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
     if (!mounted) return;
     setState(() => _isCheckingActive = true);
     try {
-      final list = await ref.read(withdrawalRepositoryProvider).getMyWithdrawals();
+      final list = await ref
+          .read(withdrawalRepositoryProvider)
+          .getMyWithdrawals();
       final count = list
           .where((w) => w.status == 'Pending' || w.status == 'Approved')
           .length;
-      if (mounted) setState(() { _activeWithdrawalCount = count; _isCheckingActive = false; });
+      if (mounted)
+        setState(() {
+          _activeWithdrawalCount = count;
+          _isCheckingActive = false;
+        });
     } catch (_) {
       if (mounted) setState(() => _isCheckingActive = false);
     }
@@ -118,8 +135,10 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
             Icon(Icons.block_rounded, color: Color(0xFFDC3545)),
             SizedBox(width: 8),
             Flexible(
-              child: Text('Đã đạt giới hạn rút tiền',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              child: Text(
+                'Đã đạt giới hạn rút tiền',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         ),
@@ -133,7 +152,9 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: widget.themeColor,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: const Text('Đã hiểu'),
           ),
@@ -149,13 +170,16 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
     }
     if (!_formKey.currentState!.validate()) return;
     if (_selectedBank == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng chọn ngân hàng')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Vui lòng chọn ngân hàng')));
       return;
     }
 
-    final raw = _amountController.text.replaceAll('.', '').replaceAll(',', '').trim();
+    final raw = _amountController.text
+        .replaceAll('.', '')
+        .replaceAll(',', '')
+        .trim();
     final amount = double.tryParse(raw) ?? 0;
 
     // Confirm dialog
@@ -164,13 +188,15 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
 
     setState(() => _isSubmitting = true);
     try {
-      await ref.read(withdrawalRepositoryProvider).createWithdrawal(
-        amount: amount,
-        bankAccount: _accountNumberController.text.trim(),
-        bankName: _selectedBank!.name,
-        accountHolderName: _accountNameController.text.trim().toUpperCase(),
-        bankBin: _selectedBank!.bin,
-      );
+      await ref
+          .read(withdrawalRepositoryProvider)
+          .createWithdrawal(
+            amount: amount,
+            bankAccount: _accountNumberController.text.trim(),
+            bankName: _selectedBank!.name,
+            accountHolderName: _accountNameController.text.trim().toUpperCase(),
+            bankBin: _selectedBank!.bin,
+          );
       if (!mounted) return;
       setState(() => _isSubmitting = false);
       await _showSuccessDialog(amount);
@@ -179,10 +205,12 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(e.toString().replaceFirst('Exception: ', '')),
-        backgroundColor: const Color(0xFFDC3545),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: const Color(0xFFDC3545),
+        ),
+      );
     }
   }
 
@@ -192,34 +220,48 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Xác nhận rút tiền',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF333333))),
+        title: const Text(
+          'Xác nhận rút tiền',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF333333),
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _ConfirmRow(label: 'Số tiền', value: _formatCurrency(amount)),
             const Divider(height: 24),
-            _ConfirmRow(label: 'Ngân hàng', value: _selectedBank?.shortName ?? ''),
+            _ConfirmRow(
+              label: 'Ngân hàng',
+              value: _selectedBank?.shortName ?? '',
+            ),
             const SizedBox(height: 8),
             _ConfirmRow(label: 'Số TK', value: _accountNumberController.text),
             const SizedBox(height: 8),
             _ConfirmRow(
-                label: 'Tên TK',
-                value: _accountNameController.text.trim().toUpperCase()),
+              label: 'Tên TK',
+              value: _accountNameController.text.trim().toUpperCase(),
+            ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Hủy', style: TextStyle(color: Color(0xFF888888))),
+            child: const Text(
+              'Hủy',
+              style: TextStyle(color: Color(0xFF888888)),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: ElevatedButton.styleFrom(
               backgroundColor: widget.themeColor,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: const Text('Xác nhận'),
           ),
@@ -244,21 +286,39 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
                 color: widget.themeColor.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.check_circle, color: widget.themeColor, size: 40),
+              child: Icon(
+                Icons.check_circle,
+                color: widget.themeColor,
+                size: 40,
+              ),
             ),
             const SizedBox(height: 16),
-            const Text('Yêu cầu rút tiền đã gửi',
-                style: TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
-                textAlign: TextAlign.center),
+            const Text(
+              'Yêu cầu rút tiền đã gửi',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF333333),
+              ),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 8),
-            Text(_formatCurrency(amount),
-                style: TextStyle(
-                    fontSize: 20, color: widget.themeColor, fontWeight: FontWeight.bold)),
+            Text(
+              _formatCurrency(amount),
+              style: TextStyle(
+                fontSize: 20,
+                color: widget.themeColor,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 8),
             const Text(
               'Yêu cầu đang chờ admin xét duyệt. Tiền sẽ được chuyển về tài khoản của bạn sau khi được duyệt.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF888888), height: 1.5),
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF888888),
+                height: 1.5,
+              ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -269,9 +329,13 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
               Navigator.of(ctx).pop();
               Navigator.of(context).pop();
             },
-            child: Text('Đóng',
-                style: TextStyle(
-                    color: widget.themeColor, fontWeight: FontWeight.bold)),
+            child: Text(
+              'Đóng',
+              style: TextStyle(
+                color: widget.themeColor,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -279,16 +343,16 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
   }
 
   String _formatBalance(double amount) {
-    final f = amount.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.',
-    );
+    final f = amount
+        .toStringAsFixed(0)
+        .replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
     return '$f đ';
   }
 
   String _formatCurrency(double amount) {
-    final f = amount.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.',
-    );
+    final f = amount
+        .toStringAsFixed(0)
+        .replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
     return '$f đ';
   }
 
@@ -304,7 +368,9 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
           Container(
             decoration: const BoxDecoration(
               color: Colors.white,
-              border: Border(bottom: BorderSide(color: Color(0xFFDDDDDD), width: 1)),
+              border: Border(
+                bottom: BorderSide(color: Color(0xFFDDDDDD), width: 1),
+              ),
             ),
             child: SafeArea(
               bottom: false,
@@ -313,19 +379,26 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
                 child: Stack(
                   children: [
                     Positioned(
-                      left: 0, top: 0, bottom: 0,
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
                       child: IconButton(
-                        icon: const Icon(Icons.arrow_back_ios_new,
-                            color: Color(0xFF333333)),
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new,
+                          color: Color(0xFF333333),
+                        ),
                         onPressed: () => Navigator.of(context).pop(),
                       ),
                     ),
                     const Center(
-                      child: Text('Rút Tiền',
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF333333))),
+                      child: Text(
+                        'Rút Tiền',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF333333),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -347,99 +420,134 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [widget.themeColor, widget.themeColor.withOpacity(0.75)],
+                          colors: [
+                            widget.themeColor,
+                            widget.themeColor.withOpacity(0.75),
+                          ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                              color: widget.themeColor.withOpacity(0.3),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4)),
+                            color: widget.themeColor.withOpacity(0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
                         ],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Row(children: [
-                            Icon(Icons.account_balance_wallet,
-                                color: Colors.white70, size: 20),
-                            SizedBox(width: 8),
-                            Text('Ví SnakeAidPay',
-                                style:
-                                    TextStyle(fontSize: 14, color: Colors.white70)),
-                          ]),
+                          const Row(
+                            children: [
+                              Icon(
+                                Icons.account_balance_wallet,
+                                color: Colors.white70,
+                                size: 20,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Ví SnakeAidPay',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 8),
-                          const Text('Số dư khả dụng',
-                              style: TextStyle(fontSize: 14, color: Colors.white70)),
+                          const Text(
+                            'Số dư khả dụng',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white70,
+                            ),
+                          ),
                           const SizedBox(height: 4),
                           if (_isLoadingWallet)
                             const SizedBox(
                               height: 40,
                               child: Center(
                                 child: SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white54)),
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white54,
+                                  ),
+                                ),
                               ),
                             )
                           else
-                            Text(_formatBalance(balance),
-                                style: const TextStyle(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white)),
+                            Text(
+                              _formatBalance(balance),
+                              style: const TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 24),
 
                     // Amount
-                    const Text('Số tiền rút',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF333333))),
+                    const Text(
+                      'Số tiền rút',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF333333),
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _amountController,
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: widget.themeColor),
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: widget.themeColor,
+                      ),
                       decoration: InputDecoration(
                         hintText: '0',
                         suffixText: 'đ',
                         suffixStyle: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF888888)),
-                        border:
-                            OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF888888),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: Color(0xFFDDDDDD), width: 2),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFDDDDDD),
+                            width: 2,
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              BorderSide(color: widget.themeColor, width: 2),
+                          borderSide: BorderSide(
+                            color: widget.themeColor,
+                            width: 2,
+                          ),
                         ),
                         filled: true,
                         fillColor: Colors.white,
                       ),
                       validator: (value) {
                         final v = double.tryParse(
-                            (value ?? '').replaceAll('.', '').replaceAll(',', ''));
+                          (value ?? '').replaceAll('.', '').replaceAll(',', ''),
+                        );
                         if (v == null || v <= 0) return 'Vui lòng nhập số tiền';
                         if (v < 50000) return 'Số tiền tối thiểu là 50.000đ';
-                        if (v > 5000000) return 'Số tiền tối đa là 5.000.000đ/lần';
+                        if (v > 5000000)
+                          return 'Số tiền tối đa là 5.000.000đ/lần';
                         if (v > balance) return 'Số dư không đủ';
                         return null;
                       },
@@ -450,37 +558,44 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
                       spacing: 8,
                       runSpacing: 8,
                       children: [
-                        ..._quickAmounts.map((a) => _QuickAmountButton(
-                              amount: a,
-                              color: widget.themeColor,
-                              onTap: () =>
-                                  _amountController.text = a.toString(),
-                            )),
+                        ..._quickAmounts.map(
+                          (a) => _QuickAmountButton(
+                            amount: a,
+                            color: widget.themeColor,
+                            onTap: () => _amountController.text = a.toString(),
+                          ),
+                        ),
                         _QuickAmountButton(
                           amount: balance.toInt(),
                           label: 'Tất cả',
                           color: widget.themeColor,
-                          onTap: () =>
-                              _amountController.text = balance.toInt().toString(),
+                          onTap: () => _amountController.text = balance
+                              .toInt()
+                              .toString(),
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
 
                     // Bank selection
-                    const Text('Ngân hàng nhận',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF333333))),
+                    const Text(
+                      'Ngân hàng nhận',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF333333),
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     if (_isLoadingBanks)
                       Center(
-                          child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: CircularProgressIndicator(
-                            color: widget.themeColor),
-                      ))
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: CircularProgressIndicator(
+                            color: widget.themeColor,
+                          ),
+                        ),
+                      )
                     else
                       FormField<BankInfo>(
                         validator: (_) => _selectedBank == null
@@ -494,12 +609,14 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
                               child: Container(
                                 height: 56,
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 12),
+                                  horizontal: 12,
+                                ),
                                 decoration: BoxDecoration(
                                   border: Border.all(
-                                      color: field.hasError
-                                          ? Colors.red
-                                          : const Color(0xFFDDDDDD)),
+                                    color: field.hasError
+                                        ? Colors.red
+                                        : const Color(0xFFDDDDDD),
+                                  ),
                                   borderRadius: BorderRadius.circular(12),
                                   color: Colors.white,
                                 ),
@@ -519,9 +636,11 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
                                             color: const Color(0xFFF0F0F0),
                                           ),
                                           errorWidget: (_, __, ___) =>
-                                              const Icon(Icons.account_balance,
-                                                  size: 24,
-                                                  color: Color(0xFF888888)),
+                                              const Icon(
+                                                Icons.account_balance,
+                                                size: 24,
+                                                color: Color(0xFF888888),
+                                              ),
                                         ),
                                       ),
                                       const SizedBox(width: 12),
@@ -531,35 +650,51 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
                                               ? _selectedBank!.shortName
                                               : _selectedBank!.name,
                                           style: const TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF333333)),
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF333333),
+                                          ),
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                     ] else ...[
-                                      const Icon(Icons.account_balance,
-                                          size: 22, color: Color(0xFF888888)),
+                                      const Icon(
+                                        Icons.account_balance,
+                                        size: 22,
+                                        color: Color(0xFF888888),
+                                      ),
                                       const SizedBox(width: 12),
                                       const Expanded(
-                                        child: Text('Chọn ngân hàng',
-                                            style: TextStyle(
-                                                fontSize: 15,
-                                                color: Color(0xFF999999))),
+                                        child: Text(
+                                          'Chọn ngân hàng',
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            color: Color(0xFF999999),
+                                          ),
+                                        ),
                                       ),
                                     ],
-                                    const Icon(Icons.keyboard_arrow_down,
-                                        color: Color(0xFF888888)),
+                                    const Icon(
+                                      Icons.keyboard_arrow_down,
+                                      color: Color(0xFF888888),
+                                    ),
                                   ],
                                 ),
                               ),
                             ),
                             if (field.hasError)
                               Padding(
-                                padding: const EdgeInsets.only(top: 6, left: 12),
-                                child: Text(field.errorText!,
-                                    style: const TextStyle(
-                                        fontSize: 12, color: Colors.red)),
+                                padding: const EdgeInsets.only(
+                                  top: 6,
+                                  left: 12,
+                                ),
+                                child: Text(
+                                  field.errorText!,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.red,
+                                  ),
+                                ),
                               ),
                           ],
                         ),
@@ -576,16 +711,17 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
                         hintText: '0123456789',
                         prefixIcon: const Icon(Icons.credit_card),
                         border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: Color(0xFFDDDDDD)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFDDDDDD),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              BorderSide(color: widget.themeColor),
+                          borderSide: BorderSide(color: widget.themeColor),
                         ),
                       ),
                       validator: (v) {
@@ -609,16 +745,17 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
                         hintText: 'NGUYEN VAN A',
                         prefixIcon: const Icon(Icons.person),
                         border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: Color(0xFFDDDDDD)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFDDDDDD),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              BorderSide(color: widget.themeColor),
+                          borderSide: BorderSide(color: widget.themeColor),
                         ),
                       ),
                       validator: (v) {
@@ -639,8 +776,11 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
                       child: const Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.warning_amber_rounded,
-                              color: Color(0xFFFF9800), size: 20),
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            color: Color(0xFFFF9800),
+                            size: 20,
+                          ),
                           SizedBox(width: 12),
                           Expanded(
                             child: Text(
@@ -649,9 +789,10 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
                               '• Hạn mức rút trong ngày: 10.000.000đ\n'
                               '• Hãy kiểm tra kỹ thông tin trước khi xác nhận',
                               style: TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF333333),
-                                  height: 1.5),
+                                fontSize: 13,
+                                color: Color(0xFF333333),
+                                height: 1.5,
+                              ),
                             ),
                           ),
                         ],
@@ -669,16 +810,20 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
                         child: const Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.block_rounded,
-                                color: Color(0xFFDC3545), size: 20),
+                            Icon(
+                              Icons.block_rounded,
+                              color: Color(0xFFDC3545),
+                              size: 20,
+                            ),
                             SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 'Bạn đang có 3 yêu cầu rút tiền chưa hoàn tất. Vui lòng đợi admin xử lý trước khi tạo yêu cầu mới.',
                                 style: TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFFC62828),
-                                    height: 1.5),
+                                  fontSize: 13,
+                                  color: Color(0xFFC62828),
+                                  height: 1.5,
+                                ),
                               ),
                             ),
                           ],
@@ -696,12 +841,15 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          border: const Border(top: BorderSide(color: Color(0xFFDDDDDD), width: 1)),
+          border: const Border(
+            top: BorderSide(color: Color(0xFFDDDDDD), width: 1),
+          ),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, -2)),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
           ],
         ),
         child: SafeArea(
@@ -710,7 +858,10 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
             child: SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: (_isSubmitting || _isCheckingActive || _activeWithdrawalCount >= 3)
+                onPressed:
+                    (_isSubmitting ||
+                        _isCheckingActive ||
+                        _activeWithdrawalCount >= 3)
                     ? null
                     : _onSubmit,
                 style: ElevatedButton.styleFrom(
@@ -720,7 +871,8 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   elevation: 0,
                   disabledBackgroundColor: _activeWithdrawalCount >= 3
                       ? const Color(0xFFDC3545).withOpacity(0.6)
@@ -731,15 +883,25 @@ class _WithdrawMoneyScreenState extends ConsumerState<WithdrawMoneyScreen> {
                         width: 22,
                         height: 22,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : _activeWithdrawalCount >= 3
-                        ? const Text('Có 3 Đơn Rút Tiền Chưa Hoàn Tất',
-                            style: TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.bold))
-                        : const Text('Xác Nhận Rút Tiền',
-                            style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold)),
+                    ? const Text(
+                        'Có 3 Đơn Rút Tiền Chưa Hoàn Tất',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    : const Text(
+                        'Xác Nhận Rút Tiền',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ),
           ),
@@ -757,9 +919,12 @@ class _QuickAmountButton extends StatelessWidget {
   final VoidCallback onTap;
   final Color color;
 
-  const _QuickAmountButton(
-      {required this.amount, this.label, required this.onTap,
-       this.color = const Color(0xFF228B22)});
+  const _QuickAmountButton({
+    required this.amount,
+    this.label,
+    required this.onTap,
+    this.color = const Color(0xFF228B22),
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -776,9 +941,10 @@ class _QuickAmountButton extends StatelessWidget {
         child: Text(
           label ?? _fmt(amount),
           style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: color),
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
         ),
       ),
     );
@@ -797,23 +963,31 @@ class _ConfirmRow extends StatelessWidget {
   final String value;
   final bool highlight;
 
-  const _ConfirmRow({required this.label, required this.value, this.highlight = false});
+  const _ConfirmRow({
+    required this.label,
+    required this.value,
+    this.highlight = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label,
-            style: const TextStyle(fontSize: 14, color: Color(0xFF888888))),
-        Text(value,
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight:
-                    highlight ? FontWeight.bold : FontWeight.normal,
-                color: highlight
-                    ? const Color(0xFF228B22)
-                    : const Color(0xFF333333))),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 14, color: Color(0xFF888888)),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: highlight ? FontWeight.bold : FontWeight.normal,
+            color: highlight
+                ? const Color(0xFF228B22)
+                : const Color(0xFF333333),
+          ),
+        ),
       ],
     );
   }
@@ -876,15 +1050,19 @@ class _BankPickerSheetState extends State<_BankPickerSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                  color: const Color(0xFFDDDDDD),
-                  borderRadius: BorderRadius.circular(2)),
+                color: const Color(0xFFDDDDDD),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
             const SizedBox(height: 16),
-            const Text('Chọn ngân hàng',
-                style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF333333))),
+            const Text(
+              'Chọn ngân hàng',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF333333),
+              ),
+            ),
             const SizedBox(height: 12),
             // Search
             Padding(
@@ -894,7 +1072,10 @@ class _BankPickerSheetState extends State<_BankPickerSheet> {
                 autofocus: true,
                 decoration: InputDecoration(
                   hintText: 'Tìm kiếm ngân hàng...',
-                  prefixIcon: const Icon(Icons.search, color: Color(0xFF888888)),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: Color(0xFF888888),
+                  ),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear, size: 18),
@@ -906,8 +1087,9 @@ class _BankPickerSheetState extends State<_BankPickerSheet> {
                   filled: true,
                   fillColor: const Color(0xFFF5F5F5),
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none),
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
@@ -918,8 +1100,11 @@ class _BankPickerSheetState extends State<_BankPickerSheet> {
             Expanded(
               child: _filtered.isEmpty
                   ? const Center(
-                      child: Text('Không tìm thấy ngân hàng',
-                          style: TextStyle(color: Color(0xFF888888))))
+                      child: Text(
+                        'Không tìm thấy ngân hàng',
+                        style: TextStyle(color: Color(0xFF888888)),
+                      ),
+                    )
                   : ListView.separated(
                       controller: scrollController,
                       itemCount: _filtered.length,
@@ -939,8 +1124,11 @@ class _BankPickerSheetState extends State<_BankPickerSheet> {
                                 width: 44,
                                 height: 44,
                                 color: const Color(0xFFF0F0F0),
-                                child: const Icon(Icons.account_balance,
-                                    size: 22, color: Color(0xFFCCCCCC)),
+                                child: const Icon(
+                                  Icons.account_balance,
+                                  size: 22,
+                                  color: Color(0xFFCCCCCC),
+                                ),
                               ),
                               errorWidget: (_, __, ___) => Container(
                                 width: 44,
@@ -949,8 +1137,11 @@ class _BankPickerSheetState extends State<_BankPickerSheet> {
                                   color: const Color(0xFFF0F0F0),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
-                                child: const Icon(Icons.account_balance,
-                                    size: 22, color: Color(0xFF888888)),
+                                child: const Icon(
+                                  Icons.account_balance,
+                                  size: 22,
+                                  color: Color(0xFF888888),
+                                ),
                               ),
                             ),
                           ),
@@ -959,16 +1150,19 @@ class _BankPickerSheetState extends State<_BankPickerSheet> {
                                 ? bank.shortName
                                 : bank.name,
                             style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
-                                color: Color(0xFF333333)),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                              color: Color(0xFF333333),
+                            ),
                           ),
                           subtitle: Text(
                             bank.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                                fontSize: 12, color: Color(0xFF888888)),
+                              fontSize: 12,
+                              color: Color(0xFF888888),
+                            ),
                           ),
                           onTap: () => Navigator.of(context).pop(bank),
                         );

@@ -16,6 +16,7 @@ class SnakeWarningMarker extends StatelessWidget {
   final String? riskLevel;
   final bool isVenomous;
   final double size;
+
   /// If provided, the marker shows the actual snake species photo in a
   /// circular badge instead of the generic warning sign image.
   final String? imageUrl;
@@ -92,9 +93,7 @@ class SnakeWarningMarker extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: (glow != Colors.transparent
-                            ? glow
-                            : Colors.black)
+                    color: (glow != Colors.transparent ? glow : Colors.black)
                         .withOpacity(0.30),
                     blurRadius: 6,
                     spreadRadius: 1,
@@ -128,11 +127,7 @@ class SnakeWarningMarker extends StatelessWidget {
 
           // Animated pulse dot for dangerous sightings
           if (_isDangerous)
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: _PulseDot(color: glow),
-            ),
+            Positioned(right: 0, bottom: 0, child: _PulseDot(color: glow)),
         ],
       ),
     );
@@ -158,10 +153,13 @@ class _PulseDotState extends State<_PulseDot>
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 850))
-      ..repeat(reverse: true);
-    _scale = Tween<double>(begin: 0.8, end: 1.2)
-        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+      vsync: this,
+      duration: const Duration(milliseconds: 850),
+    )..repeat(reverse: true);
+    _scale = Tween<double>(
+      begin: 0.8,
+      end: 1.2,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -216,8 +214,10 @@ class _FallbackMarker extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      CustomPaint(size: Size(size, size * 0.866), painter: _TrianglePainter(fill: _fill));
+  Widget build(BuildContext context) => CustomPaint(
+    size: Size(size, size * 0.866),
+    painter: _TrianglePainter(fill: _fill),
+  );
 }
 
 class _TrianglePainter extends CustomPainter {
@@ -236,12 +236,13 @@ class _TrianglePainter extends CustomPainter {
       ..close();
     canvas.drawPath(path, Paint()..color = fill);
     canvas.drawPath(
-        path,
-        Paint()
-          ..color = const Color(0xFF1A1A1A)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = bw
-          ..strokeJoin = StrokeJoin.round);
+      path,
+      Paint()
+        ..color = const Color(0xFF1A1A1A)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = bw
+        ..strokeJoin = StrokeJoin.round,
+    );
     final cx = w / 2;
     final sp = Paint()
       ..color = const Color(0xFF1A1A1A)
@@ -251,12 +252,29 @@ class _TrianglePainter extends CustomPainter {
     canvas.drawPath(
       Path()
         ..moveTo(cx, h * 0.18)
-        ..cubicTo(cx + w * 0.26, h * 0.28, cx + w * 0.24, h * 0.44, cx, h * 0.54)
-        ..cubicTo(cx - w * 0.22, h * 0.64, cx - w * 0.16, h * 0.74, cx + w * 0.08, h * 0.82),
+        ..cubicTo(
+          cx + w * 0.26,
+          h * 0.28,
+          cx + w * 0.24,
+          h * 0.44,
+          cx,
+          h * 0.54,
+        )
+        ..cubicTo(
+          cx - w * 0.22,
+          h * 0.64,
+          cx - w * 0.16,
+          h * 0.74,
+          cx + w * 0.08,
+          h * 0.82,
+        ),
       sp,
     );
-    canvas.drawCircle(Offset(cx, h * 0.13), w * 0.08,
-        Paint()..color = const Color(0xFF1A1A1A));
+    canvas.drawCircle(
+      Offset(cx, h * 0.13),
+      w * 0.08,
+      Paint()..color = const Color(0xFF1A1A1A),
+    );
   }
 
   @override

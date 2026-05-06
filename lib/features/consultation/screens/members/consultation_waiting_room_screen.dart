@@ -9,17 +9,23 @@ class ConsultationWaitingRoomScreen extends ConsumerStatefulWidget {
   final String consultationId;
   final String expertName;
   final String expertSpecialty;
+
   /// Enable report-expert-absent action for scheduled consultations.
   final bool canReportExpertAbsent;
+
   /// Scheduled start time (epoch ms) used for StartTime business rule.
   final int? scheduledStartAtMs;
+
   /// Scheduled duration used to render the schedule time range.
   final int scheduledDurationSeconds;
+
   /// true khi quay lại từ cuộc gọi đã kết thúc → hiện nút "Xác nhận hoàn thành"
   final bool showCompleteButton;
   final int durationSeconds;
+
   /// Trạng thái mic được đồng bộ từ video call (hoặc mặc định bật)
   final bool initialMicOn;
+
   /// Trạng thái camera được đồng bộ từ video call (hoặc mặc định bật)
   final bool initialCameraOn;
 
@@ -81,16 +87,21 @@ class _ConsultationWaitingRoomScreenState
     );
 
     _dotAnims = _dotControllers
-        .map((c) => Tween<double>(begin: 0, end: -7).animate(
-              CurvedAnimation(parent: c, curve: Curves.easeInOut),
-            ))
+        .map(
+          (c) => Tween<double>(
+            begin: 0,
+            end: -7,
+          ).animate(CurvedAnimation(parent: c, curve: Curves.easeInOut)),
+        )
         .toList();
 
     _dotControllers[0].repeat(reverse: true);
-    Future.delayed(const Duration(milliseconds: 200),
-        () { if (mounted) _dotControllers[1].repeat(reverse: true); });
-    Future.delayed(const Duration(milliseconds: 400),
-        () { if (mounted) _dotControllers[2].repeat(reverse: true); });
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) _dotControllers[1].repeat(reverse: true);
+    });
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) _dotControllers[2].repeat(reverse: true);
+    });
   }
 
   @override
@@ -122,8 +133,8 @@ class _ConsultationWaitingRoomScreenState
       final msg = e.toString().contains('403')
           ? 'Bạn không phải thành viên của phòng tư vấn này'
           : e.toString().contains('404')
-              ? 'Không tìm thấy buổi tư vấn'
-              : 'Không thể kết nối phòng, vui lòng thử lại';
+          ? 'Không tìm thấy buổi tư vấn'
+          : 'Không thể kết nối phòng, vui lòng thử lại';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(msg),
@@ -253,9 +264,9 @@ class _ConsultationWaitingRoomScreenState
     // Call API to end consultation
     final repo = ref.read(consultationRepositoryProvider);
     final result = await repo.endConsultation(widget.consultationId);
-    
+
     if (!mounted) return;
-    
+
     if (result) {
       // Navigate to review/completion screen
       context.go(
@@ -287,7 +298,8 @@ class _ConsultationWaitingRoomScreenState
     final startMs = widget.scheduledStartAtMs;
     if (startMs == null) return true;
     final start = DateTime.fromMillisecondsSinceEpoch(startMs);
-    return DateTime.now().isAfter(start) || DateTime.now().isAtSameMomentAs(start);
+    return DateTime.now().isAfter(start) ||
+        DateTime.now().isAtSameMomentAs(start);
   }
 
   Future<void> _showReportExpertAbsentDialog() async {
@@ -438,10 +450,15 @@ class _ConsultationWaitingRoomScreenState
                       shape: BoxShape.circle,
                       color: Colors.white.withOpacity(0.08),
                       border: Border.all(
-                          color: Colors.white.withOpacity(0.15), width: 2),
+                        color: Colors.white.withOpacity(0.15),
+                        width: 2,
+                      ),
                     ),
-                    child: const Icon(Icons.person,
-                        size: 40, color: Colors.white38),
+                    child: const Icon(
+                      Icons.person,
+                      size: 40,
+                      color: Colors.white38,
+                    ),
                   ),
                 ),
 
@@ -470,12 +487,15 @@ class _ConsultationWaitingRoomScreenState
                   child: Center(
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 12),
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(40),
                         border: Border.all(
-                            color: Colors.white.withOpacity(0.2)),
+                          color: Colors.white.withOpacity(0.2),
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -493,8 +513,7 @@ class _ConsultationWaitingRoomScreenState
 
                           // Mic (active = green circle)
                           GestureDetector(
-                            onTap: () =>
-                                setState(() => _isMicOn = !_isMicOn),
+                            onTap: () => setState(() => _isMicOn = !_isMicOn),
                             child: Container(
                               width: 48,
                               height: 48,
@@ -525,9 +544,7 @@ class _ConsultationWaitingRoomScreenState
                             onTap: () =>
                                 setState(() => _isCameraOn = !_isCameraOn),
                             child: Icon(
-                              _isCameraOn
-                                  ? Icons.videocam
-                                  : Icons.videocam_off,
+                              _isCameraOn ? Icons.videocam : Icons.videocam_off,
                               color: _isCameraOn
                                   ? Colors.white
                                   : Colors.red.shade300,
@@ -559,9 +576,10 @@ class _ConsultationWaitingRoomScreenState
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 8,
-                offset: const Offset(0, 2)),
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
           ],
           border: Border.all(color: const Color(0xFFF3F4F6)),
         ),
@@ -583,12 +601,12 @@ class _ConsultationWaitingRoomScreenState
                         border: Border.all(color: Colors.white, width: 2),
                         boxShadow: [
                           BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
-                              blurRadius: 4),
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 4,
+                          ),
                         ],
                       ),
-                      child:
-                          const Icon(Icons.person, size: 28, color: _green),
+                      child: const Icon(Icons.person, size: 28, color: _green),
                     ),
                     Positioned(
                       bottom: 1,
@@ -599,8 +617,7 @@ class _ConsultationWaitingRoomScreenState
                         decoration: BoxDecoration(
                           color: Colors.grey.shade300,
                           shape: BoxShape.circle,
-                          border:
-                              Border.all(color: Colors.white, width: 2),
+                          border: Border.all(color: Colors.white, width: 2),
                         ),
                       ),
                     ),
@@ -634,23 +651,30 @@ class _ConsultationWaitingRoomScreenState
                               color: _green.withOpacity(0.1),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.chat_bubble_outline,
-                                size: 16, color: _green),
+                            child: const Icon(
+                              Icons.chat_bubble_outline,
+                              size: 16,
+                              color: _green,
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(Icons.schedule_outlined,
-                              size: 16, color: Color(0xFF6B7280)),
+                          const Icon(
+                            Icons.schedule_outlined,
+                            size: 16,
+                            color: Color(0xFF6B7280),
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             'Lịch: ${_formatTimeRange(widget.scheduledStartAtMs, widget.scheduledDurationSeconds)}',
                             style: const TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF6B7280),
-                                fontWeight: FontWeight.w500),
+                              fontSize: 13,
+                              color: Color(0xFF6B7280),
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ],
                       ),
@@ -678,9 +702,10 @@ class _ConsultationWaitingRoomScreenState
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF160D1B)),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF160D1B),
+            ),
           ),
         ),
       ],
@@ -705,19 +730,24 @@ class _ConsultationWaitingRoomScreenState
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               child: _isJoining
                   ? const SizedBox(
                       width: 22,
                       height: 22,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2.5, color: Colors.white),
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
                     )
                   : const Text(
                       'Vào phòng',
                       style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold),
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
             ),
           ),
@@ -735,12 +765,12 @@ class _ConsultationWaitingRoomScreenState
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: const Text(
                   'Hoàn Thành Tư Vấn',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -753,7 +783,9 @@ class _ConsultationWaitingRoomScreenState
               width: double.infinity,
               height: 44,
               child: OutlinedButton(
-                onPressed: _isReportingAbsent ? null : _showReportExpertAbsentDialog,
+                onPressed: _isReportingAbsent
+                    ? null
+                    : _showReportExpertAbsentDialog,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF6B7280),
                   side: const BorderSide(color: Color(0xFFD1D5DB)),
@@ -770,10 +802,7 @@ class _ConsultationWaitingRoomScreenState
                     : Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(
-                            Icons.report_problem_outlined,
-                            size: 18,
-                          ),
+                          const Icon(Icons.report_problem_outlined, size: 18),
                           const SizedBox(width: 8),
                           Text(
                             'Báo chuyên gia vắng mặt',
@@ -806,19 +835,20 @@ class _ConsultationWaitingRoomScreenState
       ),
     );
   }
+
   String _formatTimeRange(int? startMs, int durationSeconds) {
     if (startMs == null || startMs == 0) return 'Đang cập nhật...';
-    
+
     final start = DateTime.fromMillisecondsSinceEpoch(startMs);
     // Use durationSeconds if provided (> 0), otherwise fallback to 30 mins (1800s)
     final duration = durationSeconds > 0 ? durationSeconds : 1800;
     final end = start.add(Duration(seconds: duration));
-    
+
     final h1 = start.hour.toString().padLeft(2, '0');
     final m1 = start.minute.toString().padLeft(2, '0');
     final h2 = end.hour.toString().padLeft(2, '0');
     final m2 = end.minute.toString().padLeft(2, '0');
-    
+
     return '$h1:$m1 - $h2:$m2';
   }
 }
@@ -889,10 +919,7 @@ class _ReportExpertAbsentModalContentState
             const SizedBox(height: 16),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 18,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
@@ -954,9 +981,7 @@ class _ReportExpertAbsentModalContentState
                       decoration: BoxDecoration(
                         color: const Color(0xFFF0FDF4),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: const Color(0xFFBBF7D0),
-                        ),
+                        border: Border.all(color: const Color(0xFFBBF7D0)),
                       ),
                       child: const Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -998,13 +1023,15 @@ class _ReportExpertAbsentModalContentState
                       decoration: InputDecoration(
                         hintText:
                             'Ví dụ: Đã đến giờ hẹn nhưng chuyên gia chưa vào phòng tư vấn.',
-                        hintStyle: TextStyle(
-                          color: Colors.grey.shade500,
-                        ),
+                        hintStyle: TextStyle(color: Colors.grey.shade500),
                         filled: true,
                         fillColor: const Color(0xFFF9FAFB),
-                        contentPadding:
-                            const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                        contentPadding: const EdgeInsets.fromLTRB(
+                          16,
+                          16,
+                          16,
+                          16,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
                           borderSide: const BorderSide(
@@ -1055,9 +1082,7 @@ class _ReportExpertAbsentModalContentState
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
               decoration: BoxDecoration(
                 color: Colors.grey.shade50,
-                border: Border(
-                  top: BorderSide(color: Colors.grey.shade200),
-                ),
+                border: Border(top: BorderSide(color: Colors.grey.shade200)),
               ),
               child: Column(
                 children: [
@@ -1066,10 +1091,8 @@ class _ReportExpertAbsentModalContentState
                     height: 48,
                     child: ElevatedButton(
                       onPressed: _isFilled
-                          ? () => Navigator.pop(
-                                context,
-                                _controller.text.trim(),
-                              )
+                          ? () =>
+                                Navigator.pop(context, _controller.text.trim())
                           : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF228B22),

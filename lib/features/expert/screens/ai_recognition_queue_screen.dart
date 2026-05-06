@@ -25,9 +25,7 @@ class _AiRecognitionQueueScreenState
     // Load history lazily when user switches to that tab
     _tabController.addListener(() {
       if (_tabController.index == 1) {
-        ref
-            .read(aiReviewHistoryProvider.notifier)
-            .load();
+        ref.read(aiReviewHistoryProvider.notifier).load();
       }
     });
   }
@@ -51,10 +49,7 @@ class _AiRecognitionQueueScreenState
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: const [
-                _QueueTabContent(),
-                _HistoryTabContent(),
-              ],
+              children: const [_QueueTabContent(), _HistoryTabContent()],
             ),
           ),
         ],
@@ -119,10 +114,11 @@ class _AiRecognitionQueueScreenState
         indicatorWeight: 3,
         labelColor: const Color(0xFF10B981),
         unselectedLabelColor: const Color(0xFF6B7280),
-        labelStyle:
-            const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-        unselectedLabelStyle:
-            const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+        labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        unselectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.w500,
+          fontSize: 14,
+        ),
         tabs: const [
           Tab(text: 'Hàng Đợi'),
           Tab(text: 'Đã Xử Lý'),
@@ -171,9 +167,7 @@ class _QueueTabContentState extends ConsumerState<_QueueTabContent> {
 
     if (state.isLoading) {
       return const Center(
-        child: CircularProgressIndicator(
-          color: Color(0xFF10B981),
-        ),
+        child: CircularProgressIndicator(color: Color(0xFF10B981)),
       );
     }
 
@@ -266,8 +260,7 @@ class _QueueTabContentState extends ConsumerState<_QueueTabContent> {
             Text(
               error,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 14, color: Color(0xFF6B7280)),
+              style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
@@ -279,7 +272,8 @@ class _QueueTabContentState extends ConsumerState<_QueueTabContent> {
                 backgroundColor: const Color(0xFF10B981),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
           ],
@@ -344,8 +338,7 @@ class _HistoryTabContentState extends ConsumerState<_HistoryTabContent> {
               Text(
                 state.error!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                    fontSize: 14, color: Color(0xFF6B7280)),
+                style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
               ),
               const SizedBox(height: 20),
               ElevatedButton.icon(
@@ -358,7 +351,8 @@ class _HistoryTabContentState extends ConsumerState<_HistoryTabContent> {
                   backgroundColor: const Color(0xFF10B981),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ],
@@ -379,8 +373,11 @@ class _HistoryTabContentState extends ConsumerState<_HistoryTabContent> {
                 color: const Color(0xFF6B7280).withOpacity(0.08),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.history,
-                  color: Color(0xFF9CA3AF), size: 40),
+              child: const Icon(
+                Icons.history,
+                color: Color(0xFF9CA3AF),
+                size: 40,
+              ),
             ),
             const SizedBox(height: 16),
             const Text(
@@ -414,8 +411,11 @@ class _HistoryTabContentState extends ConsumerState<_HistoryTabContent> {
             return const Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
               child: Center(
-                  child: CircularProgressIndicator(
-                      color: Color(0xFF10B981), strokeWidth: 2)),
+                child: CircularProgressIndicator(
+                  color: Color(0xFF10B981),
+                  strokeWidth: 2,
+                ),
+              ),
             );
           }
           return _ReviewHistoryCard(item: state.items[index]);
@@ -527,8 +527,11 @@ class _ReviewQueueCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.chevron_right,
-                    color: Color(0xFF9CA3AF), size: 20),
+                const Icon(
+                  Icons.chevron_right,
+                  color: Color(0xFF9CA3AF),
+                  size: 20,
+                ),
               ],
             ),
           ),
@@ -552,9 +555,8 @@ class _ReviewHistoryCard extends StatelessWidget {
     final ai = item.aiResult;
     final confident = ai.confidence;
     final confPct = (confident * 100).round();
-    final isVerified = (item.expertStatus ?? ai.status)
-            .toLowerCase()
-            .contains('verified') ||
+    final isVerified =
+        (item.expertStatus ?? ai.status).toLowerCase().contains('verified') ||
         (item.expertStatus ?? ai.status) == RecognitionStatus.expertVerified;
 
     return Container(
@@ -613,7 +615,9 @@ class _ReviewHistoryCard extends StatelessWidget {
                     Text(
                       ai.detectedSpecies!.commonName,
                       style: const TextStyle(
-                          fontSize: 12, color: Color(0xFF6B7280)),
+                        fontSize: 12,
+                        color: Color(0xFF6B7280),
+                      ),
                     ),
                   ],
                   const SizedBox(height: 8),
@@ -632,7 +636,9 @@ class _ReviewHistoryCard extends StatelessWidget {
                         Text(
                           _formatDate(item.expertReviewedAt!),
                           style: const TextStyle(
-                              fontSize: 11, color: Color(0xFF9CA3AF)),
+                            fontSize: 11,
+                            color: Color(0xFF9CA3AF),
+                          ),
                         ),
                       ],
                     ],
@@ -698,8 +704,11 @@ class _SnakeNetworkImage extends StatelessWidget {
       width: width,
       height: height,
       color: const Color(0xFFF3F4F6),
-      child: const Icon(Icons.image_outlined,
-          color: Color(0xFFD1D5DB), size: 32),
+      child: const Icon(
+        Icons.image_outlined,
+        color: Color(0xFFD1D5DB),
+        size: 32,
+      ),
     );
   }
 }
@@ -789,9 +798,7 @@ class _StatusBadge extends StatelessWidget {
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w600,
-          color: isVerified
-              ? const Color(0xFF10B981)
-              : const Color(0xFFEF4444),
+          color: isVerified ? const Color(0xFF10B981) : const Color(0xFFEF4444),
         ),
       ),
     );

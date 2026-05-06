@@ -44,7 +44,8 @@ final expertAvailabilitySignalRServiceProvider =
       return EmergencyConsultationSignalRService(baseUrl: baseUrl);
     });
 
-class ExpertAvailabilityNotifier extends StateNotifier<ExpertAvailabilityState> {
+class ExpertAvailabilityNotifier
+    extends StateNotifier<ExpertAvailabilityState> {
   final ExpertProfileRepository _profileRepository;
   final EmergencyConsultationSignalRService _signalRService;
 
@@ -140,7 +141,9 @@ final expertAvailabilityProvider =
       ref,
     ) {
       final repository = ref.watch(expertProfileRepositoryProvider);
-      final signalRService = ref.watch(expertAvailabilitySignalRServiceProvider);
+      final signalRService = ref.watch(
+        expertAvailabilitySignalRServiceProvider,
+      );
 
       return ExpertAvailabilityNotifier(
         profileRepository: repository,

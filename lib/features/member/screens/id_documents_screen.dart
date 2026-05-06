@@ -16,8 +16,10 @@ class _IdDocumentsScreenState extends State<IdDocumentsScreen> {
       issueDate: '15/03/2020',
       expiryDate: 'Vô thời hạn',
       status: DocumentStatus.verified,
-      frontImageUrl: 'https://via.placeholder.com/400x250/228B22/FFFFFF?text=CCCD+Front',
-      backImageUrl: 'https://via.placeholder.com/400x250/228B22/FFFFFF?text=CCCD+Back',
+      frontImageUrl:
+          'https://via.placeholder.com/400x250/228B22/FFFFFF?text=CCCD+Front',
+      backImageUrl:
+          'https://via.placeholder.com/400x250/228B22/FFFFFF?text=CCCD+Back',
     ),
     DocumentItem(
       type: 'BHYT',
@@ -25,7 +27,8 @@ class _IdDocumentsScreenState extends State<IdDocumentsScreen> {
       issueDate: '01/01/2026',
       expiryDate: '31/12/2026',
       status: DocumentStatus.verified,
-      frontImageUrl: 'https://via.placeholder.com/400x250/1E88E5/FFFFFF?text=BHYT',
+      frontImageUrl:
+          'https://via.placeholder.com/400x250/1E88E5/FFFFFF?text=BHYT',
     ),
   ];
 
@@ -40,10 +43,7 @@ class _IdDocumentsScreenState extends State<IdDocumentsScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border(
-                bottom: BorderSide(
-                  color: const Color(0xFFDDDDDD),
-                  width: 1,
-                ),
+                bottom: BorderSide(color: const Color(0xFFDDDDDD), width: 1),
               ),
             ),
             child: SafeArea(
@@ -82,10 +82,7 @@ class _IdDocumentsScreenState extends State<IdDocumentsScreen> {
                       top: 0,
                       bottom: 0,
                       child: IconButton(
-                        icon: const Icon(
-                          Icons.add,
-                          color: Color(0xFF228B22),
-                        ),
+                        icon: const Icon(Icons.add, color: Color(0xFF228B22)),
                         onPressed: _addDocument,
                       ),
                     ),
@@ -162,10 +159,7 @@ class _IdDocumentsScreenState extends State<IdDocumentsScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           border: Border(
-            top: BorderSide(
-              color: const Color(0xFFDDDDDD),
-              width: 1,
-            ),
+            top: BorderSide(color: const Color(0xFFDDDDDD), width: 1),
           ),
           boxShadow: [
             BoxShadow(
@@ -229,9 +223,9 @@ class _IdDocumentsScreenState extends State<IdDocumentsScreen> {
           setState(() {
             _documents.add(document);
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Đã thêm ${document.type}')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Đã thêm ${document.type}')));
         },
       ),
     );
@@ -272,10 +266,7 @@ class _IdDocumentsScreenState extends State<IdDocumentsScreen> {
                 SnackBar(content: Text('Đã xóa ${document.type}')),
               );
             },
-            child: const Text(
-              'Xóa',
-              style: TextStyle(color: Colors.red),
-            ),
+            child: const Text('Xóa', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -283,11 +274,7 @@ class _IdDocumentsScreenState extends State<IdDocumentsScreen> {
   }
 }
 
-enum DocumentStatus {
-  verified,
-  pending,
-  expired,
-}
+enum DocumentStatus { verified, pending, expired }
 
 class DocumentItem {
   final String type;
@@ -442,7 +429,10 @@ class _DocumentCard extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF888888),
                     side: const BorderSide(color: Color(0xFFDDDDDD)),
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 12,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -567,10 +557,7 @@ class _DetailItem extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF888888),
-                ),
+                style: const TextStyle(fontSize: 11, color: Color(0xFF888888)),
               ),
               Text(
                 value,
@@ -602,9 +589,9 @@ class _AddDocumentDialogState extends State<_AddDocumentDialog> {
   final _numberController = TextEditingController();
   final _issueDateController = TextEditingController();
   final _expiryDateController = TextEditingController();
-  
+
   String _selectedType = 'CMND/CCCD';
-  
+
   final List<String> _documentTypes = [
     'CMND/CCCD',
     'BHYT',
@@ -625,9 +612,7 @@ class _AddDocumentDialogState extends State<_AddDocumentDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -665,10 +650,7 @@ class _AddDocumentDialogState extends State<_AddDocumentDialog> {
                     ),
                   ),
                   items: _documentTypes.map((type) {
-                    return DropdownMenuItem(
-                      value: type,
-                      child: Text(type),
-                    );
+                    return DropdownMenuItem(value: type, child: Text(type));
                   }).toList(),
                   onChanged: (value) {
                     if (value != null) {
@@ -739,7 +721,8 @@ class _AddDocumentDialogState extends State<_AddDocumentDialog> {
                       lastDate: DateTime.now(),
                     );
                     if (date != null) {
-                      _issueDateController.text = '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+                      _issueDateController.text =
+                          '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
                     }
                   },
                   readOnly: true,
@@ -793,7 +776,11 @@ class _AddDocumentDialogState extends State<_AddDocumentDialog> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.info_outline, size: 16, color: Color(0xFF888888)),
+                          const Icon(
+                            Icons.info_outline,
+                            size: 16,
+                            color: Color(0xFF888888),
+                          ),
                           const SizedBox(width: 8),
                           const Expanded(
                             child: Text(
@@ -840,9 +827,7 @@ class _AddDocumentDialogState extends State<_AddDocumentDialog> {
                       ),
                       child: const Text(
                         'Lưu',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
@@ -881,9 +866,7 @@ class _DocumentDetailDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -923,7 +906,11 @@ class _DocumentDetailDialog extends StatelessWidget {
                         height: 200,
                         color: Colors.grey[200],
                         child: const Center(
-                          child: Icon(Icons.image, size: 48, color: Colors.grey),
+                          child: Icon(
+                            Icons.image,
+                            size: 48,
+                            color: Colors.grey,
+                          ),
                         ),
                       );
                     },
@@ -943,7 +930,11 @@ class _DocumentDetailDialog extends StatelessWidget {
                         height: 200,
                         color: Colors.grey[200],
                         child: const Center(
-                          child: Icon(Icons.image, size: 48, color: Colors.grey),
+                          child: Icon(
+                            Icons.image,
+                            size: 48,
+                            color: Colors.grey,
+                          ),
                         ),
                       );
                     },
@@ -973,10 +964,7 @@ class _DocumentDetailDialog extends StatelessWidget {
                   ),
                   child: const Text(
                     'Đóng',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -992,10 +980,7 @@ class _InfoRowDetail extends StatelessWidget {
   final String label;
   final String value;
 
-  const _InfoRowDetail({
-    required this.label,
-    required this.value,
-  });
+  const _InfoRowDetail({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -1004,10 +989,7 @@ class _InfoRowDetail extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Color(0xFF888888),
-          ),
+          style: const TextStyle(fontSize: 14, color: Color(0xFF888888)),
         ),
         Text(
           value,

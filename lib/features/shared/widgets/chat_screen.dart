@@ -114,10 +114,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF228B22),
-                    Color(0xFF1a6b1a),
-                  ],
+                  colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
                 ),
                 shape: BoxShape.circle,
                 border: Border.all(
@@ -131,7 +128,10 @@ class _ChatScreenState extends State<ChatScreen> {
                   ? Center(
                       child: Text(
                         widget.recipientAvatar!,
-                        style: const TextStyle(fontSize: 18, color: Colors.white),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          color: Colors.white,
+                        ),
                       ),
                     )
                   : const Icon(
@@ -212,7 +212,8 @@ class _ChatScreenState extends State<ChatScreen> {
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final message = _messages[index];
-                final showAvatar = !message.isSentByMe &&
+                final showAvatar =
+                    !message.isSentByMe &&
                     (index == _messages.length - 1 ||
                         _messages[index + 1].isSentByMe);
 
@@ -285,10 +286,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [
-                            Color(0xFF228B22),
-                            Color(0xFF1a6b1a),
-                          ],
+                          colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
                         ),
                         shape: BoxShape.circle,
                       ),
@@ -332,7 +330,10 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.search_rounded, color: Color(0xFF228B22)),
+              leading: const Icon(
+                Icons.search_rounded,
+                color: Color(0xFF228B22),
+              ),
               title: const Text('Tìm kiếm trong cuộc trò chuyện'),
               onTap: () {
                 Navigator.pop(context);
@@ -342,7 +343,10 @@ class _ChatScreenState extends State<ChatScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.notifications_off_outlined, color: Color(0xFF6B7280)),
+              leading: const Icon(
+                Icons.notifications_off_outlined,
+                color: Color(0xFF6B7280),
+              ),
               title: const Text('Tắt thông báo'),
               onTap: () {
                 Navigator.pop(context);
@@ -352,7 +356,10 @@ class _ChatScreenState extends State<ChatScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.block_rounded, color: Color(0xFFDC3545)),
+              leading: const Icon(
+                Icons.block_rounded,
+                color: Color(0xFFDC3545),
+              ),
               title: const Text('Chặn người dùng'),
               onTap: () {
                 Navigator.pop(context);
@@ -419,9 +426,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   color: const Color(0xFF2563EB),
                   onTap: () {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Mở camera')),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(const SnackBar(content: Text('Mở camera')));
                   },
                 ),
                 _AttachmentOption(
@@ -461,8 +468,9 @@ class ChatMessageBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
-        mainAxisAlignment:
-            message.isSentByMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: message.isSentByMe
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!message.isSentByMe) ...[
@@ -474,10 +482,7 @@ class ChatMessageBubble extends StatelessWidget {
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF228B22),
-                      Color(0xFF1a6b1a),
-                    ],
+                    colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
                   ),
                   shape: BoxShape.circle,
                   border: Border.all(
@@ -489,7 +494,10 @@ class ChatMessageBubble extends StatelessWidget {
                     ? Center(
                         child: Text(
                           message.senderAvatar!,
-                          style: const TextStyle(fontSize: 14, color: Colors.white),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.white,
+                          ),
                         ),
                       )
                     : const Icon(
@@ -518,10 +526,7 @@ class ChatMessageBubble extends StatelessWidget {
                         ? const LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xFF228B22),
-                              Color(0xFF1a6b1a),
-                            ],
+                            colors: [Color(0xFF228B22), Color(0xFF1a6b1a)],
                           )
                         : null,
                     color: message.isSentByMe ? null : Colors.white,
@@ -644,11 +649,7 @@ class _AttachmentOption extends StatelessWidget {
               color: color.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 28,
-            ),
+            child: Icon(icon, color: color, size: 28),
           ),
           const SizedBox(height: 8),
           Text(

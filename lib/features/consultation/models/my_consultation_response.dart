@@ -1,7 +1,4 @@
-enum MyConsultationType {
-  scheduled,
-  emergency,
-}
+enum MyConsultationType { scheduled, emergency }
 
 enum MyConsultationStatus {
   scheduled,
@@ -89,10 +86,7 @@ class MyConsultationResponse {
       }
     }
 
-    DateTime? parseDate(
-      dynamic value, {
-      required bool treatUtcAsWallClock,
-    }) {
+    DateTime? parseDate(dynamic value, {required bool treatUtcAsWallClock}) {
       if (value == null) return null;
       final raw = value.toString();
       final parsed = DateTime.tryParse(raw);
@@ -139,10 +133,12 @@ class MyConsultationResponse {
         json['endTime'],
         treatUtcAsWallClock: treatUtcAsWallClock,
       ),
-      grossPrice: (json['grossPrice'] as num?)?.toDouble() ??
+      grossPrice:
+          (json['grossPrice'] as num?)?.toDouble() ??
           (json['grossAmount'] as num?)?.toDouble() ??
           (json['price'] as num?)?.toDouble(),
-      netPrice: (json['netPrice'] as num?)?.toDouble() ??
+      netPrice:
+          (json['netPrice'] as num?)?.toDouble() ??
           (json['netAmount'] as num?)?.toDouble(),
       problemDescription: json['problemDescription']?.toString(),
       customerReport: json['customerReport']?.toString(),

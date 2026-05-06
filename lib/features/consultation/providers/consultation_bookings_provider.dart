@@ -33,7 +33,7 @@ class ConsultationBookingsNotifier
   final ConsultationRepository _repository;
 
   ConsultationBookingsNotifier(this._repository)
-      : super(const ConsultationBookingsState()) {
+    : super(const ConsultationBookingsState()) {
     loadBookings();
   }
 
@@ -43,16 +43,16 @@ class ConsultationBookingsNotifier
       final bookings = await _repository.getMyBookings();
       state = state.copyWith(isLoading: false, bookings: bookings);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 }
 
-final consultationBookingsProvider = StateNotifierProvider<
-    ConsultationBookingsNotifier, ConsultationBookingsState>((ref) {
-  final repository = ref.watch(consultationRepositoryProvider);
-  return ConsultationBookingsNotifier(repository);
-});
+final consultationBookingsProvider =
+    StateNotifierProvider<
+      ConsultationBookingsNotifier,
+      ConsultationBookingsState
+    >((ref) {
+      final repository = ref.watch(consultationRepositoryProvider);
+      return ConsultationBookingsNotifier(repository);
+    });

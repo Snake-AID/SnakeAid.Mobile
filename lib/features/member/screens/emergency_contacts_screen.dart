@@ -5,7 +5,8 @@ class EmergencyContactsScreen extends StatefulWidget {
   const EmergencyContactsScreen({super.key});
 
   @override
-  State<EmergencyContactsScreen> createState() => _EmergencyContactsScreenState();
+  State<EmergencyContactsScreen> createState() =>
+      _EmergencyContactsScreenState();
 }
 
 class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
@@ -15,7 +16,8 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       relationship: 'Vợ',
       phone: '+84 912 345 678',
       isPrimary: true,
-      avatarUrl: 'https://ui-avatars.com/api/?name=Nguyen+Thi+B&background=228B22&color=fff&size=200',
+      avatarUrl:
+          'https://ui-avatars.com/api/?name=Nguyen+Thi+B&background=228B22&color=fff&size=200',
     ),
     EmergencyContact(
       name: 'Trần Văn B',
@@ -29,7 +31,8 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       relationship: 'Bạn',
       phone: '+84 901 112 233',
       isPrimary: false,
-      avatarUrl: 'https://ui-avatars.com/api/?name=Le+Thi+C&background=228B22&color=fff&size=200',
+      avatarUrl:
+          'https://ui-avatars.com/api/?name=Le+Thi+C&background=228B22&color=fff&size=200',
     ),
   ];
 
@@ -44,10 +47,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border(
-                bottom: BorderSide(
-                  color: const Color(0xFFDDDDDD),
-                  width: 1,
-                ),
+                bottom: BorderSide(color: const Color(0xFFDDDDDD), width: 1),
               ),
             ),
             child: SafeArea(
@@ -86,10 +86,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                       top: 0,
                       bottom: 0,
                       child: IconButton(
-                        icon: const Icon(
-                          Icons.add,
-                          color: Color(0xFF228B22),
-                        ),
+                        icon: const Icon(Icons.add, color: Color(0xFF228B22)),
                         onPressed: _addContact,
                       ),
                     ),
@@ -165,10 +162,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           border: Border(
-            top: BorderSide(
-              color: const Color(0xFFDDDDDD),
-              width: 1,
-            ),
+            top: BorderSide(color: const Color(0xFFDDDDDD), width: 1),
           ),
           boxShadow: [
             BoxShadow(
@@ -219,10 +213,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                 const SizedBox(height: 8),
                 const Text(
                   'Khuyến nghị: 2-4 người',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF888888),
-                  ),
+                  style: TextStyle(fontSize: 12, color: Color(0xFF888888)),
                 ),
               ],
             ),
@@ -247,9 +238,9 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
           setState(() {
             _contacts.add(contact);
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Đã thêm ${contact.name}')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Đã thêm ${contact.name}')));
         },
       ),
     );
@@ -293,14 +284,11 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                 _contacts.remove(contact);
               });
               Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Đã xóa ${contact.name}')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text('Đã xóa ${contact.name}')));
             },
-            child: const Text(
-              'Xóa',
-              style: TextStyle(color: Colors.red),
-            ),
+            child: const Text('Xóa', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -353,11 +341,7 @@ class _ContactCard extends StatelessWidget {
       child: Row(
         children: [
           // Drag handle
-          Icon(
-            Icons.drag_indicator,
-            color: Colors.grey[400],
-            size: 24,
-          ),
+          Icon(Icons.drag_indicator, color: Colors.grey[400], size: 24),
           const SizedBox(width: 12),
           // Avatar
           Container(
@@ -365,10 +349,7 @@ class _ContactCard extends StatelessWidget {
             height: 60,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFFDDDDDD),
-                width: 1,
-              ),
+              border: Border.all(color: const Color(0xFFDDDDDD), width: 1),
             ),
             child: contact.avatarUrl != null
                 ? ClipOval(
@@ -443,11 +424,7 @@ class _ContactCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    Icon(
-                      Icons.phone,
-                      size: 14,
-                      color: const Color(0xFF888888),
-                    ),
+                    Icon(Icons.phone, size: 14, color: const Color(0xFF888888)),
                     const SizedBox(width: 4),
                     Text(
                       contact.phone,
@@ -472,10 +449,7 @@ class _ContactCard extends StatelessWidget {
                 ),
                 onPressed: onEdit,
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                  minWidth: 32,
-                  minHeight: 32,
-                ),
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
               const SizedBox(height: 8),
               IconButton(
@@ -486,10 +460,7 @@ class _ContactCard extends StatelessWidget {
                 ),
                 onPressed: onDelete,
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                  minWidth: 32,
-                  minHeight: 32,
-                ),
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
             ],
           ),
@@ -499,7 +470,9 @@ class _ContactCard extends StatelessWidget {
   }
 
   Widget _buildInitialAvatar() {
-    final initial = contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?';
+    final initial = contact.name.isNotEmpty
+        ? contact.name[0].toUpperCase()
+        : '?';
     return Container(
       decoration: const BoxDecoration(
         color: Color(0xFF228B22),
@@ -524,10 +497,7 @@ class _AddContactDialog extends StatefulWidget {
   final EmergencyContact? existingContact;
   final Function(EmergencyContact) onSave;
 
-  const _AddContactDialog({
-    this.existingContact,
-    required this.onSave,
-  });
+  const _AddContactDialog({this.existingContact, required this.onSave});
 
   @override
   State<_AddContactDialog> createState() => _AddContactDialogState();
@@ -555,8 +525,12 @@ class _AddContactDialogState extends State<_AddContactDialog> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.existingContact?.name ?? '');
-    _phoneController = TextEditingController(text: widget.existingContact?.phone ?? '');
+    _nameController = TextEditingController(
+      text: widget.existingContact?.name ?? '',
+    );
+    _phoneController = TextEditingController(
+      text: widget.existingContact?.phone ?? '',
+    );
     _selectedRelationship = widget.existingContact?.relationship ?? 'Vợ';
     _isPrimary = widget.existingContact?.isPrimary ?? false;
   }
@@ -574,9 +548,7 @@ class _AddContactDialogState extends State<_AddContactDialog> {
 
     return Dialog(
       backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -694,10 +666,7 @@ class _AddContactDialogState extends State<_AddContactDialog> {
                   },
                   title: const Text(
                     'Đặt làm liên hệ chính',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF333333),
-                    ),
+                    style: TextStyle(fontSize: 14, color: Color(0xFF333333)),
                   ),
                   activeColor: const Color(0xFF228B22),
                   contentPadding: EdgeInsets.zero,
@@ -734,9 +703,7 @@ class _AddContactDialogState extends State<_AddContactDialog> {
                       ),
                       child: Text(
                         isEdit ? 'Lưu' : 'Thêm',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],

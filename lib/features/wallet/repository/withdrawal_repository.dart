@@ -50,16 +50,16 @@ class BankInfo {
   }
 
   BankInfo copyWith({String? logoUrl}) => BankInfo(
-        key: key,
-        code: code,
-        shortName: shortName,
-        bin: bin,
-        name: name,
-        vietQrStatus: vietQrStatus,
-        lookupSupported: lookupSupported,
-        swiftCode: swiftCode,
-        logoUrl: logoUrl ?? this.logoUrl,
-      );
+    key: key,
+    code: code,
+    shortName: shortName,
+    bin: bin,
+    name: name,
+    vietQrStatus: vietQrStatus,
+    lookupSupported: lookupSupported,
+    swiftCode: swiftCode,
+    logoUrl: logoUrl ?? this.logoUrl,
+  );
 }
 
 class WithdrawalInfo {
@@ -214,7 +214,9 @@ class WithdrawalRepository {
       if (code == 'WITHDRAWAL_DAILY_LIMIT_EXCEEDED') {
         throw Exception('Đã vượt hạn mức rút tiền trong ngày (10.000.000đ).');
       }
-      throw Exception(msg ?? 'Tạo yêu cầu rút tiền thất bại. Vui lòng thử lại.');
+      throw Exception(
+        msg ?? 'Tạo yêu cầu rút tiền thất bại. Vui lòng thử lại.',
+      );
     }
   }
 
@@ -250,8 +252,10 @@ class WithdrawalRepository {
   Future<WithdrawalInfo> cancelWithdrawal(String id) async {
     try {
       debugPrint('🚫 POST /api/withdrawals/$id/cancel');
-      final response =
-          await _httpService.post('/api/withdrawals/$id/cancel', data: {});
+      final response = await _httpService.post(
+        '/api/withdrawals/$id/cancel',
+        data: {},
+      );
       return WithdrawalInfo.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       debugPrint('❌ cancelWithdrawal: ${e.message}');

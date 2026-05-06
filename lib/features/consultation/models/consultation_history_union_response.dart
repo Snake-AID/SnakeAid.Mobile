@@ -1,15 +1,8 @@
 import 'my_consultation_response.dart';
 
-enum ConsultationHistoryKind {
-  consultation,
-  instant,
-}
+enum ConsultationHistoryKind { consultation, instant }
 
-enum InstantRequestStatus {
-  declinedByExpert,
-  expired,
-  unknown,
-}
+enum InstantRequestStatus { declinedByExpert, expired, unknown }
 
 InstantRequestStatus parseInstantRequestStatus(String? value) {
   switch ((value ?? '').trim().toLowerCase()) {
@@ -53,22 +46,10 @@ class ConsultationHistoryMeta {
     }
 
     return ConsultationHistoryMeta(
-      currentPage: parseInt(
-        json['currentPage'] ?? json['current_page'],
-        1,
-      ),
-      pageSize: parseInt(
-        json['pageSize'] ?? json['page_size'],
-        10,
-      ),
-      totalItems: parseInt(
-        json['totalItems'] ?? json['total_items'],
-        0,
-      ),
-      totalPages: parseInt(
-        json['totalPages'] ?? json['total_pages'],
-        1,
-      ),
+      currentPage: parseInt(json['currentPage'] ?? json['current_page'], 1),
+      pageSize: parseInt(json['pageSize'] ?? json['page_size'], 10),
+      totalItems: parseInt(json['totalItems'] ?? json['total_items'], 0),
+      totalPages: parseInt(json['totalPages'] ?? json['total_pages'], 1),
     );
   }
 }
@@ -117,9 +98,7 @@ class MemberInstantConsultationHistory {
     this.respondedAt,
   });
 
-  factory MemberInstantConsultationHistory.fromJson(
-    Map<String, dynamic> json,
-  ) {
+  factory MemberInstantConsultationHistory.fromJson(Map<String, dynamic> json) {
     return MemberInstantConsultationHistory(
       instantRequestId: (json['instantRequestId'] ?? '').toString(),
       expertId: (json['expertId'] ?? '').toString(),
@@ -156,9 +135,7 @@ class ExpertInstantConsultationHistory {
     this.respondedAt,
   });
 
-  factory ExpertInstantConsultationHistory.fromJson(
-    Map<String, dynamic> json,
-  ) {
+  factory ExpertInstantConsultationHistory.fromJson(Map<String, dynamic> json) {
     return ExpertInstantConsultationHistory(
       instantRequestId: (json['instantRequestId'] ?? '').toString(),
       userId: (json['userId'] ?? '').toString(),
@@ -239,10 +216,7 @@ class ExpertConsultationHistoryResponse {
       }
     }
 
-    DateTime? parseDate(
-      dynamic value, {
-      required bool treatUtcAsWallClock,
-    }) {
+    DateTime? parseDate(dynamic value, {required bool treatUtcAsWallClock}) {
       if (value == null) return null;
       final raw = value.toString();
       final parsed = DateTime.tryParse(raw);
@@ -287,9 +261,11 @@ class ExpertConsultationHistoryResponse {
         json['endTime'],
         treatUtcAsWallClock: treatUtcAsWallClock,
       ),
-      grossPrice: (json['grossPrice'] as num?)?.toDouble() ??
+      grossPrice:
+          (json['grossPrice'] as num?)?.toDouble() ??
           (json['grossAmount'] as num?)?.toDouble(),
-      netPrice: (json['netPrice'] as num?)?.toDouble() ??
+      netPrice:
+          (json['netPrice'] as num?)?.toDouble() ??
           (json['netAmount'] as num?)?.toDouble(),
       emergencyRequestId: json['emergencyRequestId']?.toString(),
     );
@@ -300,10 +276,7 @@ class MemberConsultationHistoryUnion {
   final ConsultationHistoryKind kind;
   final Map<String, dynamic> raw;
 
-  const MemberConsultationHistoryUnion({
-    required this.kind,
-    required this.raw,
-  });
+  const MemberConsultationHistoryUnion({required this.kind, required this.raw});
 
   factory MemberConsultationHistoryUnion.fromJson(Map<String, dynamic> json) {
     final kindValue = (json['kind'] ?? '').toString().toLowerCase();
@@ -319,10 +292,7 @@ class ExpertConsultationHistoryUnion {
   final ConsultationHistoryKind kind;
   final Map<String, dynamic> raw;
 
-  const ExpertConsultationHistoryUnion({
-    required this.kind,
-    required this.raw,
-  });
+  const ExpertConsultationHistoryUnion({required this.kind, required this.raw});
 
   factory ExpertConsultationHistoryUnion.fromJson(Map<String, dynamic> json) {
     final kindValue = (json['kind'] ?? '').toString().toLowerCase();

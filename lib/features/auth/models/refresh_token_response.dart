@@ -26,5 +26,6 @@ class RefreshTokenResponse {
   }
 
   @override
-  String toString() => 'RefreshTokenResponse(isSuccess: $isSuccess, message: $message)';
+  String toString() =>
+      'RefreshTokenResponse(isSuccess: $isSuccess, message: $message)';
 }

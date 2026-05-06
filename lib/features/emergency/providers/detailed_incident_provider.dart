@@ -127,7 +127,9 @@ class DetailedIncidentNotifier extends StateNotifier<DetailedIncidentState> {
         '🔄 [DetailedIncident] Cache invalidated for: ${state.incident!.id}',
       );
       // Set lastFetched to null to force refresh on next load
-      state = state.copyWith(lastFetched: DateTime.fromMillisecondsSinceEpoch(0));
+      state = state.copyWith(
+        lastFetched: DateTime.fromMillisecondsSinceEpoch(0),
+      );
     }
   }
 
@@ -135,9 +137,7 @@ class DetailedIncidentNotifier extends StateNotifier<DetailedIncidentState> {
   /// Useful for screens that auto-refresh on focus
   Future<void> loadIfStale(String incidentId) async {
     if (state.incident?.id == incidentId && state.isCacheFresh) {
-      debugPrint(
-        '✅ [DetailedIncident] Cache still fresh, skipping load',
-      );
+      debugPrint('✅ [DetailedIncident] Cache still fresh, skipping load');
       return;
     }
 

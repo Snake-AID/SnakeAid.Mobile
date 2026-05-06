@@ -65,11 +65,11 @@ class User {
           : null,
       isActive: json['isActive'] ?? true,
       role: _getRoleFromInt(json['role']),
-      createdAt: json['createdAt'] != null 
-          ? DateTime.parse(json['createdAt']) 
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'])
           : DateTime.now(),
-      updatedAt: json['updatedAt'] != null 
-          ? DateTime.parse(json['updatedAt']) 
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'])
           : null,
       isVerified: json['isVerified'] ?? false,
     );
@@ -78,7 +78,7 @@ class User {
   /// Convert role int or string to UserRole enum
   static UserRole _getRoleFromInt(dynamic roleValue) {
     if (roleValue == null) return UserRole.member;
-    
+
     // Nếu role là String (từ API)
     if (roleValue is String) {
       switch (roleValue.toUpperCase()) {
@@ -92,10 +92,12 @@ class User {
           return UserRole.member;
       }
     }
-    
+
     // Nếu role là int
-    int roleInt = roleValue is int ? roleValue : int.tryParse(roleValue.toString()) ?? 0;
-    
+    int roleInt = roleValue is int
+        ? roleValue
+        : int.tryParse(roleValue.toString()) ?? 0;
+
     switch (roleInt) {
       case 0:
         return UserRole.member;
@@ -137,6 +139,6 @@ class User {
   }
 
   @override
-  String toString() => 
+  String toString() =>
       'User(id: $id, email: $email, fullName: $fullName, role: ${role.displayName})';
 }

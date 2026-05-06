@@ -59,9 +59,7 @@ class SecondaryMenuGrid extends ConsumerWidget {
             icon: Icons.receipt_long_outlined,
             label: 'Thanh toán\n& lịch sử',
             onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const PaymentHistoryScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const PaymentHistoryScreen()),
             ),
           ),
         ],
@@ -154,12 +152,18 @@ class _MenuItem extends StatelessWidget {
                     top: 0,
                     right: 0,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: badgeColor ?? const Color(0xFF6C757D),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      constraints: const BoxConstraints(minWidth: 20, minHeight: 16),
+                      constraints: const BoxConstraints(
+                        minWidth: 20,
+                        minHeight: 16,
+                      ),
                       child: Text(
                         badge!,
                         style: const TextStyle(

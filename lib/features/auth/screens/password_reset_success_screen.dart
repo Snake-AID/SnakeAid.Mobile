@@ -31,11 +31,7 @@ class PasswordResetSuccessScreen extends StatelessWidget {
                   color: themeColor,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.check,
-                  size: 72,
-                  color: Colors.white,
-                ),
+                child: const Icon(Icons.check, size: 72, color: Colors.white),
               ),
               const SizedBox(height: 32),
 
@@ -82,10 +78,7 @@ class PasswordResetSuccessScreen extends StatelessWidget {
                   ),
                   child: const Text(
                     'Quay về Đăng Nhập',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),

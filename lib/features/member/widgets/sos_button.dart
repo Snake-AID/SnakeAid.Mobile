@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 
 /// Giant SOS button - Emergency-first design
-/// 
+///
 /// Long-press 3 seconds to activate SOS call
 class SosButton extends StatefulWidget {
   final VoidCallback onActivate;
-  
-  const SosButton({
-    super.key,
-    required this.onActivate,
-  });
+
+  const SosButton({super.key, required this.onActivate});
 
   @override
   State<SosButton> createState() => _SosButtonState();
@@ -42,7 +39,7 @@ class _SosButtonState extends State<SosButton>
     Future.delayed(Duration.zero, () async {
       const totalFrames = 60; // 60 frames for 2 seconds = 60fps
       const frameDuration = Duration(milliseconds: 33); // ~30fps (smoother)
-      
+
       for (int i = 0; i <= totalFrames; i++) {
         if (!_isPressed) break;
         await Future.delayed(frameDuration);
@@ -85,9 +82,9 @@ class _SosButtonState extends State<SosButton>
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFDC3545).withOpacity(
-                        0.3 + (_pulseController.value * 0.2),
-                      ),
+                      color: const Color(
+                        0xFFDC3545,
+                      ).withOpacity(0.3 + (_pulseController.value * 0.2)),
                       blurRadius: 20 + (_pulseController.value * 10),
                       spreadRadius: 5 + (_pulseController.value * 5),
                     ),
@@ -150,10 +147,7 @@ class _SosButtonState extends State<SosButton>
         const SizedBox(height: 16),
         Text(
           'Giữ 2 giây để kích hoạt',
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey[600],
-          ),
+          style: TextStyle(fontSize: 13, color: Colors.grey[600]),
         ),
         const SizedBox(height: 4),
         const Text(

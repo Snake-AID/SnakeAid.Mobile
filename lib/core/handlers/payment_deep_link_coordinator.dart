@@ -100,7 +100,8 @@ class PaymentDeepLinkCoordinator {
   }
 }
 
-final paymentDeepLinkCoordinatorProvider =
-    Provider<PaymentDeepLinkCoordinator>((ref) {
-      return PaymentDeepLinkCoordinator.instance;
-    });
+final paymentDeepLinkCoordinatorProvider = Provider<PaymentDeepLinkCoordinator>(
+  (ref) {
+    return PaymentDeepLinkCoordinator.instance;
+  },
+);

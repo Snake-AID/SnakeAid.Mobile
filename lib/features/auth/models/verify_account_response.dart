@@ -18,7 +18,7 @@ class VerifyAccountResponse {
   /// Create from JSON response
   factory VerifyAccountResponse.fromJson(Map<String, dynamic> json) {
     final data = json['data'];
-    
+
     return VerifyAccountResponse(
       statusCode: json['status_code'] ?? 0,
       message: json['message'] ?? '',
@@ -26,14 +26,12 @@ class VerifyAccountResponse {
       authData: data != null && data['authData'] != null
           ? AuthData.fromJson(data['authData'])
           : null,
-      error: json['error'] != null 
-          ? ErrorData.fromJson(json['error']) 
-          : null,
+      error: json['error'] != null ? ErrorData.fromJson(json['error']) : null,
     );
   }
 
   @override
-  String toString() => 
+  String toString() =>
       'VerifyAccountResponse(isSuccess: $isSuccess, message: $message)';
 }
 
@@ -104,11 +102,7 @@ class ErrorData {
   final DateTime? timestamp;
   final Map<String, List<String>>? validationErrors;
 
-  ErrorData({
-    this.errorCode,
-    this.timestamp,
-    this.validationErrors,
-  });
+  ErrorData({this.errorCode, this.timestamp, this.validationErrors});
 
   factory ErrorData.fromJson(Map<String, dynamic> json) {
     Map<String, List<String>>? validationErrors;

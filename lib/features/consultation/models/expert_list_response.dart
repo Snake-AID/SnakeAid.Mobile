@@ -23,9 +23,7 @@ class ExpertListResponse {
       statusCode: json['status_code'] ?? 0,
       message: json['message'] ?? '',
       isSuccess: json['is_success'] ?? false,
-      data: json['data'] != null
-          ? ExpertListData.fromJson(json['data'])
-          : null,
+      data: json['data'] != null ? ExpertListData.fromJson(json['data']) : null,
       error: json['error'],
     );
   }
@@ -60,12 +58,13 @@ class ExpertListData {
         .toList();
 
     // Calculate online count if not provided
-    final onlineCount = json['onlineCount'] as int? ??
-        experts.where((e) => e.isOnline).length;
+    final onlineCount =
+        json['onlineCount'] as int? ?? experts.where((e) => e.isOnline).length;
 
     // meta.total_items (production pagination) | totalCount/totalItems (legacy)
     final meta = json['meta'] as Map<String, dynamic>?;
-    final totalCount = meta?['total_items'] as int? ??
+    final totalCount =
+        meta?['total_items'] as int? ??
         meta?['totalItems'] as int? ??
         json['totalCount'] as int? ??
         json['totalItems'] as int? ??

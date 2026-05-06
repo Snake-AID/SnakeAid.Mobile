@@ -366,10 +366,7 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _modalInfoRow(
-                              'Trạng thái',
-                              'Đã được phân công',
-                            ),
+                            _modalInfoRow('Trạng thái', 'Đã được phân công'),
                             if (assignedAtText != null) ...[
                               const Divider(height: 16, thickness: 0.5),
                               _modalInfoRow(
@@ -631,37 +628,34 @@ class _RescuerHomeScreenState extends ConsumerState<RescuerHomeScreen> {
   }
 
   /// Labeled info row widget used inside the snake catching modal
-  Widget _modalInfoRow(
-  String label,
-  String value,
-) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 6),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: Color(0xFF999999),
-            fontWeight: FontWeight.w500,
+  Widget _modalInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Color(0xFF999999),
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 14, // tăng nhẹ cho dễ đọc
-            color: Color(0xFF333333),
-            fontWeight: FontWeight.w500,
-            height: 1.3,
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14, // tăng nhẹ cho dễ đọc
+              color: Color(0xFF333333),
+              fontWeight: FontWeight.w500,
+              height: 1.3,
+            ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 
   /// Show emergency alert modal - works across all tabs
   void _showEmergencyAlert(dynamic request) {

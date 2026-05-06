@@ -75,7 +75,8 @@ class _ExpertIdDocumentsScreenState
 
   @override
   Widget build(BuildContext context) {
-    final hasVerifiedCert = _certificates.any((c) => c.isVerified) || _profile?.isVerified == true;
+    final hasVerifiedCert =
+        _certificates.any((c) => c.isVerified) || _profile?.isVerified == true;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F6F8),
@@ -83,49 +84,51 @@ class _ExpertIdDocumentsScreenState
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? _buildErrorState()
-              : RefreshIndicator(
-                  onRefresh: _loadData,
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      _buildStatusBanner(),
-                      const SizedBox(height: 24),
-                      _buildCertificateSection(),
-                      const SizedBox(height: 24),
-                      _buildInfoBox(),
-                      const SizedBox(height: 24),
-                      if (hasVerifiedCert) ...[
-                          SizedBox(
-                            height: 56,
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                await ref.read(authProvider.notifier).markUserAsVerified();
-                                if (mounted) context.go('/expert-home');
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF6C47C2),
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 2,
-                              ),
-                              child: const Text(
-                                'Vào Trang Chủ',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
+          ? _buildErrorState()
+          : RefreshIndicator(
+              onRefresh: _loadData,
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  _buildStatusBanner(),
+                  const SizedBox(height: 24),
+                  _buildCertificateSection(),
+                  const SizedBox(height: 24),
+                  _buildInfoBox(),
+                  const SizedBox(height: 24),
+                  if (hasVerifiedCert) ...[
+                    SizedBox(
+                      height: 56,
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          await ref
+                              .read(authProvider.notifier)
+                              .markUserAsVerified();
+                          if (mounted) context.go('/expert-home');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6C47C2),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        const SizedBox(height: 24),
-                      ],
-                    ],
-                  ),
-                ),
+                          elevation: 2,
+                        ),
+                        child: const Text(
+                          'Vào Trang Chủ',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ],
+              ),
+            ),
     );
   }
 
@@ -220,9 +223,7 @@ class _ExpertIdDocumentsScreenState
           topRight: Radius.circular(12),
           bottomRight: Radius.circular(12),
         ),
-        border: Border(
-          left: BorderSide(color: banner.accentColor, width: 4),
-        ),
+        border: Border(left: BorderSide(color: banner.accentColor, width: 4)),
       ),
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -372,9 +373,7 @@ class _ExpertIdDocumentsScreenState
         ..._certificates.map(
           (certificate) => Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: _buildDocumentCard(
-              certificate: certificate,
-            ),
+            child: _buildDocumentCard(certificate: certificate),
           ),
         ),
         _buildAddNewPlaceholder(),
@@ -382,9 +381,7 @@ class _ExpertIdDocumentsScreenState
     );
   }
 
-  Widget _buildDocumentCard({
-    required ExpertCertificate certificate,
-  }) {
+  Widget _buildDocumentCard({required ExpertCertificate certificate}) {
     final status = _statusFromCertificate(certificate);
     final subtitle = certificate.issuingOrganization.isNotEmpty
         ? certificate.issuingOrganization
@@ -649,6 +646,7 @@ class _ExpertIdDocumentsScreenState
       ),
     );
   }
+
   Widget _buildEmptyState() {
     return Container(
       padding: const EdgeInsets.all(24),

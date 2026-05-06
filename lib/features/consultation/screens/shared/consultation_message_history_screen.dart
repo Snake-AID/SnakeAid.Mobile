@@ -97,7 +97,7 @@ class _ConsultationMessageHistoryScreenState
 
     final previousOffset = _scrollController.hasClients
         ? _scrollController.position.maxScrollExtent -
-            _scrollController.position.pixels
+              _scrollController.position.pixels
         : 0.0;
 
     setState(() => _isLoadingMore = true);
@@ -122,7 +122,9 @@ class _ConsultationMessageHistoryScreenState
         if (!_scrollController.hasClients) return;
         final target =
             _scrollController.position.maxScrollExtent - previousOffset;
-        _scrollController.jumpTo(target.clamp(0.0, _scrollController.position.maxScrollExtent));
+        _scrollController.jumpTo(
+          target.clamp(0.0, _scrollController.position.maxScrollExtent),
+        );
       });
     } catch (_) {
       if (!mounted) return;
@@ -144,7 +146,9 @@ class _ConsultationMessageHistoryScreenState
   }
 
   bool _isMine(ConsultationMessageHistoryItem item) {
-    return _currentUserId != null && _currentUserId!.isNotEmpty && item.senderId == _currentUserId;
+    return _currentUserId != null &&
+        _currentUserId!.isNotEmpty &&
+        item.senderId == _currentUserId;
   }
 
   String _timeLabel(DateTime utc) {
@@ -204,9 +208,7 @@ class _ConsultationMessageHistoryScreenState
 
   Widget _buildBody() {
     if (_isLoading) {
-      return Center(
-        child: CircularProgressIndicator(color: _primary),
-      );
+      return Center(child: CircularProgressIndicator(color: _primary));
     }
 
     if (_error != null) {
@@ -216,7 +218,11 @@ class _ConsultationMessageHistoryScreenState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.history_toggle_off, size: 48, color: Color(0xFF9CA3AF)),
+              const Icon(
+                Icons.history_toggle_off,
+                size: 48,
+                color: Color(0xFF9CA3AF),
+              ),
               const SizedBox(height: 12),
               Text(
                 _error!,
@@ -243,7 +249,11 @@ class _ConsultationMessageHistoryScreenState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.mark_chat_read_outlined, size: 48, color: Color(0xFF9CA3AF)),
+            Icon(
+              Icons.mark_chat_read_outlined,
+              size: 48,
+              color: Color(0xFF9CA3AF),
+            ),
             SizedBox(height: 10),
             Text(
               'Không có tin nhắn lưu trữ',
@@ -293,7 +303,8 @@ class _ConsultationMessageHistoryScreenState
                 mine: mine,
                 primaryColor: _primary,
                 timeLabel: _timeLabel(item.sentAt),
-                onTapAttachment: item.attachmentUrl == null || item.attachmentUrl!.isEmpty
+                onTapAttachment:
+                    item.attachmentUrl == null || item.attachmentUrl!.isEmpty
                     ? null
                     : () => _openAttachment(item.attachmentUrl!),
               );
@@ -378,16 +389,14 @@ class _MessageBubble extends StatelessWidget {
                     ),
                   ),
                 ),
-              if (item.attachmentUrl != null && item.attachmentUrl!.isNotEmpty && item.content.trim().isNotEmpty)
+              if (item.attachmentUrl != null &&
+                  item.attachmentUrl!.isNotEmpty &&
+                  item.content.trim().isNotEmpty)
                 const SizedBox(height: 8),
               if (item.content.trim().isNotEmpty)
                 Text(
                   item.content.trim(),
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 14,
-                    height: 1.4,
-                  ),
+                  style: TextStyle(color: textColor, fontSize: 14, height: 1.4),
                 ),
             ],
           ),

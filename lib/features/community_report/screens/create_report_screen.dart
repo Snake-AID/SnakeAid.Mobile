@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:snakeaid_mobile/features/snake_catching/models/snake_species.dart' as sc;
+import 'package:snakeaid_mobile/features/snake_catching/models/snake_species.dart'
+    as sc;
 import 'package:snakeaid_mobile/features/snake_catching/repository/snake_species_repository.dart';
 import 'package:snakeaid_mobile/features/snake_catching/widgets/location_picker_dialog.dart';
 import 'package:snakeaid_mobile/features/emergency/repository/snake_ai_repository.dart';
@@ -17,8 +18,7 @@ class CreateReportScreen extends ConsumerStatefulWidget {
   const CreateReportScreen({super.key, this.onReportCreated});
 
   @override
-  ConsumerState<CreateReportScreen> createState() =>
-      _CreateReportScreenState();
+  ConsumerState<CreateReportScreen> createState() => _CreateReportScreenState();
 }
 
 class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
@@ -103,8 +103,9 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
       final aiRepo = ref.read(snakeAiRepositoryProvider);
       final imageFile = File(xFile.path);
 
-      final uploadResponse =
-          await aiRepo.uploadImageForCommunityDetection(imageFile: imageFile);
+      final uploadResponse = await aiRepo.uploadImageForCommunityDetection(
+        imageFile: imageFile,
+      );
       if (!mounted) return;
 
       final mediaId = uploadResponse.data?.id;
@@ -114,8 +115,9 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
         return;
       }
 
-      final detectionResponse =
-          await aiRepo.detectSnake(reportMediaId: mediaId);
+      final detectionResponse = await aiRepo.detectSnake(
+        reportMediaId: mediaId,
+      );
       if (!mounted) return;
 
       setState(() => _isAiDetecting = false);
@@ -127,9 +129,11 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
         return;
       }
 
-      final results = List<DetectionResult>.from(detectionResponse.data!.results)
-        ..sort((a, b) =>
-            b.aiDetection.confidence.compareTo(a.aiDetection.confidence));
+      final results =
+          List<DetectionResult>.from(detectionResponse.data!.results)..sort(
+            (a, b) =>
+                b.aiDetection.confidence.compareTo(a.aiDetection.confidence),
+          );
 
       if (!mounted) return;
       final picked = await showModalBottomSheet<sc.SnakeSpecies>(
@@ -161,11 +165,11 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
       ),
     );
   }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedLocation == null) {
-      setState(() =>
-          _submitError = 'Vui lòng chọn vị trí phát hiện rắn');
+      setState(() => _submitError = 'Vui lòng chọn vị trí phát hiện rắn');
       return;
     }
 
@@ -220,9 +224,10 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
         title: const Text(
           'Báo cáo phát hiện rắn',
           style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-              color: Colors.white),
+            fontSize: 17,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
       ),
       body: Form(
@@ -245,18 +250,24 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
                         color: const Color(0xFFE8F5E9),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                            color: const Color(0xFF228B22).withOpacity(0.4)),
+                          color: const Color(0xFF228B22).withOpacity(0.4),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.check_circle,
-                              color: Color(0xFF228B22), size: 16),
+                          const Icon(
+                            Icons.check_circle,
+                            color: Color(0xFF228B22),
+                            size: 16,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _selectedLocation!.fullAddress,
                               style: const TextStyle(
-                                  fontSize: 13, color: Color(0xFF1A5C1A)),
+                                fontSize: 13,
+                                color: Color(0xFF1A5C1A),
+                              ),
                             ),
                           ),
                         ],
@@ -264,8 +275,10 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
                     ),
                   OutlinedButton.icon(
                     onPressed: _pickLocation,
-                    icon: const Icon(Icons.map_outlined,
-                        color: Color(0xFF228B22)),
+                    icon: const Icon(
+                      Icons.map_outlined,
+                      color: Color(0xFF228B22),
+                    ),
                     label: Text(
                       _selectedLocation == null
                           ? 'Chọn vị trí trên bản đồ'
@@ -275,7 +288,8 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Color(0xFF228B22)),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                 ],
@@ -293,7 +307,9 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
                       child: Padding(
                         padding: EdgeInsets.all(8),
                         child: CircularProgressIndicator(
-                            color: Color(0xFF228B22), strokeWidth: 2),
+                          color: Color(0xFF228B22),
+                          strokeWidth: 2,
+                        ),
                       ),
                     )
                   : Column(
@@ -314,8 +330,11 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
                             children: [
                               Row(
                                 children: [
-                                  const Icon(Icons.auto_awesome,
-                                      size: 13, color: Color(0xFF228B22)),
+                                  const Icon(
+                                    Icons.auto_awesome,
+                                    size: 13,
+                                    color: Color(0xFF228B22),
+                                  ),
                                   const SizedBox(width: 5),
                                   const Text(
                                     'Nhận diện bằng AI',
@@ -331,8 +350,7 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
                               if (_isAiDetecting)
                                 const Center(
                                   child: Padding(
-                                    padding:
-                                        EdgeInsets.symmetric(vertical: 8),
+                                    padding: EdgeInsets.symmetric(vertical: 8),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
@@ -340,14 +358,18 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
                                           width: 16,
                                           height: 16,
                                           child: CircularProgressIndicator(
-                                              color: Color(0xFF228B22),
-                                              strokeWidth: 2),
+                                            color: Color(0xFF228B22),
+                                            strokeWidth: 2,
+                                          ),
                                         ),
                                         SizedBox(width: 10),
-                                        Text('Đang phân tích ảnh...',
-                                            style: TextStyle(
-                                                fontSize: 12,
-                                                color: Color(0xFF228B22))),
+                                        Text(
+                                          'Đang phân tích ảnh...',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Color(0xFF228B22),
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -359,8 +381,8 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
                                       child: _AiButton(
                                         icon: Icons.camera_alt_outlined,
                                         label: 'Chụp ảnh',
-                                        onTap: () => _pickAndDetect(
-                                            ImageSource.camera),
+                                        onTap: () =>
+                                            _pickAndDetect(ImageSource.camera),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
@@ -368,8 +390,8 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
                                       child: _AiButton(
                                         icon: Icons.photo_library_outlined,
                                         label: 'Thư viện',
-                                        onTap: () => _pickAndDetect(
-                                            ImageSource.gallery),
+                                        onTap: () =>
+                                            _pickAndDetect(ImageSource.gallery),
                                       ),
                                     ),
                                   ],
@@ -382,20 +404,24 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
                         if (_selectedSpecies == null)
                           OutlinedButton.icon(
                             onPressed: _openSpeciesPicker,
-                            icon: const Icon(Icons.search,
-                                color: Color(0xFF228B22), size: 18),
+                            icon: const Icon(
+                              Icons.search,
+                              color: Color(0xFF228B22),
+                              size: 18,
+                            ),
                             label: const Text(
                               'Chọn loài rắn thủ công (tùy chọn)',
                               style: TextStyle(color: Color(0xFF228B22)),
                             ),
                             style: OutlinedButton.styleFrom(
-                              side: const BorderSide(
-                                  color: Color(0xFF228B22)),
+                              side: const BorderSide(color: Color(0xFF228B22)),
                               shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(10)),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                               padding: const EdgeInsets.symmetric(
-                                  vertical: 12, horizontal: 14),
+                                vertical: 12,
+                                horizontal: 14,
+                              ),
                             ),
                           )
                         else
@@ -419,21 +445,21 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
                 maxLines: 4,
                 maxLength: 500,
                 decoration: InputDecoration(
-                  hintText:
-                      'Mô tả tình huống, hành vi của rắn, nơi ẩn nấp...',
-                  hintStyle:
-                      TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                  hintText: 'Mô tả tình huống, hành vi của rắn, nơi ẩn nấp...',
+                  hintStyle: TextStyle(
+                    color: Colors.grey.shade400,
+                    fontSize: 13,
+                  ),
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8)),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide:
-                        BorderSide(color: Colors.grey.shade300),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide:
-                        const BorderSide(color: Color(0xFF228B22)),
+                    borderSide: const BorderSide(color: Color(0xFF228B22)),
                   ),
                   contentPadding: const EdgeInsets.all(12),
                 ),
@@ -460,14 +486,19 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline,
-                        color: Color(0xFFDC3545), size: 18),
+                    const Icon(
+                      Icons.error_outline,
+                      color: Color(0xFFDC3545),
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _submitError!,
                         style: const TextStyle(
-                            color: Color(0xFFDC3545), fontSize: 13),
+                          color: Color(0xFFDC3545),
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                   ],
@@ -485,20 +516,25 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
                   foregroundColor: Colors.white,
                   disabledBackgroundColor: Colors.grey.shade300,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 icon: _isSubmitting
                     ? const SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2),
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
                       )
                     : const Icon(Icons.send),
                 label: Text(
                   _isSubmitting ? 'Đang gửi...' : 'Gửi báo cáo',
                   style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -516,8 +552,11 @@ class _SectionCard extends StatelessWidget {
   final IconData icon;
   final Widget child;
 
-  const _SectionCard(
-      {required this.title, required this.icon, required this.child});
+  const _SectionCard({
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -528,30 +567,36 @@ class _SectionCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2))
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.all(5),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1B5E20).withOpacity(0.08),
-                borderRadius: BorderRadius.circular(7),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1B5E20).withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Icon(icon, size: 14, color: const Color(0xFF1B5E20)),
               ),
-              child: Icon(icon, size: 14, color: const Color(0xFF1B5E20)),
-            ),
-            const SizedBox(width: 8),
-            Text(title,
+              const SizedBox(width: 8),
+              Text(
+                title,
                 style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF333333))),
-          ]),
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF333333),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           child,
         ],
@@ -606,8 +651,7 @@ class _SelectedSpeciesCard extends StatelessWidget {
                       width: 72,
                       height: 72,
                       fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) =>
-                          _PlaceholderIcon(size: 72),
+                      errorWidget: (_, __, ___) => _PlaceholderIcon(size: 72),
                     )
                   : _PlaceholderIcon(size: 72),
             ),
@@ -616,44 +660,56 @@ class _SelectedSpeciesCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(species.commonName,
-                      style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A1A1A))),
+                  Text(
+                    species.commonName,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                  ),
                   if (species.scientificName.isNotEmpty) ...[
                     const SizedBox(height: 2),
-                    Text(species.scientificName,
-                        style: const TextStyle(
-                            fontSize: 11,
-                            fontStyle: FontStyle.italic,
-                            color: Color(0xFF888888))),
+                    Text(
+                      species.scientificName,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic,
+                        color: Color(0xFF888888),
+                      ),
+                    ),
                   ],
                   const SizedBox(height: 6),
                   Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 7, vertical: 3),
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: _riskColor.withOpacity(0.12),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                              color: _riskColor.withOpacity(0.3)),
+                            color: _riskColor.withOpacity(0.3),
+                          ),
                         ),
                         child: Text(
                           'Rủi ro: ${species.riskLevel.toStringAsFixed(1)}/10',
                           style: TextStyle(
-                              fontSize: 10,
-                              color: _riskColor,
-                              fontWeight: FontWeight.bold),
+                            fontSize: 10,
+                            color: _riskColor,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       if (species.isVenomous) ...[
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 3),
+                            horizontal: 7,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFDC3545).withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
@@ -661,9 +717,10 @@ class _SelectedSpeciesCard extends StatelessWidget {
                           child: const Text(
                             '⚠️ Độc',
                             style: TextStyle(
-                                fontSize: 10,
-                                color: Color(0xFFDC3545),
-                                fontWeight: FontWeight.bold),
+                              fontSize: 10,
+                              color: Color(0xFFDC3545),
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -697,8 +754,7 @@ class _PlaceholderIcon extends StatelessWidget {
       width: size,
       height: size,
       color: const Color(0xFFE8F5E9),
-      child: const Icon(Icons.pest_control,
-          color: Color(0xFF228B22), size: 30),
+      child: const Icon(Icons.pest_control, color: Color(0xFF228B22), size: 30),
     );
   }
 }
@@ -732,10 +788,12 @@ class _SpeciesPickerSheetState extends State<_SpeciesPickerSheet> {
       _filtered = q.isEmpty
           ? widget.speciesList
           : widget.speciesList
-              .where((s) =>
-                  s.commonName.toLowerCase().contains(q) ||
-                  s.scientificName.toLowerCase().contains(q))
-              .toList();
+                .where(
+                  (s) =>
+                      s.commonName.toLowerCase().contains(q) ||
+                      s.scientificName.toLowerCase().contains(q),
+                )
+                .toList();
     });
   }
 
@@ -772,15 +830,16 @@ class _SpeciesPickerSheetState extends State<_SpeciesPickerSheet> {
             ),
             // Header
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Row(
                 children: [
                   const Expanded(
                     child: Text(
                       'Chọn loài rắn',
                       style: TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold),
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   IconButton(
@@ -812,19 +871,21 @@ class _SpeciesPickerSheetState extends State<_SpeciesPickerSheet> {
             Expanded(
               child: _filtered.isEmpty
                   ? const Center(
-                      child: Text('Không tìm thấy loài rắn nào',
-                          style: TextStyle(color: Color(0xFF888888))),
+                      child: Text(
+                        'Không tìm thấy loài rắn nào',
+                        style: TextStyle(color: Color(0xFF888888)),
+                      ),
                     )
                   : GridView.builder(
                       controller: scroll,
                       padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
-                        childAspectRatio: 0.75,
-                      ),
+                            crossAxisCount: 3,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 10,
+                            childAspectRatio: 0.75,
+                          ),
                       itemCount: _filtered.length,
                       itemBuilder: (ctx, i) {
                         final s = _filtered[i];
@@ -832,8 +893,7 @@ class _SpeciesPickerSheetState extends State<_SpeciesPickerSheet> {
                           species: s,
                           isSelected: widget.selected?.id == s.id,
                           onTap: () => Navigator.of(context).pop(s),
-                          onLongPress: () =>
-                              _showDetail(context, s),
+                          onLongPress: () => _showDetail(context, s),
                         );
                       },
                     ),
@@ -887,8 +947,7 @@ class _SpeciesGridItem extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color:
-                isSelected ? const Color(0xFF228B22) : Colors.transparent,
+            color: isSelected ? const Color(0xFF228B22) : Colors.transparent,
             width: 2.5,
           ),
           boxShadow: [
@@ -907,8 +966,9 @@ class _SpeciesGridItem extends StatelessWidget {
             // Photo
             Expanded(
               child: ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(12)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(12),
+                ),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -916,17 +976,20 @@ class _SpeciesGridItem extends StatelessWidget {
                         ? CachedNetworkImage(
                             imageUrl: species.imageUrl!,
                             fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) =>
-                                const ColoredBox(
+                            errorWidget: (_, __, ___) => const ColoredBox(
                               color: Color(0xFFE8F5E9),
-                              child: Icon(Icons.pest_control,
-                                  color: Color(0xFF228B22)),
+                              child: Icon(
+                                Icons.pest_control,
+                                color: Color(0xFF228B22),
+                              ),
                             ),
                           )
                         : const ColoredBox(
                             color: Color(0xFFE8F5E9),
-                            child: Icon(Icons.pest_control,
-                                color: Color(0xFF228B22)),
+                            child: Icon(
+                              Icons.pest_control,
+                              color: Color(0xFF228B22),
+                            ),
                           ),
                     // risk dot
                     Positioned(
@@ -938,8 +1001,7 @@ class _SpeciesGridItem extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: _riskColor,
                           shape: BoxShape.circle,
-                          border: Border.all(
-                              color: Colors.white, width: 1.5),
+                          border: Border.all(color: Colors.white, width: 1.5),
                         ),
                       ),
                     ),
@@ -953,8 +1015,11 @@ class _SpeciesGridItem extends StatelessWidget {
                           color: Colors.black38,
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Icon(Icons.info_outline,
-                            color: Colors.white, size: 10),
+                        child: const Icon(
+                          Icons.info_outline,
+                          color: Colors.white,
+                          size: 10,
+                        ),
                       ),
                     ),
                   ],
@@ -1029,16 +1094,22 @@ class _SpeciesDetailDialog extends StatelessWidget {
                 errorWidget: (_, __, ___) => Container(
                   height: 100,
                   color: const Color(0xFFE8F5E9),
-                  child: const Icon(Icons.pest_control,
-                      color: Color(0xFF228B22), size: 40),
+                  child: const Icon(
+                    Icons.pest_control,
+                    color: Color(0xFF228B22),
+                    size: 40,
+                  ),
                 ),
               )
             else
               Container(
                 height: 100,
                 color: const Color(0xFFE8F5E9),
-                child: const Icon(Icons.pest_control,
-                    color: Color(0xFF228B22), size: 40),
+                child: const Icon(
+                  Icons.pest_control,
+                  color: Color(0xFF228B22),
+                  size: 40,
+                ),
               ),
 
             Padding(
@@ -1054,17 +1125,21 @@ class _SpeciesDetailDialog extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(species.commonName,
-                                style: const TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.bold)),
+                            Text(
+                              species.commonName,
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             if (species.scientificName.isNotEmpty)
                               Text(
                                 species.scientificName,
                                 style: const TextStyle(
-                                    fontSize: 12,
-                                    fontStyle: FontStyle.italic,
-                                    color: Color(0xFF888888)),
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                  color: Color(0xFF888888),
+                                ),
                               ),
                           ],
                         ),
@@ -1086,25 +1161,32 @@ class _SpeciesDetailDialog extends StatelessWidget {
                       // Risk badge
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
                           color: _riskColor.withOpacity(0.12),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                              color: _riskColor.withOpacity(0.4)),
+                            color: _riskColor.withOpacity(0.4),
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.warning_amber_rounded,
-                                color: _riskColor, size: 13),
+                            Icon(
+                              Icons.warning_amber_rounded,
+                              color: _riskColor,
+                              size: 13,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               '$_riskLabel (${species.riskLevel.toStringAsFixed(1)}/10)',
                               style: TextStyle(
-                                  color: _riskColor,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold),
+                                color: _riskColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
@@ -1113,25 +1195,33 @@ class _SpeciesDetailDialog extends StatelessWidget {
                       if (species.isVenomous)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 5),
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFDC3545).withOpacity(0.1),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                                color: const Color(0xFFDC3545)
-                                    .withOpacity(0.4)),
+                              color: const Color(0xFFDC3545).withOpacity(0.4),
+                            ),
                           ),
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.dangerous,
-                                  color: Color(0xFFDC3545), size: 12),
+                              Icon(
+                                Icons.dangerous,
+                                color: Color(0xFFDC3545),
+                                size: 12,
+                              ),
                               SizedBox(width: 4),
-                              Text('Có nọc độc',
-                                  style: TextStyle(
-                                      color: Color(0xFFDC3545),
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold)),
+                              Text(
+                                'Có nọc độc',
+                                style: TextStyle(
+                                  color: Color(0xFFDC3545),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -1139,19 +1229,23 @@ class _SpeciesDetailDialog extends StatelessWidget {
                       if (species.primaryVenomType != null)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 5),
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.purple.withOpacity(0.08),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                                color: Colors.purple.withOpacity(0.3)),
+                              color: Colors.purple.withOpacity(0.3),
+                            ),
                           ),
                           child: Text(
                             species.primaryVenomType!,
                             style: const TextStyle(
-                                color: Colors.purple,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600),
+                              color: Colors.purple,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                     ],
@@ -1160,31 +1254,45 @@ class _SpeciesDetailDialog extends StatelessWidget {
                   // Description
                   if (species.description != null) ...[
                     const SizedBox(height: 12),
-                    const Text('Mô tả',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF555555))),
+                    const Text(
+                      'Mô tả',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF555555),
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text(species.description!,
-                        style: const TextStyle(
-                            fontSize: 13, color: Color(0xFF333333),
-                            height: 1.5)),
+                    Text(
+                      species.description!,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF333333),
+                        height: 1.5,
+                      ),
+                    ),
                   ],
 
                   // Identification summary
                   if (species.identificationSummary != null) ...[
                     const SizedBox(height: 12),
-                    const Text('Nhận dạng',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF555555))),
+                    const Text(
+                      'Nhận dạng',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF555555),
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text(species.identificationSummary!,
-                        style: const TextStyle(
-                            fontSize: 13, color: Color(0xFF333333),
-                            height: 1.5)),
+                    Text(
+                      species.identificationSummary!,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF333333),
+                        height: 1.5,
+                      ),
+                    ),
                   ],
 
                   // Physical traits
@@ -1192,8 +1300,9 @@ class _SpeciesDetailDialog extends StatelessWidget {
                       true) ...[
                     const SizedBox(height: 12),
                     _DetailSubHeader(
-                        icon: Icons.visibility_outlined,
-                        label: 'Đặc điểm hình thái'),
+                      icon: Icons.visibility_outlined,
+                      label: 'Đặc điểm hình thái',
+                    ),
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 6,
@@ -1205,12 +1314,12 @@ class _SpeciesDetailDialog extends StatelessWidget {
                   ],
 
                   // Behaviors
-                  if (species.identification?.behaviors.isNotEmpty ==
-                      true) ...[
+                  if (species.identification?.behaviors.isNotEmpty == true) ...[
                     const SizedBox(height: 12),
                     _DetailSubHeader(
-                        icon: Icons.psychology_outlined,
-                        label: 'Hành vi'),
+                      icon: Icons.psychology_outlined,
+                      label: 'Hành vi',
+                    ),
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 6,
@@ -1225,14 +1334,17 @@ class _SpeciesDetailDialog extends StatelessWidget {
                   if ((species.identification?.habitat ?? '').isNotEmpty) ...[
                     const SizedBox(height: 12),
                     _DetailSubHeader(
-                        icon: Icons.forest_outlined, label: 'Môi trường sống'),
+                      icon: Icons.forest_outlined,
+                      label: 'Môi trường sống',
+                    ),
                     const SizedBox(height: 4),
                     Text(
                       species.identification!.habitat,
                       style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF333333),
-                          height: 1.5),
+                        fontSize: 13,
+                        color: Color(0xFF333333),
+                        height: 1.5,
+                      ),
                     ),
                   ],
 
@@ -1240,8 +1352,9 @@ class _SpeciesDetailDialog extends StatelessWidget {
                   if (species.symptomsByTime?.isNotEmpty == true) ...[
                     const SizedBox(height: 12),
                     _DetailSubHeader(
-                        icon: Icons.medical_services_outlined,
-                        label: 'Triệu chứng sau khi bị cắn'),
+                      icon: Icons.medical_services_outlined,
+                      label: 'Triệu chứng sau khi bị cắn',
+                    ),
                     const SizedBox(height: 6),
                     ...species.symptomsByTime!
                         .take(2)
@@ -1254,17 +1367,19 @@ class _SpeciesDetailDialog extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () =>
-                          Navigator.of(context).pop(),
+                      onPressed: () => Navigator.of(context).pop(),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF228B22),
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      child: const Text('Đóng',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Đóng',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                 ],
@@ -1290,11 +1405,14 @@ class _DetailSubHeader extends StatelessWidget {
       children: [
         Icon(icon, size: 14, color: const Color(0xFF555555)),
         const SizedBox(width: 5),
-        Text(label,
-            style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF555555))),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF555555),
+          ),
+        ),
       ],
     );
   }
@@ -1315,8 +1433,10 @@ class _InfoChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFF228B22).withOpacity(0.25)),
       ),
-      child: Text(text,
-          style: const TextStyle(fontSize: 11, color: Color(0xFF1A5C1A))),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 11, color: Color(0xFF1A5C1A)),
+      ),
     );
   }
 }
@@ -1372,22 +1492,29 @@ class _SymptomRow extends StatelessWidget {
           ),
           if (symptom.signs.isNotEmpty) ...[
             const SizedBox(height: 4),
-            ...symptom.signs.map((s) => Padding(
-                  padding: const EdgeInsets.only(left: 4, bottom: 2),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('• ',
-                          style: TextStyle(
-                              fontSize: 11, color: Color(0xFF555555))),
-                      Expanded(
-                        child: Text(s,
-                            style: const TextStyle(
-                                fontSize: 11, color: Color(0xFF333333))),
+            ...symptom.signs.map(
+              (s) => Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 2),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '• ',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF555555)),
+                    ),
+                    Expanded(
+                      child: Text(
+                        s,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF333333),
+                        ),
                       ),
-                    ],
-                  ),
-                )),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ],
       ),
@@ -1401,8 +1528,11 @@ class _AiButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  const _AiButton(
-      {required this.icon, required this.label, required this.onTap});
+  const _AiButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1419,11 +1549,14 @@ class _AiButton extends StatelessWidget {
           children: [
             Icon(icon, color: Colors.white, size: 16),
             const SizedBox(width: 6),
-            Text(label,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600)),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),
@@ -1449,8 +1582,9 @@ class _AiDetectionResultSheet extends StatelessWidget {
     final byId = speciesList.where((s) => s.id == info.id).firstOrNull;
     if (byId != null) return byId;
     final byName = speciesList
-        .where((s) =>
-            s.commonName.toLowerCase() == info.commonName.toLowerCase())
+        .where(
+          (s) => s.commonName.toLowerCase() == info.commonName.toLowerCase(),
+        )
         .firstOrNull;
     return byName;
   }
@@ -1482,18 +1616,22 @@ class _AiDetectionResultSheet extends StatelessWidget {
             ),
             // Header
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Row(
                 children: [
-                  const Icon(Icons.auto_awesome,
-                      color: Color(0xFF228B22), size: 18),
+                  const Icon(
+                    Icons.auto_awesome,
+                    color: Color(0xFF228B22),
+                    size: 18,
+                  ),
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
                       'Kết quả nhận diện AI',
                       style: TextStyle(
-                          fontSize: 17, fontWeight: FontWeight.bold),
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   IconButton(
@@ -1527,15 +1665,15 @@ class _AiDetectionResultSheet extends StatelessWidget {
             Expanded(
               child: ListView.separated(
                 controller: scroll,
-                padding:
-                    const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemCount: results.length,
                 itemBuilder: (_, i) {
                   final r = results[i];
                   final matched = _matchSpecies(r.snake);
-                  final pct =
-                      (r.aiDetection.confidence * 100).toStringAsFixed(1);
+                  final pct = (r.aiDetection.confidence * 100).toStringAsFixed(
+                    1,
+                  );
                   final isTop = i == 0;
                   return GestureDetector(
                     onTap: matched != null
@@ -1547,7 +1685,9 @@ class _AiDetectionResultSheet extends StatelessWidget {
                         borderRadius: BorderRadius.circular(14),
                         border: isTop
                             ? Border.all(
-                                color: const Color(0xFF228B22), width: 2)
+                                color: const Color(0xFF228B22),
+                                width: 2,
+                              )
                             : null,
                         boxShadow: [
                           BoxShadow(
@@ -1580,10 +1720,11 @@ class _AiDetectionResultSheet extends StatelessWidget {
                           Expanded(
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
-                                  vertical: 10, horizontal: 4),
+                                vertical: 10,
+                                horizontal: 4,
+                              ),
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
                                     children: [
@@ -1591,28 +1732,30 @@ class _AiDetectionResultSheet extends StatelessWidget {
                                         child: Text(
                                           r.snake.commonName,
                                           style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.bold),
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
                                       if (isTop)
                                         Container(
-                                          padding:
-                                              const EdgeInsets.symmetric(
-                                                  horizontal: 6,
-                                                  vertical: 2),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
                                           decoration: BoxDecoration(
                                             color: const Color(0xFF228B22),
-                                            borderRadius:
-                                                BorderRadius.circular(6),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
                                           ),
                                           child: const Text(
                                             'Tốt nhất',
                                             style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 9,
-                                                fontWeight:
-                                                    FontWeight.bold),
+                                              color: Colors.white,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ),
                                     ],
@@ -1620,9 +1763,10 @@ class _AiDetectionResultSheet extends StatelessWidget {
                                   Text(
                                     r.snake.scientificName,
                                     style: const TextStyle(
-                                        fontSize: 11,
-                                        fontStyle: FontStyle.italic,
-                                        color: Color(0xFF888888)),
+                                      fontSize: 11,
+                                      fontStyle: FontStyle.italic,
+                                      color: Color(0xFF888888),
+                                    ),
                                   ),
                                   const SizedBox(height: 6),
                                   // Confidence bar
@@ -1630,11 +1774,11 @@ class _AiDetectionResultSheet extends StatelessWidget {
                                     children: [
                                       Expanded(
                                         child: ClipRRect(
-                                          borderRadius:
-                                              BorderRadius.circular(4),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
                                           child: LinearProgressIndicator(
-                                            value:
-                                                r.aiDetection.confidence,
+                                            value: r.aiDetection.confidence,
                                             backgroundColor:
                                                 Colors.grey.shade200,
                                             color: isTop
@@ -1663,8 +1807,9 @@ class _AiDetectionResultSheet extends StatelessWidget {
                                       child: Text(
                                         'Không tìm thấy trong danh sách',
                                         style: TextStyle(
-                                            fontSize: 10,
-                                            color: Color(0xFF999999)),
+                                          fontSize: 10,
+                                          color: Color(0xFF999999),
+                                        ),
                                       ),
                                     ),
                                 ],
@@ -1725,8 +1870,9 @@ class _ReportSuccessScreenState extends State<ReportSuccessScreen>
     )..forward();
     _scaleAnim = CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut);
     _fadeAnim = CurvedAnimation(
-        parent: _ctrl,
-        curve: const Interval(0.0, 0.5, curve: Curves.easeIn));
+      parent: _ctrl,
+      curve: const Interval(0.0, 0.5, curve: Curves.easeIn),
+    );
   }
 
   @override
@@ -1756,8 +1902,9 @@ class _ReportSuccessScreenState extends State<ReportSuccessScreen>
                     shape: BoxShape.circle,
                     color: const Color(0xFF228B22).withOpacity(0.10),
                     border: Border.all(
-                        color: const Color(0xFF228B22).withOpacity(0.30),
-                        width: 2),
+                      color: const Color(0xFF228B22).withOpacity(0.30),
+                      width: 2,
+                    ),
                   ),
                   child: const Icon(
                     Icons.check_circle_rounded,
@@ -1839,7 +1986,9 @@ class _ReportSuccessScreenState extends State<ReportSuccessScreen>
                               const Text(
                                 'Loài rắn đã báo cáo',
                                 style: TextStyle(
-                                    fontSize: 11, color: Color(0xFF888888)),
+                                  fontSize: 11,
+                                  color: Color(0xFF888888),
+                                ),
                               ),
                               const SizedBox(height: 3),
                               Text(
@@ -1853,8 +2002,11 @@ class _ReportSuccessScreenState extends State<ReportSuccessScreen>
                             ],
                           ),
                         ),
-                        const Icon(Icons.pest_control,
-                            color: Color(0xFF228B22), size: 22),
+                        const Icon(
+                          Icons.pest_control,
+                          color: Color(0xFF228B22),
+                          size: 22,
+                        ),
                       ],
                     ),
                   ),
@@ -1884,8 +2036,11 @@ class _ReportSuccessScreenState extends State<ReportSuccessScreen>
                           color: Colors.white.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.people_alt_outlined,
-                            color: Colors.white, size: 22),
+                        child: const Icon(
+                          Icons.people_alt_outlined,
+                          color: Colors.white,
+                          size: 22,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       const Expanded(
@@ -1915,13 +2070,13 @@ class _ReportSuccessScreenState extends State<ReportSuccessScreen>
                     backgroundColor: const Color(0xFF228B22),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                     elevation: 0,
                   ),
                   child: const Text(
                     'Về trang chủ',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -1943,9 +2098,7 @@ class _SuccessSpeciesIcon extends StatelessWidget {
         color: const Color(0xFFE8F5E9),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: const Icon(Icons.pest_control,
-          color: Color(0xFF228B22), size: 28),
+      child: const Icon(Icons.pest_control, color: Color(0xFF228B22), size: 28),
     );
   }
 }
-

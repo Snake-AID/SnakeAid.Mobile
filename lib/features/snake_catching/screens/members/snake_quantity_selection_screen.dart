@@ -64,10 +64,7 @@ class _SnakeQuantitySelectionScreenState
                   const SizedBox(height: 8),
                   Text(
                     'Chọn loại báo cáo phù hợp để chúng tôi chuẩn bị hỗ trợ tốt nhất.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 24),
 
@@ -84,7 +81,8 @@ class _SnakeQuantitySelectionScreenState
                   _buildSelectionCard(
                     quantity: 'few',
                     title: '2-5 loài rắn',
-                    description: 'Bạn rắn nhiều loài khác nhau, quan sát hướng di chuyển.',
+                    description:
+                        'Bạn rắn nhiều loài khác nhau, quan sát hướng di chuyển.',
                     icon: Icons.pie_chart,
                     accentColor: const Color(0xFFFFA726),
                     isSelected: _selectedQuantity == 'few',
@@ -93,7 +91,8 @@ class _SnakeQuantitySelectionScreenState
                   _buildSelectionCard(
                     quantity: 'many',
                     title: 'Ổ rắn',
-                    description: 'Phát hiện ổ rắn hoặc nhiều rắn tập trung. Rời khu vực ngay lập tức!',
+                    description:
+                        'Phát hiện ổ rắn hoặc nhiều rắn tập trung. Rời khu vực ngay lập tức!',
                     icon: Icons.warning,
                     accentColor: const Color(0xFFDC3545),
                     isSelected: _selectedQuantity == 'many',
@@ -165,12 +164,7 @@ class _SnakeQuantitySelectionScreenState
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.8),
-          border: Border(
-            top: BorderSide(
-              color: Colors.grey[200]!,
-              width: 1,
-            ),
-          ),
+          border: Border(top: BorderSide(color: Colors.grey[200]!, width: 1)),
         ),
         child: SafeArea(
           child: SizedBox(
@@ -198,10 +192,7 @@ class _SnakeQuantitySelectionScreenState
                 children: [
                   Text(
                     'Tiếp tục',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   SizedBox(width: 8),
                   Icon(Icons.arrow_forward, size: 20),
@@ -226,8 +217,8 @@ class _SnakeQuantitySelectionScreenState
     final imageUrl = quantity == 'single'
         ? 'https://lh3.googleusercontent.com/aida-public/AB6AXuCpV2th9rwq2wC-qfes_zN4Jyu_o8CcEeJUSOuLKvs0rrG9inQOYXV0uIRdXnGi2UypaX9oGCnutBk7_w-SlvJ9gbURrvj20huVFQrB5kJABRPDuGJmww0nytuR0rezLXnsEPB-oUN6VuPwSPt-eoECEqnsOTc-AC_Pnk2Ul0-3rO37z1j2fGDpxGsUdQcEuMhHKdBSfMVLSVgzeBWOwQ_pHit_vsStT4sLkU2xeEZylfr26dKJ6PexamIWcMthywV3BIBl-pFqCzcY'
         : quantity == 'few'
-            ? 'https://lh3.googleusercontent.com/aida-public/AB6AXuApxQfoNj0gGh6WbfW55N4bB4TA5YRlnXsZV4WiB9knnGb9Sp6FxCvTlCD1yawx3fFYXotmNUoBxIPPrmzmFQVigpFayK3gF9XeqwyXHnfBwTjZ-EL3ks-4-AW4VEBmmdsSnz-IZ3RjrORvp7ygJlgfccOaxH3hCjDfQthiHykwuBHsJcypw3Qesyxqjtylg5UNhSB12sZmiIpWaSBjbCcX-qtWNlJ604xCL3lz2fml2IP8qPK3xnma4bGpL2s35rUqZHfwn7M5ikWn'
-            : 'https://lh3.googleusercontent.com/aida-public/AB6AXuC2DcJ_pN0oc3OwvatjuyzxQnmkGLrv6JCuBDQgbIhsvym3ihKxT8rxY8b5t_g0ZdfS3H0qeo1eGfGzyuCWAoepwpYF5Aq7pQN60kxFyPrYBB87GG2LClgSQG1jSG8WCWaxcKXjgrVFcMGDCLktGjyz_fPoUhZUsh9yor04rAdOPkD3WAlJvzkb5K1yajsv_dhWpbwdPU7S92MjcdQ9-SM62_6jIv89thId0iO6AzW3O9Ae6ynf4xZWM2sMl-sF1ahyVtAGcxoPmEzF';
+        ? 'https://lh3.googleusercontent.com/aida-public/AB6AXuApxQfoNj0gGh6WbfW55N4bB4TA5YRlnXsZV4WiB9knnGb9Sp6FxCvTlCD1yawx3fFYXotmNUoBxIPPrmzmFQVigpFayK3gF9XeqwyXHnfBwTjZ-EL3ks-4-AW4VEBmmdsSnz-IZ3RjrORvp7ygJlgfccOaxH3hCjDfQthiHykwuBHsJcypw3Qesyxqjtylg5UNhSB12sZmiIpWaSBjbCcX-qtWNlJ604xCL3lz2fml2IP8qPK3xnma4bGpL2s35rUqZHfwn7M5ikWn'
+        : 'https://lh3.googleusercontent.com/aida-public/AB6AXuC2DcJ_pN0oc3OwvatjuyzxQnmkGLrv6JCuBDQgbIhsvym3ihKxT8rxY8b5t_g0ZdfS3H0qeo1eGfGzyuCWAoepwpYF5Aq7pQN60kxFyPrYBB87GG2LClgSQG1jSG8WCWaxcKXjgrVFcMGDCLktGjyz_fPoUhZUsh9yor04rAdOPkD3WAlJvzkb5K1yajsv_dhWpbwdPU7S92MjcdQ9-SM62_6jIv89thId0iO6AzW3O9Ae6ynf4xZWM2sMl-sF1ahyVtAGcxoPmEzF';
 
     return GestureDetector(
       onTap: () {
@@ -298,8 +289,12 @@ class _SnakeQuantitySelectionScreenState
                             description,
                             style: TextStyle(
                               fontSize: 13,
-                              fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
-                              color: isSelected ? Colors.grey[700] : Colors.grey[500],
+                              fontWeight: isSelected
+                                  ? FontWeight.w500
+                                  : FontWeight.normal,
+                              color: isSelected
+                                  ? Colors.grey[700]
+                                  : Colors.grey[500],
                               height: 1.2,
                             ),
                             maxLines: 2,

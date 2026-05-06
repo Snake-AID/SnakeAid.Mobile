@@ -14,10 +14,7 @@ const Color _primaryColor = Color(0xFF228B22);
 class ExpertProfileDetailScreen extends ConsumerStatefulWidget {
   final String expertId;
 
-  const ExpertProfileDetailScreen({
-    super.key,
-    required this.expertId,
-  });
+  const ExpertProfileDetailScreen({super.key, required this.expertId});
 
   @override
   ConsumerState<ExpertProfileDetailScreen> createState() =>
@@ -45,107 +42,121 @@ class _ExpertProfileDetailScreenState
       body: state.isLoading
           ? const Center(child: CircularProgressIndicator())
           : state.error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('Lỗi: ${state.error}'),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () {
-                          ref.read(expertDetailProvider(widget.expertId).notifier).refresh();
-                        },
-                        child: const Text('Thử lại'),
-                      ),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('Lỗi: ${state.error}'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      ref
+                          .read(expertDetailProvider(widget.expertId).notifier)
+                          .refresh();
+                    },
+                    child: const Text('Thử lại'),
                   ),
-                )
-              : state.expert == null
-                  ? const Center(child: Text('Không tìm thấy chuyên gia'))
-                  : Stack(
-                      children: [
-                        // Main scrollable content
-                        CustomScrollView(
-                          slivers: [
-                            // Top App Bar
-                            SliverAppBar(
-                              pinned: true,
-                              backgroundColor: theme.colorScheme.surface,
-                              leading: IconButton(
-                                icon: const Icon(Icons.arrow_back, color: Color(0xFF1F2937)),
-                                onPressed: () => context.pop(),
-                              ),
-                              title: Text(
-                                state.expert!.displayName,
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              actions: [
-                                IconButton(
-                                  icon: const Icon(Icons.share, color: Color(0xFF1F2937)),
-                                  onPressed: () {
-                                    // TODO: Implement share functionality
-                                  },
-                                ),
-                              ],
-                            ),
-
-                            // Content
-                            SliverToBoxAdapter(
-                              child: Column(
-                                children: [
-                                  // Profile Header
-                                  _buildProfileHeader(context, state.expert!),
-
-                                  // Verified Badge & Specialties
-                                  _buildSpecialties(context, state.expert!),
-
-                                  // Main content sections
-                                  Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        // Introduction
-                                        _buildIntroductionSection(context, state.expert!),
-                                        const SizedBox(height: 24),
-
-                                        // Statistics
-                                        _buildStatisticsSection(context, state.expert!),
-                                        const SizedBox(height: 24),
-
-                                        // Consultation Fees
-                                        _buildFeesSection(context, state.expert!),
-                                        const SizedBox(height: 24),
-
-                                        // Availability
-                                        _buildAvailabilitySection(context, state.expert!),
-                                        const SizedBox(height: 24),
-
-                                        // Reviews
-                                        _buildReviewsSection(context, state.expert!),
-
-                                        // Bottom padding for sticky footer
-                                        const SizedBox(height: 160),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                ],
+              ),
+            )
+          : state.expert == null
+          ? const Center(child: Text('Không tìm thấy chuyên gia'))
+          : Stack(
+              children: [
+                // Main scrollable content
+                CustomScrollView(
+                  slivers: [
+                    // Top App Bar
+                    SliverAppBar(
+                      pinned: true,
+                      backgroundColor: theme.colorScheme.surface,
+                      leading: IconButton(
+                        icon: const Icon(
+                          Icons.arrow_back,
+                          color: Color(0xFF1F2937),
                         ),
-
-                        // Sticky Footer with CTAs
-                        Positioned(
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          child: _buildStickyFooter(context, state.expert!),
+                        onPressed: () => context.pop(),
+                      ),
+                      title: Text(
+                        state.expert!.displayName,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      actions: [
+                        IconButton(
+                          icon: const Icon(
+                            Icons.share,
+                            color: Color(0xFF1F2937),
+                          ),
+                          onPressed: () {
+                            // TODO: Implement share functionality
+                          },
                         ),
                       ],
                     ),
+
+                    // Content
+                    SliverToBoxAdapter(
+                      child: Column(
+                        children: [
+                          // Profile Header
+                          _buildProfileHeader(context, state.expert!),
+
+                          // Verified Badge & Specialties
+                          _buildSpecialties(context, state.expert!),
+
+                          // Main content sections
+                          Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Introduction
+                                _buildIntroductionSection(
+                                  context,
+                                  state.expert!,
+                                ),
+                                const SizedBox(height: 24),
+
+                                // Statistics
+                                _buildStatisticsSection(context, state.expert!),
+                                const SizedBox(height: 24),
+
+                                // Consultation Fees
+                                _buildFeesSection(context, state.expert!),
+                                const SizedBox(height: 24),
+
+                                // Availability
+                                _buildAvailabilitySection(
+                                  context,
+                                  state.expert!,
+                                ),
+                                const SizedBox(height: 24),
+
+                                // Reviews
+                                _buildReviewsSection(context, state.expert!),
+
+                                // Bottom padding for sticky footer
+                                const SizedBox(height: 160),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Sticky Footer with CTAs
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: _buildStickyFooter(context, state.expert!),
+                ),
+              ],
+            ),
     );
   }
 
@@ -288,7 +299,10 @@ class _ExpertProfileDetailScreenState
             alignment: WrapAlignment.center,
             children: expert.specialties.map<Widget>((specialty) {
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.indigo[600],
                   borderRadius: BorderRadius.circular(20),
@@ -345,6 +359,7 @@ class _ExpertProfileDetailScreenState
       ],
     );
   }
+
   /// Build statistics section
   Widget _buildStatisticsSection(BuildContext context, expert) {
     final theme = Theme.of(context);
@@ -390,8 +405,6 @@ class _ExpertProfileDetailScreenState
                 ),
               ),
 
-              
-
               // Success Rate
               Expanded(
                 child: Column(
@@ -423,7 +436,10 @@ class _ExpertProfileDetailScreenState
   /// Build consultation fees section
   Widget _buildFeesSection(BuildContext context, expert) {
     final theme = Theme.of(context);
-    final currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: 'VNĐ');
+    final currencyFormat = NumberFormat.currency(
+      locale: 'vi_VN',
+      symbol: 'VNĐ',
+    );
 
     String formatFee(double fee) =>
         fee <= 0 ? 'Miễn phí' : currencyFormat.format(fee);
@@ -514,7 +530,6 @@ class _ExpertProfileDetailScreenState
                 fontWeight: FontWeight.bold,
               ),
             ),
-            
           ],
         ),
         const SizedBox(height: 8),

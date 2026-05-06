@@ -56,12 +56,18 @@ class _BlogListScreenState extends ConsumerState<BlogListScreen> {
                     decoration: InputDecoration(
                       hintText: 'Tìm kiếm bài viết...',
                       hintStyle: TextStyle(color: Colors.grey[500]),
-                      prefixIcon:
-                          const Icon(Icons.search, color: Colors.grey, size: 20),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: Colors.grey,
+                        size: 20,
+                      ),
                       suffixIcon: _searchCtrl.text.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear,
-                                  color: Colors.grey, size: 18),
+                              icon: const Icon(
+                                Icons.clear,
+                                color: Colors.grey,
+                                size: 18,
+                              ),
                               onPressed: () {
                                 _searchCtrl.clear();
                                 notifier.search('');
@@ -70,8 +76,9 @@ class _BlogListScreenState extends ConsumerState<BlogListScreen> {
                           : null,
                       filled: true,
                       fillColor: Colors.white,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 16),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(22),
                         borderSide: BorderSide.none,
@@ -91,12 +98,13 @@ class _BlogListScreenState extends ConsumerState<BlogListScreen> {
                         selected: _selectedCategory == null,
                         onTap: () => setState(() => _selectedCategory = null),
                       ),
-                      ...BlogCategory.values.map((cat) => _CategoryChip(
-                            label: blogCategoryLabel(cat),
-                            selected: _selectedCategory == cat,
-                            onTap: () =>
-                                setState(() => _selectedCategory = cat),
-                          )),
+                      ...BlogCategory.values.map(
+                        (cat) => _CategoryChip(
+                          label: blogCategoryLabel(cat),
+                          selected: _selectedCategory == cat,
+                          onTap: () => setState(() => _selectedCategory = cat),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -107,18 +115,14 @@ class _BlogListScreenState extends ConsumerState<BlogListScreen> {
           // Blog list
           Expanded(
             child: state.isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: _green))
+                ? const Center(child: CircularProgressIndicator(color: _green))
                 : state.error != null
-                    ? _ErrorView(
-                        error: state.error!,
-                        onRetry: notifier.refresh,
-                      )
-                    : RefreshIndicator(
-                        color: _green,
-                        onRefresh: notifier.refresh,
-                        child: _buildList(state, notifier),
-                      ),
+                ? _ErrorView(error: state.error!, onRetry: notifier.refresh)
+                : RefreshIndicator(
+                    color: _green,
+                    onRefresh: notifier.refresh,
+                    child: _buildList(state, notifier),
+                  ),
           ),
         ],
       ),
@@ -127,8 +131,9 @@ class _BlogListScreenState extends ConsumerState<BlogListScreen> {
 
   Widget _buildList(BlogListState state, BlogListNotifier notifier) {
     final blogs = state.filtered
-        .where((b) =>
-            _selectedCategory == null || b.category == _selectedCategory)
+        .where(
+          (b) => _selectedCategory == null || b.category == _selectedCategory,
+        )
         .toList();
 
     if (blogs.isEmpty) {
@@ -167,8 +172,11 @@ class _CategoryChip extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  const _CategoryChip(
-      {required this.label, required this.selected, required this.onTap});
+  const _CategoryChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -203,8 +211,11 @@ class _BlogCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onLike;
 
-  const _BlogCard(
-      {required this.blog, required this.onTap, required this.onLike});
+  const _BlogCard({
+    required this.blog,
+    required this.onTap,
+    required this.onLike,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -228,8 +239,9 @@ class _BlogCard extends StatelessWidget {
           children: [
             // Thumbnail
             ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
               child: Image.network(
                 blog.thumbnailUrl,
                 height: 160,
@@ -250,7 +262,9 @@ class _BlogCard extends StatelessWidget {
                   // Category chip
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF228B22).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
@@ -280,24 +294,30 @@ class _BlogCard extends StatelessWidget {
                   // Author + read time
                   Row(
                     children: [
-                      const Icon(Icons.person_outline,
-                          size: 13, color: Colors.grey),
+                      const Icon(
+                        Icons.person_outline,
+                        size: 13,
+                        color: Colors.grey,
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
                           blog.author?.fullName ?? 'Chuyên gia',
-                          style:
-                              const TextStyle(fontSize: 12, color: Colors.grey),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const Icon(Icons.schedule,
-                          size: 13, color: Colors.grey),
+                      const Icon(Icons.schedule, size: 13, color: Colors.grey),
                       const SizedBox(width: 4),
                       Text(
                         '${blog.readingTime} phút đọc',
-                        style:
-                            const TextStyle(fontSize: 12, color: Colors.grey),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
                       ),
                     ],
                   ),
@@ -305,13 +325,18 @@ class _BlogCard extends StatelessWidget {
                   // Stats row
                   Row(
                     children: [
-                      const Icon(Icons.visibility_outlined,
-                          size: 14, color: Colors.grey),
+                      const Icon(
+                        Icons.visibility_outlined,
+                        size: 14,
+                        color: Colors.grey,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '${blog.viewCount}',
-                        style:
-                            const TextStyle(fontSize: 12, color: Colors.grey),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       GestureDetector(
@@ -331,7 +356,9 @@ class _BlogCard extends StatelessWidget {
                             Text(
                               '${blog.likeCount}',
                               style: const TextStyle(
-                                  fontSize: 12, color: Colors.grey),
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
                             ),
                           ],
                         ),
@@ -371,8 +398,9 @@ class _ErrorView extends StatelessWidget {
           ElevatedButton(
             onPressed: onRetry,
             style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF228B22),
-                foregroundColor: Colors.white),
+              backgroundColor: const Color(0xFF228B22),
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Thử lại'),
           ),
         ],

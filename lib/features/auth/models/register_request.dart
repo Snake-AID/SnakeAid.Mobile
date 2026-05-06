@@ -6,7 +6,8 @@ class RegisterRequest {
   final String fullName;
   final String phoneNumber;
   final String role; // MEMBER, RESCUER, EXPERT
-  final String? type; // For RESCUER: "Emergency", "SnakeCatching", "Both" (hoặc null cho MEMBER/EXPERT)
+  final String?
+  type; // For RESCUER: "Emergency", "SnakeCatching", "Both" (hoặc null cho MEMBER/EXPERT)
   final String? biography; // For EXPERT (null cho MEMBER/RESCUER)
 
   RegisterRequest({
@@ -32,6 +33,6 @@ class RegisterRequest {
   }
 
   @override
-  String toString() => 
+  String toString() =>
       'RegisterRequest(email: $email, fullName: $fullName, phoneNumber: $phoneNumber, role: $role, type: $type, biography: $biography)';
 }

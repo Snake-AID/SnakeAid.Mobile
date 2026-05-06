@@ -17,7 +17,11 @@ class _SnakeEntry {
   final SnakeSpecies species;
   final int quantity;
   final String detailId; // ID returned by BE after addMissionDetail
-  const _SnakeEntry({required this.species, required this.quantity, required this.detailId});
+  const _SnakeEntry({
+    required this.species,
+    required this.quantity,
+    required this.detailId,
+  });
 }
 
 /// Màn hình xác nhận kết quả sau khi bắt rắn thành công
@@ -26,7 +30,7 @@ class RescuerResultConfirmationScreen extends ConsumerStatefulWidget {
   final String missionId;
   final List<File> capturedPhotos;
   final String notes;
-  
+
   const RescuerResultConfirmationScreen({
     super.key,
     required this.requestData,
@@ -36,10 +40,12 @@ class RescuerResultConfirmationScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<RescuerResultConfirmationScreen> createState() => _RescuerResultConfirmationScreenState();
+  ConsumerState<RescuerResultConfirmationScreen> createState() =>
+      _RescuerResultConfirmationScreenState();
 }
 
-class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultConfirmationScreen> {
+class _RescuerResultConfirmationScreenState
+    extends ConsumerState<RescuerResultConfirmationScreen> {
   // Snake species loaded from API
   List<SnakeSpecies> _allSpecies = [];
   bool _isLoadingSpecies = true;
@@ -60,18 +66,21 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
   final Set<String> _deletingIds = {}; // detailIds currently being deleted
 
   // Species picker search
-  final TextEditingController _speciesSearchController = TextEditingController();
+  final TextEditingController _speciesSearchController =
+      TextEditingController();
 
   // Additional notes
-  final TextEditingController _additionalNotesController = TextEditingController();
+  final TextEditingController _additionalNotesController =
+      TextEditingController();
 
-  bool get _isValid => _confirmedSnakes.isNotEmpty && _catchingEnvironmentId != null;
+  bool get _isValid =>
+      _confirmedSnakes.isNotEmpty && _catchingEnvironmentId != null;
 
- String formatDate(String rawDate) {
-  final dateTimeUtc = DateTime.parse(rawDate);
-  final dateTimeLocal = dateTimeUtc.toLocal();
-  return DateFormat('dd/MM/yyyy HH:mm').format(dateTimeLocal);
-}
+  String formatDate(String rawDate) {
+    final dateTimeUtc = DateTime.parse(rawDate);
+    final dateTimeLocal = dateTimeUtc.toLocal();
+    return DateFormat('dd/MM/yyyy HH:mm').format(dateTimeLocal);
+  }
 
   @override
   void initState() {
@@ -84,7 +93,11 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
     try {
       final repo = ref.read(snakeSpeciesRepositoryProvider);
       final list = await repo.getSnakeSpecies();
-      if (mounted) setState(() { _allSpecies = list; _isLoadingSpecies = false; });
+      if (mounted)
+        setState(() {
+          _allSpecies = list;
+          _isLoadingSpecies = false;
+        });
     } catch (e) {
       if (mounted) setState(() => _isLoadingSpecies = false);
     }
@@ -94,7 +107,11 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
     try {
       final repo = ref.read(catchingEnvironmentRepositoryProvider);
       final list = await repo.getCatchingEnvironments();
-      if (mounted) setState(() { _allEnvironments = list; _isLoadingEnvironments = false; });
+      if (mounted)
+        setState(() {
+          _allEnvironments = list;
+          _isLoadingEnvironments = false;
+        });
     } catch (e) {
       if (mounted) setState(() => _isLoadingEnvironments = false);
     }
@@ -149,12 +166,20 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                   children: [
                     Text(
                       'Chọn nơi bắt rắn',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF222222)),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF222222),
+                      ),
                     ),
                     SizedBox(height: 4),
                     Text(
                       'Chọn vị trí phù hợp để hệ thống xử lý chính xác',
-                      style: TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFF777777)),
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.4,
+                        color: Color(0xFF777777),
+                      ),
                     ),
                   ],
                 ),
@@ -177,10 +202,14 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                         duration: const Duration(milliseconds: 180),
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: isSelected ? const Color(0xFFFFF3EE) : Colors.white,
+                          color: isSelected
+                              ? const Color(0xFFFFF3EE)
+                              : Colors.white,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: isSelected ? const Color(0xFFFF6B35) : const Color(0xFFE9E9E9),
+                            color: isSelected
+                                ? const Color(0xFFFF6B35)
+                                : const Color(0xFFE9E9E9),
                             width: isSelected ? 1.4 : 1,
                           ),
                           boxShadow: [
@@ -212,10 +241,15 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                                       ),
                                       if (isSelected)
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
                                           decoration: BoxDecoration(
                                             color: const Color(0xFFFF6B35),
-                                            borderRadius: BorderRadius.circular(999),
+                                            borderRadius: BorderRadius.circular(
+                                              999,
+                                            ),
                                           ),
                                           child: const Text(
                                             'Đã chọn',
@@ -270,22 +304,30 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
     setState(() => _isConfirmingSnake = true);
     try {
       final repo = ref.read(snakeCatchingRepositoryProvider);
-      final detailId = await repo.addMissionDetail(widget.missionId, _pendingSpecies!.id, _pendingQuantity);
+      final detailId = await repo.addMissionDetail(
+        widget.missionId,
+        _pendingSpecies!.id,
+        _pendingQuantity,
+      );
       setState(() {
-        _confirmedSnakes.add(_SnakeEntry(
-          species: _pendingSpecies!,
-          quantity: _pendingQuantity,
-          detailId: detailId,
-        ));
+        _confirmedSnakes.add(
+          _SnakeEntry(
+            species: _pendingSpecies!,
+            quantity: _pendingQuantity,
+            detailId: detailId,
+          ),
+        );
         _pendingSpecies = null;
         _pendingQuantity = 1;
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Lỗi: ${e.toString().replaceAll('Exception: ', '')}'),
-          backgroundColor: Colors.red,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isConfirmingSnake = false);
@@ -304,10 +346,14 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
       if (mounted) setState(() => _confirmedSnakes.removeAt(index));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Không thể xóa: ${e.toString().replaceAll('Exception: ', '')}'),
-          backgroundColor: Colors.red,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Không thể xóa: ${e.toString().replaceAll('Exception: ', '')}',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _deletingIds.remove(detailId));
@@ -349,13 +395,21 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                   const Text(
                     'Xác nhận gửi kết quả',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF222222)),
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF222222),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   const Text(
                     'Kiểm tra lại thông tin trước khi gửi cho khách hàng.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, height: 1.5, color: Color(0xFF666666)),
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.5,
+                      color: Color(0xFF666666),
+                    ),
                   ),
                   const SizedBox(height: 18),
                   Container(
@@ -373,34 +427,52 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                             Expanded(
                               child: Text(
                                 'Loài rắn đã xác nhận',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF1F3D26)),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF1F3D26),
+                                ),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 12),
-                        ..._confirmedSnakes.map((e) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  e.species.commonName,
-                                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w400, color: Color(0xFF333333)),
+                        ..._confirmedSnakes.map(
+                          (e) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    e.species.commonName,
+                                    style: const TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w400,
+                                      color: Color(0xFF333333),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                '× ${e.quantity}',
-                                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFFFF6B35)),
-                              ),
-                            ],
+                                Text(
+                                  '× ${e.quantity}',
+                                  style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFFF6B35),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        )),
+                        ),
                         Row(
                           children: [
                             Text(
                               'Tổng cộng: $totalSnakes con',
-                              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFFFF6B35)),
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFFF6B35),
+                              ),
                             ),
                           ],
                         ),
@@ -420,18 +492,31 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                       children: [
                         const Text(
                           'Nơi bắt rắn',
-                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF8A4E34)),
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF8A4E34),
+                          ),
                         ),
                         const SizedBox(height: 6),
                         Text(
                           selectedEnvironment?.name ?? 'Chưa chọn',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF333333),
+                          ),
                         ),
-                        if (_cleanText(selectedEnvironment?.description) != null) ...[
+                        if (_cleanText(selectedEnvironment?.description) !=
+                            null) ...[
                           const SizedBox(height: 4),
                           Text(
                             _cleanText(selectedEnvironment?.description)!,
-                            style: const TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFF666666)),
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              height: 1.4,
+                              color: Color(0xFF666666),
+                            ),
                           ),
                         ],
                       ],
@@ -441,10 +526,14 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                   const Text(
                     'Sau khi gửi, kết quả sẽ được chốt và không thể chỉnh sửa.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFF777777)),
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      height: 1.4,
+                      color: Color(0xFF777777),
+                    ),
                   ),
                   const SizedBox(height: 18),
-                      Row(
+                  Row(
                     children: [
                       Expanded(
                         child: OutlinedButton(
@@ -453,22 +542,32 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                             foregroundColor: const Color(0xFF666666),
                             side: const BorderSide(color: Color(0xFFE2E2E2)),
                             padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
                           ),
-                          child: const Text('Kiểm tra lại', style: TextStyle(fontWeight: FontWeight.w700)),
+                          child: const Text(
+                            'Kiểm tra lại',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('Gửi ngay', style: TextStyle(fontWeight: FontWeight.w800)),
+                          child: const Text(
+                            'Gửi ngay',
+                            style: TextStyle(fontWeight: FontWeight.w800),
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFFF6B35),
                             foregroundColor: Colors.white,
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
                           ),
                         ),
                       ),
@@ -490,8 +589,11 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
     setState(() => _isSubmitting = true);
     try {
       final repo = ref.read(snakeCatchingRepositoryProvider);
-      await repo.completeMission(widget.missionId, catchingEnvironmentId: _catchingEnvironmentId!);
-      
+      await repo.completeMission(
+        widget.missionId,
+        catchingEnvironmentId: _catchingEnvironmentId!,
+      );
+
       // Tắt và bật lại rescue mode để refresh trạng thái của rescuer với server
       final prefs = await SharedPreferences.getInstance();
       final rescuerId = prefs.getString('user_id');
@@ -514,10 +616,12 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Lỗi: ${e.toString().replaceAll('Exception: ', '')}'),
-          backgroundColor: Colors.red,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -560,21 +664,21 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
               children: [
                 // Success Section
                 _buildSuccessSection(),
-                
+
                 // Summary Card
                 _buildSummaryCard(),
-                
+
                 // Snake Confirmation Card
                 _buildSnakeConfirmationCard(),
-                
+
                 // Details Section
                 _buildDetailsSection(),
-                         
+
                 const SizedBox(height: 100),
               ],
             ),
           ),
-          
+
           // Fixed Bottom Button
           _buildBottomButton(),
         ],
@@ -639,7 +743,10 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
         children: [
           _buildSummaryRow(Icons.location_on, widget.requestData.address),
           const SizedBox(height: 12),
-          _buildSummaryRow(Icons.calendar_today, formatDate(widget.requestData.requestDate.toString())),
+          _buildSummaryRow(
+            Icons.calendar_today,
+            formatDate(widget.requestData.requestDate.toString()),
+          ),
         ],
       ),
     );
@@ -651,19 +758,14 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
         Container(
           width: 40,
           height: 40,
-          decoration: const BoxDecoration(
-            color: Color(0xFFF5F5F5),
-          ),
+          decoration: const BoxDecoration(color: Color(0xFFF5F5F5)),
           child: Icon(icon, color: const Color(0xFF666666), size: 24),
         ),
         const SizedBox(width: 16),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(
-              fontSize: 16,
-              color: Color(0xFF333333),
-            ),
+            style: const TextStyle(fontSize: 16, color: Color(0xFF333333)),
           ),
         ),
       ],
@@ -710,9 +812,11 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
         builder: (ctx, setSheet) {
           final query = _speciesSearchController.text.toLowerCase();
           final filtered = _allSpecies
-              .where((s) =>
-                  s.commonName.toLowerCase().contains(query) ||
-                  s.scientificName.toLowerCase().contains(query))
+              .where(
+                (s) =>
+                    s.commonName.toLowerCase().contains(query) ||
+                    s.scientificName.toLowerCase().contains(query),
+              )
               .toList();
           return DraggableScrollableSheet(
             initialChildSize: 0.75,
@@ -728,7 +832,8 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                   // ── handle ────────────────────────────────────────
                   const SizedBox(height: 10),
                   Container(
-                    width: 36, height: 4,
+                    width: 36,
+                    height: 4,
                     decoration: BoxDecoration(
                       color: Colors.grey[300],
                       borderRadius: BorderRadius.circular(2),
@@ -744,11 +849,21 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                         const Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Chọn Loài Rắn',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
-                                    color: Color(0xFF333333))),
-                            Text('Chọn loài rắn đã bắt được',
-                                style: TextStyle(fontSize: 12, color: Color(0xFF888888))),
+                            Text(
+                              'Chọn Loài Rắn',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF333333),
+                              ),
+                            ),
+                            Text(
+                              'Chọn loài rắn đã bắt được',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF888888),
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -764,11 +879,22 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                       onChanged: (_) => setSheet(() {}),
                       decoration: InputDecoration(
                         hintText: 'Tìm theo tên hoặc tên khoa học...',
-                        hintStyle: const TextStyle(fontSize: 13, color: Color(0xFFAAAAAA)),
-                        prefixIcon: const Icon(Icons.search, color: Color(0xFFAAAAAA), size: 20),
+                        hintStyle: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFFAAAAAA),
+                        ),
+                        prefixIcon: const Icon(
+                          Icons.search,
+                          color: Color(0xFFAAAAAA),
+                          size: 20,
+                        ),
                         suffixIcon: _speciesSearchController.text.isNotEmpty
                             ? IconButton(
-                                icon: const Icon(Icons.clear, size: 18, color: Color(0xFFAAAAAA)),
+                                icon: const Icon(
+                                  Icons.clear,
+                                  size: 18,
+                                  color: Color(0xFFAAAAAA),
+                                ),
                                 onPressed: () {
                                   _speciesSearchController.clear();
                                   setSheet(() {});
@@ -777,8 +903,10 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                             : null,
                         filled: true,
                         fillColor: Colors.white,
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
@@ -789,19 +917,33 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                   const SizedBox(height: 4),
 
                   // ── divider ───────────────────────────────────────
-                  const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
+                  const Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: Color(0xFFEEEEEE),
+                  ),
 
                   // ── species list ──────────────────────────────────
                   Expanded(
                     child: filtered.isEmpty
                         ? const Center(
-                            child: Text('Không tìm thấy loài rắn',
-                                style: TextStyle(color: Color(0xFF999999), fontSize: 14)))
+                            child: Text(
+                              'Không tìm thấy loài rắn',
+                              style: TextStyle(
+                                color: Color(0xFF999999),
+                                fontSize: 14,
+                              ),
+                            ),
+                          )
                         : ListView.separated(
                             controller: scrollCtrl,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
                             itemCount: filtered.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 8),
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 8),
                             itemBuilder: (_, i) {
                               final s = filtered[i];
                               final isSelected = _pendingSpecies?.id == s.id;
@@ -839,10 +981,13 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                                           topLeft: Radius.circular(12),
                                           bottomLeft: Radius.circular(12),
                                         ),
-                                        child: s.imageUrl != null && s.imageUrl!.isNotEmpty
+                                        child:
+                                            s.imageUrl != null &&
+                                                s.imageUrl!.isNotEmpty
                                             ? Image.network(
                                                 s.imageUrl!,
-                                                width: 80, height: 80,
+                                                width: 80,
+                                                height: 80,
                                                 fit: BoxFit.cover,
                                                 errorBuilder: (_, __, ___) =>
                                                     _speciesImagePlaceholder(),
@@ -853,64 +998,107 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                                       // ── info ──────────────────────
                                       Expanded(
                                         child: Padding(
-                                          padding: const EdgeInsets.symmetric(vertical: 10),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 10,
+                                          ),
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
-                                              Text(s.commonName,
-                                                  style: const TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Color(0xFF222222),
-                                                  ),
-                                                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                                              Text(
+                                                s.commonName,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF222222),
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
                                               const SizedBox(height: 2),
-                                              Text(s.scientificName,
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    fontStyle: FontStyle.italic,
-                                                    color: Color(0xFF888888),
-                                                  ),
-                                                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                                              Text(
+                                                s.scientificName,
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontStyle: FontStyle.italic,
+                                                  color: Color(0xFF888888),
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
                                               const SizedBox(height: 6),
                                               Row(
                                                 children: [
                                                   Container(
-                                                    padding: const EdgeInsets.symmetric(
-                                                        horizontal: 7, vertical: 3),
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 7,
+                                                          vertical: 3,
+                                                        ),
                                                     decoration: BoxDecoration(
-                                                      color: dc.withOpacity(0.12),
-                                                      borderRadius: BorderRadius.circular(20),
+                                                      color: dc.withOpacity(
+                                                        0.12,
+                                                      ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            20,
+                                                          ),
                                                     ),
                                                     child: Row(
-                                                      mainAxisSize: MainAxisSize.min,
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
                                                       children: [
-                                                        Icon(_dangerIcon(s), size: 11, color: dc),
-                                                        const SizedBox(width: 4),
-                                                        Text(_dangerLabel(s),
-                                                            style: TextStyle(
-                                                              fontSize: 11,
-                                                              fontWeight: FontWeight.bold,
-                                                              color: dc,
-                                                            )),
+                                                        Icon(
+                                                          _dangerIcon(s),
+                                                          size: 11,
+                                                          color: dc,
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 4,
+                                                        ),
+                                                        Text(
+                                                          _dangerLabel(s),
+                                                          style: TextStyle(
+                                                            fontSize: 11,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            color: dc,
+                                                          ),
+                                                        ),
                                                       ],
                                                     ),
                                                   ),
-                                                  if (s.primaryVenomType != null &&
-                                                      _displayMetaValue(s.primaryVenomType) != null) ...[
+                                                  if (s.primaryVenomType !=
+                                                          null &&
+                                                      _displayMetaValue(
+                                                            s.primaryVenomType,
+                                                          ) !=
+                                                          null) ...[
                                                     const SizedBox(width: 6),
                                                     Container(
-                                                      padding: const EdgeInsets.symmetric(
-                                                          horizontal: 7, vertical: 3),
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 7,
+                                                            vertical: 3,
+                                                          ),
                                                       decoration: BoxDecoration(
-                                                        color: const Color(0xFFF0F0F0),
-                                                        borderRadius: BorderRadius.circular(20),
+                                                        color: const Color(
+                                                          0xFFF0F0F0,
+                                                        ),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              20,
+                                                            ),
                                                       ),
                                                       child: Text(
-                                                        _displayMetaValue(s.primaryVenomType)!,
+                                                        _displayMetaValue(
+                                                          s.primaryVenomType,
+                                                        )!,
                                                         style: const TextStyle(
                                                           fontSize: 10,
-                                                          color: Color(0xFF666666),
+                                                          color: Color(
+                                                            0xFF666666,
+                                                          ),
                                                         ),
                                                       ),
                                                     ),
@@ -925,8 +1113,11 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                                       if (isSelected)
                                         const Padding(
                                           padding: EdgeInsets.only(right: 12),
-                                          child: Icon(Icons.check_circle,
-                                              color: Color(0xFFFF6B35), size: 20),
+                                          child: Icon(
+                                            Icons.check_circle,
+                                            color: Color(0xFFFF6B35),
+                                            size: 20,
+                                          ),
                                         ),
                                     ],
                                   ),
@@ -946,10 +1137,10 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
 
   Widget _speciesImagePlaceholder() {
     return Container(
-      width: 80, height: 80,
+      width: 80,
+      height: 80,
       color: const Color(0xFFF0EDE8),
-      child: const Icon(Icons.pest_control,
-          color: Color(0xFFCCBBAA), size: 32),
+      child: const Icon(Icons.pest_control, color: Color(0xFFCCBBAA), size: 32),
     );
   }
 
@@ -961,7 +1152,11 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
@@ -975,14 +1170,27 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                 children: [
                   Row(
                     children: [
-                      Text('Xác Nhận Loài Rắn',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
-                              color: Color(0xFF333333))),
-                      Text(' *', style: TextStyle(fontSize: 16, color: Color(0xFFFF6B35))),
+                      Text(
+                        'Xác Nhận Loài Rắn',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF333333),
+                        ),
+                      ),
+                      Text(
+                        ' *',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Color(0xFFFF6B35),
+                        ),
+                      ),
                     ],
                   ),
-                  Text('Thêm từng loài rắn đã bắt được',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF888888))),
+                  Text(
+                    'Thêm từng loài rắn đã bắt được',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                  ),
                 ],
               ),
             ],
@@ -1002,9 +1210,14 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                 children: [
                   Icon(Icons.info_outline, size: 16, color: Color(0xFFAAAAAA)),
                   SizedBox(width: 8),
-                  Text('Chưa có loài rắn nào được xác nhận',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF999999),
-                          fontStyle: FontStyle.italic)),
+                  Text(
+                    'Chưa có loài rắn nào được xác nhận',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF999999),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
                 ],
               ),
             )
@@ -1017,7 +1230,9 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                 decoration: BoxDecoration(
                   color: const Color(0xFFF0FFF4),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF28A745).withOpacity(0.3)),
+                  border: Border.all(
+                    color: const Color(0xFF28A745).withOpacity(0.3),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -1027,11 +1242,16 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                         topLeft: Radius.circular(10),
                         bottomLeft: Radius.circular(10),
                       ),
-                      child: entry.species.imageUrl != null && entry.species.imageUrl!.isNotEmpty
+                      child:
+                          entry.species.imageUrl != null &&
+                              entry.species.imageUrl!.isNotEmpty
                           ? Image.network(
                               entry.species.imageUrl!,
-                              width: 56, height: 56, fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _confirmedImageFallback(),
+                              width: 56,
+                              height: 56,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  _confirmedImageFallback(),
                             )
                           : _confirmedImageFallback(),
                     ),
@@ -1040,34 +1260,57 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(entry.species.commonName,
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold,
-                                  color: Color(0xFF222222)),
-                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                          Text(
+                            entry.species.commonName,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF222222),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                           const SizedBox(height: 2),
                           Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   color: dc.withOpacity(0.12),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
-                                child: Text(_dangerLabel(entry.species),
-                                    style: TextStyle(fontSize: 10, color: dc,
-                                        fontWeight: FontWeight.bold)),
+                                child: Text(
+                                  _dangerLabel(entry.species),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: dc,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                               const SizedBox(width: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF28A745).withOpacity(0.12),
+                                  color: const Color(
+                                    0xFF28A745,
+                                  ).withOpacity(0.12),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
-                                child: Text('× ${entry.quantity}',
-                                    style: const TextStyle(fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF28A745))),
+                                child: Text(
+                                  '× ${entry.quantity}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF28A745),
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -1078,14 +1321,20 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                         ? const Padding(
                             padding: EdgeInsets.all(12),
                             child: SizedBox(
-                              width: 18, height: 18,
+                              width: 18,
+                              height: 18,
                               child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Color(0xFFCC3333)),
+                                strokeWidth: 2,
+                                color: Color(0xFFCC3333),
+                              ),
                             ),
                           )
                         : IconButton(
-                            icon: const Icon(Icons.delete_outline,
-                                size: 18, color: Color(0xFFCC3333)),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              size: 18,
+                              color: Color(0xFFCC3333),
+                            ),
                             onPressed: () => _deleteSnake(entry.detailId, i),
                           ),
                   ],
@@ -1098,16 +1347,24 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
           const SizedBox(height: 14),
 
           // ── Add new snake ──────────────────────────────────────────
-          const Text('Thêm rắn',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                  color: Color(0xFF555555))),
+          const Text(
+            'Thêm rắn',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF555555),
+            ),
+          ),
           const SizedBox(height: 10),
 
           if (_isLoadingSpecies)
             const Center(
               child: Padding(
                 padding: EdgeInsets.symmetric(vertical: 16),
-                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFF6B35)),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Color(0xFFFF6B35),
+                ),
               ),
             )
           else if (_allSpecies.isEmpty)
@@ -1117,12 +1374,20 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                 color: const Color(0xFFFFF3EE),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Row(children: [
-                Icon(Icons.warning_amber_rounded, color: Color(0xFFFF6B35), size: 16),
-                SizedBox(width: 8),
-                Text('Không thể tải danh sách loài rắn',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF7B3A00))),
-              ]),
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: Color(0xFFFF6B35),
+                    size: 16,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Không thể tải danh sách loài rắn',
+                    style: TextStyle(fontSize: 13, color: Color(0xFF7B3A00)),
+                  ),
+                ],
+              ),
             )
           else ...[
             // Species selector button / selected card
@@ -1130,7 +1395,10 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
               onTap: _openSpeciesPicker,
               child: _pendingSpecies == null
                   ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFFF8F6),
                         borderRadius: BorderRadius.circular(10),
@@ -1141,13 +1409,25 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                       ),
                       child: const Row(
                         children: [
-                          Icon(Icons.search, color: Color(0xFFFF6B35), size: 20),
+                          Icon(
+                            Icons.search,
+                            color: Color(0xFFFF6B35),
+                            size: 20,
+                          ),
                           SizedBox(width: 10),
-                          Text('Chọn loài rắn đã bắt...',
-                              style: TextStyle(fontSize: 14, color: Color(0xFFBB7055))),
+                          Text(
+                            'Chọn loài rắn đã bắt...',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFFBB7055),
+                            ),
+                          ),
                           Spacer(),
-                          Icon(Icons.keyboard_arrow_down,
-                              color: Color(0xFFFF6B35), size: 22),
+                          Icon(
+                            Icons.keyboard_arrow_down,
+                            color: Color(0xFFFF6B35),
+                            size: 22,
+                          ),
                         ],
                       ),
                     )
@@ -1156,7 +1436,9 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                         color: const Color(0xFFFFF3EE),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: const Color(0xFFFF6B35), width: 1.5),
+                          color: const Color(0xFFFF6B35),
+                          width: 1.5,
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -1166,19 +1448,26 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                               topLeft: Radius.circular(9),
                               bottomLeft: Radius.circular(9),
                             ),
-                            child: _pendingSpecies!.imageUrl != null &&
+                            child:
+                                _pendingSpecies!.imageUrl != null &&
                                     _pendingSpecies!.imageUrl!.isNotEmpty
                                 ? Image.network(
                                     _pendingSpecies!.imageUrl!,
-                                    width: 70, height: 70, fit: BoxFit.cover,
+                                    width: 70,
+                                    height: 70,
+                                    fit: BoxFit.cover,
                                     errorBuilder: (_, __, ___) =>
                                         _speciesImagePlaceholder(),
                                   )
                                 : Container(
-                                    width: 70, height: 70,
+                                    width: 70,
+                                    height: 70,
                                     color: const Color(0xFFF0EDE8),
-                                    child: const Icon(Icons.pest_control,
-                                        color: Color(0xFFCCBBAA), size: 28),
+                                    child: const Icon(
+                                      Icons.pest_control,
+                                      color: Color(0xFFCCBBAA),
+                                      size: 28,
+                                    ),
                                   ),
                           ),
                           const SizedBox(width: 12),
@@ -1186,42 +1475,62 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(_pendingSpecies!.commonName,
-                                    style: const TextStyle(
-                                      fontSize: 14, fontWeight: FontWeight.bold,
-                                      color: Color(0xFF222222),
-                                    ),
-                                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                                Text(
+                                  _pendingSpecies!.commonName,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF222222),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                                 const SizedBox(height: 2),
-                                Text(_pendingSpecies!.scientificName,
-                                    style: const TextStyle(
-                                      fontSize: 11, fontStyle: FontStyle.italic,
-                                      color: Color(0xFF888888),
-                                    ),
-                                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                                Text(
+                                  _pendingSpecies!.scientificName,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontStyle: FontStyle.italic,
+                                    color: Color(0xFF888888),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                                 const SizedBox(height: 5),
                                 Row(
                                   children: [
                                     Container(
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 7, vertical: 3),
+                                        horizontal: 7,
+                                        vertical: 3,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: _dangerColor(_pendingSpecies!).withOpacity(0.14),
+                                        color: _dangerColor(
+                                          _pendingSpecies!,
+                                        ).withOpacity(0.14),
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(_dangerIcon(_pendingSpecies!),
-                                              size: 11,
-                                              color: _dangerColor(_pendingSpecies!)),
+                                          Icon(
+                                            _dangerIcon(_pendingSpecies!),
+                                            size: 11,
+                                            color: _dangerColor(
+                                              _pendingSpecies!,
+                                            ),
+                                          ),
                                           const SizedBox(width: 3),
-                                          Text(_dangerLabel(_pendingSpecies!),
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
-                                                color: _dangerColor(_pendingSpecies!),
-                                              )),
+                                          Text(
+                                            _dangerLabel(_pendingSpecies!),
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: _dangerColor(
+                                                _pendingSpecies!,
+                                              ),
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
@@ -1235,14 +1544,19 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                             padding: const EdgeInsets.symmetric(horizontal: 10),
                             child: Column(
                               children: [
-                                const Icon(Icons.swap_vert,
-                                    color: Color(0xFFFF6B35), size: 18),
+                                const Icon(
+                                  Icons.swap_vert,
+                                  color: Color(0xFFFF6B35),
+                                  size: 18,
+                                ),
                                 const SizedBox(height: 2),
-                                Text('Đổi',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.grey[500],
-                                    )),
+                                Text(
+                                  'Đổi',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey[500],
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -1257,8 +1571,10 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
             Row(
               children: [
                 // Label
-                const Text('Số lượng:',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF666666))),
+                const Text(
+                  'Số lượng:',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF666666)),
+                ),
                 const SizedBox(width: 8),
                 // Quantity stepper
                 Container(
@@ -1271,7 +1587,8 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       SizedBox(
-                        width: 28, height: 36,
+                        width: 28,
+                        height: 36,
                         child: IconButton(
                           icon: const Icon(Icons.remove, size: 14),
                           padding: EdgeInsets.zero,
@@ -1283,14 +1600,18 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                       Container(
                         width: 30,
                         alignment: Alignment.center,
-                        child: Text('$_pendingQuantity',
-                            style: const TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.bold,
-                              color: Color(0xFF333333),
-                            )),
+                        child: Text(
+                          '$_pendingQuantity',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF333333),
+                          ),
+                        ),
                       ),
                       SizedBox(
-                        width: 28, height: 36,
+                        width: 28,
+                        height: 36,
                         child: IconButton(
                           icon: const Icon(Icons.add, size: 14),
                           padding: EdgeInsets.zero,
@@ -1306,7 +1627,8 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                   child: SizedBox(
                     height: 42,
                     child: ElevatedButton(
-                      onPressed: (_pendingSpecies != null && !_isConfirmingSnake)
+                      onPressed:
+                          (_pendingSpecies != null && !_isConfirmingSnake)
                           ? _showConfirmSnakeDialog
                           : null,
                       style: ElevatedButton.styleFrom(
@@ -1316,14 +1638,19 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                         disabledForegroundColor: const Color(0xFF999999),
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                       ),
                       child: _isConfirmingSnake
                           ? const SizedBox(
-                              width: 18, height: 18,
+                              width: 18,
+                              height: 18,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white))
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
                           : const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               mainAxisSize: MainAxisSize.min,
@@ -1331,12 +1658,14 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                                 Icon(Icons.add_circle_outline, size: 16),
                                 SizedBox(width: 4),
                                 Flexible(
-                                  child: Text('THÊM RẮN',
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                      )),
+                                  child: Text(
+                                    'THÊM RẮN',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
@@ -1353,7 +1682,8 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
 
   Widget _confirmedImageFallback() {
     return Container(
-      width: 56, height: 56,
+      width: 56,
+      height: 56,
       color: const Color(0xFFF0EDE8),
       child: const Icon(Icons.pest_control, color: Color(0xFFCCBBAA), size: 24),
     );
@@ -1388,7 +1718,10 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                   color: Color(0xFF666666),
                 ),
               ),
-              Text(' *', style: TextStyle(fontSize: 14, color: Color(0xFFFF6B35))),
+              Text(
+                ' *',
+                style: TextStyle(fontSize: 14, color: Color(0xFFFF6B35)),
+              ),
             ],
           ),
           const SizedBox(height: 4),
@@ -1401,7 +1734,10 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
             const Center(
               child: Padding(
                 padding: EdgeInsets.symmetric(vertical: 12),
-                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFF6B35)),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Color(0xFFFF6B35),
+                ),
               ),
             )
           else if (_allEnvironments.isEmpty)
@@ -1414,10 +1750,16 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.warning_amber_rounded, color: Color(0xFFFF8F00), size: 16),
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: Color(0xFFFF8F00),
+                    size: 16,
+                  ),
                   SizedBox(width: 8),
-                  Text('Không thể tải danh sách môi trường',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF7B5800))),
+                  Text(
+                    'Không thể tải danh sách môi trường',
+                    style: TextStyle(fontSize: 13, color: Color(0xFF7B5800)),
+                  ),
                 ],
               ),
             )
@@ -1432,7 +1774,7 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                   border: Border.all(
                     color: _catchingEnvironmentId == null
                         ? const Color(0xFFFF6B35)
-                          : const Color(0xFFFF6B35),
+                        : const Color(0xFFFF6B35),
                     width: 1.4,
                   ),
                   boxShadow: [
@@ -1464,7 +1806,8 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _cleanText(_selectedEnvironment?.description) ?? 'Chạm để chọn môi trường phù hợp',
+                            _cleanText(_selectedEnvironment?.description) ??
+                                'Chạm để chọn môi trường phù hợp',
                             style: const TextStyle(
                               fontSize: 12.5,
                               color: Color(0xFF777777),
@@ -1520,8 +1863,6 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
     );
   }
 
-  
-
   Widget _buildBottomButton() {
     return Positioned(
       bottom: 0,
@@ -1531,9 +1872,7 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: const Color(0xFFF4F4F4),
-          border: const Border(
-            top: BorderSide(color: Color(0xFFE0E0E0)),
-          ),
+          border: const Border(top: BorderSide(color: Color(0xFFE0E0E0))),
         ),
         child: SizedBox(
           width: double.infinity,
@@ -1541,24 +1880,36 @@ class _RescuerResultConfirmationScreenState extends ConsumerState<RescuerResultC
           child: ElevatedButton.icon(
             onPressed: (_isValid && !_isSubmitting) ? _confirmAndSubmit : null,
             icon: _isSubmitting
-                ? const SizedBox(width: 20, height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
                 : const Icon(Icons.send, size: 20),
             label: Text(
               _isValid
                   ? 'GỬI KẾT QUẢ CHO KHÁCH HÀNG'
                   : (_confirmedSnakes.isEmpty
-                      ? 'CẦN XÁC NHẬN ÍT NHẤT 1 LOÀI RẮN'
-                      : 'CẦN CHỌN NƠI BẮT RẮN'),
+                        ? 'CẦN XÁC NHẬN ÍT NHẤT 1 LOÀI RẮN'
+                        : 'CẦN CHỌN NƠI BẮT RẮN'),
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: (_isValid && !_isSubmitting) ? const Color(0xFFFF6B35) : const Color(0xFFDDDDDD),
-              foregroundColor: (_isValid && !_isSubmitting) ? Colors.white : const Color(0xFF999999),
+              backgroundColor: (_isValid && !_isSubmitting)
+                  ? const Color(0xFFFF6B35)
+                  : const Color(0xFFDDDDDD),
+              foregroundColor: (_isValid && !_isSubmitting)
+                  ? Colors.white
+                  : const Color(0xFF999999),
               elevation: 0,
               disabledBackgroundColor: const Color(0xFFDDDDDD),
               disabledForegroundColor: const Color(0xFF999999),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
         ),

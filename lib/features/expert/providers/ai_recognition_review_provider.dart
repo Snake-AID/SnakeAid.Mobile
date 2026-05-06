@@ -81,8 +81,10 @@ class AiReviewQueueNotifier extends StateNotifier<AiReviewQueueState> {
     if (!state.hasMore || state.isLoading || state.isLoadingMore) return;
     state = state.copyWith(isLoadingMore: true);
     try {
-      final results =
-          await _repo.getReviewQueue(page: state.page, pageSize: _pageSize);
+      final results = await _repo.getReviewQueue(
+        page: state.page,
+        pageSize: _pageSize,
+      );
       state = state.copyWith(
         isLoadingMore: false,
         items: [...state.items, ...results],
@@ -106,9 +108,10 @@ class AiReviewQueueNotifier extends StateNotifier<AiReviewQueueState> {
 
 final aiReviewQueueProvider =
     StateNotifierProvider<AiReviewQueueNotifier, AiReviewQueueState>((ref) {
-  return AiReviewQueueNotifier(
-      ref.watch(aiRecognitionReviewRepositoryProvider));
-});
+      return AiReviewQueueNotifier(
+        ref.watch(aiRecognitionReviewRepositoryProvider),
+      );
+    });
 
 // ---------------------------------------------------------------------------
 // Review History Provider
@@ -166,8 +169,10 @@ class AiReviewHistoryNotifier extends StateNotifier<AiReviewHistoryState> {
       state = state.copyWith(isLoading: true, clearError: true);
     }
     try {
-      final results =
-          await _repo.getReviewHistory(page: 1, pageSize: _pageSize);
+      final results = await _repo.getReviewHistory(
+        page: 1,
+        pageSize: _pageSize,
+      );
       state = state.copyWith(
         isLoading: false,
         items: results,
@@ -187,8 +192,10 @@ class AiReviewHistoryNotifier extends StateNotifier<AiReviewHistoryState> {
     if (!state.hasMore || state.isLoading || state.isLoadingMore) return;
     state = state.copyWith(isLoadingMore: true);
     try {
-      final results =
-          await _repo.getReviewHistory(page: state.page, pageSize: _pageSize);
+      final results = await _repo.getReviewHistory(
+        page: state.page,
+        pageSize: _pageSize,
+      );
       state = state.copyWith(
         isLoadingMore: false,
         items: [...state.items, ...results],
@@ -203,9 +210,10 @@ class AiReviewHistoryNotifier extends StateNotifier<AiReviewHistoryState> {
 
 final aiReviewHistoryProvider =
     StateNotifierProvider<AiReviewHistoryNotifier, AiReviewHistoryState>((ref) {
-  return AiReviewHistoryNotifier(
-      ref.watch(aiRecognitionReviewRepositoryProvider));
-});
+      return AiReviewHistoryNotifier(
+        ref.watch(aiRecognitionReviewRepositoryProvider),
+      );
+    });
 
 // ---------------------------------------------------------------------------
 // Detail Provider (autoDispose.family — per recognitionResultId)
@@ -213,14 +221,17 @@ final aiReviewHistoryProvider =
 
 final aiReviewDetailProvider = FutureProvider.autoDispose
     .family<AIRecognitionReviewDetailResponse, String>((ref, id) {
-  return ref.watch(aiRecognitionReviewRepositoryProvider).getReviewDetail(id);
-});
+      return ref
+          .watch(aiRecognitionReviewRepositoryProvider)
+          .getReviewDetail(id);
+    });
 
 // ---------------------------------------------------------------------------
 // All species (for verify picker) — cached for session
 // ---------------------------------------------------------------------------
 
-final allSpeciesForPickerProvider =
-    FutureProvider<List<SnakeSpeciesModel>>((ref) {
+final allSpeciesForPickerProvider = FutureProvider<List<SnakeSpeciesModel>>((
+  ref,
+) {
   return ref.watch(snakeSpeciesRepositoryProvider).getAllSpecies();
 });
