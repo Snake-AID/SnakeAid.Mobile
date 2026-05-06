@@ -163,8 +163,9 @@ _ExpertConsultation _historyToExpertConsultation(
     patientName: h.userName,
     patientAvatarUrl: h.userAvatarUrl,
     patientPhone: '',
-    consultationType:
-        h.type == MyConsultationType.emergency ? 'Khẩn Cấp' : 'Đặt Lịch',
+    consultationType: h.type == MyConsultationType.emergency
+        ? 'Khẩn Cấp'
+        : 'Đặt Lịch',
     snakeSuspect: '',
     hasSnakeImage: false,
     scheduledTime: scheduled,
@@ -2492,23 +2493,24 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
 
     for (final entry in entries) {
       if (entry.kind == ConsultationHistoryKind.instant) {
-        final instant =
-            ExpertInstantConsultationHistory.fromJson(entry.raw);
+        final instant = ExpertInstantConsultationHistory.fromJson(entry.raw);
         if (instant.requestStatus == InstantRequestStatus.unknown) continue;
         final sortTime =
             instant.respondedAt ?? instant.requestedAt ?? DateTime.now();
-        items.add(
-          _ExpertHistoryEntry(sortTime: sortTime, instant: instant),
-        );
+        items.add(_ExpertHistoryEntry(sortTime: sortTime, instant: instant));
         continue;
       }
 
-      final consultation =
-          ExpertConsultationHistoryResponse.fromJson(entry.raw);
+      final consultation = ExpertConsultationHistoryResponse.fromJson(
+        entry.raw,
+      );
       final mapped = _historyToExpertConsultation(consultation);
       if (!_isHistoryStatus(mapped.status)) continue;
       items.add(
-        _ExpertHistoryEntry(sortTime: mapped.scheduledTime, consultation: mapped),
+        _ExpertHistoryEntry(
+          sortTime: mapped.scheduledTime,
+          consultation: mapped,
+        ),
       );
     }
 
@@ -2993,7 +2995,10 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
         shape: BoxShape.circle,
         color: _purple.withOpacity(0.08),
         image: hasAvatar
-            ? DecorationImage(image: NetworkImage(resolvedUrl), fit: BoxFit.cover)
+            ? DecorationImage(
+                image: NetworkImage(resolvedUrl),
+                fit: BoxFit.cover,
+              )
             : null,
       ),
       child: hasAvatar
@@ -3431,12 +3436,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border(
-          left: BorderSide(
-            color: statusColor,
-            width: 4,
-          ),
-        ),
+        border: Border(left: BorderSide(color: statusColor, width: 4)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -3449,6 +3449,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildPatientAvatar(
                 item.patientAvatarUrl,
@@ -3460,36 +3461,15 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          item.patientName,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2D2D2D),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            statusLabel,
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                              color: statusColor,
-                            ),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      item.patientName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2D2D2D),
+                      ),
                     ),
                     const SizedBox(height: 3),
                     Text(
@@ -3502,28 +3482,51 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
                   ],
                 ),
               ),
-              if (isDone)
-                Column(
+              const SizedBox(width: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 120),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      '+${_formatFee(item.netPrice ?? item.feeCost)}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF28A745),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
                       ),
-                    ),
-                    if (item.durationSeconds != null)
-                      Text(
-                        _formatDuration(item.durationSeconds!),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF999999),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          statusLabel,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: statusColor,
+                          ),
                         ),
                       ),
+                    ),
+                    if (isDone) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '+${_formatFee(item.netPrice ?? item.feeCost)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF28A745),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -3644,8 +3647,9 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
     final isDeclined =
         instant.requestStatus == InstantRequestStatus.declinedByExpert;
     final statusLabel = isDeclined ? 'Đã từ chối' : 'Hết hạn';
-    final statusColor =
-        isDeclined ? const Color(0xFFEF4444) : const Color(0xFFF59E0B);
+    final statusColor = isDeclined
+        ? const Color(0xFFEF4444)
+        : const Color(0xFFF59E0B);
     final timeLabel =
         instant.respondedAt ?? instant.requestedAt ?? DateTime.now();
 
@@ -3654,9 +3658,7 @@ class _ConsultationsTabState extends ConsumerState<_ConsultationsTab>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border(
-          left: BorderSide(color: statusColor, width: 4),
-        ),
+        border: Border(left: BorderSide(color: statusColor, width: 4)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),

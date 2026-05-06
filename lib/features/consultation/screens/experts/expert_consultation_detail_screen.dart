@@ -184,9 +184,9 @@ class _ExpertConsultationDetailScreenState
 
     setState(() => _isCancellingBooking = true);
     try {
-      await ref.read(consultationRepositoryProvider).cancelScheduledBooking(
-            bookingId,
-          );
+      await ref
+          .read(consultationRepositoryProvider)
+          .cancelScheduledBooking(bookingId);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -233,8 +233,8 @@ class _ExpertConsultationDetailScreenState
 
     final int displayGross = grossPrice ?? feeCost;
     final int? displayNet = netPrice ?? (_expertPayout?.toInt());
-    final int? displayPlatformFee = (netPrice != null) 
-        ? (displayGross - netPrice) 
+    final int? displayPlatformFee = (netPrice != null)
+        ? (displayGross - netPrice)
         : (_platformFee?.toInt());
 
     return Scaffold(
@@ -406,7 +406,7 @@ class _ExpertConsultationDetailScreenState
                       const _Divider(),
                       _DetailRow(
                         icon: Icons.schedule,
-                        label: 'Thời Lượng Dự Kiến',
+                        label: 'Thời Lượng Tư Vấn',
                         value: '$durationMinutes phút',
                       ),
                       const _Divider(),
@@ -541,21 +541,23 @@ class _ExpertConsultationDetailScreenState
                                 _DetailRow(
                                   icon: Icons.account_balance_outlined,
                                   label: 'Phí nền tảng',
-                                  value: '- ${_formatCurrency(displayPlatformFee)}',
+                                  value:
+                                      '- ${_formatCurrency(displayPlatformFee)}',
                                   valueColor: _red,
                                 ),
                               ],
                               const SizedBox(height: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 10),
+                                  horizontal: 12,
+                                  vertical: 10,
+                                ),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFEAF7EE),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     const Icon(
                                       Icons.savings_outlined,
@@ -600,9 +602,11 @@ class _ExpertConsultationDetailScreenState
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
                                       children: const [
-                                        Icon(Icons.refresh,
-                                            size: 14,
-                                            color: Color(0xFF999999)),
+                                        Icon(
+                                          Icons.refresh,
+                                          size: 14,
+                                          color: Color(0xFF999999),
+                                        ),
                                         SizedBox(width: 4),
                                         Text(
                                           'Tải lại dữ liệu phân bổ',
@@ -713,7 +717,10 @@ class _ExpertConsultationDetailScreenState
                       icon: const Icon(Icons.videocam, size: 22),
                       label: const Text(
                         'Bắt Đầu Tư Vấn',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _isWaiting ? _red : _purple,
@@ -765,10 +772,7 @@ class _ExpertConsultationDetailScreenState
                   onPressed: () {
                     context.push(
                       '/consultation-message-history/$consultationId',
-                      extra: {
-                        'title': patientName,
-                        'isExpertMode': true,
-                      },
+                      extra: {'title': patientName, 'isExpertMode': true},
                     );
                   },
                   icon: const Icon(Icons.chat_bubble_outline, size: 20),
@@ -924,10 +928,7 @@ class _DetailRow extends StatelessWidget {
           Expanded(
             flex: 3,
             child: trailing != null
-                ? Align(
-                    alignment: Alignment.centerRight,
-                    child: trailing!,
-                  )
+                ? Align(alignment: Alignment.centerRight, child: trailing!)
                 : Text(
                     value,
                     textAlign: TextAlign.right,
@@ -935,8 +936,7 @@ class _DetailRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 13.5,
-                      fontWeight:
-                          valueBold ? FontWeight.w600 : FontWeight.w500,
+                      fontWeight: valueBold ? FontWeight.w600 : FontWeight.w500,
                       color: valueColor ?? const Color(0xFF2D2D2D),
                     ),
                   ),

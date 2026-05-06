@@ -36,6 +36,7 @@ class VideoConsultationScreen extends ConsumerStatefulWidget {
 
   /// Scheduled start time (epoch ms) for waiting room time label
   final int? scheduledStartAtMs;
+
   /// Scheduled duration (seconds) for waiting room time label
   final int? scheduledDurationSeconds;
 

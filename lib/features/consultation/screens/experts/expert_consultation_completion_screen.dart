@@ -268,7 +268,10 @@ class _ExpertConsultationCompletionScreenState
                                     decoration: BoxDecoration(
                                       color: _purple.withOpacity(0.1),
                                       shape: BoxShape.circle,
-                                      image: (_patientAvatarUrl ?? '').trim().isEmpty
+                                      image:
+                                          (_patientAvatarUrl ?? '')
+                                              .trim()
+                                              .isEmpty
                                           ? null
                                           : DecorationImage(
                                               image: NetworkImage(
@@ -281,7 +284,8 @@ class _ExpertConsultationCompletionScreenState
                                         width: 2,
                                       ),
                                     ),
-                                    child: (_patientAvatarUrl ?? '').trim().isEmpty
+                                    child:
+                                        (_patientAvatarUrl ?? '').trim().isEmpty
                                         ? const Icon(
                                             Icons.person,
                                             color: _purple,
@@ -390,85 +394,131 @@ class _ExpertConsultationCompletionScreenState
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: const Color(0xFFBBF7D0)),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _green,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              'THANH TOÁN HOÀN TẤT',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                letterSpacing: 0.6,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          _PayRow(
-                            label: 'Phí tư vấn',
-                            value: _fmtCurrency(feeCost),
-                            valueColor: const Color(0xFF1A1A2E),
-                          ),
-                          const SizedBox(height: 10),
-                          _PayRow(
-                            label: 'Phí nền tảng',
-                            value: '-${_fmtCurrency(platformFee)}',
-                            valueColor: const Color(0xFFDC3545),
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 10),
-                            child: DashedDivider(),
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              const Text(
-                                'Bạn nhận được',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF374151),
+                      child: _isSyncingSessionData
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                SizedBox(height: 4),
+                                _ShimmerPlaceholder(
+                                  width: 120,
+                                  height: 20,
+                                  radius: 20,
                                 ),
-                              ),
-                              Text(
-                                '+${_fmtCurrency(finalNet)}',
-                                style: TextStyle(
-                                  fontSize: finalNet > 999999 ? 20 : 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: _green,
+                                SizedBox(height: 16),
+                                _ShimmerPlaceholder(
+                                  width: double.infinity,
+                                  height: 18,
+                                  radius: 6,
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          const Row(
-                            children: [
-                              Icon(
-                                Icons.account_balance_wallet,
-                                size: 16,
-                                color: _green,
-                              ),
-                              SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  'Chuyển vào ví SnakeAid trong vòng 24h',
-                                  style: TextStyle(fontSize: 12, color: _green),
+                                SizedBox(height: 10),
+                                _ShimmerPlaceholder(
+                                  width: double.infinity,
+                                  height: 18,
+                                  radius: 6,
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                                SizedBox(height: 12),
+                                _ShimmerPlaceholder(
+                                  width: double.infinity,
+                                  height: 1,
+                                  radius: 1,
+                                ),
+                                SizedBox(height: 12),
+                                _ShimmerPlaceholder(
+                                  width: 140,
+                                  height: 20,
+                                  radius: 6,
+                                ),
+                                SizedBox(height: 10),
+                                _ShimmerPlaceholder(
+                                  width: double.infinity,
+                                  height: 14,
+                                  radius: 6,
+                                ),
+                              ],
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _green,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Text(
+                                    'THANH TOÁN HOÀN TẤT',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                      letterSpacing: 0.6,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                _PayRow(
+                                  label: 'Phí tư vấn',
+                                  value: _fmtCurrency(feeCost),
+                                  valueColor: const Color(0xFF1A1A2E),
+                                ),
+                                const SizedBox(height: 10),
+                                _PayRow(
+                                  label: 'Phí nền tảng',
+                                  value: '-${_fmtCurrency(platformFee)}',
+                                  valueColor: const Color(0xFFDC3545),
+                                ),
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 10),
+                                  child: DashedDivider(),
+                                ),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    const Text(
+                                      'Bạn nhận được',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF374151),
+                                      ),
+                                    ),
+                                    Text(
+                                      '+${_fmtCurrency(finalNet)}',
+                                      style: TextStyle(
+                                        fontSize: finalNet > 999999 ? 20 : 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: _green,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                const Row(
+                                  children: [
+                                    Icon(
+                                      Icons.account_balance_wallet,
+                                      size: 16,
+                                      color: _green,
+                                    ),
+                                    SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'Chuyển vào ví SnakeAid trong vòng 24h',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: _green,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                     ),
                   ),
 
@@ -714,6 +764,61 @@ class DashedDivider extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _ShimmerPlaceholder extends StatefulWidget {
+  final double width;
+  final double height;
+  final double radius;
+
+  const _ShimmerPlaceholder({
+    required this.width,
+    required this.height,
+    required this.radius,
+  });
+
+  @override
+  State<_ShimmerPlaceholder> createState() => _ShimmerPlaceholderState();
+}
+
+class _ShimmerPlaceholderState extends State<_ShimmerPlaceholder>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..repeat(reverse: true);
+    _anim = Tween(
+      begin: 0.35,
+      end: 0.85,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _anim,
+      child: Container(
+        width: widget.width == double.infinity ? double.infinity : widget.width,
+        height: widget.height,
+        decoration: BoxDecoration(
+          color: const Color(0xFFECEFF1),
+          borderRadius: BorderRadius.circular(widget.radius),
+        ),
+      ),
     );
   }
 }

@@ -46,6 +46,7 @@ const Map<String, String> kTransTypeLabels = {
   'WalletTopup': 'Nạp ví',
   'WalletWithdraw': 'Rút ví',
   'AdminAdjustment': 'Điều chỉnh admin',
+  'WithdrawalInitiated': 'Khởi tạo rút tiền',
 };
 
 /// Whether a transaction type is a credit (money in) from the user's perspective
