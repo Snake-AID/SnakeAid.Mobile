@@ -378,6 +378,7 @@ class _SnakeIdentificationScreenState
           ),
           DialogAction(
             label: 'Chọn theo vị trí',
+            flex: 2,
             onPressed: () {
               context.pop(); // Close dialog
               // Replace camera screen with location filter

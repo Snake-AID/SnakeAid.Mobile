@@ -24,9 +24,7 @@ class CustomDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       elevation: 8,
       child: Container(
         padding: const EdgeInsets.all(24),
@@ -44,14 +42,10 @@ class CustomDialog extends StatelessWidget {
                 color: iconBackgroundColor,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                icon,
-                size: 48,
-                color: iconColor,
-              ),
+              child: Icon(icon, size: 48, color: iconColor),
             ),
             const SizedBox(height: 20),
-            
+
             // Title
             Text(
               title,
@@ -63,7 +57,7 @@ class CustomDialog extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
-            
+
             // Description
             Text(
               description,
@@ -74,15 +68,15 @@ class CustomDialog extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            
+
             // Extra Content (optional)
             if (extraContent != null) ...[
               const SizedBox(height: 16),
               ...extraContent!,
             ],
-            
+
             const SizedBox(height: 24),
-            
+
             // Action Buttons
             _buildActions(actions),
           ],
@@ -93,22 +87,13 @@ class CustomDialog extends StatelessWidget {
 
   Widget _buildActions(List<DialogAction> actions) {
     if (actions.length == 1) {
-      return SizedBox(
-        width: double.infinity,
-        child: _buildButton(actions[0]),
-      );
+      return SizedBox(width: double.infinity, child: _buildButton(actions[0]));
     } else if (actions.length == 2) {
       return Row(
         children: [
-          Expanded(
-            flex: actions[0].flex ?? 1,
-            child: _buildButton(actions[0]),
-          ),
+          Expanded(flex: actions[0].flex ?? 1, child: _buildButton(actions[0])),
           const SizedBox(width: 12),
-          Expanded(
-            flex: actions[1].flex ?? 1,
-            child: _buildButton(actions[1]),
-          ),
+          Expanded(flex: actions[1].flex ?? 1, child: _buildButton(actions[1])),
         ],
       );
     } else {
@@ -150,7 +135,9 @@ class CustomDialog extends StatelessWidget {
                     action.label,
                     style: TextStyle(
                       fontSize: 15,
-                      fontWeight: action.isBold ? FontWeight.bold : FontWeight.w600,
+                      fontWeight: action.isBold
+                          ? FontWeight.bold
+                          : FontWeight.w600,
                     ),
                   ),
                 ],
@@ -185,7 +172,9 @@ class CustomDialog extends StatelessWidget {
                     action.label,
                     style: TextStyle(
                       fontSize: 15,
-                      fontWeight: action.isBold ? FontWeight.bold : FontWeight.w600,
+                      fontWeight: action.isBold
+                          ? FontWeight.bold
+                          : FontWeight.w600,
                     ),
                   ),
                 ],

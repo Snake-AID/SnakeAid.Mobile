@@ -16,7 +16,8 @@ class SnakeDetailScreen extends ConsumerWidget {
     if (state.isLoading) {
       return const Scaffold(
         body: Center(
-            child: CircularProgressIndicator(color: Color(0xFF1B5E20))),
+          child: CircularProgressIndicator(color: Color(0xFF1B5E20)),
+        ),
       );
     }
 
@@ -33,8 +34,10 @@ class SnakeDetailScreen extends ConsumerWidget {
             children: [
               Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
               const SizedBox(height: 12),
-              Text(state.error ?? 'Không tìm thấy loài rắn.',
-                  style: const TextStyle(color: Colors.black54)),
+              Text(
+                state.error ?? 'Không tìm thấy loài rắn.',
+                style: const TextStyle(color: Colors.black54),
+              ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 onPressed: () => ref
@@ -86,19 +89,18 @@ class _SnakeDetailView extends StatelessWidget {
                   fontSize: 16,
                   shadows: [
                     Shadow(
-                        blurRadius: 8,
-                        color: Colors.black54,
-                        offset: Offset(0, 1)),
+                      blurRadius: 8,
+                      color: Colors.black54,
+                      offset: Offset(0, 1),
+                    ),
                   ],
                 ),
               ),
-              background: snake.imageUrl != null &&
-                      snake.imageUrl!.isNotEmpty
+              background: snake.imageUrl != null && snake.imageUrl!.isNotEmpty
                   ? Image.network(
                       snake.imageUrl!,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          _buildImagePlaceholder(),
+                      errorBuilder: (_, __, ___) => _buildImagePlaceholder(),
                     )
                   : _buildImagePlaceholder(),
             ),
@@ -156,7 +158,7 @@ class _SnakeDetailView extends StatelessWidget {
                           const SizedBox(height: 8),
                           _InfoChip(
                             icon: Icons.science,
-                            label: 'Loại độc: ${snake.primaryVenomType}',
+                            label: 'Loại độc: ${snake.venomTypeDisplayName}',
                             color: Colors.orange[700]!,
                           ),
                         ],
@@ -178,8 +180,7 @@ class _SnakeDetailView extends StatelessWidget {
 
                   // Identification
                   if (snake.identification != null) ...[
-                    _SectionHeader(
-                        icon: Icons.search, title: 'Nhận dạng'),
+                    _SectionHeader(icon: Icons.search, title: 'Nhận dạng'),
                     const SizedBox(height: 8),
                     if (snake.identificationSummary != null)
                       _SectionCard(
@@ -214,14 +215,15 @@ class _SnakeDetailView extends StatelessWidget {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.landscape,
-                                size: 18,
-                                color: Colors.green[700]),
+                            Icon(
+                              Icons.landscape,
+                              size: 18,
+                              color: Colors.green[700],
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     'Môi trường sống',
@@ -251,8 +253,9 @@ class _SnakeDetailView extends StatelessWidget {
                   // Venoms
                   if (snake.venoms.isNotEmpty) ...[
                     _SectionHeader(
-                        icon: Icons.science_outlined,
-                        title: 'Thông tin nọc độc'),
+                      icon: Icons.science_outlined,
+                      title: 'Thông tin nọc độc',
+                    ),
                     const SizedBox(height: 8),
                     ...snake.venoms.map(
                       (v) => Padding(
@@ -267,14 +270,16 @@ class _SnakeDetailView extends StatelessWidget {
                                   color: Colors.red.withOpacity(0.1),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.science,
-                                    size: 16, color: Colors.red),
+                                child: const Icon(
+                                  Icons.science,
+                                  size: 16,
+                                  color: Colors.red,
+                                ),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       v.venomType,
@@ -308,8 +313,9 @@ class _SnakeDetailView extends StatelessWidget {
                   // Symptoms by time
                   if (snake.symptomsByTime.isNotEmpty) ...[
                     _SectionHeader(
-                        icon: Icons.timeline,
-                        title: 'Triệu chứng theo thời gian'),
+                      icon: Icons.timeline,
+                      title: 'Triệu chứng theo thời gian',
+                    ),
                     const SizedBox(height: 8),
                     ...snake.symptomsByTime.map(
                       (s) => Padding(
@@ -325,19 +331,21 @@ class _SnakeDetailView extends StatelessWidget {
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: () => context.push(
-                          '/snake-first-aid/${snake.id}',
-                          extra: {'commonName': snake.commonName}),
+                        '/snake-first-aid/${snake.id}',
+                        extra: {'commonName': snake.commonName},
+                      ),
                       icon: const Icon(Icons.medical_services_outlined),
                       label: const Text(
                         'Xem cách sơ cứu khi bị loài này cắn',
                         style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 15),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF1B5E20),
                         foregroundColor: Colors.white,
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -506,8 +514,11 @@ class _InfoChip extends StatelessWidget {
   final String label;
   final Color color;
 
-  const _InfoChip(
-      {required this.icon, required this.label, required this.color});
+  const _InfoChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -582,8 +593,10 @@ class _SymptomTimeCard extends StatelessWidget {
               if (symptom.isCritical) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.red,
                     borderRadius: BorderRadius.circular(20),

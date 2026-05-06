@@ -14,12 +14,10 @@ class SnakeLibraryScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<SnakeLibraryScreen> createState() =>
-      _SnakeLibraryScreenState();
+  ConsumerState<SnakeLibraryScreen> createState() => _SnakeLibraryScreenState();
 }
 
-class _SnakeLibraryScreenState
-    extends ConsumerState<SnakeLibraryScreen> {
+class _SnakeLibraryScreenState extends ConsumerState<SnakeLibraryScreen> {
   final _searchController = TextEditingController();
 
   @override
@@ -39,10 +37,7 @@ class _SnakeLibraryScreenState
         foregroundColor: Colors.white,
         title: Text(
           widget.firstAidMode ? 'Hướng dẫn sơ cứu' : 'Thư viện loài rắn',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         elevation: 0,
       ),
@@ -59,10 +54,11 @@ class _SnakeLibraryScreenState
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Tìm kiếm tên loài rắn...',
-                hintStyle:
-                    TextStyle(color: Colors.white.withOpacity(0.7)),
-                prefixIcon: Icon(Icons.search,
-                    color: Colors.white.withOpacity(0.8)),
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: Colors.white.withOpacity(0.8),
+                ),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear, color: Colors.white),
@@ -89,20 +85,18 @@ class _SnakeLibraryScreenState
           if (!state.isLoading && state.error == null)
             Container(
               color: Colors.white,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Row(
                 children: [
-                  Icon(Icons.pets,
-                      size: 16,
-                      color: widget.themeColor.withOpacity(0.7)),
+                  Icon(
+                    Icons.pets,
+                    size: 16,
+                    color: widget.themeColor.withOpacity(0.7),
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     '${state.filtered.length} loài',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -117,9 +111,7 @@ class _SnakeLibraryScreenState
 
   Widget _buildBody(SnakeSpeciesListState state) {
     if (state.isLoading) {
-      return Center(
-        child: CircularProgressIndicator(color: widget.themeColor),
-      );
+      return Center(child: CircularProgressIndicator(color: widget.themeColor));
     }
 
     if (state.error != null) {
@@ -170,8 +162,11 @@ class _SnakeLibraryScreenState
       padding: const EdgeInsets.all(16),
       itemCount: state.filtered.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) =>
-          _SnakeCard(snake: state.filtered[index], firstAidMode: widget.firstAidMode, themeColor: widget.themeColor),
+      itemBuilder: (context, index) => _SnakeCard(
+        snake: state.filtered[index],
+        firstAidMode: widget.firstAidMode,
+        themeColor: widget.themeColor,
+      ),
     );
   }
 }
@@ -199,7 +194,10 @@ class _SnakeCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () => firstAidMode
-            ? context.push('/snake-first-aid/${snake.id}', extra: {'commonName': snake.commonName})
+            ? context.push(
+                '/snake-first-aid/${snake.id}',
+                extra: {'commonName': snake.commonName},
+              )
             : context.push('/snake-species/${snake.id}'),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -214,8 +212,7 @@ class _SnakeCard extends StatelessWidget {
                         width: 80,
                         height: 80,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            _placeholderImage(),
+                        errorBuilder: (_, __, ___) => _placeholderImage(),
                       )
                     : _placeholderImage(),
               ),
@@ -243,8 +240,9 @@ class _SnakeCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         _RiskBadge(
-                            riskLevel: snake.riskLevel,
-                            color: riskColor),
+                          riskLevel: snake.riskLevel,
+                          color: riskColor,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -283,9 +281,11 @@ class _SnakeCard extends StatelessWidget {
                             color: Colors.red[600]!,
                             icon: Icons.warning_rounded,
                           ),
-                        if (snake.primaryVenomType != null)
+                        if (snake.primaryVenomType != null &&
+                            snake.primaryVenomType!.isNotEmpty &&
+                            snake.isVenomous)
                           _Tag(
-                            label: snake.primaryVenomType!,
+                            label: snake.venomTypeDisplayName,
                             color: Colors.orange[700]!,
                             icon: Icons.science,
                           ),
@@ -295,10 +295,7 @@ class _SnakeCard extends StatelessWidget {
                 ),
               ),
 
-              Icon(
-                Icons.chevron_right,
-                color: themeColor,
-              ),
+              Icon(Icons.chevron_right, color: themeColor),
             ],
           ),
         ),
@@ -314,8 +311,7 @@ class _SnakeCard extends StatelessWidget {
         color: themeColor.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Icon(Icons.pets,
-          size: 36, color: themeColor),
+      child: Icon(Icons.pets, size: 36, color: themeColor),
     );
   }
 
@@ -365,8 +361,7 @@ class _Tag extends StatelessWidget {
   final Color color;
   final IconData icon;
 
-  const _Tag(
-      {required this.label, required this.color, required this.icon});
+  const _Tag({required this.label, required this.color, required this.icon});
 
   @override
   Widget build(BuildContext context) {

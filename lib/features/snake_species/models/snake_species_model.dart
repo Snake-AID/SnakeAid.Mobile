@@ -48,11 +48,11 @@ class SnakeSpeciesModel {
       primaryVenomType: json['primaryVenomType'] as String?,
       identification: json['identification'] != null
           ? SnakeIdentification.fromJson(
-              json['identification'] as Map<String, dynamic>)
+              json['identification'] as Map<String, dynamic>,
+            )
           : null,
       symptomsByTime: (json['symptomsByTime'] as List<dynamic>? ?? [])
-          .map((e) =>
-              SnakeSymptomsByTime.fromJson(e as Map<String, dynamic>))
+          .map((e) => SnakeSymptomsByTime.fromJson(e as Map<String, dynamic>))
           .toList(),
       riskLevel: (json['riskLevel'] as num? ?? 0).toInt(),
       isVenomous: json['isVenomous'] as bool? ?? false,
@@ -65,6 +65,26 @@ class SnakeSpeciesModel {
           .toList(),
       antivenoms: json['antivenoms'] as List<dynamic>? ?? [],
     );
+  }
+
+  String get venomTypeDisplayName {
+    if (primaryVenomType == null || primaryVenomType!.isEmpty) {
+      return 'Không rõ';
+    }
+    switch (primaryVenomType!.toLowerCase()) {
+      case 'Neurotoxic':
+        return 'Độc thần kinh';
+      case 'Hemotoxic':
+        return 'Độc máu';
+      case 'Cytotoxic':
+        return 'Độc tế bào';
+      case 'Myotoxic':
+        return 'Độc cơ';
+      case 'None':
+        return 'Không Độc';
+      default:
+        return primaryVenomType!;
+    }
   }
 }
 
@@ -125,5 +145,20 @@ class SnakeVenom {
       venomType: (json['venomType'] ?? '') as String,
       description: json['description'] as String?,
     );
+  }
+
+  get venomTypeDisplayName {
+    switch (venomType.toLowerCase()) {
+      case 'Neurotoxic':
+        return 'Độc thần kinh';
+      case 'Hemotoxic':
+        return 'Độc máu';
+      case 'Cytotoxic':
+        return 'Độc tế bào';
+      case 'Myotoxic':
+        return 'Độc cơ';
+      default:
+        return venomType;
+    }
   }
 }
