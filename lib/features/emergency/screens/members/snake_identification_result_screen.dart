@@ -871,7 +871,7 @@ class _SnakeIdentificationResultScreenState
             ),
           ),
           const SizedBox(width: 12),
-          Icon(icon, color: const Color(0xFF228B22), size: 24),
+          // Icon(icon, color: const Color(0xFF228B22), size: 24),
         ],
       ),
     );

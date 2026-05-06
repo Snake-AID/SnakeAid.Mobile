@@ -422,7 +422,7 @@ class _SeverityAssessmentScreenState
           ),
           const SizedBox(height: 8),
           Text(
-            'Dựa trên triệu chứng và phân tích ảnh',
+            'Dựa trên mức độ nguy hiểm của loài rắn và triệu chứng đã ghi nhận',
             style: TextStyle(fontSize: 12, color: Colors.grey[600]),
           ),
         ],
